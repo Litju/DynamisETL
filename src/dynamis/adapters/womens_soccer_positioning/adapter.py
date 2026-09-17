@@ -18,6 +18,7 @@ rule id, never dropped silently.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -49,6 +50,7 @@ from dynamis.contracts import (
 )
 from dynamis.pipeline.quarantine import (
     RULE_COORDINATE_OUT_OF_RANGE,
+    RULE_NON_FINITE_VALUE,
     RULE_REQUIRED_FIELD_NULL,
     RULE_TIME_OUT_OF_RANGE,
     RULE_TIMESTAMP_UNPARSABLE,
@@ -135,6 +137,20 @@ def stream_id_for_sheet(sheet_name: str) -> str:
     return f"gnss-{sheet_name}"
 
 
+def relative_ns(later: datetime, origin: datetime) -> int:
+    """Integer nanoseconds between two provider-local datetimes.
+
+    The workbook timestamps are naive local wall-clock values. Subtracting them
+    directly avoids re-interpreting them in the host timezone (which a DST
+    transition or a ``timestamp()`` float round-trip could shift) and yields
+    exact integer nanoseconds.
+    """
+    delta = later - origin
+    return (
+        delta.days * 86_400_000_000_000 + delta.seconds * 1_000_000_000 + delta.microseconds * 1_000
+    )
+
+
 class WomenWorkbookAdapter:
     """Streaming anti-corruption layer for verified ``J01.xlsx`` workbooks."""
 
@@ -190,7 +206,6 @@ class WomenWorkbookAdapter:
         )
 
     def canonical_stream(self, subject: WomenSubjectStream) -> CanonicalStream:
-        origin_ns = int(self.session_origin.timestamp() * 1_000_000_000)
         return CanonicalStream(
             dataset_id=WOMENS_DATASET_ID,
             session_id=WOMENS_SESSION_ID,
@@ -213,7 +228,7 @@ class WomenWorkbookAdapter:
                 "unmapped_columns": ",".join(UNMAPPED_COLUMNS),
             },
             schema=GNSS_SCHEMA,
-            batches=self._batches_for_sheet(subject, origin_ns=origin_ns),
+            batches=self._batches_for_sheet(subject),
         )
 
     def counters(self, sheet_name: str) -> SheetCounters:
@@ -286,11 +301,10 @@ class WomenWorkbookAdapter:
             },
         )
 
-    def _batches_for_sheet(
-        self, subject: WomenSubjectStream, *, origin_ns: int
-    ) -> Iterator[pa.RecordBatch]:
+    def _batches_for_sheet(self, subject: WomenSubjectStream) -> Iterator[pa.RecordBatch]:
         counters = SheetCounters()
         self._counters[subject.sheet_name] = counters
+        origin = self.session_origin
         workbook = openpyxl.load_workbook(self._path, read_only=True, data_only=True)
         try:
             worksheet = workbook[subject.sheet_name]
@@ -303,7 +317,7 @@ class WomenWorkbookAdapter:
                 record = self._canonicalize_row(
                     row,
                     subject,
-                    origin_ns=origin_ns,
+                    origin=origin,
                     previous_parsed=previous_parsed,
                     counters=counters,
                 )
@@ -324,7 +338,7 @@ class WomenWorkbookAdapter:
         row: tuple[Any, ...],
         subject: WomenSubjectStream,
         *,
-        origin_ns: int,
+        origin: datetime,
         previous_parsed: datetime | None,
         counters: SheetCounters,
     ) -> dict[str, Any] | None:
@@ -384,7 +398,23 @@ class WomenWorkbookAdapter:
                 )
             )
             return None
-        latitude_f, longitude_f = float(latitude), float(longitude)
+        try:
+            latitude_f, longitude_f = float(latitude), float(longitude)
+        except (TypeError, ValueError):
+            counters.quarantined.append(
+                QuarantinedRecord(
+                    rule=RULE_COORDINATE_OUT_OF_RANGE,
+                    detail="latitude/longitude cell is not numeric",
+                    dataset_id=WOMENS_DATASET_ID,
+                    session_id=WOMENS_SESSION_ID,
+                    stream_id=subject.stream_id,
+                    subject_id=subject.subject_id,
+                    source_record_id=f"{subject.sheet_name}:row-{counters.source_rows}",
+                    source_time=str(raw_time),
+                    evidence={"latitude": str(latitude), "longitude": str(longitude)},
+                )
+            )
+            return None
         if not (-90.0 <= latitude_f <= 90.0) or not (-180.0 <= longitude_f <= 180.0):
             counters.quarantined.append(
                 QuarantinedRecord(
@@ -402,10 +432,29 @@ class WomenWorkbookAdapter:
             return None
 
         speed_raw = value(_SPEED_INDEX)
-        speed_m_s = (
-            None if speed_raw is None else float(speed_raw) * authorities.SPEED_SOURCE_TO_SI_SCALE
-        )
-        t_rel_ns = int(round(parsed.timestamp() * 1_000_000_000)) - origin_ns
+        speed_m_s: float | None = None
+        if speed_raw is not None:
+            try:
+                speed_value = float(speed_raw)
+            except (TypeError, ValueError):
+                speed_value = float("nan")
+            if not math.isfinite(speed_value):
+                counters.quarantined.append(
+                    QuarantinedRecord(
+                        rule=RULE_NON_FINITE_VALUE,
+                        detail="speed cell is not a finite number",
+                        dataset_id=WOMENS_DATASET_ID,
+                        session_id=WOMENS_SESSION_ID,
+                        stream_id=subject.stream_id,
+                        subject_id=subject.subject_id,
+                        source_record_id=f"{subject.sheet_name}:row-{counters.source_rows}",
+                        source_time=str(raw_time),
+                        evidence={"speed": str(speed_raw)},
+                    )
+                )
+                return None
+            speed_m_s = speed_value * authorities.SPEED_SOURCE_TO_SI_SCALE
+        t_rel_ns = relative_ns(parsed, origin)
         counters.canonical_rows += 1
         if counters.first_source_time is None:
             counters.first_source_time = str(raw_time)

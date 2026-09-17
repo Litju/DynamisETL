@@ -304,6 +304,8 @@ def download_verified(
                 continue
             raise last_transport from exc
         except Exception:
+            if response is not None:
+                response.close()
             partial.unlink(missing_ok=True)
             raise
 

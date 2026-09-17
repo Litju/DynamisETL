@@ -88,6 +88,26 @@ def _required(element: etree._Element, attribute: str) -> str:
     return value
 
 
+def _required_aware_datetime(element: etree._Element, attribute: str) -> datetime:
+    """Parse a timestamp that must carry a UTC offset.
+
+    ``kickoff_utc`` is the origin of every canonical ``t_rel_ns`` value, so a
+    naive provider timestamp must fail loudly: interpreting it in the host
+    timezone would silently make the canonical output machine-dependent.
+    """
+    raw = _required(element, attribute)
+    try:
+        parsed = datetime.fromisoformat(raw)
+    except ValueError as exc:
+        raise MatchInfoError(f"{attribute}={raw!r} is not an ISO 8601 timestamp") from exc
+    if parsed.tzinfo is None:
+        raise MatchInfoError(
+            f"{attribute}={raw!r} carries no UTC offset; a naive kickoff time cannot "
+            "define a machine-independent canonical time origin"
+        )
+    return parsed
+
+
 def parse_match_information(path: Path) -> IdsseMatchMetadata:
     tree = etree.parse(str(path))
     root = tree.getroot()
@@ -146,8 +166,8 @@ def parse_match_information(path: Path) -> IdsseMatchMetadata:
         match_day=int(general.get("MatchDay") or 0),
         title=_required(general, "MatchTitle"),
         result=_required(general, "Result"),
-        kickoff_utc=datetime.fromisoformat(_required(general, "KickoffTime")),
-        planned_kickoff_utc=datetime.fromisoformat(_required(general, "PlannedKickoffTime")),
+        kickoff_utc=_required_aware_datetime(general, "KickoffTime"),
+        planned_kickoff_utc=_required_aware_datetime(general, "PlannedKickoffTime"),
         stadium=environment.get("StadiumName") or "",
         pitch_x_m=float(_required(environment, "PitchX")),
         pitch_y_m=float(_required(environment, "PitchY")),

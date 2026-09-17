@@ -172,6 +172,13 @@ class ZenodoResolver:
         keys: Sequence[str],
         timeout: tuple[float, float],
     ) -> tuple[ResolvedFile, ...]:
+        """Resolve record files and carry every known expectation forward.
+
+        The provider exposes MD5 only. When the registry declares a SHA-256 the
+        provider does not publish, that registry expectation is carried into the
+        resolved file so the download is still verified against it; a registry
+        expectation is never dropped just because the provider stays silent.
+        """
         record_id = self.record_id(source)
         payload = _require_mapping(
             _get_json(
@@ -225,7 +232,14 @@ class ZenodoResolver:
                     key=key,
                     url=url,
                     size_bytes=size_bytes,
-                    upstream_md5=md5,
+                    upstream_md5=(
+                        md5
+                        if md5 is not None
+                        else (None if expectation.md5 == "unknown" else expectation.md5)
+                    ),
+                    upstream_sha256=(
+                        None if expectation.sha256 == "unknown" else expectation.sha256
+                    ),
                     provider_metadata={"record": record_id},
                 )
             )
@@ -320,8 +334,16 @@ class HuggingFaceResolver:
                     key=key,
                     url=HUGGING_FACE_RESOLVE.format(repo_id=repo_id, revision=revision, path=key),
                     size_bytes=size_bytes,
-                    upstream_sha256=sha256,
-                    git_blob_sha1=git_blob_sha1,
+                    upstream_sha256=(
+                        sha256
+                        if sha256 is not None
+                        else (None if expectation.sha256 == "unknown" else expectation.sha256)
+                    ),
+                    git_blob_sha1=(
+                        git_blob_sha1
+                        if git_blob_sha1 is not None
+                        else (None if expectation.sha1 == "unknown" else expectation.sha1)
+                    ),
                     provider_metadata={"repo": repo_id, "revision": revision},
                 )
             )

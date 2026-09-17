@@ -338,98 +338,105 @@ def ingest_dfl_match(
         spill_dir=spill_dir,
         batch_size=batch_size or DEFAULT_BATCH_SIZE,
     )
-    positions_summary = adapter.parse_positions()
-    events_summary = adapter.parse_events()
-    domain: ProviderDomain = adapter.domain()
-    positions_keys = (
-        match_information_path.name,
-        events_path.name,
-        positions_path.name,
-    )
+    try:
+        positions_summary = adapter.parse_positions()
+        events_summary = adapter.parse_events()
+        domain: ProviderDomain = adapter.domain()
+        positions_keys = (
+            match_information_path.name,
+            events_path.name,
+            positions_path.name,
+        )
 
-    results: list[IngestStreamResult] = []
-    for stream in adapter.tracking_streams():
-        results.append(write_canonical_stream(settings, stream, row_group_size=row_group_size))
-    results.append(
-        write_canonical_stream(settings, adapter.event_stream(), row_group_size=row_group_size)
-    )
+        results: list[IngestStreamResult] = []
+        for stream in adapter.tracking_streams():
+            results.append(write_canonical_stream(settings, stream, row_group_size=row_group_size))
+        results.append(
+            write_canonical_stream(settings, adapter.event_stream(), row_group_size=row_group_size)
+        )
 
-    sink = QuarantineSink(settings)
-    quarantined = adapter.quarantined()
-    sink.add_many(quarantined)
-    quarantine_by_rule = sink.counts
-    quarantine_by_stream: dict[str, int] = {}
-    for record in quarantined:
-        key = record.stream_id or "unscoped"
-        quarantine_by_stream[key] = quarantine_by_stream.get(key, 0) + 1
-    quarantine_artifacts = tuple(sink.materialize(name=session_id)) if sink.total else ()
+        sink = QuarantineSink(settings)
+        quarantined = adapter.quarantined()
+        sink.add_many(quarantined)
+        quarantine_by_rule = sink.counts
+        quarantine_by_stream: dict[str, int] = {}
+        for record in quarantined:
+            key = record.stream_id or "unscoped"
+            quarantine_by_stream[key] = quarantine_by_stream.get(key, 0) + 1
+        quarantine_artifacts = tuple(sink.materialize(name=session_id)) if sink.total else ()
 
-    reconcile_streams: list[StreamReconciliation] = []
-    for section in positions_summary.sections:
-        stream_id = tracking_stream_id(section.period_id)
-        result = next(item for item in results if item.stream_id == stream_id)
+        reconcile_streams: list[StreamReconciliation] = []
+        for section in positions_summary.sections:
+            stream_id = tracking_stream_id(section.period_id)
+            result = next(item for item in results if item.stream_id == stream_id)
+            reconcile_streams.append(
+                StreamReconciliation(
+                    stream_id=stream_id,
+                    modality=Modality.TRACKING.value,
+                    subject_id=None,
+                    trial_id=section.period_id,
+                    source_records=section.source_frames,
+                    canonical_rows=section.canonical_rows,
+                    quarantined_rows=quarantine_by_stream.get(stream_id, 0),
+                    ignored_records=0,
+                    ignored_reasons={},
+                    source_time_min=None,
+                    source_time_max=None,
+                    canonical_time_min_ns=result.t_rel_min_ns,
+                    canonical_time_max_ns=result.t_rel_max_ns,
+                    null_counts=result.null_counts,
+                    schema_valid=True,
+                    units_valid=True,
+                    coordinate_frame_id=result.coordinate_frame_id,
+                    checks={
+                        "frame_number_range": [section.frame_first, section.frame_last],
+                        "frame_count": section.frame_count,
+                        "entities": section.entity_count,
+                        "ball_object_id": section.ball_object_id,
+                        "frame_major_ordering": True,
+                        "unmapped_attributes": (
+                            "D,A,M (no published semantics; kloppy ignores them)"
+                        ),
+                    },
+                )
+            )
+        events_result = next(item for item in results if item.stream_id == "events")
         reconcile_streams.append(
             StreamReconciliation(
-                stream_id=stream_id,
-                modality=Modality.TRACKING.value,
+                stream_id="events",
+                modality=Modality.EVENT.value,
                 subject_id=None,
-                trial_id=section.period_id,
-                source_records=section.source_frames,
-                canonical_rows=section.canonical_rows,
-                quarantined_rows=quarantine_by_stream.get(stream_id, 0),
-                ignored_records=0,
-                ignored_reasons={},
-                source_time_min=None,
-                source_time_max=None,
-                canonical_time_min_ns=result.t_rel_min_ns,
-                canonical_time_max_ns=result.t_rel_max_ns,
-                null_counts=result.null_counts,
+                trial_id=None,
+                source_records=events_summary.source_events,
+                canonical_rows=events_summary.canonical_rows,
+                quarantined_rows=len(events_summary.quarantined),
+                ignored_records=events_summary.deleted_events,
+                ignored_reasons={
+                    "provider Delete retraction events (explicitly excluded)": (
+                        events_summary.deleted_events
+                    )
+                },
+                source_time_min=events_summary.source_time_min,
+                source_time_max=events_summary.source_time_max,
+                canonical_time_min_ns=events_summary.t_rel_min_ns,
+                canonical_time_max_ns=events_summary.t_rel_max_ns,
+                null_counts=events_result.null_counts,
                 schema_valid=True,
                 units_valid=True,
-                coordinate_frame_id=result.coordinate_frame_id,
+                coordinate_frame_id=events_result.coordinate_frame_id,
                 checks={
-                    "frame_number_range": [section.frame_first, section.frame_last],
-                    "frame_count": section.frame_count,
-                    "entities": section.entity_count,
-                    "ball_object_id": section.ball_object_id,
-                    "frame_major_ordering": True,
-                    "unmapped_attributes": "D,A,M (no published semantics; kloppy ignores them)",
+                    "event_types": events_summary.event_types,
+                    "source_order_chronological": False,
+                    "events_reordered": events_summary.events_reordered,
+                    "duplicate_timestamps": events_summary.duplicate_timestamps,
+                    "periods": [period.to_dict() for period in events_summary.periods],
                 },
             )
         )
-    events_result = next(item for item in results if item.stream_id == "events")
-    reconcile_streams.append(
-        StreamReconciliation(
-            stream_id="events",
-            modality=Modality.EVENT.value,
-            subject_id=None,
-            trial_id=None,
-            source_records=events_summary.source_events,
-            canonical_rows=events_summary.canonical_rows,
-            quarantined_rows=len(events_summary.quarantined),
-            ignored_records=events_summary.deleted_events,
-            ignored_reasons={
-                "provider Delete retraction events (explicitly excluded)": (
-                    events_summary.deleted_events
-                )
-            },
-            source_time_min=events_summary.source_time_min,
-            source_time_max=events_summary.source_time_max,
-            canonical_time_min_ns=events_summary.t_rel_min_ns,
-            canonical_time_max_ns=events_summary.t_rel_max_ns,
-            null_counts=events_result.null_counts,
-            schema_valid=True,
-            units_valid=True,
-            coordinate_frame_id=events_result.coordinate_frame_id,
-            checks={
-                "event_types": events_summary.event_types,
-                "source_order_chronological": False,
-                "events_reordered": events_summary.events_reordered,
-                "duplicate_timestamps": events_summary.duplicate_timestamps,
-                "periods": [period.to_dict() for period in events_summary.periods],
-            },
-        )
-    )
+    finally:
+        # Spill files are temporary; a failed write must not leave the dataset
+        # root growing run after run.
+        adapter.cleanup()
     receipt = ReconciliationReceipt(
         dataset_id=adapter.dataset_id,
         version=version,
@@ -456,7 +463,6 @@ def ingest_dfl_match(
     )
     assert_reconciled(receipt)
     receipt_path = write_reconciliation_receipt(settings, receipt, name=f"{session_id}-match")
-    adapter.cleanup()
     return IngestResult(
         dataset_id=adapter.dataset_id,
         version=version,

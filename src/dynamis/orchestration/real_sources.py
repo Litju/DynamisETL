@@ -162,7 +162,13 @@ def dfl_j03wpy_metadata(dfl_j03wpy_bronze: dict, config: DflSliceConfig) -> dict
 def dfl_j03wpy_silver_tracking(
     dfl_j03wpy_bronze: dict, dfl_j03wpy_metadata: dict, config: DflSliceConfig
 ) -> dict:
-    """Frame-major canonical tracking Silver streams for the complete match."""
+    """Canonical tracking and event Silver streams for the complete match.
+
+    One ``ingest_dfl_match`` run materializes both modalities; the tracking and
+    events assets are projections of that single run, so the events artifact has
+    exactly one writer (a second write would replace the file behind the other
+    asset's descriptor and re-parse the events XML).
+    """
     resolved = settings()
     files = {item["key"]: item for item in dfl_j03wpy_bronze["files"]}
     positions = _bronze_path(resolved, config.version, files, "_positions_")
@@ -178,55 +184,26 @@ def dfl_j03wpy_silver_tracking(
         spill_dir=tmp_run_dir(resolved, f"res97-{config.match}-tracking"),
         row_group_size=1 << 16,
     )
-    tracking = {
-        stream.stream_id: stream for stream in result.streams if stream.modality == "tracking"
-    }
     descriptor = _descriptor(result)
-    descriptor["streams"] = [
-        item for item in descriptor["streams"] if item["modality"] == "tracking"
-    ]
-    descriptor["source_rows"] = result.reconciliation.source_rows
-    if not tracking:
+    if not any(stream["modality"] == "tracking" for stream in descriptor["streams"]):
         raise ValueError("tracking ingestion produced no tracking streams")
     return descriptor
 
 
 @asset(group_name="real_sources", compute_kind="python")
-def dfl_j03wpy_silver_events(dfl_j03wpy_metadata: dict, config: DflSliceConfig) -> dict:
-    """Chronological canonical event stream for the accepted match."""
-    resolved = settings()
-    bronze = _verify_bronze(
-        "dfl-sportec-idsse",
-        config.version,
-        tuple(
-            item.key
-            for item in source_by_id(validate_registry(), "dfl-sportec-idsse")
-            .version(config.version)
-            .retrieval.files
-            if config.match in item.key
+def dfl_j03wpy_silver_events(dfl_j03wpy_silver_tracking: dict, dfl_j03wpy_metadata: dict) -> dict:
+    """The event stream materialized by the single tracking/events ingest run."""
+    events = next(
+        (
+            item
+            for item in dfl_j03wpy_silver_tracking.get("streams", [])
+            if item["stream_id"] == "events"
         ),
+        None,
     )
-    files = {item["key"]: item for item in bronze["files"]}
-    events = _bronze_path(resolved, config.version, files, "_events_")
-    information = _bronze_path(resolved, config.version, files, "_matchinformation_")
-    adapter = IdsseMatchAdapter(
-        match_information_path=information,
-        events_path=events,
-        positions_path=information,
-        version=config.version,
-        spill_dir=tmp_run_dir(resolved, f"res97-{config.match}-events"),
-    )
-    from dynamis.pipeline.ingest import write_canonical_stream
-
-    result = write_canonical_stream(settings(), adapter.event_stream())
-    return {
-        "match_id": dfl_j03wpy_metadata["match_id"],
-        "stream_id": result.stream_id,
-        "row_count": result.row_count,
-        "byte_size": result.byte_size,
-        "checksum_sha256": result.checksum_sha256,
-        "relative_path": result.relative_path,
-    }
+    if events is None:
+        raise ValueError("the tracking ingest produced no event stream")
+    return {"match_id": dfl_j03wpy_metadata["match_id"], **events}
 
 
 def _descriptor(result) -> dict:

@@ -12,9 +12,11 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
+import pyarrow as pa
 import pytest
 
 import synthetic_providers as providers
+from dynamis.acquisition.resolvers import ZenodoResolver
 from dynamis.adapters.sportec_idsse.adapter import IdsseMatchAdapter
 from dynamis.adapters.sportec_idsse.authorities import (
     CENTER_FRAME_ID,
@@ -39,6 +41,7 @@ from dynamis.pipeline.quarantine import KNOWN_RULES
 from dynamis.quality.checks import validate
 from dynamis.storage.parquet import read_parquet_schema, read_parquet_table
 from dynamis.storage.paths import receipt_path, silver_parquet_path
+from synthetic_providers import FakeSession, synthetic_registry
 
 KICKOFF = datetime(2022, 10, 15, 11, 1, 28, 300000, tzinfo=UTC)
 HALF_END = datetime(2022, 10, 15, 11, 47, 31, tzinfo=UTC)
@@ -592,3 +595,166 @@ def test_ingest_cli_rejects_a_selection_outside_the_registry(
 def test_synthetic_event_document_has_no_namespaces(dfl_files: dict[str, Path]) -> None:
     root = ET.parse(str(dfl_files["events"])).getroot()
     assert root.tag == "PutDataRequest"
+
+
+# ---------------------------------------------------------------------------
+# Review-driven regression tests (CodeRabbit findings on PR #2)
+# ---------------------------------------------------------------------------
+
+
+def test_repeated_frameset_for_one_entity_is_merged_not_truncated(tmp_path: Path) -> None:
+    """A second FrameSet for the same person must extend, never replace, its rows."""
+    from xml.etree import ElementTree as ET
+
+    from dynamis.adapters.sportec_idsse.matchinfo import parse_match_information
+    from dynamis.adapters.sportec_idsse.positions import PositionsCanonicalizer
+
+    info = providers.write_match_information(tmp_path / "info.xml", kickoff_utc=KICKOFF)
+    metadata = parse_match_information(info)
+    start = KICKOFF + timedelta(seconds=1)
+    root = ET.Element("PutDataRequest")
+    positions = ET.SubElement(root, "Positions", {"EventTime": start.isoformat()})
+
+    def add_frameset(numbers: tuple[int, ...]) -> None:
+        frameset = ET.SubElement(
+            positions,
+            "FrameSet",
+            {
+                "GameSection": "firstHalf",
+                "MatchId": "DFL-MAT-SYNTH1",
+                "TeamId": "DFL-CLU-00000H",
+                "PersonId": "DFL-OBJ-H001",
+            },
+        )
+        for n in numbers:
+            stamp = start + timedelta(milliseconds=40 * (n - 10_000))
+            ET.SubElement(
+                frameset,
+                "Frame",
+                {
+                    "N": str(n),
+                    "T": (
+                        stamp.strftime("%Y-%m-%dT%H:%M:%S.") + f"{stamp.microsecond // 1000:03d}Z"
+                    ),
+                    "X": "1.00",
+                    "Y": "2.00",
+                    "D": "0.00",
+                    "S": "1.00",
+                    "A": "0.00",
+                    "M": "1",
+                },
+            )
+
+    add_frameset((10_000, 10_001, 10_002))
+    add_frameset((10_003, 10_004))
+
+    target = tmp_path / "positions.xml"
+    ET.ElementTree(root).write(str(target), encoding="UTF-8", xml_declaration=True)
+
+    canonicalizer = PositionsCanonicalizer(
+        target,
+        metadata,
+        spill_dir=tmp_path / "spill",
+        batch_size=2,
+        dataset_id="dfl-sportec-idsse",
+        clock_id="dfl-sportec-utc",
+        synchronization_spec_id="dfl-source-provided",
+        coordinate_frame_id="dfl-pitch-center-m",
+    )
+    summary = canonicalizer.spill()
+    assert summary.canonical_rows == 5
+    rows = [
+        row
+        for batch in canonicalizer.streams(session_id=metadata.match_id)[0].batches
+        for row in batch.to_pylist()
+    ]
+    assert len(rows) == 5
+    assert [row["t_rel_ns"] for row in rows] == sorted(row["t_rel_ns"] for row in rows)
+    assert summary.sections[0].frame_first == 10_000
+    assert summary.sections[0].frame_last == 10_004
+    canonicalizer.cleanup()
+
+
+def test_naive_kickoff_time_is_rejected(tmp_path: Path) -> None:
+    from dynamis.adapters.sportec_idsse.matchinfo import (
+        MatchInfoError,
+        parse_match_information,
+    )
+
+    path = providers.write_match_information(
+        tmp_path / "info.xml", kickoff_utc=KICKOFF.replace(tzinfo=None)
+    )
+    with pytest.raises(MatchInfoError, match="no UTC offset"):
+        parse_match_information(path)
+
+
+def test_womens_non_numeric_and_non_finite_cells_are_quarantined(
+    tmp_settings: Settings, tmp_path: Path
+) -> None:
+    start = datetime(2023, 9, 10, 17, 22, 32, 800000)
+    stamp = start.strftime("%Y-%m-%d %H:%M:%S.800")
+    later = (start + timedelta(seconds=0.1)).strftime("%Y-%m-%d %H:%M:%S.900")
+    workbook = providers.write_womens_workbook(
+        tmp_path / "J01.xlsx",
+        (
+            providers.WomensSheet(
+                name="p01",
+                rows=(
+                    (stamp, 43.35, -5.92, "not-a-number", None),
+                    (later, 43.35, -5.92, "inf", None),
+                ),
+            ),
+        ),
+    )
+    result = ingest_womens_j01(
+        tmp_settings, workbook_path=workbook, version="1.0", session_id="J01"
+    )
+    assert result.reconciliation.source_rows == 2
+    assert result.reconciliation.canonical_rows == 0
+    assert result.reconciliation.quarantined_rows == 2
+    assert result.reconciliation.streams[0].source_records == 2
+    # A text cell and an infinite cell both fail the non-finite numeric rule;
+    # neither row is silently dropped and no invalid speed is published.
+    assert {record.rule for record in result.quarantine_records} == {"non_finite_value"}
+
+
+def test_zenodo_resolution_carries_registry_sha256_when_provider_is_silent() -> None:
+    from dynamis.contracts import RetrievalFile
+
+    digest = "ab" * 32
+    registry = synthetic_registry(
+        files=(RetrievalFile(key="a.bin", size_bytes=4, md5="unknown", sha256=digest),)
+    )
+    session = FakeSession(
+        {
+            "https://zenodo.org/api/records/12345": {
+                "files": [
+                    {
+                        "key": "a.bin",
+                        "size": 4,
+                        "links": {
+                            "self": "https://zenodo.org/api/records/12345/files/a.bin/content"
+                        },
+                    }
+                ]
+            }
+        }
+    )
+    resolved = ZenodoResolver().resolve(
+        session,
+        source=registry.sources[0],
+        version=registry.sources[0].versions[0],
+        keys=["a.bin"],
+        timeout=(1.0, 1.0),
+    )
+    assert resolved[0].upstream_sha256 == digest
+
+
+def test_streaming_validator_ignores_empty_batches() -> None:
+    from dynamis.contracts import get_schema
+    from dynamis.quality.streaming import StreamingValidator
+
+    schema = get_schema("gnss")
+    validator = StreamingValidator(schema)
+    validator.observe(pa.RecordBatch.from_pylist([], schema=schema))
+    assert validator.finish() == ()

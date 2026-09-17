@@ -416,7 +416,7 @@ def persist_ingest_run(
         status=ProcessingStatus.COMPLETED,
         code_git_sha=code_git_sha,
         completed_at=completed_at,
-        inputs=tuple(_processing_inputs(source_checksums, result=result)),
+        inputs=tuple(_processing_inputs(source_checksums)),
         notes=f"RES-97 local ingestion of {result.session_id}",
     )
     written["processing_run"] = _update_run(
@@ -511,12 +511,21 @@ def persist_ingest_run(
     return written, run
 
 
-def _processing_inputs(checksums: tuple[str, ...], *, result: IngestResult):
+def _processing_inputs(checksums: tuple[str, ...]):
+    """Bind a run to its verified Bronze checksums.
+
+    A run must never cite one of its own outputs as an input: if no Bronze
+    checksum is available the caller has skipped manifest verification, which is
+    a programming error rather than something to paper over.
+    """
     from dynamis.contracts import ProcessingInput
 
     usable = [checksum for checksum in checksums if len(checksum) == 64]
     if not usable:
-        usable = [result.streams[0].checksum_sha256] if result.streams else []
+        raise ValueError(
+            "no verified Bronze checksums are available; persist only after "
+            "Bronze manifest verification"
+        )
     return [
         ProcessingInput(artifact_id=f"bronze-{index}", checksum_sha256=checksum, role="bronze")
         for index, checksum in enumerate(usable)

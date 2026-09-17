@@ -26,6 +26,7 @@ RULE_TIMESTAMP_UNPARSABLE = "timestamp_unparsable"
 RULE_TIME_OUT_OF_RANGE = "time_out_of_range"
 RULE_COORDINATE_OUT_OF_RANGE = "coordinate_out_of_range"
 RULE_COORDINATE_MISSING = "coordinate_missing"
+RULE_NON_FINITE_VALUE = "non_finite_value"
 RULE_FRAME_TIME_MISMATCH = "frame_time_mismatch"
 RULE_DUPLICATE_FRAME = "duplicate_frame"
 RULE_UNKNOWN_PARTICIPANT = "unknown_participant"
@@ -38,6 +39,7 @@ KNOWN_RULES = frozenset(
         RULE_TIME_OUT_OF_RANGE,
         RULE_COORDINATE_OUT_OF_RANGE,
         RULE_COORDINATE_MISSING,
+        RULE_NON_FINITE_VALUE,
         RULE_FRAME_TIME_MISMATCH,
         RULE_DUPLICATE_FRAME,
         RULE_UNKNOWN_PARTICIPANT,

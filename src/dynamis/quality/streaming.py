@@ -72,6 +72,11 @@ class StreamingValidator:
         return self._row_count
 
     def observe(self, batch: pa.RecordBatch) -> None:
+        if batch.num_rows == 0:
+            # An empty batch carries no evidence; treating it as a stream prefix
+            # would report "no identity/authority observed" against a stream that
+            # simply has not started yet.
+            return
         if not self._initialized:
             table = pa.Table.from_batches([batch]).slice(0, 0)
             self._violations.extend(check_schema_conformance(table, self._schema))
@@ -213,8 +218,16 @@ class StreamingValidator:
                     )
 
     def finish(self) -> tuple[Violation, ...]:
-        """Accumulated violations so far (the caller decides when to enforce)."""
+        """Accumulated violations for the prefix observed so far.
+
+        Aggregate checks (identity, authorities, measurement class, zero-based
+        time) only make sense once at least one row exists; an empty stream is
+        reported by the caller's own emptiness contract, not as a false
+        "multiple identities" finding.
+        """
         violations = list(self._violations)
+        if self._row_count == 0:
+            return tuple(violations)
         for name, values in self._identity.items():
             if self._identity_nulls[name]:
                 violations.append(

@@ -23,6 +23,8 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy.exc import SQLAlchemyError
+
 from dynamis.acquisition.plan import PlanError, select_keys
 from dynamis.adapters.sportec_idsse.adapter import adapter_algorithm_spec as idsse_algorithm_spec
 from dynamis.adapters.womens_soccer_positioning.adapter import (
@@ -277,7 +279,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not args.no_persist:
         try:
             payload["persist"] = _persist(args, result, session_id)
-        except (ConfigurationError, RuntimeError) as exc:
+        except (ConfigurationError, RuntimeError, SQLAlchemyError) as exc:
+            # Persistence is a control-plane concern; a database outage must not
+            # lose the ingestion summary that has already been written to disk.
             payload["persist"] = {"skipped": str(exc)}
     if args.as_json:
         print(json.dumps(payload, indent=2, sort_keys=True))

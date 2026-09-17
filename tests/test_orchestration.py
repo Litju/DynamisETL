@@ -147,4 +147,9 @@ def test_dagster_definitions_expose_lineage_edges() -> None:
     }
 
     events = graph.get(AssetKey("dfl_j03wpy_silver_events"))
-    assert {key.path[-1] for key in events.parent_keys} == {"dfl_j03wpy_metadata"}
+    # The events asset is a projection of the single tracking/events ingest run,
+    # so the artifact has exactly one writer.
+    assert {key.path[-1] for key in events.parent_keys} == {
+        "dfl_j03wpy_silver_tracking",
+        "dfl_j03wpy_metadata",
+    }

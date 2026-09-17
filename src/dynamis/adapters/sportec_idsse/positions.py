@@ -248,8 +248,9 @@ class PositionsCanonicalizer:
                     frame = int(row["source_frame"])
                     if spill.first_frame is None:
                         spill.first_frame = frame
-                        summary.frame_first = frame
                     spill.last_frame = frame
+                    if summary.frame_first == 0 or frame < summary.frame_first:
+                        summary.frame_first = frame
                     summary.frame_last = max(summary.frame_last, frame)
                     if len(state["rows"]) >= self._batch_size:
                         flush()
@@ -261,13 +262,18 @@ class PositionsCanonicalizer:
         return self.summary()
 
     def _open_entity(self, *, section: str, team_id: str, person_id: str) -> EntitySpill:
+        """Open a spill file for one ``FrameSet`` occurrence.
+
+        A provider may emit more than one ``FrameSet`` for the same entity in a
+        section; every occurrence gets its own file (the merge reads the whole
+        section directory), so a later occurrence can never truncate the frames
+        an earlier one already produced.
+        """
         if section not in PERIOD_SECTIONS:
             raise ValueError(f"unsupported GameSection {section!r} in {self._path.name}")
-        self._spills.setdefault(section, {})
-        existing = self._spills[section].get(person_id)
-        if existing is not None:
-            return existing
-        target = self._spill_dir / section / f"{person_id}.arrow"
+        entities = self._spills.setdefault(section, {})
+        occurrence = sum(1 for spill in entities.values() if spill.person_id == person_id)
+        target = self._spill_dir / section / f"{person_id}.{occurrence}.arrow"
         target.parent.mkdir(parents=True, exist_ok=True)
         spill = EntitySpill(
             section=section,
@@ -276,7 +282,7 @@ class PositionsCanonicalizer:
             object_type="ball" if team_id == BALL_TEAM_ID else "player",
             path=target,
         )
-        self._spills[section][person_id] = spill
+        entities[f"{person_id}#{occurrence}"] = spill
         self._summaries.setdefault(
             section,
             SectionSummary(
@@ -417,7 +423,9 @@ class PositionsCanonicalizer:
         self._session_id = session_id
         streams: list[CanonicalStream] = []
         for section, summary in self._summaries.items():
-            summary.entity_count = len(self._spills.get(section, {}))
+            summary.entity_count = len(
+                {spill.person_id for spill in self._spills.get(section, {}).values()}
+            )
             streams.append(
                 CanonicalStream(
                     dataset_id=self._dataset_id,
@@ -445,7 +453,10 @@ class PositionsCanonicalizer:
         return tuple(streams)
 
     def _merged_batches(self, section: str) -> Iterator[pa.RecordBatch]:
-        entities = sorted(self._spills[section].values(), key=lambda item: item.person_id)
+        entities = sorted(
+            self._spills[section].values(),
+            key=lambda item: (item.person_id, item.path.name),
+        )
         # Sequential stream reads keep the working set to the current buffer
         # instead of accumulating memory-mapped pages for every entity file.
         handles = [pa.OSFile(str(entity.path), "rb") for entity in entities]
@@ -480,7 +491,10 @@ class PositionsCanonicalizer:
             canonical_rows=sum(summary.canonical_rows for summary in self._summaries.values()),
             quarantined_rows=len(self._quarantined),
             quarantined_by_rule=dict(by_rule),
-            entity_count=sum(len(entities) for entities in self._spills.values()),
+            entity_count=sum(
+                len({spill.person_id for spill in entities.values()})
+                for entities in self._spills.values()
+            ),
             sections=tuple(self._summaries[section] for section in self._summaries),
             spill_dir=self._spill_dir,
         )

@@ -9,12 +9,14 @@ network access and no licensed data in the repository.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
 import openpyxl
+import requests
 
 #: The Women's workbook header exactly as discovered in the verified J01 file.
 WOMENS_HEADER = ("local_time", "latitude", "longitude", "speed(km/h)", "hr(bpm)")
@@ -25,10 +27,15 @@ FRAME_STEP = timedelta(seconds=1.0 / SPORTEC_FPS)
 
 @dataclass(frozen=True, slots=True)
 class WomensSheet:
-    """One synthetic sheet: rows are ``(local_time, lat, lon, speed, hr)``."""
+    """One synthetic sheet.
+
+    Cell values are deliberately loosely typed: the fixture also carries
+    malformed cells (text timestamps, text or non-finite numbers) so the
+    adapter's quarantine paths are exercised.
+    """
 
     name: str
-    rows: tuple[tuple[str | None, float | None, float | None, float | None, None], ...]
+    rows: tuple[tuple[object, ...], ...]
 
 
 def womens_rows(
@@ -533,3 +540,97 @@ def write_positions(
     path.parent.mkdir(parents=True, exist_ok=True)
     ET.ElementTree(root).write(str(path), encoding="UTF-8", xml_declaration=True)
     return path
+
+
+# ---------------------------------------------------------------------------
+# Acquisition helpers shared with the acquisition test module
+# ---------------------------------------------------------------------------
+
+
+class FakeSession(requests.Session):
+    """A ``requests.Session`` that serves provider metadata from memory."""
+
+    def __init__(self, routes: dict[str, object]) -> None:
+        super().__init__()
+        self.routes = routes
+        self.calls: list[str] = []
+
+    def get(self, url: str | bytes, **kwargs: object) -> requests.Response:
+        del kwargs
+        url_str = url.decode("utf-8") if isinstance(url, bytes) else url
+        self.calls.append(url_str)
+        if url_str not in self.routes:
+            raise AssertionError(f"unexpected metadata URL: {url_str}")
+        payload = self.routes[url_str]
+        response = requests.Response()
+        response.status_code = 200
+        response._content = json.dumps(payload).encode("utf-8")
+        response.headers["Content-Type"] = "application/json"
+        response.url = url_str
+        response.request = requests.Request("GET", url_str).prepare()
+        return response
+
+
+def synthetic_license():
+    from dynamis.contracts import (
+        LicensePolicy,
+        LicenseStatus,
+        RedistributionPolicy,
+    )
+
+    return LicensePolicy(
+        identifier="CC-BY-4.0",
+        status=LicenseStatus.DECLARED,
+        attribution_required=True,
+        noncommercial_only=False,
+        share_alike=False,
+        redistribution=RedistributionPolicy.CONDITIONAL,
+        local_only=False,
+        restrictions=("Attribution required.",),
+    )
+
+
+def synthetic_registry(
+    *,
+    dataset_id: str = "syn-provider",
+    version: str = "v1",
+    files,
+    provider: str = "Zenodo",
+    upstream_urls=None,
+    doi: str | None = "10.5281/zenodo.12345",
+):
+    from pydantic import HttpUrl
+
+    from dynamis.contracts import (
+        DatasetRegistry,
+        DatasetSource,
+        DatasetVersion,
+        Modality,
+        RetrievalState,
+        RetrievalStatus,
+    )
+
+    urls = upstream_urls or (HttpUrl("https://zenodo.org/records/12345"),)
+    source = DatasetSource(
+        dataset_id=dataset_id,
+        name="Synthetic provider source",
+        provider=provider,
+        upstream_urls=tuple(HttpUrl(str(url)) for url in urls),
+        doi=doi,
+        domain="football",
+        modalities=(Modality.GNSS,),
+        adapter_id="syn_adapter",
+        v1_role="Test source",
+        initial_scope="Synthetic",
+        license=synthetic_license(),
+        versions=(
+            DatasetVersion(
+                dataset_id=dataset_id,
+                version=version,
+                upstream_url=urls[0],
+                citation="Synthetic citation.",
+                retrieval=RetrievalState(status=RetrievalStatus.NOT_FETCHED, files=files),
+            ),
+        ),
+    )
+    return DatasetRegistry(sources=(source,))
