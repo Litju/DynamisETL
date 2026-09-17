@@ -34,8 +34,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      # Refuse to resolve or rewrite uv.lock anywhere in this job.
-      UV_FROZEN: "1"
+      # Refuse to update uv.lock anywhere in this job (same guarantee as
+      # `uv sync --locked`, but inherited by every later `uv run`).
+      UV_LOCKED: "1"
     steps:
       - name: Check out the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -110,8 +111,9 @@ jobs:
           --health-retries 24
           --health-start-period 20s
     env:
-      # Refuse to resolve or rewrite uv.lock anywhere in this job.
-      UV_FROZEN: "1"
+      # Refuse to update uv.lock anywhere in this job (same guarantee as
+      # `uv sync --locked`, but inherited by every later `uv run`).
+      UV_LOCKED: "1"
       POSTGRES_URL: postgresql+psycopg://dynamis:ci-only-not-a-secret@127.0.0.1:5432/dynamis
       DYNAMIS_TEST_POSTGRES_URL: postgresql+psycopg://dynamis:ci-only-not-a-secret@127.0.0.1:5432/dynamis
       DYNAMIS_DB_SCHEMA: dynamis
