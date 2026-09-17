@@ -199,7 +199,6 @@ def _discover_sheet(sheet_name: str, rows: list[tuple[Any, ...]]) -> SheetDiscov
         parsed = parse_source_timestamp(raw_time)
         if parsed is None:
             unparsable += 1
-            previous = None
             continue
         parseable += 1
         if first is None:

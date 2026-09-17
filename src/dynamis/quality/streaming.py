@@ -6,6 +6,11 @@ be validated. This module accumulates the same rule outcomes batch by batch,
 using the same kernels (strict/non-decreasing) and the same rule identifiers; a
 test proves it agrees with :func:`dynamis.quality.checks.validate` on synthetic
 tables.
+
+One deliberate difference: the streaming validator may report the same rule once
+per offending batch (and once at a batch boundary), where the table authority
+reports it once for the whole column. The rule vocabulary and verdicts are
+identical; only the multiplicity differs.
 """
 
 from __future__ import annotations
@@ -219,7 +224,7 @@ class StreamingValidator:
                         evidence={"column": name, "null_count": self._identity_nulls[name]},
                     )
                 )
-            if len(values) > 1:
+            if len(values) != 1:
                 violations.append(
                     Violation(
                         rule="identity.multiple",
@@ -248,7 +253,7 @@ class StreamingValidator:
                     evidence={"null_count": self._clock_nulls},
                 )
             )
-        if len(self._clock_values) > 1:
+        if len(self._clock_values) != 1:
             violations.append(
                 Violation(
                     rule="authority.multiple",
@@ -264,7 +269,7 @@ class StreamingValidator:
                     evidence={"null_count": self._sync_nulls},
                 )
             )
-        if len(self._sync_values) > 1:
+        if len(self._sync_values) != 1:
             violations.append(
                 Violation(
                     rule="authority.multiple",
@@ -281,7 +286,7 @@ class StreamingValidator:
                         evidence={"null_rows": self._frame_nulls},
                     )
                 )
-            if len(self._frame_values) > 1:
+            if len(self._frame_values) != 1:
                 violations.append(
                     Violation(
                         rule="authority.frame_multiple",

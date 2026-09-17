@@ -382,18 +382,38 @@ def discover_positions(path: Path) -> PositionsDiscovery:
             frame_to_time_ok = False
         if n != origin[0]:
             step_ns[actual_ns // (n - origin[0])] += 1
-        x_min = min(x_min, float(str(elem.get("X"))))
-        x_max = max(x_max, float(str(elem.get("X"))))
-        y_min = min(y_min, float(str(elem.get("Y"))))
-        y_max = max(y_max, float(str(elem.get("Y"))))
+        for coordinate_name, aggregate in (
+            ("X", "x"),
+            ("Y", "y"),
+        ):
+            raw_coordinate = elem.get(coordinate_name)
+            if raw_coordinate is None:
+                null_counts[coordinate_name] += 1
+                continue
+            try:
+                value = float(raw_coordinate)
+            except ValueError:
+                null_counts[f"{coordinate_name}_unparsable"] += 1
+                continue
+            if aggregate == "x":
+                x_min = min(x_min, value)
+                x_max = max(x_max, value)
+            else:
+                y_min = min(y_min, value)
+                y_max = max(y_max, value)
         z_raw = elem.get("Z")
         if z_raw is None:
             if current[1] == BALL_TEAM_ID:
                 z_missing_on_ball += 1
         else:
             z_observed += 1
-            z_min = min(z_min, float(z_raw))
-            z_max = max(z_max, float(z_raw))
+            try:
+                z_value = float(z_raw)
+            except ValueError:
+                null_counts["Z_unparsable"] += 1
+            else:
+                z_min = min(z_min, z_value)
+                z_max = max(z_max, z_value)
         for name, destination in (("BallPossession", possession), ("BallStatus", status)):
             raw = elem.get(name)
             if raw is not None:

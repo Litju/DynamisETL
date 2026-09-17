@@ -43,6 +43,9 @@ DELETE_EVENT = "Delete"
 PERIOD_FOR_SECTION = {"firstHalf": "period-1", "secondHalf": "period-2"}
 
 #: Explicit actor mapping: canonical ``provider_player_id`` per primary element.
+#: Types without an entry fall back to the generic ``Player`` attribute, which
+#: the chain flattening resolves from the nested specialization (for example
+#: ``KickOff > Play > Pass`` carries the player on ``Play``).
 PRIMARY_PLAYER_ATTRIBUTE = {
     "Play": "Player",
     "OtherBallAction": "Player",
@@ -56,7 +59,8 @@ PRIMARY_PLAYER_ATTRIBUTE = {
     "Substitution": "PlayerIn",
 }
 
-#: Explicit team mapping: canonical ``provider_team_id`` per primary element.
+#: Explicit team mapping: canonical ``provider_team_id`` per primary element;
+#: the generic ``Team`` fallback resolves from the nested chain like the actor map.
 PRIMARY_TEAM_ATTRIBUTE = {
     "Play": "Team",
     "OtherBallAction": "Team",
@@ -74,6 +78,26 @@ PRIMARY_TEAM_ATTRIBUTE = {
 
 #: Provider shot-type vocabulary with an explicit body-part interpretation.
 BODY_PART_MAP = {"leftLeg": "left_leg", "rightLeg": "right_leg", "head": "head"}
+
+
+@dataclass(frozen=True, slots=True)
+class RawEvent:
+    """One parsed event element held between the boundary and row passes.
+
+    ``chain_attributes`` merges the attributes of the primary element and every
+    nested specialization (e.g. ``KickOff > Play > Pass``), outermost first, so
+    an inner element wins a name collision. That mirrors how the reference
+    client flattens the event chain before reading ``Team``/``Player``.
+    """
+
+    event_id: str
+    parsed_time: datetime
+    primary_tag: str
+    chain_attributes: dict[str, str]
+    event_attributes: dict[str, str]
+    deepest_tag: str | None
+    x_raw: str | None
+    y_raw: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -227,7 +251,7 @@ class EventsCanonicalizer:
         if self._summary.source_events:
             return
         kickoff_ns = int(self._metadata.kickoff_utc.timestamp() * 1_000_000_000)
-        raw: list[tuple[int, str, dict[str, Any]]] = []
+        raw: list[RawEvent] = []
         boundaries: dict[str, dict[str, datetime]] = defaultdict(dict)
         source_order_times: list[str] = []
 
@@ -302,9 +326,23 @@ class EventsCanonicalizer:
                 boundaries[section]["start"] = parsed_time
             elif primary.tag == "FinalWhistle" and section:
                 boundaries[section]["end"] = parsed_time
-            row = self._canonical_row(elem, primary, event_id, parsed_time, kickoff_ns)
-            if row is not None:
-                raw.append((int(parsed_time.timestamp() * 1_000_000_000), event_id, row))
+            deepest = deepest_child(primary)
+            chain_attributes: dict[str, str] = {}
+            for element in primary.iter():
+                if isinstance(element.tag, str):
+                    chain_attributes.update(element.attrib)
+            raw.append(
+                RawEvent(
+                    event_id=event_id,
+                    parsed_time=parsed_time,
+                    primary_tag=str(primary.tag),
+                    chain_attributes=chain_attributes,
+                    event_attributes=dict(elem.attrib),
+                    deepest_tag=str(deepest.tag) if deepest is not primary else None,
+                    x_raw=elem.get("X-Position"),
+                    y_raw=elem.get("Y-Position"),
+                )
+            )
             elem.clear()
             while elem.getprevious() is not None:
                 del elem.getparent()[0]
@@ -313,39 +351,44 @@ class EventsCanonicalizer:
         self._summary.duplicate_timestamps = sum(
             1 for a, b in zip(source_order_times, source_order_times[1:], strict=False) if a == b
         )
-        raw.sort(key=lambda item: (item[0], item[1]))
-        times = [item[0] for item in raw]
-        reordered = sum(1 for a, b in zip(times, times[1:], strict=False) if b < a)
-        self._summary.events_reordered = reordered
-        self._rows = [row for _, _, row in raw]
+        source_order_ns = [int(event.parsed_time.timestamp() * 1_000_000_000) for event in raw]
+        self._summary.events_reordered = sum(
+            1 for a, b in zip(source_order_ns, source_order_ns[1:], strict=False) if b < a
+        )
+        raw.sort(key=lambda event: (event.parsed_time, event.event_id))
+        for event in raw:
+            row = self._canonical_row(event, kickoff_ns)
+            if row is not None:
+                self._rows.append(row)
 
-    def _canonical_row(
-        self,
-        elem: etree._Element,
-        primary: etree._Element,
-        event_id: str,
-        parsed_time: datetime,
-        kickoff_ns: int,
-    ) -> dict[str, Any] | None:
-        deepest = deepest_child(primary)
-        event_type = snake_case(primary.tag)
-        subtype = deepest.tag if deepest is not primary else None
-        player_attribute = PRIMARY_PLAYER_ATTRIBUTE.get(primary.tag)
-        team_attribute = PRIMARY_TEAM_ATTRIBUTE.get(primary.tag)
-        payload_attributes = dict(primary.attrib)
-        if subtype is not None:
-            payload_attributes.update(deepest.attrib)
-        # Drop the location/time attributes already mapped to canonical fields.
+    def _canonical_row(self, event: RawEvent, kickoff_ns: int) -> dict[str, Any] | None:
+        primary_tag = event.primary_tag
+        event_id = event.event_id
+        parsed_time = event.parsed_time
+        event_type = snake_case(primary_tag)
+        subtype = event.deepest_tag
+        player_attribute = PRIMARY_PLAYER_ATTRIBUTE.get(primary_tag, "Player")
+        team_attribute = PRIMARY_TEAM_ATTRIBUTE.get(primary_tag, "Team")
+        # Keep every provider attribute for anti-corruption-layer fidelity except
+        # the ones already mapped to canonical identity/time/location columns.
         context = {
             key: value
-            for key, value in payload_attributes.items()
-            if key not in {"GameSection", "MatchId"}
+            for key, value in {**event.event_attributes, **event.chain_attributes}.items()
+            if key
+            not in {
+                "EventId",
+                "EventTime",
+                "MatchId",
+                "GameSection",
+                "X-Position",
+                "Y-Position",
+            }
         }
 
         x_m: float | None = None
         y_m: float | None = None
-        x_raw = elem.get("X-Position")
-        y_raw = elem.get("Y-Position")
+        x_raw = event.x_raw
+        y_raw = event.y_raw
         if x_raw is not None and y_raw is not None:
             try:
                 ((x_center, y_center, _),) = transform_points(
@@ -413,14 +456,16 @@ class EventsCanonicalizer:
             "event_id": event_id,
             "event_type": event_type,
             "event_subtype": None if subtype is None else snake_case(subtype),
-            "provider_team_id": (None if team_attribute is None else primary.get(team_attribute)),
+            "provider_team_id": (
+                None if team_attribute is None else event.chain_attributes.get(team_attribute)
+            ),
             "provider_player_id": (
-                None if player_attribute is None else primary.get(player_attribute)
+                None if player_attribute is None else event.chain_attributes.get(player_attribute)
             ),
             "x_m": x_m,
             "y_m": y_m,
-            "body_part": BODY_PART_MAP.get(primary.get("TypeOfShot") or ""),
-            "outcome": primary.get("Evaluation"),
+            "body_part": BODY_PART_MAP.get(event.chain_attributes.get("TypeOfShot") or ""),
+            "outcome": event.chain_attributes.get("Evaluation"),
             "provider_context_json": json.dumps(context, sort_keys=True, separators=(",", ":")),
         }
 

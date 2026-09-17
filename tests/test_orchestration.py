@@ -18,12 +18,20 @@ EXPECTED_ASSETS = {
     "synthetic_canonical_streams",
     "synthetic_parquet_artifacts",
     "synthetic_validation",
+    "womens_j01_bronze",
+    "womens_j01_silver_gnss",
+    "dfl_j03wpy_bronze",
+    "dfl_j03wpy_metadata",
+    "dfl_j03wpy_silver_tracking",
+    "dfl_j03wpy_silver_events",
 }
 
 EXPECTED_ASSET_CHECKS = {
     "synthetic_artifacts_are_zstd",
     "synthetic_roundtrip_reconciles",
     "registry_covers_all_modalities",
+    "womens_gnss_reconciliation_balances",
+    "dfl_tracking_reconciliation_balances",
 }
 
 
@@ -128,3 +136,15 @@ def test_dagster_definitions_expose_lineage_edges() -> None:
 
     registry = graph.get(AssetKey("dataset_registry"))
     assert not registry.parent_keys
+
+    gnss = graph.get(AssetKey("womens_j01_silver_gnss"))
+    assert {key.path[-1] for key in gnss.parent_keys} == {"womens_j01_bronze"}
+
+    tracking = graph.get(AssetKey("dfl_j03wpy_silver_tracking"))
+    assert {key.path[-1] for key in tracking.parent_keys} == {
+        "dfl_j03wpy_bronze",
+        "dfl_j03wpy_metadata",
+    }
+
+    events = graph.get(AssetKey("dfl_j03wpy_silver_events"))
+    assert {key.path[-1] for key in events.parent_keys} == {"dfl_j03wpy_metadata"}
