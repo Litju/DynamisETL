@@ -114,9 +114,11 @@ monotonic time, deterministic identity and checksums. See
 
 CI (`.github/workflows/ci.yml`) runs the same gates on GitHub-hosted runners
 against a throwaway PostgreSQL 18.6 service container and synthetic data only:
-no dataset download, no credential, no secret. Every workflow under
-`.github/workflows/` is itself statically validated (actionlint) and security
-audited (zizmor) by `.github/workflows/workflow-lint.yml`.
+no dataset is downloaded and no external credential or repository secret is
+used (the service database password is a non-secret, job-local throwaway).
+Every workflow under `.github/workflows/` is itself statically validated
+(actionlint) and security audited (zizmor) by
+`.github/workflows/workflow-lint.yml`.
 
 ## Data and license boundary
 
