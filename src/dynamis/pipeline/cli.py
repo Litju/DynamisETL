@@ -90,6 +90,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Skip PostgreSQL control-plane persistence",
     )
+    parser.add_argument(
+        "--discovery",
+        action="store_true",
+        help="Also write the structural discovery receipt (extra full source pass)",
+    )
     parser.add_argument("--json", action="store_true", dest="as_json")
     return parser
 
@@ -125,6 +130,38 @@ def _resolve_bronze_paths(
     return paths
 
 
+def _write_discovery(
+    config, args: argparse.Namespace, paths: dict[str, Path], session_id: str
+) -> None:
+    """Write the structural discovery receipt for the selected source slice."""
+    from dynamis.pipeline.ingest import write_discovery_receipts
+
+    def first(token: str) -> Path | None:
+        return next((path for key, path in paths.items() if token in key), None)
+
+    if args.dataset_id == WOMENS_DATASET_ID:
+        workbook = first(".xlsx")
+        if workbook is None:
+            raise PlanError("no workbook key selected for the Women's source")
+        write_discovery_receipts(
+            config,
+            dataset_id=args.dataset_id,
+            version=args.version,
+            workbook_path=workbook,
+            name=f"{session_id}-workbook",
+        )
+        return
+    write_discovery_receipts(
+        config,
+        dataset_id=args.dataset_id,
+        version=args.version,
+        match_information_path=first("_matchinformation_"),
+        events_path=first("_events_"),
+        positions_path=first("_positions_"),
+        name=f"{session_id}-xml",
+    )
+
+
 def _ingest(args: argparse.Namespace) -> tuple[IngestResult, str]:
     config = settings()
     keys = _selected_keys(args)
@@ -138,6 +175,8 @@ def _ingest(args: argparse.Namespace) -> tuple[IngestResult, str]:
         )
     paths = _resolve_bronze_paths(config, keys, dataset_id=args.dataset_id, version=args.version)
     session_id = args.session or _default_session(args.dataset_id, keys)
+    if args.discovery:
+        _write_discovery(config, args, paths, session_id)
 
     if args.dataset_id == WOMENS_DATASET_ID:
         workbook = next((path for key, path in paths.items() if key.endswith(".xlsx")), None)

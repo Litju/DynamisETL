@@ -556,11 +556,20 @@ def test_ingest_cli_verifies_bronze_and_writes_silver(
                 "--key",
                 "J01.xlsx",
                 "--no-persist",
+                "--discovery",
                 "--json",
             ]
         )
         == 0
     )
+    discovery_receipt = receipt_path(
+        resolved,
+        dataset_id=WOMENS_DATASET_ID,
+        kind="discovery",
+        name="J01-workbook",
+    )
+    assert discovery_receipt.is_file()
+    assert '"sheet_names"' in discovery_receipt.read_text(encoding="utf-8")
     silver = silver_parquet_path(
         resolved,
         dataset_id=WOMENS_DATASET_ID,

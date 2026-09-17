@@ -9,6 +9,7 @@ balance.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -18,6 +19,7 @@ import pyarrow as pa
 
 from dynamis.adapters.sportec_idsse.adapter import IdsseMatchAdapter
 from dynamis.adapters.sportec_idsse.authorities import tracking_stream_id
+from dynamis.adapters.sportec_idsse.discovery import discover_idsse
 from dynamis.adapters.womens_soccer_positioning.adapter import canonical_gnss_streams
 from dynamis.adapters.womens_soccer_positioning.authorities import WOMENS_DATASET_ID
 from dynamis.adapters.womens_soccer_positioning.discovery import discover_workbook
@@ -118,6 +120,39 @@ class IngestResult:
             "domain": self.domain,
             "reconciliation": self.reconciliation.to_dict(),
         }
+
+
+def write_discovery_receipts(
+    settings: Settings,
+    *,
+    dataset_id: str,
+    version: str,
+    workbook_path: Path | None = None,
+    match_information_path: Path | None = None,
+    events_path: Path | None = None,
+    positions_path: Path | None = None,
+    name: str,
+) -> str:
+    """Write the structural discovery receipt for a provider slice.
+
+    Nothing here is assumed from memory: the receipt records sheets/rows/columns/
+    null patterns for the workbook or namespaces/hierarchy/frames/entities/units
+    and the undecoded vendor attributes for the XML set.
+    """
+    from dynamis.storage.atomic import atomic_write_text
+    from dynamis.storage.paths import receipt_path
+
+    if dataset_id == WOMENS_DATASET_ID:
+        if workbook_path is None:
+            raise ValueError("Women's discovery requires the workbook path")
+        payload = discover_workbook(workbook_path).to_dict()
+    else:
+        if match_information_path is None or events_path is None or positions_path is None:
+            raise ValueError("IDSSE discovery requires the three XML paths")
+        payload = discover_idsse(match_information_path, events_path, positions_path).to_dict()
+    target = receipt_path(settings, dataset_id=dataset_id, kind="discovery", name=name)
+    atomic_write_text(target, json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    return target.as_posix()
 
 
 def write_canonical_stream(
