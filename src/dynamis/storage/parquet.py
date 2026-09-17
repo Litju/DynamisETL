@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -22,6 +23,10 @@ from dynamis.storage.atomic import atomic_write_path, sha256_file
 DEFAULT_COMPRESSION = "zstd"
 DEFAULT_COMPRESSION_LEVEL = 3
 PARQUET_FORMAT_VERSION = "2.6"
+
+#: Row-group authority for streaming writes. The writer holds at most one row
+#: group plus one incoming batch in memory, never the whole stream.
+DEFAULT_STREAMING_ROW_GROUP_SIZE = 1 << 18
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,6 +83,99 @@ def write_parquet_atomic(
         byte_size=target.stat().st_size,
         row_count=table.num_rows,
         schema_fingerprint=schema_fingerprint(table.schema),
+        compression=compression,
+        relative_path=relative,
+    )
+
+
+def _write_row_groups(
+    handle: pq.ParquetWriter,
+    batches: Iterable[pa.RecordBatch],
+    *,
+    schema: pa.Schema,
+    row_group_size: int,
+) -> int:
+    """Write ``batches`` as exactly ``row_group_size``-row groups.
+
+    The buffer never exceeds one row group plus one incoming batch, so a
+    multi-million-row stream is bounded by configuration, not by its size. Row
+    groups are cut at exact multiples of ``row_group_size``, which makes the
+    streaming artifact byte-identical to the table writer for the same schema
+    and row-group policy.
+    """
+    buffer: list[pa.RecordBatch] = []
+    buffered = 0
+    written = 0
+    for batch in batches:
+        if batch.schema != schema:
+            raise ValueError(
+                "streaming batch schema does not match the declared canonical schema: "
+                f"batch={batch.schema.names} expected={schema.names}"
+            )
+        if batch.num_rows == 0:
+            continue
+        buffer.append(batch)
+        buffered += batch.num_rows
+        while buffered >= row_group_size:
+            merged = pa.Table.from_batches(buffer, schema=schema).combine_chunks()
+            handle.write_batch(merged.slice(0, row_group_size).to_batches()[0])
+            remainder = merged.slice(row_group_size)
+            buffered = remainder.num_rows
+            buffer = remainder.to_batches() if buffered else []
+            written += row_group_size
+    if buffered:
+        remainder = pa.Table.from_batches(buffer, schema=schema).combine_chunks()
+        handle.write_batch(remainder.to_batches()[0])
+        written += buffered
+    return written
+
+
+def write_parquet_streaming_atomic(
+    batches: Iterable[pa.RecordBatch] | pa.RecordBatchReader,
+    path: Path,
+    *,
+    schema: pa.Schema,
+    row_group_size: int = DEFAULT_STREAMING_ROW_GROUP_SIZE,
+    compression: str = DEFAULT_COMPRESSION,
+    compression_level: int = DEFAULT_COMPRESSION_LEVEL,
+    relative_to: Path | None = None,
+) -> WrittenArtifact:
+    """Write a bounded Arrow batch stream to ``path`` as Parquet+Zstd, atomically.
+
+    The canonical schema is fixed before the first row group; every batch must
+    match it exactly, and a mismatch aborts the write, leaving no accepted
+    artifact (the temporary sibling is removed by the atomic write context).
+    """
+    if row_group_size <= 0:
+        raise ValueError("row_group_size must be positive")
+    target = Path(path)
+    with atomic_write_path(target) as tmp:
+        with pq.ParquetWriter(
+            tmp,
+            schema,
+            compression=compression,
+            compression_level=compression_level,
+            version=PARQUET_FORMAT_VERSION,
+            write_statistics=True,
+        ) as writer:
+            row_count = _write_row_groups(
+                writer,
+                batches,
+                schema=schema,
+                row_group_size=row_group_size,
+            )
+            if row_count == 0:
+                # Parity with pq.write_table on an empty table: one empty row group.
+                writer.write_table(pa.Table.from_batches([], schema=schema))
+    relative = None
+    if relative_to is not None:
+        relative = target.resolve().relative_to(Path(relative_to).resolve()).as_posix()
+    return WrittenArtifact(
+        path=target,
+        checksum_sha256=sha256_file(target),
+        byte_size=target.stat().st_size,
+        row_count=row_count,
+        schema_fingerprint=schema_fingerprint(schema),
         compression=compression,
         relative_path=relative,
     )
