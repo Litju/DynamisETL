@@ -6,33 +6,51 @@ on:
   pull_request:
   workflow_dispatch:
 
+# One group per workflow + ref (a pull request ref is refs/pull/<n>/merge), so a
+# newer commit cancels the obsolete run without cancelling unrelated branches.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Least privilege: every job only reads the repository. CI uses no secrets and
+# never pushes, so ordinary pull_request execution stays safe.
 permissions:
   contents: read
 
 env:
   PYTHON_VERSION: "3.12"
   NODE_VERSION: "24"
-  POSTGRES_IMAGE: postgres:18.6
+  # GitHub Actions already exports CI=true. TZ and PYTHONHASHSEED remove the
+  # remaining ambient nondeterminism inherited from the hosted runner image.
+  TZ: UTC
+  PYTHONHASHSEED: "0"
 
 jobs:
   # Static analysis, unit tests, registry validation and synthetic V&V.
   # Synthetic-data-only: no external dataset is downloaded and no credential is
   # required for this job.
   foundation:
-    name: Python foundation (ruff, pyright, pytest, registry, synthetic V&V)
+    name: Python foundation
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Refuse to resolve or rewrite uv.lock anywhere in this job.
+      UV_FROZEN: "1"
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install uv and Python ${{ env.PYTHON_VERSION }}
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
+          version: "0.12.4"
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
+          # The cache key follows the lockfile only, so unrelated edits do not
+          # invalidate the uv download cache.
+          cache-dependency-glob: uv.lock
 
       - name: Verify the locked environment installs
         run: uv sync --locked
@@ -55,22 +73,30 @@ jobs:
       - name: Materialize every synthetic modality (Arrow -> Parquet+Zstd)
         run: uv run dynamis-synthetic-materialize --out "$RUNNER_TEMP/synthetic"
 
+      - name: Build the distributable package (smoke check, never published)
+        run: uv build --out-dir "$RUNNER_TEMP/dist"
+
       - name: Upload synthetic artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: synthetic-parquet
           path: ${{ runner.temp }}/synthetic
           retention-days: 7
+          if-no-files-found: error
+          # Parquet+Zstd is already compressed; a zlib pass only wastes time.
+          compression-level: 0
 
   # Proves the metadata/provenance schema against a real PostgreSQL 18.6 server:
   # clean database, upgrade to head, expected schema/tables, downgrade/upgrade
   # symmetry and no autogenerate drift.
   postgres:
-    name: PostgreSQL 18.6 + Alembic migration
+    name: PostgreSQL migration
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     services:
       postgres:
-        image: postgres:18.6
+        # postgres:18.6 pinned to its canonical multi-platform manifest digest.
+        image: postgres:18.6@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280
         env:
           POSTGRES_USER: dynamis
           POSTGRES_PASSWORD: ci-only-not-a-secret
@@ -84,20 +110,37 @@ jobs:
           --health-retries 24
           --health-start-period 20s
     env:
+      # Refuse to resolve or rewrite uv.lock anywhere in this job.
+      UV_FROZEN: "1"
       POSTGRES_URL: postgresql+psycopg://dynamis:ci-only-not-a-secret@127.0.0.1:5432/dynamis
       DYNAMIS_TEST_POSTGRES_URL: postgresql+psycopg://dynamis:ci-only-not-a-secret@127.0.0.1:5432/dynamis
       DYNAMIS_DB_SCHEMA: dynamis
-      DYNAMIS_DATASET_ROOT: ${{ runner.temp }}/datasets
-      DYNAMIS_DATABASE_ROOT: ${{ runner.temp }}/databases
-      DYNAMIS_DUCKDB_PATH: ${{ runner.temp }}/databases/duckdb/dynamis.duckdb
+      # The ephemeral scientific/database roots are exported by the first step
+      # below: the `runner` context does not exist when job-level `env` is
+      # evaluated, so they cannot be written here.
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Prepare ephemeral scientific and database roots
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/datasets" "$RUNNER_TEMP/databases/duckdb"
+          {
+            echo "DYNAMIS_DATASET_ROOT=$RUNNER_TEMP/datasets"
+            echo "DYNAMIS_DATABASE_ROOT=$RUNNER_TEMP/databases"
+            echo "DYNAMIS_DUCKDB_PATH=$RUNNER_TEMP/databases/duckdb/dynamis.duckdb"
+          } >> "$GITHUB_ENV"
 
       - name: Install uv and Python ${{ env.PYTHON_VERSION }}
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
+          version: "0.12.4"
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
+          cache-dependency-glob: uv.lock
 
       - name: Verify the locked environment installs
         run: uv sync --locked
@@ -105,39 +148,50 @@ jobs:
       - name: Upgrade a clean database to head
         run: uv run alembic upgrade head
 
-      - name: Report the migration head
-        run: uv run alembic current
+      - name: Assert the database is at the migration head
+        run: |
+          set -euo pipefail
+          current="$(uv run alembic current | tail -n 1 | awk '{print $1}')"
+          head="$(uv run alembic heads | tail -n 1 | awk '{print $1}')"
+          echo "current revision: $current"
+          echo "head revision:    $head"
+          test "$current" = "$head"
 
-      - name: Migration lifecycle tests against PostgreSQL
+      - name: Migration lifecycle tests against PostgreSQL (downgrade + replay + drift)
         run: uv run pytest -m postgres -v
 
-      - name: Generate offline DDL for audit
+      - name: Generate offline bootstrap DDL for audit
         run: uv run alembic upgrade head --sql > "$RUNNER_TEMP/bootstrap.sql"
 
       - name: Upload the generated bootstrap DDL
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: bootstrap-sql
           path: ${{ runner.temp }}/bootstrap.sql
           retention-days: 7
+          if-no-files-found: error
 
-  # Validates the pnpm workspace required by RES-96 (no product surface yet).
+  # Validates the pnpm workspace required by RES-96 (no product surface yet;
+  # RES-101 owns the React product and its tests).
   node:
-    name: Node 24 + pnpm workspace
+    name: Node workspace
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          version: 11.24.0
+          persist-credentials: false
 
-      - name: Set up Node.js ${{ env.NODE_VERSION }}
-        uses: actions/setup-node@v4
+      - name: Install pnpm (version from package.json `packageManager`)
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }} with the pnpm store cache
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install from the frozen lockfile
         run: pnpm install --frozen-lockfile
@@ -149,23 +203,27 @@ jobs:
         run: pnpm run web:lint
 
   # Rejects scientific data, database state, secrets, machine-specific absolute
-  # paths and static-analysis suppression from the repository. Dependency-free so
-  # it runs before any installation.
+  # paths and static-analysis suppression from the repository. The guard script
+  # is dependency-free so it runs before any installation.
   repository-boundary:
-    name: Repository boundary (no data, secrets or machine paths)
+    name: Repository boundary
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Run the repository guard
+      - name: Run the repository boundary guard
         run: python scripts/guard_repository.py
 
-      - name: Fail if any dataset or database artifact is tracked by git
+      - name: Fail if any dataset, database or secret artifact is tracked by git
         run: |
           set -euo pipefail
           if git ls-files | grep -Ei '\.(parquet|arrow|ipc|feather|duckdb|db|sqlite3?|c3d|npz|npy|xlsx?|zip|tgz?|h5|hdf5)$'; then

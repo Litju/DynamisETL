@@ -1,0 +1,66 @@
+name: Workflow lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  TZ: UTC
+  PYTHONHASHSEED: "0"
+  # actionlint release to install, with its published SHA-256 checksum. Bump
+  # both values together from https://github.com/rhysd/actionlint/releases and
+  # never install with an unverified download.
+  ACTIONLINT_VERSION: "1.7.12"
+  ACTIONLINT_SHA256: "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+
+jobs:
+  # Deliberately independent from ci.yml: if ci.yml itself is structurally
+  # invalid, GitHub refuses to run that workflow's jobs, but this workflow still
+  # starts and reports the defect.
+  workflow-lint:
+    name: Workflow lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install the checksum-verified actionlint release
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/actionlint.tar.gz"
+          curl --fail --silent --show-error --location \
+            --output "$archive" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          printf '%s  %s\n' "$ACTIONLINT_SHA256" "$archive" | sha256sum --check --strict -
+          tar --extract --gzip --file "$archive" --directory "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" --version
+
+      - name: Lint every workflow with actionlint (uses the runner's ShellCheck)
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/actionlint"
+
+      - name: Install uv and Python 3.12 for the workflow security audit
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.4"
+          python-version: "3.12"
+          enable-cache: false
+
+      - name: Audit workflows for security weaknesses with zizmor
+        run: |
+          set -euo pipefail
+          uv sync --locked --only-group lint --no-install-project
+          ./.venv/bin/zizmor --offline --no-progress .github/workflows
