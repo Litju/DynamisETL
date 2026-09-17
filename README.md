@@ -6,10 +6,12 @@ Compact, reproducible **multimodal human-performance data platform**: heterogene
 sports-science datasets are ingested through source adapters, normalized into
 explicit measurement contracts, validated, and served as interactive 2D/3D analysis.
 
-> **Repository status: RES-96 foundation.** Contracts, registry, storage
-> conventions, synthetic verification, the PostgreSQL metadata schema, the
-> orchestration skeleton and CI exist. Provider adapters, production metrics, ML
-> and the visualization product are later issues.
+> **Repository status: RES-97 first real-data slices.** Contracts, registry,
+> storage conventions, synthetic verification, the PostgreSQL metadata schema,
+> orchestration and CI exist, plus the first two real provider adapters
+> (Women's Soccer Positioning GNSS; DFL/Sportec IDSSE tracking + events).
+> Production metrics, gold marts, ML and the visualization product are later
+> issues.
 
 ## V1 product boundary
 
@@ -120,6 +122,41 @@ Every workflow under `.github/workflows/` is itself statically validated
 (actionlint) and security audited (zizmor) by
 `.github/workflows/workflow-lint.yml`.
 
+## Real-data slices (RES-97)
+
+Two compact provider slices are implemented end to end. Data lives **outside the
+repository**; CI never downloads it and the provider fixtures are structurally
+synthetic.
+
+| dataset | accepted slice | acquisition | adapter |
+| --- | --- | --- | --- |
+| `womens-soccer-positioning` | `J01.xlsx` (one matchday) | Zenodo Records API | streaming `openpyxl` workbook |
+| `dfl-sportec-idsse` | match `J03WPY`: matchinformation + events + positions XML | Hugging Face pinned revision `a715a38d…` | streaming `lxml.iterparse` + frame-major merge |
+
+```bash
+# 1. Acquire the verified slice into immutable Bronze (never in the repository)
+uv run dynamis-fetch womens-soccer-positioning --version 1.0 --key J01.xlsx --dry-run
+uv run dynamis-fetch womens-soccer-positioning --version 1.0 --key J01.xlsx
+uv run dynamis-fetch dfl-sportec-idsse \
+  --version a715a38dfbaf5f58e431727c2b78d174101a703c --match J03WPY
+
+# 2. Canonicalize into validated Silver Parquet + reconciliation receipts
+uv run dynamis-ingest womens-soccer-positioning --version 1.0 --key J01.xlsx
+uv run dynamis-ingest dfl-sportec-idsse \
+  --version a715a38dfbaf5f58e431727c2b78d174101a703c --match J03WPY
+```
+
+Both commands verify the Bronze manifest before ingesting, are idempotent, and
+never overwrite contradicted evidence. Reconciliation receipts and discovery
+receipts land under `cache/receipts/`; Silver Parquet under
+`silver/dataset_id=…/modality=…/session_id=…/`. The same pipeline is exposed as
+Dagster assets (`womens_j01_*`, `dfl_j03wpy_*`).
+
+**Licensing.** `womens-soccer-positioning` is **CC BY-NC 4.0** (non-commercial,
+attribution): keep it local, do not commit it or its derivatives.
+`dfl-sportec-idsse` is **CC BY 4.0** (attribution). See
+[`DATA_SOURCES.md`](DATA_SOURCES.md).
+
 ## Data and license boundary
 
 Project code is **Apache-2.0**. External datasets are governed by their own
@@ -131,7 +168,8 @@ Unclear-rights sources stay local-only, and the OpenBiomechanics
 professional-sports-organization / financial-analysis exclusion is preserved
 verbatim. NC/SA data stay outside the code license boundary.
 
-## Out of scope for RES-96
+## Out of scope so far
 
-No real dataset download, no provider adapters, no production metrics, no final
-visualization UI, no ML, no RES-97+ work.
+No production metric or gold mart, no visualization UI, no ML. Dense tracking and
+GNSS samples never enter PostgreSQL; only their artifact metadata and the
+semantic/provenance envelope do.

@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+import sqlalchemy as sa
 from sqlalchemy import Engine, Table
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
@@ -81,6 +82,49 @@ def _upsert(connection, table: Table, rows: list[dict[str, Any]]) -> int:
         .returning(*primary_keys)
     )
     return len(connection.execute(statement).fetchall())
+
+
+def _update_run(connection, table: Table, row: dict[str, Any]) -> int:
+    """Upsert one processing run so a re-run refreshes its state."""
+    statement = pg_insert(table).values([row])
+    statement = statement.on_conflict_do_update(
+        index_elements=["run_id"],
+        set_={
+            "status": statement.excluded.status,
+            "code_git_sha": statement.excluded.code_git_sha,
+            "completed_at": statement.excluded.completed_at,
+            "input_checksums": statement.excluded.input_checksums,
+            "notes": statement.excluded.notes,
+        },
+    )
+    result = connection.execute(statement)
+    return int(result.rowcount if result.rowcount and result.rowcount > 0 else 1)
+
+
+def _replace_by_path(
+    connection,
+    table: Table,
+    rows: list[dict[str, Any]],
+    *,
+    dataset_id: str,
+) -> int:
+    """Replace artifact rows for the same (dataset_id, relative_path).
+
+    ``sample_artifact`` describes the *current* materialization of a path and
+    ``processing_artifact`` is unique per path too; re-materializing the same
+    stream must not leave a stale checksum behind. Historical runs stay
+    auditable through ``processing_run`` and the external receipts.
+    """
+    if not rows:
+        return 0
+    paths = sorted({str(row["relative_path"]) for row in rows})
+    table_delete = table.delete()
+    connection.execute(
+        table_delete.where(
+            sa.and_(table.c.dataset_id == dataset_id, table.c.relative_path.in_(paths))
+        )
+    )
+    return _upsert(connection, table, rows)
 
 
 def persist_source(connection, source: DatasetSource) -> dict[str, int]:
@@ -375,26 +419,24 @@ def persist_ingest_run(
         inputs=tuple(_processing_inputs(source_checksums, result=result)),
         notes=f"RES-97 local ingestion of {result.session_id}",
     )
-    written["processing_run"] = _upsert(
+    written["processing_run"] = _update_run(
         connection,
         PROCESSING_RUN_TABLE,
-        [
-            {
-                "run_id": run.run_id,
-                "dataset_id": run.dataset_id,
-                "algorithm_id": run.algorithm_id,
-                "status": run.status.value,
-                "code_git_sha": run.code_git_sha,
-                "parameters_hash": run.parameters_hash,
-                "dagster_run_id": run.dagster_run_id,
-                "started_at": completed_at,
-                "completed_at": run.completed_at,
-                "input_checksums": [item.checksum_sha256 for item in run.inputs],
-                "notes": run.notes,
-            }
-        ],
+        {
+            "run_id": run.run_id,
+            "dataset_id": run.dataset_id,
+            "algorithm_id": run.algorithm_id,
+            "status": run.status.value,
+            "code_git_sha": run.code_git_sha,
+            "parameters_hash": run.parameters_hash,
+            "dagster_run_id": run.dagster_run_id,
+            "started_at": completed_at,
+            "completed_at": run.completed_at,
+            "input_checksums": [item.checksum_sha256 for item in run.inputs],
+            "notes": run.notes,
+        },
     )
-    written["sample_artifact"] = _upsert(
+    written["sample_artifact"] = _replace_by_path(
         connection,
         SAMPLE_ARTIFACT_TABLE,
         [
@@ -419,6 +461,7 @@ def persist_ingest_run(
             }
             for stream in result.streams
         ],
+        dataset_id=dataset_id,
     )
     processing_artifacts = [
         {
@@ -456,10 +499,14 @@ def persist_ingest_run(
         }
         for artifact in result.quarantine_artifacts
     )
-    written["processing_artifact"] = _upsert(
-        connection, PROCESSING_ARTIFACT_TABLE, processing_artifacts
+    written["processing_artifact"] = _replace_by_path(
+        connection,
+        PROCESSING_ARTIFACT_TABLE,
+        processing_artifacts,
+        dataset_id=dataset_id,
     )
     issues = _quality_issues(dataset_id, run_id, result)
+    connection.execute(QUALITY_ISSUE_TABLE.delete().where(QUALITY_ISSUE_TABLE.c.run_id == run_id))
     written["quality_issue"] = _upsert(connection, QUALITY_ISSUE_TABLE, issues)
     return written, run
 
