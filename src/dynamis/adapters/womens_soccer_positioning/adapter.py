@@ -34,7 +34,19 @@ from dynamis.adapters.womens_soccer_positioning.discovery import (
     WorkbookDiscovery,
     parse_source_timestamp,
 )
-from dynamis.contracts import GNSS_SCHEMA, MeasurementClass, Modality
+from dynamis.contracts import (
+    GNSS_SCHEMA,
+    AlgorithmKind,
+    AlgorithmSpec,
+    MeasurementClass,
+    Modality,
+    ParticipantRole,
+    SensorStream,
+    Session,
+    SessionKind,
+    SessionParticipant,
+    Subject,
+)
 from dynamis.pipeline.quarantine import (
     RULE_COORDINATE_OUT_OF_RANGE,
     RULE_REQUIRED_FIELD_NULL,
@@ -42,11 +54,34 @@ from dynamis.pipeline.quarantine import (
     RULE_TIMESTAMP_UNPARSABLE,
     QuarantinedRecord,
 )
-from dynamis.pipeline.streams import DEFAULT_BATCH_SIZE, CanonicalStream, SourceAuthorities
+from dynamis.pipeline.streams import (
+    DEFAULT_BATCH_SIZE,
+    CanonicalStream,
+    ProviderDomain,
+    SourceAuthorities,
+)
 
 WOMENS_DATASET_ID = authorities.WOMENS_DATASET_ID
 WOMENS_VERSION = authorities.WOMENS_VERSION
 WOMENS_SESSION_ID = authorities.WOMENS_SESSION_ID
+
+#: The single accepted workbook for RES-97.
+WORKBOOK_KEY_J01 = "J01.xlsx"
+
+
+def adapter_algorithm_spec() -> AlgorithmSpec:
+    """Deterministic algorithm identity for the Women's workbook adapter."""
+    return AlgorithmSpec(
+        algorithm_id="womens_soccer_positioning_adapter",
+        name="Women's Soccer Positioning anti-corruption adapter",
+        version="1",
+        kind=AlgorithmKind.ADAPTER,
+        description=(
+            "Streams the verified J01 workbook into canonical gnss_sample streams "
+            "with SI-unit speed, WGS 84 frame and session-monotonic time."
+        ),
+    )
+
 
 _LATITUDE_INDEX = SOURCE_COLUMNS.index("latitude")
 _LONGITUDE_INDEX = SOURCE_COLUMNS.index("longitude")
@@ -183,6 +218,73 @@ class WomenWorkbookAdapter:
 
     def counters(self, sheet_name: str) -> SheetCounters:
         return self._counters.get(sheet_name, SheetCounters())
+
+    def domain(self) -> ProviderDomain:
+        """Canonical domain records derived from workbook truth.
+
+        No UTC anchors exist upstream, so the session carries no timestamps; the
+        local-clock origin lives in the clock notes and session metadata.
+        """
+        subjects = tuple(
+            Subject(
+                dataset_id=WOMENS_DATASET_ID,
+                subject_id=subject_id_for_sheet(sheet.name),
+                sex="female",
+                cohort="2023/2024 Spanish third category",
+                notes=f"provider sheet {sheet.name}",
+            )
+            for sheet in self._discovery.sheets
+        )
+        participants = tuple(
+            SessionParticipant(
+                dataset_id=WOMENS_DATASET_ID,
+                session_id=WOMENS_SESSION_ID,
+                subject_id=subject.subject_id,
+                role=ParticipantRole.PLAYER,
+            )
+            for subject in subjects
+        )
+        streams = tuple(
+            SensorStream(
+                dataset_id=WOMENS_DATASET_ID,
+                session_id=WOMENS_SESSION_ID,
+                stream_id=subject.stream_id,
+                modality=Modality.GNSS,
+                measurement_class=MeasurementClass.RAW_MEASURED,
+                clock_id=authorities.CLOCK_ID,
+                synchronization_spec_id=authorities.SYNC_SPEC_ID,
+                coordinate_frame_id=authorities.WGS84_FRAME_ID,
+                subject_id=subject.subject_id,
+                nominal_sampling_rate_hz=subject.nominal_rate_hz,
+                si_units=("deg", "m", "m/s", "1"),
+                source_unit=authorities.SPEED_SOURCE_UNIT,
+                stream_metadata={
+                    "source_file_key": WORKBOOK_KEY_J01,
+                    "provider_sheet": subject.sheet_name,
+                },
+            )
+            for subject in self.subject_streams()
+        )
+        return ProviderDomain(
+            session=Session(
+                dataset_id=WOMENS_DATASET_ID,
+                session_id=WOMENS_SESSION_ID,
+                kind=SessionKind.MATCH,
+                label="2023/2024 matchday J01",
+            ),
+            subjects=subjects,
+            participants=participants,
+            trials=(),
+            streams=streams,
+            authorities=self.source_authorities(),
+            session_metadata={
+                "workbook_key": WORKBOOK_KEY_J01,
+                "sheet_count": len(self._discovery.sheet_names),
+                "session_origin_local": self.session_origin.isoformat(sep=" "),
+                "time_representation": "provider local wall-clock text (no timezone declared)",
+                "license": "CC-BY-NC-4.0 (local use only for this project slice)",
+            },
+        )
 
     def _batches_for_sheet(
         self, subject: WomenSubjectStream, *, origin_ns: int

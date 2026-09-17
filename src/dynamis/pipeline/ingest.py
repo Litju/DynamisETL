@@ -16,14 +16,15 @@ from typing import Any
 
 import pyarrow as pa
 
-from dynamis.adapters.sportec_idsse.adapter import IdsseDomain, IdsseMatchAdapter
+from dynamis.adapters.sportec_idsse.adapter import IdsseMatchAdapter
+from dynamis.adapters.sportec_idsse.authorities import tracking_stream_id
 from dynamis.adapters.womens_soccer_positioning.adapter import canonical_gnss_streams
 from dynamis.adapters.womens_soccer_positioning.authorities import WOMENS_DATASET_ID
 from dynamis.adapters.womens_soccer_positioning.discovery import discover_workbook
 from dynamis.config import Settings
 from dynamis.contracts import Modality
 from dynamis.contracts.schemas import schema_fingerprint
-from dynamis.pipeline.quarantine import QuarantineSink
+from dynamis.pipeline.quarantine import QuarantinedRecord, QuarantineSink
 from dynamis.pipeline.reconcile import (
     ReconciliationReceipt,
     StreamReconciliation,
@@ -34,6 +35,7 @@ from dynamis.pipeline.streams import (
     DEFAULT_BATCH_SIZE,
     DEFAULT_ROW_GROUP_SIZE,
     CanonicalStream,
+    ProviderDomain,
 )
 from dynamis.quality.checks import QualityError
 from dynamis.quality.streaming import StreamingValidator
@@ -100,6 +102,8 @@ class IngestResult:
     quarantine_artifacts: tuple[dict[str, Any], ...]
     reconciliation: ReconciliationReceipt
     receipt_path: str
+    provider_domain: ProviderDomain
+    quarantine_records: tuple[QuarantinedRecord, ...] = ()
     domain: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -256,6 +260,11 @@ def ingest_womens_j01(
     )
     assert_reconciled(receipt)
     receipt_path = write_reconciliation_receipt(settings, receipt, name=f"{session_id}-gnss")
+    sink_records = [
+        record
+        for subject in adapter.subject_streams()
+        for record in adapter.counters(subject.sheet_name).quarantined
+    ]
     return IngestResult(
         dataset_id=receipt.dataset_id,
         version=version,
@@ -265,6 +274,8 @@ def ingest_womens_j01(
         quarantine_artifacts=quarantine_artifacts,
         reconciliation=receipt,
         receipt_path=receipt_path,
+        provider_domain=adapter.domain(),
+        quarantine_records=tuple(sink_records),
         domain=dict(receipt.domain),
     )
 
@@ -294,7 +305,7 @@ def ingest_dfl_match(
     )
     positions_summary = adapter.parse_positions()
     events_summary = adapter.parse_events()
-    domain: IdsseDomain = adapter.domain()
+    domain: ProviderDomain = adapter.domain()
     positions_keys = (
         match_information_path.name,
         events_path.name,
@@ -320,7 +331,7 @@ def ingest_dfl_match(
 
     reconcile_streams: list[StreamReconciliation] = []
     for section in positions_summary.sections:
-        stream_id = f"tracking-{section.period_id}"
+        stream_id = tracking_stream_id(section.period_id)
         result = next(item for item in results if item.stream_id == stream_id)
         reconcile_streams.append(
             StreamReconciliation(
@@ -420,5 +431,7 @@ def ingest_dfl_match(
         quarantine_artifacts=quarantine_artifacts,
         reconciliation=receipt,
         receipt_path=receipt_path,
+        provider_domain=domain,
+        quarantine_records=tuple(quarantined),
         domain=dict(receipt.domain),
     )

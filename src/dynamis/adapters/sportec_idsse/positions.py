@@ -40,6 +40,7 @@ import pyarrow.ipc as ipc
 
 from dynamis.adapters.sportec_idsse.authorities import (
     FRAME_INTERVAL_NS,
+    tracking_stream_id,
 )
 from dynamis.adapters.sportec_idsse.matchinfo import BALL_TEAM_ID, IdsseMatchMetadata
 from dynamis.contracts import TRACKING_SCHEMA, MeasurementClass, Modality
@@ -303,7 +304,7 @@ class PositionsCanonicalizer:
                 detail=detail,
                 dataset_id=self._dataset_id,
                 session_id=self._session_id,
-                stream_id=f"tracking-{PERIOD_SECTIONS[spill.section]}",
+                stream_id=tracking_stream_id(PERIOD_SECTIONS[spill.section]),
                 subject_id=spill.person_id if spill.object_type == "player" else None,
                 source_record_id=f"{spill.person_id}:{elem.get('N')}",
                 source_time=elem.get("T"),
@@ -421,7 +422,7 @@ class PositionsCanonicalizer:
                 CanonicalStream(
                     dataset_id=self._dataset_id,
                     session_id=session_id,
-                    stream_id=f"tracking-{summary.period_id}",
+                    stream_id=tracking_stream_id(summary.period_id),
                     modality=Modality.TRACKING,
                     measurement_class=MeasurementClass.RAW_MEASURED,
                     clock_id=self._clock_id,

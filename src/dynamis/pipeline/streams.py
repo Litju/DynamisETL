@@ -1,4 +1,4 @@
-﻿"""Canonical stream descriptors shared by provider adapters and the pipeline.
+"""Canonical stream descriptors shared by provider adapters and the pipeline.
 
 An adapter emits :class:`CanonicalStream` objects: a declared identity/authority
 envelope plus a bounded iterator of Arrow batches for one canonical modality.
@@ -16,10 +16,16 @@ import pyarrow as pa
 from dynamis.contracts import (
     Clock,
     CoordinateFrame,
+    Device,
     MeasurementClass,
     Modality,
+    SensorStream,
+    Session,
+    SessionParticipant,
+    Subject,
     SyncAlignment,
     SynchronizationSpec,
+    Trial,
 )
 from dynamis.contracts.schemas import with_file_metadata
 
@@ -83,3 +89,18 @@ class SourceAuthorities:
     clocks: tuple[Clock, ...] = ()
     synchronizations: tuple[SynchronizationSpec, ...] = ()
     alignments: tuple[SyncAlignment, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderDomain:
+    """Canonical domain records for one provider session (match, matchday, ...)."""
+
+    session: Session
+    subjects: tuple[Subject, ...]
+    participants: tuple[SessionParticipant, ...]
+    trials: tuple[Trial, ...]
+    streams: tuple[SensorStream, ...]
+    authorities: SourceAuthorities = SourceAuthorities()
+    devices: tuple[Device, ...] = ()
+    session_metadata: dict[str, Any] = field(default_factory=dict)
+    participants_ignored: dict[str, int] = field(default_factory=dict)

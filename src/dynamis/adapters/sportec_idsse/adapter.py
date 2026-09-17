@@ -11,9 +11,8 @@ control plane without re-deriving provider semantics.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from dynamis.adapters.sportec_idsse import authorities
 from dynamis.adapters.sportec_idsse.events import EventsCanonicalizer, EventsSummary
@@ -29,7 +28,6 @@ from dynamis.adapters.sportec_idsse.positions import (
 from dynamis.contracts import (
     AlgorithmKind,
     AlgorithmSpec,
-    Device,
     MeasurementClass,
     Modality,
     ParticipantRole,
@@ -44,10 +42,27 @@ from dynamis.pipeline.streams import (
     DEFAULT_BATCH_SIZE,
     DEFAULT_ROW_GROUP_SIZE,
     CanonicalStream,
+    ProviderDomain,
     SourceAuthorities,
 )
 
 IDSSE_DATASET_ID = authorities.IDSSE_DATASET_ID
+
+
+def adapter_algorithm_spec() -> AlgorithmSpec:
+    """Deterministic algorithm identity for the DFL/Sportec adapter."""
+    return AlgorithmSpec(
+        algorithm_id="sportec_idsse_adapter",
+        name="DFL/Sportec IDSSE anti-corruption adapter",
+        version="1",
+        kind=AlgorithmKind.ADAPTER,
+        description=(
+            "Streams the pinned IDSSE matchinformation/events/positions XML into "
+            "canonical tracking_sample and event_record streams."
+        ),
+    )
+
+
 BALL_SUBJECT_PREFIX = "ball"
 
 
@@ -56,20 +71,6 @@ class IdsseMatchAdapterConfig:
     version: str
     batch_size: int = DEFAULT_BATCH_SIZE
     row_group_size: int = DEFAULT_ROW_GROUP_SIZE
-
-
-@dataclass(slots=True)
-class IdsseDomain:
-    """Canonical domain records for one match, derived from provider truth."""
-
-    session: Session
-    subjects: tuple[Subject, ...]
-    participants: tuple[SessionParticipant, ...]
-    trials: tuple[Trial, ...]
-    streams: tuple[SensorStream, ...]
-    devices: tuple[Device, ...] = ()
-    session_metadata: dict[str, Any] = field(default_factory=dict)
-    participants_ignored: dict[str, int] = field(default_factory=dict)
 
 
 class IdsseMatchAdapter:
@@ -118,16 +119,7 @@ class IdsseMatchAdapter:
         return self.metadata.match_id
 
     def algorithm_spec(self) -> AlgorithmSpec:
-        return AlgorithmSpec(
-            algorithm_id="sportec_idsse_adapter",
-            name="DFL/Sportec IDSSE anti-corruption adapter",
-            version="1",
-            kind=AlgorithmKind.ADAPTER,
-            description=(
-                "Streams the pinned IDSSE matchinformation/events/positions XML into "
-                "canonical tracking_sample and event_record streams."
-            ),
-        )
+        return adapter_algorithm_spec()
 
     # -- authorities -----------------------------------------------------
 
@@ -144,7 +136,7 @@ class IdsseMatchAdapter:
 
     # -- domain ----------------------------------------------------------
 
-    def domain(self) -> IdsseDomain:
+    def domain(self) -> ProviderDomain:
         metadata = self.metadata
         subjects: list[Subject] = []
         participants: list[SessionParticipant] = []
@@ -220,12 +212,13 @@ class IdsseMatchAdapter:
             "period_total_times_ms": metadata.period_total_times_ms,
             "capture": "TRACAB optical tracking (DFL/Sportec provider)",
         }
-        return IdsseDomain(
+        return ProviderDomain(
             session=session,
             subjects=tuple(subjects),
             participants=tuple(participants),
             trials=trials,
             streams=streams,
+            authorities=self.source_authorities(),
             session_metadata=session_metadata,
             participants_ignored={
                 "trainers": metadata.trainer_count,
@@ -253,7 +246,7 @@ class IdsseMatchAdapter:
                 SensorStream(
                     dataset_id=self.dataset_id,
                     session_id=metadata.match_id,
-                    stream_id=f"{authorities.TRACKING_STREAM_PREFIX}{trial.trial_id}",
+                    stream_id=authorities.tracking_stream_id(trial.trial_id),
                     modality=Modality.TRACKING,
                     measurement_class=MeasurementClass.RAW_MEASURED,
                     clock_id=authorities.CLOCK_ID,

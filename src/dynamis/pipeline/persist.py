@@ -1,0 +1,549 @@
+"""Control-plane persistence for real ingestions.
+
+The dense samples stay in Parquet; PostgreSQL receives the semantic and
+provenance envelope only: source/version/files, subjects/participants/trials,
+declared authorities (clocks, frames, synchronization), streams, materialized
+artifact metadata, processing runs and quality findings.
+
+Every statement is an idempotent upsert so re-running the same ingestion does
+not duplicate control-plane rows.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
+
+from sqlalchemy import Engine, Table
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+from dynamis.config import Settings
+from dynamis.contracts import (
+    AlgorithmSpec,
+    DatasetSource,
+    ProcessingRun,
+    ProcessingStatus,
+)
+from dynamis.pipeline.ingest import IngestResult
+from dynamis.pipeline.streams import ProviderDomain
+from dynamis.registry import source_by_id, validate_registry
+from dynamis.storage.manifest import read_bronze_manifest
+from dynamis.storage.metadata import build_metadata
+
+_TABLES = build_metadata().tables
+
+ALGORITHM_SPEC_TABLE = _TABLES["algorithm_spec"]
+CLOCK_TABLE = _TABLES["clock"]
+COORDINATE_FRAME_TABLE = _TABLES["coordinate_frame"]
+DATASET_SOURCE_TABLE = _TABLES["dataset_source"]
+DATASET_SOURCE_MODALITY_TABLE = _TABLES["dataset_source_modality"]
+DATASET_VERSION_TABLE = _TABLES["dataset_version"]
+DATASET_VERSION_FILE_TABLE = _TABLES["dataset_version_file"]
+LICENSE_POLICY_TABLE = _TABLES["license_policy"]
+PROCESSING_ARTIFACT_TABLE = _TABLES["processing_artifact"]
+PROCESSING_RUN_TABLE = _TABLES["processing_run"]
+QUALITY_ISSUE_TABLE = _TABLES["quality_issue"]
+SAMPLE_ARTIFACT_TABLE = _TABLES["sample_artifact"]
+SENSOR_STREAM_TABLE = _TABLES["sensor_stream"]
+SESSION_TABLE = _TABLES["session"]
+SESSION_PARTICIPANT_TABLE = _TABLES["session_participant"]
+SUBJECT_TABLE = _TABLES["subject"]
+SYNCHRONIZATION_SPEC_TABLE = _TABLES["synchronization_spec"]
+TRIAL_TABLE = _TABLES["trial"]
+
+
+@dataclass(frozen=True, slots=True)
+class PersistSummary:
+    dataset_id: str
+    version: str
+    run_id: str
+    rows_written: dict[str, int]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "dataset_id": self.dataset_id,
+            "version": self.version,
+            "run_id": self.run_id,
+            "rows_written": self.rows_written,
+        }
+
+
+def _upsert(connection, table: Table, rows: list[dict[str, Any]]) -> int:
+    """Insert-or-ignore, returning the number of rows actually inserted."""
+    if not rows:
+        return 0
+    primary_keys = [column for column in table.primary_key.columns]
+    statement = (
+        pg_insert(table)
+        .values(rows)
+        .on_conflict_do_nothing(index_elements=[column.name for column in primary_keys])
+        .returning(*primary_keys)
+    )
+    return len(connection.execute(statement).fetchall())
+
+
+def persist_source(connection, source: DatasetSource) -> dict[str, int]:
+    """Registry source, license, modalities, version and expected files."""
+    written: dict[str, int] = {}
+    written["license_policy"] = _upsert(
+        connection,
+        LICENSE_POLICY_TABLE,
+        [
+            {
+                "policy_id": source.license.policy_id,
+                "identifier": source.license.identifier,
+                "status": source.license.status.value,
+                "attribution_required": source.license.attribution_required,
+                "noncommercial_only": source.license.noncommercial_only,
+                "share_alike": source.license.share_alike,
+                "redistribution": source.license.redistribution.value,
+                "local_only": source.license.local_only,
+                "restrictions": list(source.license.restrictions),
+            }
+        ],
+    )
+    written["dataset_source"] = _upsert(
+        connection,
+        DATASET_SOURCE_TABLE,
+        [
+            {
+                "dataset_id": source.dataset_id,
+                "name": source.name,
+                "provider": source.provider,
+                "upstream_urls": [str(url) for url in source.upstream_urls],
+                "doi": source.doi,
+                "domain": source.domain,
+                "adapter_id": source.adapter_id,
+                "v1_role": source.v1_role,
+                "initial_scope": source.initial_scope,
+                "license_policy_id": source.license.policy_id,
+            }
+        ],
+    )
+    written["dataset_source_modality"] = _upsert(
+        connection,
+        DATASET_SOURCE_MODALITY_TABLE,
+        [
+            {"dataset_id": source.dataset_id, "modality": modality.value}
+            for modality in source.modalities
+        ],
+    )
+    version_rows = [
+        {
+            "dataset_id": source.dataset_id,
+            "version": version.version,
+            "release_date": version.release_date,
+            "upstream_url": str(version.upstream_url),
+            "citation": version.citation,
+            "optional": version.optional,
+            "retrieval_status": version.retrieval.status.value,
+            "retrieved_at": version.retrieval.retrieved_at,
+        }
+        for version in source.versions
+    ]
+    written["dataset_version"] = _upsert(connection, DATASET_VERSION_TABLE, version_rows)
+    file_rows = [
+        {
+            "dataset_id": source.dataset_id,
+            "version": version.version,
+            "key": item.key,
+            "size_bytes": item.size_bytes,
+            "upstream_md5": None if item.md5 == "unknown" else item.md5,
+            "upstream_sha256": None if item.sha256 == "unknown" else item.sha256,
+            "local_sha256": item.local_sha256,
+            "retrieved_at": item.retrieved_at,
+        }
+        for version in source.versions
+        for item in version.retrieval.files
+    ]
+    written["dataset_version_file"] = _upsert(connection, DATASET_VERSION_FILE_TABLE, file_rows)
+    return written
+
+
+def persist_bronze_state(
+    connection, settings: Settings, *, dataset_id: str, version: str
+) -> tuple[str, ...]:
+    """Record the verified Bronze retrieval state and return its checksums."""
+    manifest = read_bronze_manifest(settings, dataset_id=dataset_id, version=version)
+    retrieved = [item for item in manifest.files if item.local_sha256 is not None]
+    if retrieved:
+        connection.execute(
+            DATASET_VERSION_TABLE.update()
+            .where(
+                DATASET_VERSION_TABLE.c.dataset_id == dataset_id,
+                DATASET_VERSION_TABLE.c.version == version,
+            )
+            .values(retrieval_status="fetched", retrieved_at=manifest.retrieved_at)
+        )
+        for item in retrieved:
+            connection.execute(
+                DATASET_VERSION_FILE_TABLE.update()
+                .where(
+                    DATASET_VERSION_FILE_TABLE.c.dataset_id == dataset_id,
+                    DATASET_VERSION_FILE_TABLE.c.version == version,
+                    DATASET_VERSION_FILE_TABLE.c.key == item.key,
+                )
+                .values(local_sha256=item.local_sha256, retrieved_at=manifest.retrieved_at)
+            )
+    return tuple(item.local_sha256 or "" for item in retrieved)
+
+
+def persist_domain(connection, domain: ProviderDomain) -> dict[str, int]:
+    written: dict[str, int] = {}
+    written["subject"] = _upsert(
+        connection,
+        SUBJECT_TABLE,
+        [
+            {
+                "dataset_id": subject.dataset_id,
+                "subject_id": subject.subject_id,
+                "sex": subject.sex,
+                "cohort": subject.cohort,
+                "notes": subject.notes,
+            }
+            for subject in domain.subjects
+        ],
+    )
+    written["session"] = _upsert(
+        connection,
+        SESSION_TABLE,
+        [
+            {
+                "dataset_id": domain.session.dataset_id,
+                "session_id": domain.session.session_id,
+                "kind": domain.session.kind.value,
+                "protocol_id": domain.session.protocol_id,
+                "label": domain.session.label,
+                "started_at": domain.session.started_at,
+                "ended_at": domain.session.ended_at,
+                "venue": domain.session.venue,
+            }
+        ],
+    )
+    written["session_participant"] = _upsert(
+        connection,
+        SESSION_PARTICIPANT_TABLE,
+        [
+            {
+                "dataset_id": participant.dataset_id,
+                "session_id": participant.session_id,
+                "subject_id": participant.subject_id,
+                "role": participant.role.value,
+                "group_label": participant.group_label,
+            }
+            for participant in domain.participants
+        ],
+    )
+    written["trial"] = _upsert(
+        connection,
+        TRIAL_TABLE,
+        [
+            {
+                "dataset_id": trial.dataset_id,
+                "session_id": trial.session_id,
+                "trial_id": trial.trial_id,
+                "subject_id": trial.subject_id,
+                "parent_trial_id": trial.parent_trial_id,
+                "label": trial.label,
+                "started_at": trial.started_at,
+                "ended_at": trial.ended_at,
+            }
+            for trial in domain.trials
+        ],
+    )
+    written["clock"] = _upsert(
+        connection,
+        CLOCK_TABLE,
+        [
+            {
+                "clock_id": clock.clock_id,
+                "timebase": clock.timebase.value,
+                "frequency_hz": clock.frequency_hz,
+                "epoch_utc": clock.epoch_utc,
+                "drift_ppm": clock.drift_ppm,
+                "rollover_period_s": clock.rollover_period_s,
+                "notes": clock.notes,
+            }
+            for clock in domain.authorities.clocks
+        ],
+    )
+    written["coordinate_frame"] = _upsert(
+        connection,
+        COORDINATE_FRAME_TABLE,
+        [
+            {
+                "frame_id": frame.frame_id,
+                "name": frame.name,
+                "kind": frame.kind.value,
+                "handedness": frame.handedness.value,
+                "x_direction": frame.x_direction.value,
+                "y_direction": frame.y_direction.value,
+                "z_direction": frame.z_direction.value,
+                "origin_description": frame.origin_description,
+                "length_unit": frame.length_unit,
+                "parent_frame_id": frame.parent_frame_id,
+                "description": frame.description,
+            }
+            for frame in domain.authorities.frames
+        ],
+    )
+    written["synchronization_spec"] = _upsert(
+        connection,
+        SYNCHRONIZATION_SPEC_TABLE,
+        [
+            {
+                "sync_spec_id": spec.sync_spec_id,
+                "method": spec.method.value,
+                "reference_clock_id": spec.reference_clock_id,
+                "uncertainty_ms": spec.uncertainty_ms,
+                "residual_max_abs_ms": spec.residual_max_abs_ms,
+                "residual_rms_ms": spec.residual_rms_ms,
+                "verified": spec.verified,
+                "verified_at": spec.verified_at,
+                "evidence_artifact_id": spec.evidence_artifact_id,
+                "notes": spec.notes,
+            }
+            for spec in domain.authorities.synchronizations
+        ],
+    )
+    written["sensor_stream"] = _upsert(
+        connection,
+        SENSOR_STREAM_TABLE,
+        [
+            {
+                "dataset_id": stream.dataset_id,
+                "stream_id": stream.stream_id,
+                "session_id": stream.session_id,
+                "trial_id": stream.trial_id,
+                "subject_id": stream.subject_id,
+                "device_id": stream.device_id,
+                "modality": stream.modality.value,
+                "measurement_class": stream.measurement_class.value,
+                "clock_id": stream.clock_id,
+                "synchronization_spec_id": stream.synchronization_spec_id,
+                "coordinate_frame_id": stream.coordinate_frame_id,
+                "skeleton_id": stream.skeleton_id,
+                "nominal_sampling_rate_hz": stream.nominal_sampling_rate_hz,
+                "si_units": list(stream.si_units),
+                "source_unit": stream.source_unit,
+                "stream_metadata": dict(stream.stream_metadata),
+            }
+            for stream in domain.streams
+        ],
+    )
+    return written
+
+
+def persist_ingest_run(
+    connection,
+    *,
+    dataset_id: str,
+    result: IngestResult,
+    domain: ProviderDomain,
+    algorithm: AlgorithmSpec,
+    source_checksums: tuple[str, ...],
+    run_id: str,
+    code_git_sha: str | None = None,
+) -> tuple[dict[str, int], ProcessingRun]:
+    written: dict[str, int] = {}
+    written["algorithm_spec"] = _upsert(
+        connection,
+        ALGORITHM_SPEC_TABLE,
+        [
+            {
+                "algorithm_id": algorithm.algorithm_id,
+                "name": algorithm.name,
+                "version": algorithm.version,
+                "kind": algorithm.kind.value,
+                "code_git_sha": algorithm.code_git_sha,
+                "parameters": dict(algorithm.parameters),
+                "parameters_hash": algorithm.parameters_hash,
+                "description": algorithm.description,
+                "citation": algorithm.citation,
+            }
+        ],
+    )
+    completed_at = datetime.now(UTC)
+    run = ProcessingRun(
+        run_id=run_id,
+        dataset_id=dataset_id,
+        algorithm_id=algorithm.algorithm_id,
+        status=ProcessingStatus.COMPLETED,
+        code_git_sha=code_git_sha,
+        completed_at=completed_at,
+        inputs=tuple(_processing_inputs(source_checksums, result=result)),
+        notes=f"RES-97 local ingestion of {result.session_id}",
+    )
+    written["processing_run"] = _upsert(
+        connection,
+        PROCESSING_RUN_TABLE,
+        [
+            {
+                "run_id": run.run_id,
+                "dataset_id": run.dataset_id,
+                "algorithm_id": run.algorithm_id,
+                "status": run.status.value,
+                "code_git_sha": run.code_git_sha,
+                "parameters_hash": run.parameters_hash,
+                "dagster_run_id": run.dagster_run_id,
+                "started_at": completed_at,
+                "completed_at": run.completed_at,
+                "input_checksums": [item.checksum_sha256 for item in run.inputs],
+                "notes": run.notes,
+            }
+        ],
+    )
+    written["sample_artifact"] = _upsert(
+        connection,
+        SAMPLE_ARTIFACT_TABLE,
+        [
+            {
+                "artifact_id": f"{stream.stream_id}-{stream.checksum_sha256[:12]}",
+                "dataset_id": dataset_id,
+                "session_id": result.session_id,
+                "stream_id": stream.stream_id,
+                "layer": "silver",
+                "relative_path": stream.relative_path,
+                "format": "parquet",
+                "compression": "zstd",
+                "row_count": stream.row_count,
+                "byte_size": stream.byte_size,
+                "checksum_sha256": stream.checksum_sha256,
+                "schema_version": "1",
+                "schema_fingerprint": stream.schema_fingerprint,
+                "partition": stream.partition,
+                "coordinate_frame_id": stream.coordinate_frame_id,
+                "synchronization_spec_id": stream.synchronization_spec_id,
+                "created_at": completed_at,
+            }
+            for stream in result.streams
+        ],
+    )
+    processing_artifacts = [
+        {
+            "artifact_id": f"art-{stream.stream_id}-{stream.checksum_sha256[:12]}",
+            "dataset_id": dataset_id,
+            "run_id": run_id,
+            "artifact_type": f"silver_{stream.modality}",
+            "layer": "silver",
+            "relative_path": stream.relative_path,
+            "checksum_sha256": stream.checksum_sha256,
+            "byte_size": stream.byte_size,
+            "row_count": stream.row_count,
+            "created_at": completed_at,
+            "artifact_metadata": {
+                "stream_id": stream.stream_id,
+                "schema_fingerprint": stream.schema_fingerprint,
+                "contract_schema_fingerprint": stream.contract_schema_fingerprint,
+            },
+        }
+        for stream in result.streams
+    ]
+    processing_artifacts.extend(
+        {
+            "artifact_id": f"art-quarantine-{artifact['rule']}-{artifact['checksum_sha256'][:12]}",
+            "dataset_id": dataset_id,
+            "run_id": run_id,
+            "artifact_type": f"quarantine_{artifact['rule']}",
+            "layer": "quarantine",
+            "relative_path": artifact["relative_path"],
+            "checksum_sha256": artifact["checksum_sha256"],
+            "byte_size": artifact["byte_size"],
+            "row_count": artifact["row_count"],
+            "created_at": completed_at,
+            "artifact_metadata": {"rule": artifact["rule"]},
+        }
+        for artifact in result.quarantine_artifacts
+    )
+    written["processing_artifact"] = _upsert(
+        connection, PROCESSING_ARTIFACT_TABLE, processing_artifacts
+    )
+    issues = _quality_issues(dataset_id, run_id, result)
+    written["quality_issue"] = _upsert(connection, QUALITY_ISSUE_TABLE, issues)
+    return written, run
+
+
+def _processing_inputs(checksums: tuple[str, ...], *, result: IngestResult):
+    from dynamis.contracts import ProcessingInput
+
+    usable = [checksum for checksum in checksums if len(checksum) == 64]
+    if not usable:
+        usable = [result.streams[0].checksum_sha256] if result.streams else []
+    return [
+        ProcessingInput(artifact_id=f"bronze-{index}", checksum_sha256=checksum, role="bronze")
+        for index, checksum in enumerate(usable)
+    ]
+
+
+def _quality_issues(dataset_id: str, run_id: str, result: IngestResult) -> list[dict[str, Any]]:
+    issues: list[dict[str, Any]] = []
+    for index, record in enumerate(result.quarantine_records):
+        issues.append(
+            {
+                "issue_id": f"qi-{run_id}-{index:05d}"[:128],
+                "dataset_id": dataset_id,
+                "run_id": run_id,
+                "session_id": record.session_id,
+                "stream_id": record.stream_id,
+                "subject_id": record.subject_id,
+                "trial_id": None,
+                "sample_index": None,
+                "rule": record.rule,
+                "severity": record.severity.value,
+                "state": "QUARANTINED",
+                "evidence": dict(record.evidence)
+                or {"detail": record.detail, "source_record_id": record.source_record_id},
+                "detected_at": datetime.now(UTC),
+            }
+        )
+    return issues
+
+
+def persist_ingest(
+    settings: Settings,
+    *,
+    dataset_id: str,
+    version: str,
+    domain: ProviderDomain,
+    result: IngestResult,
+    algorithm: AlgorithmSpec,
+    run_id: str,
+    code_git_sha: str | None = None,
+    engine: Engine | None = None,
+) -> PersistSummary:
+    """Full control-plane persistence for one ingestion."""
+    from dynamis.storage.control_plane import control_plane_engine
+
+    registry = validate_registry()
+    source = source_by_id(registry, dataset_id)
+    owns_engine = engine is None
+    active = engine or control_plane_engine(settings)
+    written: dict[str, int] = {}
+    try:
+        with active.begin() as connection:
+            written.update(persist_source(connection, source))
+            checksums = persist_bronze_state(
+                connection, settings, dataset_id=dataset_id, version=version
+            )
+            written.update(persist_domain(connection, domain))
+            run_written, _run = persist_ingest_run(
+                connection,
+                dataset_id=dataset_id,
+                result=result,
+                domain=domain,
+                algorithm=algorithm,
+                source_checksums=checksums,
+                run_id=run_id,
+                code_git_sha=code_git_sha,
+            )
+            written.update(run_written)
+    finally:
+        if owns_engine:
+            active.dispose()
+    return PersistSummary(
+        dataset_id=dataset_id,
+        version=version,
+        run_id=run_id,
+        rows_written={key: value for key, value in written.items() if value},
+    )

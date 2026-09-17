@@ -37,8 +37,13 @@ SYNC_SPEC_ID = "dfl-source-provided"
 SPORTEC_FPS = 25
 FRAME_INTERVAL_NS = 1_000_000_000 // SPORTEC_FPS
 
-TRACKING_STREAM_PREFIX = "tracking-period-"
 EVENT_STREAM_ID = "events"
+
+
+def tracking_stream_id(period_id: str) -> str:
+    """Canonical tracking stream identity for one period (single authority)."""
+    return f"tracking-{period_id}"
+
 
 REFERENCE_CLIENT = (
     "kloppy SportecTrackingDataCoordinateSystem (Origin.CENTER, VerticalOrientation."
