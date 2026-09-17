@@ -148,7 +148,7 @@ class PositionsDiscovery:
     frames: int
     distinct_frame_numbers: int
     frames_per_period: dict[str, int]
-    entities_per_frame: dict[str, int]
+    frame_entity_count_distribution: dict[str, int]
     entity_kinds: dict[str, int]
     ball_entities: tuple[str, ...]
     player_entities: int
@@ -175,7 +175,7 @@ class PositionsDiscovery:
             "frames": self.frames,
             "distinct_frame_numbers": self.distinct_frame_numbers,
             "frames_per_period": self.frames_per_period,
-            "entities_per_frame": self.entities_per_frame,
+            "frame_entity_count_distribution": self.frame_entity_count_distribution,
             "entity_kinds": self.entity_kinds,
             "ball_entity_ids": list(self.ball_entities),
             "player_entities": self.player_entities,
@@ -306,7 +306,7 @@ def discover_positions(path: Path) -> PositionsDiscovery:
     framesets = 0
     frames = 0
     frames_per_period: Counter[str] = Counter()
-    entities_per_frame: Counter[int] = Counter()
+    entity_counts_per_frame: Counter[int] = Counter()
     entity_kinds: Counter[str] = Counter()
     ball_entities: list[str] = []
     player_entities = 0
@@ -366,7 +366,7 @@ def discover_positions(path: Path) -> PositionsDiscovery:
         if n_raw is None:
             raise DiscoveryError(f"{path.name}: Frame without N in {section}")
         n = int(n_raw)
-        entities_per_frame[n] += 1
+        entity_counts_per_frame[n] += 1
         if last_frame_number.get(current) == n:
             duplicates += 1
         last_frame_number[current] = n
@@ -414,10 +414,11 @@ def discover_positions(path: Path) -> PositionsDiscovery:
         sections=tuple(sections),
         framesets=framesets,
         frames=frames,
-        distinct_frame_numbers=len(entities_per_frame),
+        distinct_frame_numbers=len(entity_counts_per_frame),
         frames_per_period=dict(frames_per_period),
-        entities_per_frame={
-            str(config): count for config, count in entities_per_frame.items() if count
+        frame_entity_count_distribution={
+            str(count): number
+            for count, number in Counter(entity_counts_per_frame.values()).items()
         },
         entity_kinds=dict(entity_kinds),
         ball_entities=tuple(ball_entities),
@@ -434,7 +435,7 @@ def discover_positions(path: Path) -> PositionsDiscovery:
         ball_possession_values=dict(possession),
         ball_status_values=dict(status),
         unmapped_attribute_distributions={
-            name: dict(counter.most_common(50)) for name, counter in unmapped.items()
+            name: _summarize_unmapped(counter) for name, counter in unmapped.items()
         },
         attribute_null_counts={**dict(null_counts), "Z_observed": z_observed},
         pitch_size_declared_m=pitch_size,
@@ -443,6 +444,33 @@ def discover_positions(path: Path) -> PositionsDiscovery:
 
 def _parse_iso(value: str) -> datetime:
     return datetime.fromisoformat(value)
+
+
+def _summarize_unmapped(counter: Counter[str]) -> dict[str, Any]:
+    """Bounded summary of an undecoded vendor attribute.
+
+    A float attribute (``D``) has near-continuous cardinality, so a full value
+    histogram would bloat the receipt; it is summarized with count/min/max and
+    the 10 most frequent values. Low-cardinality codes (``M``) keep the full
+    distribution.
+    """
+    total = sum(counter.values())
+    summary: dict[str, Any] = {"observed": total, "distinct": len(counter)}
+    if total == 0:
+        return summary
+    try:
+        numeric = [float(value) for value in counter]
+    except ValueError:
+        numeric = []
+    if numeric and len(counter) > 64:
+        summary["kind"] = "numeric"
+        summary["min"] = min(numeric)
+        summary["max"] = max(numeric)
+        summary["top_values"] = {value: count for value, count in counter.most_common(10)}
+    else:
+        summary["kind"] = "code"
+        summary["values"] = dict(counter.most_common(64))
+    return summary
 
 
 @dataclass(frozen=True, slots=True)

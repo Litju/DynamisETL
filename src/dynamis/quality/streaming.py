@@ -125,7 +125,17 @@ class StreamingValidator:
         self._class_values.update(str(v) for v in kernels.distinct_values(column))
 
     def _observe_time(self, batch: pa.RecordBatch) -> None:
-        if not is_dense(self._schema) or batch.num_rows == 0:
+        if batch.num_rows == 0:
+            return
+        if "t_rel_ns" in batch.schema.names and not batch.column("t_rel_ns").null_count:
+            column = batch.column("t_rel_ns")
+            first = int(column[0].as_py())
+            last = int(column[-1].as_py())
+            self.t_rel_min_ns = (
+                first if self.t_rel_min_ns is None else min(self.t_rel_min_ns, first)
+            )
+            self.t_rel_max_ns = last if self.t_rel_max_ns is None else max(self.t_rel_max_ns, last)
+        if not is_dense(self._schema):
             return
         strictness = time_monotonicity(self._schema)
         for name in ("sample_index", "t_rel_ns"):
@@ -176,14 +186,7 @@ class StreamingValidator:
                                 evidence={"column": name, "monotonicity": strictness},
                             )
                         )
-                if self.t_rel_min_ns is None:
-                    self.t_rel_min_ns = first
-                else:
-                    self.t_rel_min_ns = min(self.t_rel_min_ns, first)
                 self._previous_t_rel_ns = last
-                self.t_rel_max_ns = (
-                    last if self.t_rel_max_ns is None else max(self.t_rel_max_ns, last)
-                )
             if batch.num_rows > 1:
                 ordered = (
                     kernels.is_strictly_increasing(column)

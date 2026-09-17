@@ -1,4 +1,4 @@
-"""Canonical stream descriptors shared by provider adapters and the pipeline.
+﻿"""Canonical stream descriptors shared by provider adapters and the pipeline.
 
 An adapter emits :class:`CanonicalStream` objects: a declared identity/authority
 envelope plus a bounded iterator of Arrow batches for one canonical modality.
@@ -24,9 +24,9 @@ from dynamis.contracts import (
 from dynamis.contracts.schemas import with_file_metadata
 
 #: Batch authority: the maximum rows an adapter may hold before emitting a batch.
-DEFAULT_BATCH_SIZE = 1 << 16
+DEFAULT_BATCH_SIZE = 1 << 14
 #: Row-group authority for streaming Silver writes.
-DEFAULT_ROW_GROUP_SIZE = 1 << 18
+DEFAULT_ROW_GROUP_SIZE = 1 << 16
 
 
 @dataclass(slots=True)

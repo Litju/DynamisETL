@@ -9,7 +9,7 @@ excluded explicitly, never silently.
 Two provider realities shape the canonical output:
 
 * the source file is **not** chronologically ordered, so canonical rows are
-  sorted by ``(EventTime, EventId)`` Ã¢â‚¬â€ deterministic and time-ordered;
+  sorted by ``(EventTime, EventId)`` - deterministic and time-ordered;
 * event positions use the provider's bottom-left origin, so they are resolved
   into the declared pitch-centred frame through the declared frame transform.
 """

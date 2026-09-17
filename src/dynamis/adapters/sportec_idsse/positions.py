@@ -3,11 +3,11 @@
 Design (bounded memory is a hard requirement: the file is 372 MB / 3.36 M
 frames and must never be materialized):
 
-1. **Spill pass** â€” one ``lxml.iterparse`` pass with aggressive element clearing.
+1. **Spill pass** - one ``lxml.iterparse`` pass with aggressive element clearing.
    Each ``FrameSet`` (one entity: player or ball, one period) is written to a
    small temporary Arrow IPC file as canonical ``tracking_sample`` columns plus a
    temporary ``source_frame`` column. Nothing but one batch is held in memory.
-2. **Merge pass** â€” per period, the entity files are merged with a k-way heap
+2. **Merge pass** - per period, the entity files are merged with a k-way heap
    ordered by ``(frame, object_id)`` so the canonical file is frame-major and
    ``t_rel_ns`` is non-decreasing, as the tracking contract requires. Entities
    that joined late (substitutes) are handled by the merge naturally.
@@ -59,6 +59,12 @@ SPILL_SCHEMA = TRACKING_SCHEMA.append(pa.field("source_frame", pa.int64()))
 FRAME_COLUMN_INDEX = TRACKING_SCHEMA.get_field_index("source_frame")
 OBJECT_ID_COLUMN_INDEX = TRACKING_SCHEMA.get_field_index("object_id")
 ROW_FRAME_TOLERANCE_NS = 1_000_000  # 1 ms
+
+#: Slice size for the frame-major merge. The merge never materializes a full
+#: entity batch as Python objects, so peak memory stays bounded by
+#: ``merge_batch_size`` plus one slice per entity.
+MERGE_SLICE_ROWS = 1_024
+MERGE_BATCH_ROWS = 8_192
 
 
 @dataclass(slots=True)
@@ -216,7 +222,7 @@ class PositionsCanonicalizer:
                     )
                     state["spill"] = spill
                     state["sink"] = pa.OSFile(str(spill.path), "wb")
-                    state["writer"] = ipc.new_file(state["sink"], SPILL_SCHEMA)
+                    state["writer"] = ipc.new_stream(state["sink"], SPILL_SCHEMA)
                 continue
 
             spill = state["spill"]
@@ -439,7 +445,10 @@ class PositionsCanonicalizer:
 
     def _merged_batches(self, section: str) -> Iterator[pa.RecordBatch]:
         entities = sorted(self._spills[section].values(), key=lambda item: item.person_id)
-        readers = [ipc.open_file(pa.memory_map(str(entity.path), "r")) for entity in entities]
+        # Sequential stream reads keep the working set to the current buffer
+        # instead of accumulating memory-mapped pages for every entity file.
+        handles = [pa.OSFile(str(entity.path), "rb") for entity in entities]
+        readers = [ipc.open_stream(handle) for handle in handles]
         try:
             iterators = [_entity_rows(reader) for reader in readers]
             merged = heapq.merge(
@@ -450,15 +459,16 @@ class PositionsCanonicalizer:
             sample_index = 0
             for row in merged:
                 rows.append(row)
-                if len(rows) >= self._batch_size:
+                if len(rows) >= MERGE_BATCH_ROWS:
                     yield _batch_from_rows(rows, start=sample_index)
                     sample_index += len(rows)
                     rows = []
             if rows:
                 yield _batch_from_rows(rows, start=sample_index)
         finally:
-            for reader in readers:
-                reader.close()
+            del readers
+            for handle in handles:
+                handle.close()
 
     # -- receipts --------------------------------------------------------
 
@@ -482,11 +492,15 @@ class PositionsCanonicalizer:
             shutil.rmtree(self._spill_dir, ignore_errors=True)
 
 
-def _entity_rows(reader: ipc.RecordBatchFileReader) -> Iterator[tuple[Any, ...]]:
-    for index in range(reader.num_record_batches):
-        batch = reader.get_batch(index)
-        columns = [batch.column(position).to_pylist() for position in range(batch.num_columns)]
-        yield from zip(*columns, strict=True)
+def _entity_rows(reader: ipc.RecordBatchReader) -> Iterator[tuple[Any, ...]]:
+    """Row tuples from one entity stream, never materializing a whole batch."""
+    for batch in reader:
+        for start in range(0, batch.num_rows, MERGE_SLICE_ROWS):
+            window = batch.slice(start, MERGE_SLICE_ROWS)
+            columns = [
+                window.column(position).to_pylist() for position in range(window.num_columns)
+            ]
+            yield from zip(*columns, strict=True)
 
 
 def _batch_from_rows(rows: list[tuple[Any, ...]], *, start: int) -> pa.RecordBatch:
