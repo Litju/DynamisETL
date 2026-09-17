@@ -23,6 +23,7 @@ dependencies = [
 ]
 
 [project.scripts]
+dynamis-fetch = "dynamis.acquisition.cli:main"
 dynamis-registry-validate = "dynamis.registry:main"
 dynamis-synthetic-materialize = "dynamis.fixtures.cli:main"
 

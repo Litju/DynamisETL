@@ -114,6 +114,32 @@ def test_dfl_doi_points_at_the_dataset_not_only_the_paper() -> None:
     assert any("pysport/idsse-data" in str(url) for url in dfl.upstream_urls)
 
 
+def test_dfl_pinned_revision_declares_verified_upstream_identities() -> None:
+    """RES-97 promotes the verified Hugging Face identities into the registry."""
+    registry = validate_registry()
+    dfl = source_by_id(registry, "dfl-sportec-idsse")
+    assert [version.version for version in dfl.versions] == [
+        "a715a38dfbaf5f58e431727c2b78d174101a703c"
+    ]
+    version = dfl.versions[0]
+    files = {item.key: item for item in version.retrieval.files}
+    positions = files["DFL_04_03_positions_raw_observed_DFL-COM-000002_DFL-MAT-J03WPY.xml"]
+    assert positions.size_bytes == 371688499
+    assert positions.sha256 == "845202c29ad93d696653436da426a7cdaefb848298e07b7343de6529581671e1"
+    assert (
+        files["DFL_02_01_matchinformation_DFL-COM-000002_DFL-MAT-J03WPY.xml"].sha1
+        == "46f1ffe15e1b96b12aab10594b12886c503c2f68"
+    )
+    assert (
+        files["DFL_03_02_events_raw_DFL-COM-000002_DFL-MAT-J03WPY.xml"].sha1
+        == "c8065cd1464a67a0312a7788bc6da6442084d141"
+    )
+    # Local retrieval state never enters the registry: it belongs to the Bronze
+    # manifest under DYNAMIS_DATASET_ROOT.
+    assert version.retrieval.status.value == "not_fetched"
+    assert all(item.local_sha256 is None for item in version.retrieval.files)
+
+
 def test_audit_detects_a_tampered_spl_policy() -> None:
     registry = validate_registry()
     spl = source_by_id(registry, "spl-open-data")
