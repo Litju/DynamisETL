@@ -1,5 +1,7 @@
 # DynamisData
 
+[![CI](https://github.com/Litju/DynamisETL/actions/workflows/ci.yml/badge.svg)](https://github.com/Litju/DynamisETL/actions/workflows/ci.yml)
+
 Compact, reproducible **multimodal human-performance data platform**: heterogeneous
 sports-science datasets are ingested through source adapters, normalized into
 explicit measurement contracts, validated, and served as interactive 2D/3D analysis.
@@ -109,6 +111,14 @@ Every V1 modality is proven by synthetic known-answer tests through
 `Arrow -> Parquet(Zstd) -> DuckDB`, including schema, SI units, nullability,
 monotonic time, deterministic identity and checksums. See
 `tests/test_synthetic_roundtrip.py`.
+
+CI (`.github/workflows/ci.yml`) runs the same gates on GitHub-hosted runners
+against a throwaway PostgreSQL 18.6 service container and synthetic data only:
+no dataset is downloaded and no external credential or repository secret is
+used (the service database password is a non-secret, job-local throwaway).
+Every workflow under `.github/workflows/` is itself statically validated
+(actionlint) and security audited (zizmor) by
+`.github/workflows/workflow-lint.yml`.
 
 ## Data and license boundary
 

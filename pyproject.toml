@@ -64,3 +64,7 @@ dev = [
     "pytest>=9.1.1",
     "ruff>=0.16.8",
 ]
+# Workflow security auditing used by the "Workflow lint" CI gate. Kept in its
+# own group (not `dev`) so the test environment stays focused; the exact version
+# is pinned because it runs unattended on every pull request.
+lint = ["zizmor==1.30.1"]

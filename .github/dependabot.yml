@@ -1,0 +1,22 @@
+version: 2
+
+updates:
+  # Keep the SHA-pinned GitHub Actions current. Weekly and grouped so the
+  # repository is not flooded with version-noise pull requests. Dependabot
+  # understands full-length commit SHA pins and rewrites them with the version
+  # comment.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "ci"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  # Python (uv.lock) and pnpm (pnpm-lock.yaml) dependencies are updated
+  # deliberately by hand so lock diffs are reviewed as data, not merged as
+  # automated noise.
