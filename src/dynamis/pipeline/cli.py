@@ -163,8 +163,10 @@ def _write_discovery(
 
 
 def _ingest(args: argparse.Namespace) -> tuple[IngestResult, str]:
-    config = settings()
+    # Parameter validation first: a selection outside the registry must fail
+    # regardless of whether this machine has scientific roots configured.
     keys = _selected_keys(args)
+    config = settings()
     manifest = read_bronze_manifest(config, dataset_id=args.dataset_id, version=args.version)
     verification = verify_manifest(config, manifest)
     if not verification.ok:
