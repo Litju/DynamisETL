@@ -1,0 +1,14 @@
+{
+  "name": "@dynamis/web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "DynamisData web visual laboratory (RES-101 placeholder; no product code in RES-96).",
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "typecheck": "node --eval \"console.log('@dynamis/web: no TypeScript sources yet (RES-101)')\"",
+    "lint": "node --eval \"console.log('@dynamis/web: no lint sources yet (RES-101)')\""
+  }
+}

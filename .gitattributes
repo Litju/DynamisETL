@@ -1,0 +1,56 @@
+# Normalize text to LF in the repository for reproducibility across platforms.
+* text=auto eol=lf
+
+# Explicit text files
+*.py text eol=lf
+*.pyi text eol=lf
+*.toml text eol=lf
+*.cfg text eol=lf
+*.ini text eol=lf
+*.json text eol=lf
+*.jsonl text eol=lf
+*.md text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.sql text eol=lf
+*.mako text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+Dockerfile text eol=lf
+Makefile text eol=lf
+
+# Windows-specific scripts keep CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Scientific and binary artifacts are never diffed as text
+*.parquet binary
+*.arrow binary
+*.ipc binary
+*.feather binary
+*.duckdb binary
+*.db binary
+*.c3d binary
+*.npz binary
+*.npy binary
+*.xlsx binary
+*.zip binary
+*.tar binary
+*.tgz binary
+*.h5 binary
+*.hdf5 binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+
+# Lockfiles are generated: keep them intact and review them as data
+uv.lock text eol=lf -diff merge=binary
+pnpm-lock.yaml text eol=lf -diff merge=binary

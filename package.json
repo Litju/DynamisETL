@@ -1,0 +1,19 @@
+{
+  "name": "dynamisetl",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DynamisData — multimodal human-performance data platform (monorepo root)",
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@11.24.0",
+  "engines": {
+    "node": ">=24 <25",
+    "pnpm": ">=11 <12"
+  },
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "web:typecheck": "pnpm --filter @dynamis/web run typecheck",
+    "web:lint": "pnpm --filter @dynamis/web run lint"
+  }
+}

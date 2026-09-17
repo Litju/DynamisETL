@@ -1,0 +1,179 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "24"
+  POSTGRES_IMAGE: postgres:18.6
+
+jobs:
+  # Static analysis, unit tests, registry validation and synthetic V&V.
+  # Synthetic-data-only: no external dataset is downloaded and no credential is
+  # required for this job.
+  foundation:
+    name: Python foundation (ruff, pyright, pytest, registry, synthetic V&V)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv and Python ${{ env.PYTHON_VERSION }}
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+
+      - name: Verify the locked environment installs
+        run: uv sync --locked
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: Pyright type check
+        run: uv run pyright
+
+      - name: pytest (synthetic-only, PostgreSQL suite excluded)
+        run: uv run pytest -m "not postgres"
+
+      - name: Validate the dataset registry and rights audit
+        run: uv run dynamis-registry-validate
+
+      - name: Materialize every synthetic modality (Arrow -> Parquet+Zstd)
+        run: uv run dynamis-synthetic-materialize --out "$RUNNER_TEMP/synthetic"
+
+      - name: Upload synthetic artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthetic-parquet
+          path: ${{ runner.temp }}/synthetic
+          retention-days: 7
+
+  # Proves the metadata/provenance schema against a real PostgreSQL 18.6 server:
+  # clean database, upgrade to head, expected schema/tables, downgrade/upgrade
+  # symmetry and no autogenerate drift.
+  postgres:
+    name: PostgreSQL 18.6 + Alembic migration
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: dynamis
+          POSTGRES_PASSWORD: ci-only-not-a-secret
+          POSTGRES_DB: dynamis
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dynamis -d dynamis -h 127.0.0.1"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 24
+          --health-start-period 20s
+    env:
+      POSTGRES_URL: postgresql+psycopg://dynamis:ci-only-not-a-secret@127.0.0.1:5432/dynamis
+      DYNAMIS_TEST_POSTGRES_URL: postgresql+psycopg://dynamis:ci-only-not-a-secret@127.0.0.1:5432/dynamis
+      DYNAMIS_DB_SCHEMA: dynamis
+      DYNAMIS_DATASET_ROOT: ${{ runner.temp }}/datasets
+      DYNAMIS_DATABASE_ROOT: ${{ runner.temp }}/databases
+      DYNAMIS_DUCKDB_PATH: ${{ runner.temp }}/databases/duckdb/dynamis.duckdb
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv and Python ${{ env.PYTHON_VERSION }}
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+
+      - name: Verify the locked environment installs
+        run: uv sync --locked
+
+      - name: Upgrade a clean database to head
+        run: uv run alembic upgrade head
+
+      - name: Report the migration head
+        run: uv run alembic current
+
+      - name: Migration lifecycle tests against PostgreSQL
+        run: uv run pytest -m postgres -v
+
+      - name: Generate offline DDL for audit
+        run: uv run alembic upgrade head --sql > "$RUNNER_TEMP/bootstrap.sql"
+
+      - name: Upload the generated bootstrap DDL
+        uses: actions/upload-artifact@v4
+        with:
+          name: bootstrap-sql
+          path: ${{ runner.temp }}/bootstrap.sql
+          retention-days: 7
+
+  # Validates the pnpm workspace required by RES-96 (no product surface yet).
+  node:
+    name: Node 24 + pnpm workspace
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.24.0
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install from the frozen lockfile
+        run: pnpm install --frozen-lockfile
+
+      - name: Workspace typecheck hook
+        run: pnpm run web:typecheck
+
+      - name: Workspace lint hook
+        run: pnpm run web:lint
+
+  # Rejects scientific data, database state, secrets, machine-specific absolute
+  # paths and static-analysis suppression from the repository. Dependency-free so
+  # it runs before any installation.
+  repository-boundary:
+    name: Repository boundary (no data, secrets or machine paths)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Run the repository guard
+        run: python scripts/guard_repository.py
+
+      - name: Fail if any dataset or database artifact is tracked by git
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -Ei '\.(parquet|arrow|ipc|feather|duckdb|db|sqlite3?|c3d|npz|npy|xlsx?|zip|tgz?|h5|hdf5)$'; then
+            echo "::error::scientific data or database artifacts must never be committed"
+            exit 1
+          fi
+          if git ls-files | grep -E '(^|/)(\.env|node_modules)(/|$)'; then
+            echo "::error::secrets or dependency trees must never be committed"
+            exit 1
+          fi
+          echo "no data, database or secret artifacts are tracked"

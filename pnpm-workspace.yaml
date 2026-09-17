@@ -1,0 +1,7 @@
+# DynamisData pnpm workspace (RES-96 bootstrap only).
+#
+# Node authority: 24 LTS. Package manager authority: pnpm.
+# Only the workspace skeleton exists in RES-96; the React/Vite/ECharts/PixiJS/
+# Three.js product surfaces are RES-101 and must not be built here.
+packages:
+  - "apps/*"

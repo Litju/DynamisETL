@@ -1,0 +1,71 @@
+# DynamisData local services.
+#
+# PostgreSQL 18 is the control/provenance plane: dataset registry, subjects,
+# sessions, trials, devices, provenance, algorithms, quality results and curated
+# serving marts. Dense scientific signals never enter PostgreSQL (they live in
+# Parquet, scanned by embedded DuckDB).
+#
+# PostgreSQL 18 changed the container volume root from /var/lib/postgresql/data
+# to /var/lib/postgresql. The host directory under DYNAMIS_DATABASE_ROOT is
+# bind-mounted at /var/lib/postgresql exactly as the official image expects.
+#
+# Credentials come from the environment (.env, git-ignored). No real password is
+# committed.
+
+name: dynamisetl
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:18.6}
+    container_name: dynamisetl-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dynamis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be provided via .env or the environment}
+      POSTGRES_DB: ${POSTGRES_DB:-dynamis}
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      # Host state root -> PostgreSQL 18 volume root (NOT /var/lib/postgresql/data).
+      - ${DYNAMIS_DATABASE_ROOT:-./data}/postgres:/var/lib/postgresql
+    healthcheck:
+      test:
+        ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB} -h 127.0.0.1"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 20s
+    stop_grace_period: 30s
+
+  # Optional orchestration UI. Gated behind a profile so the RES-96 foundation
+  # gates (PostgreSQL health + Alembic migration) never depend on building a
+  # Dagster image.
+  #   docker compose --profile orchestration up -d
+  dagster:
+    profiles: ["orchestration"]
+    build:
+      context: .
+      dockerfile: infra/docker/dagster.Dockerfile
+    container_name: dynamisetl-dagster
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_URL: postgresql+psycopg://${POSTGRES_USER:-dynamis}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be provided}@postgres:5432/${POSTGRES_DB:-dynamis}
+      DYNAMIS_DB_SCHEMA: ${DYNAMIS_DB_SCHEMA:-dynamis}
+      DYNAMIS_DATASET_ROOT: /datasets
+      DYNAMIS_DATABASE_ROOT: /databases
+      DYNAMIS_DUCKDB_PATH: /databases/duckdb/dynamis.duckdb
+    volumes:
+      - ${DYNAMIS_DATASET_ROOT:-./data}:/datasets
+      - ${DYNAMIS_DATABASE_ROOT:-./data}:/databases
+    ports:
+      - "${DAGSTER_PORT:-3000}:3000"
+    command:
+      [
+        "uv", "run", "dagster", "dev",
+        "-f", "src/dynamis/orchestration/definitions.py",
+        "-h", "0.0.0.0", "-p", "3000",
+      ]

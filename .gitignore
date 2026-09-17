@@ -1,0 +1,90 @@
+# ---------------------------------------------------------------------------
+# DynamisData repository ignores
+#
+# The repository holds code, configuration, contracts and documentation only.
+# Scientific datasets, database engine state, caches and generated artifacts
+# live outside the repository (see .env.example) and must never be committed.
+# ---------------------------------------------------------------------------
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.python-version.lock
+build/
+dist/
+.ruff_cache/
+.pytest_cache/
+.pyright/
+.mypy_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+hypothesis/
+
+# Node / pnpm
+node_modules/
+.pnpm-store/
+.pnpm-debug.log*
+npm-debug.log*
+yarn-error.log*
+dist/
+build/
+.vite/
+*.tsbuildinfo
+
+# Scientific data formats (raw, canonical, gold, quarantine)
+*.parquet
+*.arrow
+*.ipc
+*.feather
+*.duckdb
+*.duckdb.wal
+*.db
+*.sqlite
+*.sqlite3
+*.c3d
+*.npz
+*.npy
+*.xlsx
+*.xls
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.h5
+*.hdf5
+*.bag
+*.mcap
+
+# Dataset and database state roots if a developer points them in-tree
+data/
+datasets/
+databases/
+bronze/
+silver/
+gold/
+quarantine/
+cache/
+tmp/
+
+# Local-only credentials and service state
+infra/docker/data/
+pgdata/
+
+# Editors and OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+*~
