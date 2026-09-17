@@ -33,6 +33,9 @@ class BronzeFile(Contract):
     upstream_sha256: SHA256 | None = None
     local_sha256: SHA256 | None = None
     retrieved_at: AwareDatetime | None = None
+    #: Canonical URL a retrieval actually used. Kept per file because a manifest
+    #: may cover several upstream files with different resolver links.
+    upstream_url: str | None = None
 
 
 class BronzeManifest(Contract):

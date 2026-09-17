@@ -107,9 +107,44 @@ scale/stress benchmark, after correctness and modality coverage are proven.
 
 - Project code may be public; raw external datasets are never committed to Git.
 - Dataset acquisition is registry-driven and fetched from original/canonical
-  distributors.
+  distributors (`uv run dynamis-fetch …`), verified against the upstream size and
+  checksum, and promoted atomically into immutable Bronze under
+  `DYNAMIS_DATASET_ROOT`.
 - CI uses synthetic fixtures, and tiny extracts only from sources whose licenses
   permit that redistribution with the required notices.
 - NC/SA or unclear-license data stay outside the code license boundary.
 - Every source entry stores URL/DOI, source version, checksum, retrieval time,
   citation, license identifier/status, and redistribution policy.
+
+## Accepted RES-97 slices
+
+The first real-data slices are `womens-soccer-positioning` **J01.xlsx** (one
+matchday) and `dfl-sportec-idsse` match **J03WPY** (pinned revision
+`a715a38dfbaf5f58e431727c2b78d174101a703c`: matchinformation + events +
+positions). Local retrieval state (timestamps, locally computed SHA-256) belongs
+to the external Bronze manifests under `DYNAMIS_DATASET_ROOT`, never to this
+repository; the committed registry carries only upstream expectations and rights.
+
+```bash
+uv run dynamis-fetch  womens-soccer-positioning --version 1.0 --key J01.xlsx
+uv run dynamis-ingest womens-soccer-positioning --version 1.0 --key J01.xlsx
+uv run dynamis-fetch  dfl-sportec-idsse \
+  --version a715a38dfbaf5f58e431727c2b78d174101a703c --match J03WPY
+uv run dynamis-ingest dfl-sportec-idsse \
+  --version a715a38dfbaf5f58e431727c2b78d174101a703c --match J03WPY
+```
+
+The Women's source is **CC BY-NC 4.0**: non-commercial use only, attribution
+required, and neither the source nor any derived canonical output may be
+committed to this repository. The DFL/Sportec source is **CC BY 4.0**:
+attribution required, commercial reuse permitted by the license.
+
+Attribution:
+
+- Oliveira Rodriguez, L. A. (2024). *Women's team soccer positioning data,
+  collected during 2023/2024 season. Third category of female soccer, Spain.*
+  Zenodo. <https://doi.org/10.5281/zenodo.10913119>
+- Bassek, M., et al. (2025). *An integrated dataset of synchronized
+  spatiotemporal and event data in elite soccer.* Scientific Data, 12(1), 195.
+  <https://doi.org/10.1038/s41597-025-04505-y> — data © Deutsche Fußball Liga
+  (DFL), distributed via <https://huggingface.co/datasets/pysport/idsse-data>.
