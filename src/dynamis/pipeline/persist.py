@@ -66,6 +66,20 @@ SYNC_ALIGNMENT_KEY = (
 )
 
 
+def processing_run_notes(*, dataset_id: str, session_id: str, algorithm_id: str) -> str:
+    """Deterministic, issue-agnostic provenance text for an ingestion run.
+
+    A processing run must describe *what actually ran* (dataset, session,
+    algorithm), never which Linear issue commissioned it: a rerun under the same
+    run identity may be executed by different code revisions and a hard-coded
+    issue number would silently mislabel it.
+    """
+    return (
+        "DynamisData source ingestion; "
+        f"dataset={dataset_id}; session={session_id}; algorithm={algorithm_id}"
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class PersistSummary:
     dataset_id: str
@@ -519,7 +533,11 @@ def persist_ingest_run(
         code_git_sha=code_git_sha,
         completed_at=completed_at,
         inputs=tuple(_processing_inputs(source_checksums)),
-        notes=f"RES-97 local ingestion of {result.session_id}",
+        notes=processing_run_notes(
+            dataset_id=dataset_id,
+            session_id=result.session_id,
+            algorithm_id=algorithm.algorithm_id,
+        ),
     )
     written["processing_run"] = _update_run(
         connection,
