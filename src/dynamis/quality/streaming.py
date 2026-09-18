@@ -30,9 +30,12 @@ from dynamis.contracts.schemas import (
 )
 from dynamis.quality import arrow_kernels as kernels
 from dynamis.quality.checks import (
+    FORCE_BODY_WEIGHT_RATIO_FIELD,
+    FORCE_NEWTON_FIELDS,
     Violation,
     check_schema_conformance,
     check_units,
+    force_payload_fields,
 )
 
 
@@ -64,6 +67,7 @@ class StreamingValidator:
         self._previous_sample_index: int | None = None
         self._previous_t_rel_ns: int | None = None
         self._first_sample_index: int | None = None
+        self._force_payload_fields = force_payload_fields(schema)
         self.t_rel_min_ns: int | None = None
         self.t_rel_max_ns: int | None = None
 
@@ -96,6 +100,7 @@ class StreamingValidator:
         self._observe_identity(batch)
         self._observe_authorities(batch)
         self._observe_measurement_class(batch)
+        self._observe_payload_completeness(batch)
         self._observe_time(batch)
 
     def _observe_identity(self, batch: pa.RecordBatch) -> None:
@@ -133,6 +138,67 @@ class StreamingValidator:
         column = batch.column("measurement_class")
         self._class_nulls += column.null_count
         self._class_values.update(str(v) for v in kernels.distinct_values(column))
+
+    def _observe_payload_completeness(self, batch: pa.RecordBatch) -> None:
+        """Force rows must carry a newton component or the explicit BW ratio."""
+        if not self._force_payload_fields:
+            return
+        names = set(batch.schema.names)
+        newton_fields = [name for name in FORCE_NEWTON_FIELDS if name in names]
+        ratio_present = FORCE_BODY_WEIGHT_RATIO_FIELD in names
+        newton_valid = (
+            kernels.any_non_null([batch.column(name) for name in newton_fields])
+            if newton_fields
+            else None
+        )
+        ratio_valid = (
+            kernels.any_non_null([batch.column(FORCE_BODY_WEIGHT_RATIO_FIELD)])
+            if ratio_present
+            else None
+        )
+        if newton_valid is None and ratio_valid is None:
+            return
+        if newton_valid is None:
+            assert ratio_valid is not None
+            valid = ratio_valid
+            both: pa.Array | None = None
+        elif ratio_valid is None:
+            valid = newton_valid
+            both = None
+        else:
+            valid = kernels.or_(newton_valid, ratio_valid)
+            both = kernels.and_(newton_valid, ratio_valid)
+        valid_rows = kernels.count_true(valid)
+        if valid_rows != batch.num_rows:
+            self._violations.append(
+                Violation(
+                    rule="force.payload.missing",
+                    detail=(
+                        "a force sample must provide at least one newton component or "
+                        "force_z_body_weight_ratio"
+                    ),
+                    evidence={
+                        "rows_without_payload": batch.num_rows - valid_rows,
+                        "rows": batch.num_rows,
+                    },
+                )
+            )
+        if both is not None:
+            both_rows = kernels.count_true(both)
+            if both_rows:
+                self._violations.append(
+                    Violation(
+                        rule="force.payload.ambiguous",
+                        detail=(
+                            "a force sample must not carry newton components and "
+                            "force_z_body_weight_ratio at the same time"
+                        ),
+                        evidence={
+                            "rows_with_both_representations": both_rows,
+                            "rows": batch.num_rows,
+                        },
+                    )
+                )
 
     def _observe_time(self, batch: pa.RecordBatch) -> None:
         if batch.num_rows == 0:

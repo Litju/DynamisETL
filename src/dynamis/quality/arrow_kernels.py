@@ -11,6 +11,7 @@ rest of the codebase stays fully typed.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any, cast
 
 import pyarrow as pa
@@ -24,6 +25,31 @@ _kernels: Any = _pc
 def count_distinct(column: Column) -> int:
     """Number of distinct non-null values (NULLs are excluded by Arrow)."""
     return int(_kernels.count_distinct(column).as_py())
+
+
+def any_non_null(columns: Sequence[Column]) -> pa.Array:
+    """Boolean array: True where at least one of ``columns`` is non-null."""
+    if not columns:
+        raise ValueError("any_non_null requires at least one column")
+    result = _kernels.is_valid(columns[0])
+    for column in columns[1:]:
+        result = _kernels.or_(result, _kernels.is_valid(column))
+    return cast(pa.Array, result)
+
+
+def and_(left: Column, right: Column) -> pa.Array:
+    return cast(pa.Array, _kernels.and_(left, right))
+
+
+def or_(left: Column, right: Column) -> pa.Array:
+    return cast(pa.Array, _kernels.or_(left, right))
+
+
+def count_true(column: Column) -> int:
+    """Number of True values in a boolean column."""
+    if len(column) == 0:
+        return 0
+    return int(_kernels.sum(_kernels.cast(column, pa.int64())).as_py() or 0)
 
 
 def distinct_values(column: Column) -> list[Any]:

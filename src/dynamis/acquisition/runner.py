@@ -27,7 +27,8 @@ from dynamis.acquisition.download import (
 from dynamis.acquisition.plan import AcquisitionPlan, PlannedFile
 from dynamis.config import Settings
 from dynamis.contracts import DatasetRegistry
-from dynamis.registry import source_by_id, validate_registry
+from dynamis.registry import RegistryError, source_by_id, validate_registry
+from dynamis.rights import assert_dataset_root_outside_repository
 from dynamis.storage.atomic import atomic_write_text
 from dynamis.storage.manifest import (
     BronzeManifest,
@@ -222,9 +223,21 @@ def acquire(
     promoted, so an unreadable manifest can never leave a freshly downloaded
     immutable file without its manifest update.
     """
+    # Rights gate first: raw payloads of a local-only source must never land
+    # inside the repository, not even an empty layout directory on an ignored path.
+    # The registry that produced the plan is the same one consulted here.
+    document = registry if registry is not None else validate_registry()
+    try:
+        source = source_by_id(document, plan.dataset_id)
+    except KeyError as exc:
+        raise RegistryError(
+            f"registry has no dataset {plan.dataset_id!r}; the plan was not built from "
+            "this registry"
+        ) from exc
+    assert_dataset_root_outside_repository(source, settings.dataset_root)
     ensure_dataset_layout(settings)
     run_at = now()
-    manifest = _load_or_expect(settings, plan, registry)
+    manifest = _load_or_expect(settings, plan, document)
     owns_session = session is None
     http = session if session is not None else requests.Session()
     http.headers.setdefault("User-Agent", USER_AGENT)

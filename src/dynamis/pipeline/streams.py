@@ -93,9 +93,16 @@ class SourceAuthorities:
 
 @dataclass(frozen=True, slots=True)
 class ProviderDomain:
-    """Canonical domain records for one provider session (match, matchday, ...)."""
+    """Canonical domain records for one provider slice.
 
-    session: Session
+    A slice normally belongs to one session (a match, a matchday). A provider
+    whose source distributes independent per-subject laboratory trials without
+    visit boundaries declares one session per subject instead, using
+    ``sessions``; ``session`` stays the single-session form and must not be
+    mixed with it.
+    """
+
+    session: Session | None
     subjects: tuple[Subject, ...]
     participants: tuple[SessionParticipant, ...]
     trials: tuple[Trial, ...]
@@ -104,3 +111,17 @@ class ProviderDomain:
     devices: tuple[Device, ...] = ()
     session_metadata: dict[str, Any] = field(default_factory=dict)
     participants_ignored: dict[str, int] = field(default_factory=dict)
+    sessions: tuple[Session, ...] = ()
+
+    def __post_init__(self) -> None:
+        if self.session is not None and self.sessions:
+            raise ValueError("declare either session or sessions, not both")
+        if self.session is None and not self.sessions:
+            raise ValueError("a provider domain must declare at least one session")
+
+    @property
+    def all_sessions(self) -> tuple[Session, ...]:
+        if self.sessions:
+            return self.sessions
+        assert self.session is not None  # enforced by __post_init__
+        return (self.session,)

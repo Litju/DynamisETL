@@ -41,6 +41,8 @@ DATASET_SOURCE_TABLE = _TABLES["dataset_source"]
 DATASET_SOURCE_MODALITY_TABLE = _TABLES["dataset_source_modality"]
 DATASET_VERSION_TABLE = _TABLES["dataset_version"]
 DATASET_VERSION_FILE_TABLE = _TABLES["dataset_version_file"]
+DERIVED_METRIC_TABLE = _TABLES["derived_metric"]
+DEVICE_TABLE = _TABLES["device"]
 LICENSE_POLICY_TABLE = _TABLES["license_policy"]
 PROCESSING_ARTIFACT_TABLE = _TABLES["processing_artifact"]
 PROCESSING_RUN_TABLE = _TABLES["processing_run"]
@@ -252,20 +254,36 @@ def persist_domain(connection, domain: ProviderDomain) -> dict[str, int]:
             for subject in domain.subjects
         ],
     )
+    written["device"] = _upsert(
+        connection,
+        DEVICE_TABLE,
+        [
+            {
+                "dataset_id": device.dataset_id,
+                "device_id": device.device_id,
+                "device_type": device.device_type,
+                "vendor": device.vendor,
+                "model": device.model,
+                "specs": dict(device.specs),
+            }
+            for device in domain.devices
+        ],
+    )
     written["session"] = _upsert(
         connection,
         SESSION_TABLE,
         [
             {
-                "dataset_id": domain.session.dataset_id,
-                "session_id": domain.session.session_id,
-                "kind": domain.session.kind.value,
-                "protocol_id": domain.session.protocol_id,
-                "label": domain.session.label,
-                "started_at": domain.session.started_at,
-                "ended_at": domain.session.ended_at,
-                "venue": domain.session.venue,
+                "dataset_id": session.dataset_id,
+                "session_id": session.session_id,
+                "kind": session.kind.value,
+                "protocol_id": session.protocol_id,
+                "label": session.label,
+                "started_at": session.started_at,
+                "ended_at": session.ended_at,
+                "venue": session.venue,
             }
+            for session in domain.all_sessions
         ],
     )
     written["session_participant"] = _upsert(
@@ -446,7 +464,9 @@ def persist_ingest_run(
             {
                 "artifact_id": f"{stream.stream_id}-{stream.checksum_sha256[:12]}",
                 "dataset_id": dataset_id,
-                "session_id": result.session_id,
+                # The artifact belongs to the stream's own session; a provider
+                # slice may materialize many sessions (one per laboratory subject).
+                "session_id": stream.session_id,
                 "stream_id": stream.stream_id,
                 "layer": "silver",
                 "relative_path": stream.relative_path,
@@ -455,7 +475,7 @@ def persist_ingest_run(
                 "row_count": stream.row_count,
                 "byte_size": stream.byte_size,
                 "checksum_sha256": stream.checksum_sha256,
-                "schema_version": "1",
+                "schema_version": stream.schema_version,
                 "schema_fingerprint": stream.schema_fingerprint,
                 "partition": stream.partition,
                 "coordinate_frame_id": stream.coordinate_frame_id,
@@ -511,6 +531,24 @@ def persist_ingest_run(
     issues = _quality_issues(dataset_id, run_id, result)
     connection.execute(QUALITY_ISSUE_TABLE.delete().where(QUALITY_ISSUE_TABLE.c.run_id == run_id))
     written["quality_issue"] = _upsert(connection, QUALITY_ISSUE_TABLE, issues)
+    # Source-derived observations are the current materialization of this run:
+    # replacing them makes a rerun that removes or quarantines an observation, or
+    # that changes a value under an unchanged identity, converge to the current
+    # source state instead of preserving stale rows.
+    connection.execute(DERIVED_METRIC_TABLE.delete().where(DERIVED_METRIC_TABLE.c.run_id == run_id))
+    if result.source_metrics:
+        from dynamis.pipeline.source_metrics import persist_source_metrics
+
+        written.update(
+            persist_source_metrics(
+                connection,
+                dataset_id=dataset_id,
+                run_id=run_id,
+                observations=result.source_metrics,
+                input_checksums=source_checksums,
+                computed_at=completed_at,
+            )
+        )
     return written, run
 
 

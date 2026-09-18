@@ -18,7 +18,7 @@ from sqlalchemy.engine import Engine
 from dynamis.config import ENV_DB_SCHEMA, ENV_POSTGRES_URL, repository_root
 from dynamis.storage.tables import EXPECTED_TABLE_NAMES
 
-HEAD_REVISION = "0001_bootstrap"
+HEAD_REVISION = "0002_handedness_unspecified"
 
 
 def _alembic_config(url: str) -> Config:
@@ -119,6 +119,63 @@ def test_migration_lifecycle_on_postgresql(
         # 3. Replay from clean state.
         command.upgrade(config, "head")
         assert EXPECTED_TABLE_NAMES <= _schema_tables(engine, test_db_schema)
+    finally:
+        _drop_schema(engine, test_db_schema)
+        engine.dispose()
+
+
+@pytest.mark.postgres
+def test_handedness_downgrade_refuses_rows_it_cannot_represent(
+    postgres_url: str,
+    test_db_schema: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(ENV_POSTGRES_URL, postgres_url)
+    monkeypatch.setenv(ENV_DB_SCHEMA, test_db_schema)
+    config = _alembic_config(postgres_url)
+    engine = create_engine(postgres_url, future=True)
+
+    def insert_frame(
+        frame_id: str,
+        handedness: str,
+        description: str | None,
+        axes: tuple[str, str, str] = ("unspecified", "unspecified", "unspecified"),
+    ) -> None:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    f'INSERT INTO "{test_db_schema}".coordinate_frame '
+                    "(frame_id, name, kind, handedness, x_direction, y_direction, "
+                    "z_direction, origin_description, length_unit, description) "
+                    "VALUES (:frame_id, 'test frame', 'sensor', :handedness, :x, :y, :z, "
+                    "'origin', 'm', :description)"
+                ),
+                {
+                    "frame_id": frame_id,
+                    "handedness": handedness,
+                    "description": description,
+                    "x": axes[0],
+                    "y": axes[1],
+                    "z": axes[2],
+                },
+            )
+
+    try:
+        _drop_schema(engine, test_db_schema)
+        command.upgrade(config, "head")
+        insert_frame("refuse-downgrade", "unspecified", "explicitly undocumented")
+        with pytest.raises(RuntimeError, match="cannot downgrade"):
+            command.downgrade(config, "0001_bootstrap")
+
+        with engine.begin() as connection:
+            connection.execute(text(f'DELETE FROM "{test_db_schema}".coordinate_frame'))
+        insert_frame("clean-downgrade", "right", None, axes=("east", "north", "up"))
+        command.downgrade(config, "0001_bootstrap")
+        with engine.connect() as connection:
+            revision = connection.execute(
+                text(f'SELECT version_num FROM "{test_db_schema}".alembic_version')
+            ).scalar_one()
+        assert revision == "0001_bootstrap"
     finally:
         _drop_schema(engine, test_db_schema)
         engine.dispose()

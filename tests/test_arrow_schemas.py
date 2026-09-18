@@ -8,6 +8,7 @@ import pytest
 from dynamis.contracts import Modality
 from dynamis.contracts.enums import MeasurementClass
 from dynamis.contracts.schemas import (
+    CONTRACT_SCHEMA_VERSIONS,
     DENSE_KEY,
     MEASUREMENT_CLASSES_KEY,
     MODALITY_KEY,
@@ -26,6 +27,7 @@ from dynamis.contracts.schemas import (
     modality_of,
     nullable_reason_of,
     schema_fingerprint,
+    schema_version_of,
     si_unit_of,
     subject_required,
     time_monotonicity,
@@ -111,7 +113,9 @@ def test_identity_and_timing_envelope_is_present(modality: Modality) -> None:
 def test_schema_metadata_is_complete(modality: Modality) -> None:
     schema = get_schema(modality)
     metadata = schema.metadata or {}
-    assert metadata[SCHEMA_VERSION_KEY] == SCHEMA_VERSION.encode()
+    expected_version = CONTRACT_SCHEMA_VERSIONS.get(contract_of(schema), SCHEMA_VERSION)
+    assert metadata[SCHEMA_VERSION_KEY] == expected_version.encode()
+    assert schema_version_of(schema) == expected_version
     assert metadata[UNITS_KEY] == b"SI"
     assert metadata[MODALITY_KEY] == modality.value.encode()
     assert metadata[DENSE_KEY] == (b"true" if modality in DENSE_MODALITIES else b"false")
@@ -218,3 +222,37 @@ def test_event_records_have_no_sampling_rate_concept() -> None:
     assert not is_dense(schema)
     assert schema.field("nominal_sampling_rate_hz").nullable
     assert contract_of(schema) == "event_record"
+
+
+# Pinned at RES-103 (commit a165728) before the RES-98 additive contract work.
+# A mismatch means an unrelated modality's schema identity silently changed and
+# every already-materialized Silver artifact for that modality is invalidated.
+RES103_FINGERPRINTS = {
+    Modality.GNSS: "9e6888ce09fc901219cd8876e65e2909822d8f7d40aa7820732f264b437e86bc",
+    Modality.LPT: "2ca7c89cbfd39b734e2a0bd96a8015f381df41307328400946955264651980b2",
+    Modality.TRACKING: "00670b561c77866de51abe70e705081538c2da8bc877df429b8d5eae39653d90",
+    Modality.EVENT: "4ce5b3ddc4f976586b0b918dd859f05d5b6c797bde18acf5daa61f329e252048",
+    Modality.POSE: "52a1b31ec06dcf7b64a8949858d1868085b6a638ed9c8e1957460324255419eb",
+}
+
+
+@pytest.mark.parametrize("modality", list(RES103_FINGERPRINTS))
+def test_untouched_modality_schemas_keep_their_res103_identity(modality: Modality) -> None:
+    assert schema_fingerprint(get_schema(modality)) == RES103_FINGERPRINTS[modality]
+    assert schema_version_of(get_schema(modality)) == SCHEMA_VERSION
+
+
+def test_revised_contracts_are_versioned_and_additive() -> None:
+    # RES-98 added force_z_body_weight_ratio and made accelerometer-only IMU
+    # gyro channels nullable; both contracts carry their own revision.
+    assert schema_version_of(get_schema(Modality.IMU)) == "2"
+    assert schema_version_of(get_schema(Modality.FORCE)) == "2"
+    imu = get_schema(Modality.IMU)
+    assert imu.field("gyro_x_rad_s").nullable
+    assert nullable_reason_of(imu.field("gyro_x_rad_s"))
+    force = get_schema(Modality.FORCE)
+    ratio = force.field("force_z_body_weight_ratio")
+    assert ratio.type == pa.float64()
+    assert si_unit_of(ratio) == "1"
+    assert axis_of(ratio) == "z"
+    assert ratio.nullable and nullable_reason_of(ratio)

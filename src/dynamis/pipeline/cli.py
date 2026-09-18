@@ -26,7 +26,15 @@ from typing import Any
 from sqlalchemy.exc import SQLAlchemyError
 
 from dynamis.acquisition.plan import PlanError, select_keys
+from dynamis.adapters.gymaware_landmine.adapter import (
+    adapter_algorithm_spec as gymaware_algorithm_spec,
+)
+from dynamis.adapters.gymaware_landmine.authorities import GYMAWARE_DATASET_ID
 from dynamis.adapters.sportec_idsse.adapter import adapter_algorithm_spec as idsse_algorithm_spec
+from dynamis.adapters.white_cmj.adapter import (
+    adapter_algorithm_spec as white_algorithm_spec,
+)
+from dynamis.adapters.white_cmj.authorities import WHITE_DATASET_ID, WHITE_NPZ_KEY
 from dynamis.adapters.womens_soccer_positioning.adapter import (
     adapter_algorithm_spec as womens_algorithm_spec,
 )
@@ -36,6 +44,8 @@ from dynamis.pipeline.ingest import (
     WORKBOOK_KEY_J01,
     IngestResult,
     ingest_dfl_match,
+    ingest_gymaware_landmine,
+    ingest_white_cmj,
     ingest_womens_j01,
 )
 from dynamis.registry import source_by_id, validate_registry
@@ -52,6 +62,8 @@ MATCH_TOKEN = re.compile(r"DFL-MAT-([A-Z0-9]+)")
 SUPPORTED_DATASETS = {
     "womens-soccer-positioning": "womens soccer positioning (GNSS)",
     "dfl-sportec-idsse": "DFL/Sportec IDSSE (tracking + events)",
+    "white-cmj-acc-grf": "White CMJ accelerometer + vGRF (per-trial IMU + force)",
+    "gymaware-landmine-vision": "GymAware landmine press + vision (source metrics)",
 }
 
 
@@ -111,6 +123,10 @@ def _selected_keys(args: argparse.Namespace) -> tuple[str, ...]:
 def _default_session(dataset_id: str, keys: Sequence[str]) -> str:
     if dataset_id == WOMENS_DATASET_ID:
         return Path(WORKBOOK_KEY_J01).stem
+    if dataset_id == WHITE_DATASET_ID:
+        return "white-cmj-release"
+    if dataset_id == GYMAWARE_DATASET_ID:
+        return "gymaware-landmine-release"
     for key in keys:
         match = MATCH_TOKEN.search(key)
         if match:
@@ -153,6 +169,33 @@ def _write_discovery(
             name=f"{session_id}-workbook",
         )
         return
+    if args.dataset_id == WHITE_DATASET_ID:
+        npz = next(
+            (path for key, path in paths.items() if key == WHITE_NPZ_KEY),
+            None,
+        )
+        if npz is None:
+            raise PlanError("no accepted .npz key selected for the White CMJ source")
+        write_discovery_receipts(
+            config,
+            dataset_id=args.dataset_id,
+            version=args.version,
+            npz_path=npz,
+            name=f"{session_id}-npz",
+        )
+        return
+    if args.dataset_id == GYMAWARE_DATASET_ID:
+        archive = next((path for key, path in paths.items() if key.lower().endswith(".zip")), None)
+        if archive is None:
+            raise PlanError("no accepted .zip key selected for the GymAware source")
+        write_discovery_receipts(
+            config,
+            dataset_id=args.dataset_id,
+            version=args.version,
+            archive_path=archive,
+            name=f"{session_id}-zip",
+        )
+        return
     write_discovery_receipts(
         config,
         dataset_id=args.dataset_id,
@@ -190,6 +233,18 @@ def _ingest(args: argparse.Namespace) -> tuple[IngestResult, str]:
             config, workbook_path=workbook, version=args.version, session_id=session_id
         )
         return result, session_id
+    if args.dataset_id == WHITE_DATASET_ID:
+        npz = next((path for key, path in paths.items() if key == WHITE_NPZ_KEY), None)
+        if npz is None:
+            raise PlanError("no accepted .npz key selected for the White CMJ source")
+        result = ingest_white_cmj(config, npz_path=npz, version=args.version)
+        return result, session_id
+    if args.dataset_id == GYMAWARE_DATASET_ID:
+        archive = next((path for key, path in paths.items() if key.lower().endswith(".zip")), None)
+        if archive is None:
+            raise PlanError("no accepted .zip key selected for the GymAware source")
+        result = ingest_gymaware_landmine(config, zip_path=archive, version=args.version)
+        return result, session_id
 
     positions = next((path for key, path in paths.items() if "_positions_" in key), None)
     events = next((path for key, path in paths.items() if "_events_" in key), None)
@@ -225,6 +280,9 @@ def _persist(args: argparse.Namespace, result: IngestResult, session_id: str) ->
 
     config = settings()
     code_git_sha = _git_sha()
+    suffix = "res97"
+    if args.dataset_id in {WHITE_DATASET_ID, GYMAWARE_DATASET_ID}:
+        suffix = "res98"
     return persist_ingest(
         config,
         dataset_id=args.dataset_id,
@@ -232,7 +290,7 @@ def _persist(args: argparse.Namespace, result: IngestResult, session_id: str) ->
         domain=result.provider_domain,
         result=result,
         algorithm=_adapter_algorithm(args.dataset_id),
-        run_id=f"run-{session_id.lower()}-res97",
+        run_id=f"run-{session_id.lower()}-{suffix}",
         code_git_sha=code_git_sha,
     ).to_dict()
 
@@ -240,6 +298,10 @@ def _persist(args: argparse.Namespace, result: IngestResult, session_id: str) ->
 def _adapter_algorithm(dataset_id: str):
     if dataset_id == WOMENS_DATASET_ID:
         return womens_algorithm_spec()
+    if dataset_id == WHITE_DATASET_ID:
+        return white_algorithm_spec()
+    if dataset_id == GYMAWARE_DATASET_ID:
+        return gymaware_algorithm_spec()
     return idsse_algorithm_spec()
 
 

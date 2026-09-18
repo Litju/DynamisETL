@@ -31,6 +31,16 @@ RULE_FRAME_TIME_MISMATCH = "frame_time_mismatch"
 RULE_DUPLICATE_FRAME = "duplicate_frame"
 RULE_UNKNOWN_PARTICIPANT = "unknown_participant"
 RULE_SCHEMA_FAILURE = "schema_failure"
+#: Archive container/member violates the security gate (path, pickle, bound).
+RULE_UNSAFE_ARCHIVE_MEMBER = "unsafe_archive_member"
+#: An object-dtype array could not be decoded as plain numeric arrays.
+RULE_OBJECT_ARRAY_REJECTED = "object_array_rejected"
+#: A trial's array shape contradicts the declared structural dimension.
+RULE_SHAPE_MISMATCH = "shape_mismatch"
+#: A synchronized trial is missing one side of its declared pairing.
+RULE_MISSING_PAIRING = "missing_pairing"
+#: Two source records claim the same canonical identity.
+RULE_DUPLICATE_IDENTITY = "duplicate_identity"
 
 KNOWN_RULES = frozenset(
     {
@@ -44,6 +54,11 @@ KNOWN_RULES = frozenset(
         RULE_DUPLICATE_FRAME,
         RULE_UNKNOWN_PARTICIPANT,
         RULE_SCHEMA_FAILURE,
+        RULE_UNSAFE_ARCHIVE_MEMBER,
+        RULE_OBJECT_ARRAY_REJECTED,
+        RULE_SHAPE_MISMATCH,
+        RULE_MISSING_PAIRING,
+        RULE_DUPLICATE_IDENTITY,
     }
 )
 
@@ -106,13 +121,19 @@ class QuarantineSink:
 
     settings: Settings
     _records: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    _originals: list[QuarantinedRecord] = field(default_factory=list)
 
     def add(self, record: QuarantinedRecord) -> None:
         self._records.setdefault(record.rule, []).append(record.to_row())
+        self._originals.append(record)
 
     def add_many(self, records: Iterable[QuarantinedRecord]) -> None:
         for record in records:
             self.add(record)
+
+    def all_records(self) -> tuple[QuarantinedRecord, ...]:
+        """Original typed records, in insertion order (for receipts/quality issues)."""
+        return tuple(self._originals)
 
     @property
     def counts(self) -> dict[str, int]:

@@ -45,20 +45,41 @@ unclear-rights data stay outside the code license boundary.
 
 ### `white-cmj-acc-grf`
 
-- Zenodo record <https://zenodo.org/records/19136480>, DOI
-  `10.5281/zenodo.19136480`; companion repository
-  <https://github.com/markgewhite/acc2grf_prediction>.
-- The upstream record currently exposes **no explicit license value**. Rights are
-  not clarified, so this source is **local research input only**:
-  do not redistribute or commit source or derived data pending explicit rights
-  clarification.
+- Zenodo record <https://zenodo.org/records/19136480>, version **v1**, DOI
+  `10.5281/zenodo.19136480`. The record's own `code:codeRepository` metadata links
+  <https://github.com/markgewhite/acc2grf_prediction> (currently 404); the verified
+  companion pipeline for the same deposit is <https://github.com/markgewhite/acc2grf-cmj>.
+- The upstream record exposes **no explicit license value** in its Rights section
+  as audited for this mission; the Zenodo API record metadata nevertheless carries
+  a `cc-by-4.0` license id. The conservative position is retained: **no explicit
+  license value**, **local research input only** --- do not redistribute or commit
+  source or derived data pending explicit rights clarification.
+- Verified v1 structure: `cmj_dataset_both.npz` holds 663 trials (67 distinct
+  distributed subject ids), a full per-trial triaxial accelerometer member at
+  250 Hz in `g`, and a per-trial pre-takeoff vGRF member at 1000 Hz normalized by
+  body weight. The record prose describes a 500-sample 2000 ms pre-takeoff window,
+  but the distributed arrays are longer; RES-98 canonicalizes the released arrays
+  as distributed and never fabricates the window.
+- Sensor-placement documentation conflict preserved: the 2026 distributed record
+  places the lower-back sensor at **L5**, the 2022 acquisition paper at **L4**.
+  No placement is chosen and no signal is altered.
 
 ### `gymaware-landmine-vision`
 
-- Zenodo record <https://zenodo.org/records/18598087>, DOI
+- Zenodo record <https://zenodo.org/records/18598087>, version **v1**, DOI
   `10.5281/zenodo.18598087`.
-- No explicit license value upstream; **local research input only**, no
-  redistribution of source or derived data.
+- As with the White deposit, the record exposes **no explicit license value** in
+  its Rights section while the Zenodo API metadata carries a `cc-by-4.0` id; the
+  conservative **local research input only** policy is retained and no
+  redistribution of source or derived data is permitted.
+- Verified v1 structure: `LP_data.zip` contains per-set GymAware CSV exports with
+  rep-level summary indicators only (no sample-level trajectory), a vision
+  workbook whose numeric values are populated for one example row, YOLO training
+  code and raw video. RES-98 imports source-provided trial metrics only and does
+  not fabricate any dense LPT stream.
+- Method metadata preserved from the study protocol: vision uses the full bar
+  (≈2.20 m), the GymAware attachment/effective radius is ≈2.05 m. No cross-method
+  correction is applied in RES-98.
 
 ### `dfl-sportec-idsse`
 
@@ -153,3 +174,28 @@ Attribution:
   spatiotemporal and event data in elite soccer.* Scientific Data, 12(1), 195.
   <https://doi.org/10.1038/s41597-025-04505-y> — data © Deutsche Fußball Liga
   (DFL), distributed via <https://huggingface.co/datasets/pysport/idsse-data>.
+
+## Accepted RES-98 slices
+
+The laboratory slices are White CMJ `white-cmj-acc-grf` **v1**
+(`cmj_dataset_both.npz` only; the per-condition archives duplicate the same
+accepted corpus) and GymAware landmine `gymaware-landmine-vision` **v1**
+(`LP_data.zip`). Both are **local-only**: the registry keeps source versions and
+upstream checksums, while retrieval timestamps and locally computed SHA-256 live
+only in the external Bronze manifests.
+
+```bash
+uv run dynamis-fetch  white-cmj-acc-grf --version v1 --key cmj_dataset_both.npz
+uv run dynamis-ingest white-cmj-acc-grf --version v1 --key cmj_dataset_both.npz --discovery
+uv run dynamis-fetch  gymaware-landmine-vision --version v1 --key LP_data.zip
+uv run dynamis-ingest gymaware-landmine-vision --version v1 --key LP_data.zip --discovery
+```
+
+Attribution:
+
+- White, M. (2026). *Preprocessed accelerometer and ground reaction force data
+  from countermovement jumps (Python format).* Zenodo.
+  <https://doi.org/10.5281/zenodo.19136480>
+- Zhao, R. (2026). *A landmine press test involving 24 male athletes, based on
+  video-based and GymAware measurements.* Zenodo.
+  <https://doi.org/10.5281/zenodo.18598087>

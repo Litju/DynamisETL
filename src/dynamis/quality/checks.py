@@ -336,6 +336,87 @@ def check_declared_authorities(table: pa.Table, schema: pa.Schema) -> tuple[Viol
     return tuple(violations)
 
 
+#: Newton-valued vertical/horizontal force components of the force contract.
+FORCE_NEWTON_FIELDS = ("force_x_n", "force_y_n", "force_z_n")
+#: Explicit dimensionless alternative: vertical force divided by body weight.
+FORCE_BODY_WEIGHT_RATIO_FIELD = "force_z_body_weight_ratio"
+
+
+def force_payload_fields(schema: pa.Schema) -> tuple[str, ...]:
+    """Payload fields that can satisfy the force contract on their own."""
+    if contract_of(schema) != "force_sample":
+        return ()
+    names = set(schema.names)
+    return tuple(
+        name for name in (*FORCE_NEWTON_FIELDS, FORCE_BODY_WEIGHT_RATIO_FIELD) if name in names
+    )
+
+
+def check_payload_completeness(table: pa.Table, schema: pa.Schema) -> tuple[Violation, ...]:
+    """A force sample must carry exactly one force representation.
+
+    ``1 BW`` is never ``1 N``: the normalized representation is a legitimate,
+    separately named field, so a row that carries neither representation is
+    rejected, and a row that carries both (newton components *and* the
+    body-weight ratio) is rejected as ambiguous rather than silently preferring
+    one of them.
+    """
+    fields = force_payload_fields(schema)
+    if not fields:
+        return ()
+    present = [name for name in fields if name in table.column_names]
+    if not present:
+        return ()
+    newton_present = [name for name in FORCE_NEWTON_FIELDS if name in table.column_names]
+    violations: list[Violation] = []
+    if newton_present:
+        newton_valid = kernels.any_non_null([table.column(name) for name in newton_present])
+    else:
+        newton_valid = None
+    if FORCE_BODY_WEIGHT_RATIO_FIELD in table.column_names:
+        ratio_valid = kernels.any_non_null([table.column(FORCE_BODY_WEIGHT_RATIO_FIELD)])
+    else:
+        ratio_valid = None
+    if newton_valid is None and ratio_valid is None:
+        return ()
+    if newton_valid is None:
+        assert ratio_valid is not None
+        valid = ratio_valid
+        both: pa.Array | None = None
+    elif ratio_valid is None:
+        valid = newton_valid
+        both = None
+    else:
+        valid = kernels.or_(newton_valid, ratio_valid)
+        both = kernels.and_(newton_valid, ratio_valid)
+    invalid_count = table.num_rows - kernels.count_true(valid)
+    if invalid_count:
+        violations.append(
+            Violation(
+                rule="force.payload.missing",
+                detail=(
+                    "a force sample must provide at least one newton component "
+                    f"{FORCE_NEWTON_FIELDS} or {FORCE_BODY_WEIGHT_RATIO_FIELD}"
+                ),
+                evidence={"rows_without_payload": invalid_count, "rows": table.num_rows},
+            )
+        )
+    if both is not None:
+        both_count = kernels.count_true(both)
+        if both_count:
+            violations.append(
+                Violation(
+                    rule="force.payload.ambiguous",
+                    detail=(
+                        "a force sample must not carry newton components and "
+                        f"{FORCE_BODY_WEIGHT_RATIO_FIELD} at the same time"
+                    ),
+                    evidence={"rows_with_both_representations": both_count},
+                )
+            )
+    return tuple(violations)
+
+
 def check_measurement_class(table: pa.Table) -> tuple[Violation, ...]:
     if "measurement_class" not in table.column_names:
         return ()
@@ -373,6 +454,7 @@ def validate(table: pa.Table, schema: pa.Schema) -> tuple[Violation, ...]:
     violations.extend(check_declared_authorities(table, schema))
     violations.extend(check_time_monotonic(table, schema))
     violations.extend(check_measurement_class(table))
+    violations.extend(check_payload_completeness(table, schema))
     return tuple(violations)
 
 

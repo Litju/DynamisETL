@@ -24,6 +24,14 @@ EXPECTED_ASSETS = {
     "dfl_j03wpy_metadata",
     "dfl_j03wpy_silver_tracking",
     "dfl_j03wpy_silver_events",
+    "white_cmj_bronze",
+    "white_cmj_discovery",
+    "white_cmj_silver",
+    "white_cmj_reconciliation",
+    "gymaware_landmine_bronze",
+    "gymaware_landmine_discovery",
+    "gymaware_landmine_canonical",
+    "gymaware_landmine_reconciliation",
 }
 
 EXPECTED_ASSET_CHECKS = {
@@ -32,6 +40,8 @@ EXPECTED_ASSET_CHECKS = {
     "registry_covers_all_modalities",
     "womens_gnss_reconciliation_balances",
     "dfl_tracking_reconciliation_balances",
+    "white_cmj_reconciliation_balances",
+    "gymaware_landmine_reconciliation_balances",
 }
 
 
@@ -152,4 +162,22 @@ def test_dagster_definitions_expose_lineage_edges() -> None:
     assert {key.path[-1] for key in events.parent_keys} == {
         "dfl_j03wpy_silver_tracking",
         "dfl_j03wpy_metadata",
+    }
+
+    white_silver = graph.get(AssetKey("white_cmj_silver"))
+    assert {key.path[-1] for key in white_silver.parent_keys} == {
+        "white_cmj_bronze",
+        "white_cmj_discovery",
+    }
+    white_reconciliation = graph.get(AssetKey("white_cmj_reconciliation"))
+    assert {key.path[-1] for key in white_reconciliation.parent_keys} == {"white_cmj_silver"}
+
+    gymaware_canonical = graph.get(AssetKey("gymaware_landmine_canonical"))
+    assert {key.path[-1] for key in gymaware_canonical.parent_keys} == {
+        "gymaware_landmine_bronze",
+        "gymaware_landmine_discovery",
+    }
+    gymaware_reconciliation = graph.get(AssetKey("gymaware_landmine_reconciliation"))
+    assert {key.path[-1] for key in gymaware_reconciliation.parent_keys} == {
+        "gymaware_landmine_canonical"
     }

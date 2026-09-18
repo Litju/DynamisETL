@@ -84,7 +84,7 @@
       },
       "versions": [
         {
-          "version": "unknown",
+          "version": "v1",
           "release_date": "2026-03-20",
           "upstream_url": "https://zenodo.org/records/19136480",
           "citation": "White, M. (2026). Preprocessed accelerometer and ground reaction force data from countermovement jumps (Python format). Zenodo. https://doi.org/10.5281/zenodo.19136480",
@@ -131,7 +131,7 @@
       },
       "versions": [
         {
-          "version": "unknown",
+          "version": "v1",
           "release_date": "2026-02-10",
           "upstream_url": "https://zenodo.org/records/18598087",
           "citation": "Zhao, R. (2026). A landmine press test involving 24 male athletes, based on video-based and GymAware measurements. Zenodo. https://doi.org/10.5281/zenodo.18598087",
