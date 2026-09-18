@@ -89,19 +89,17 @@ class StreamingValidator:
             # would report "no identity/authority observed" against a stream that
             # simply has not started yet.
             return
+        # Structural conformance is re-checked for *every* non-empty batch. A
+        # later batch can keep the exact field names of the frozen contract while
+        # changing a required type, so checking only the first batch would let a
+        # payload observer below see a shape the contract never admitted. The
+        # zero-row projection evaluates names, types, nullability and schema
+        # metadata deterministically without materializing any row.
+        table = pa.Table.from_batches([batch]).slice(0, 0)
+        self._violations.extend(check_schema_conformance(table, self._schema))
         if not self._initialized:
-            table = pa.Table.from_batches([batch]).slice(0, 0)
-            self._violations.extend(check_schema_conformance(table, self._schema))
             self._violations.extend(check_units(table, self._schema))
             self._initialized = True
-        elif batch.schema.names != self._schema.names:
-            self._violations.append(
-                Violation(
-                    rule="schema.field.missing",
-                    detail="batch schema drifted from the frozen canonical schema",
-                    evidence={"observed": batch.schema.names},
-                )
-            )
         self._row_count += batch.num_rows
         for name in batch.schema.names:
             self.null_counts[name] += batch.column(name).null_count
@@ -302,7 +300,15 @@ class StreamingValidator:
     def _observe_time(self, batch: pa.RecordBatch) -> None:
         if batch.num_rows == 0:
             return
-        if "t_rel_ns" in batch.schema.names and not batch.column("t_rel_ns").null_count:
+        # Timing kernels are only defined for the canonical integer timebase; a
+        # structurally drifted batch is reported by ``check_schema_conformance``
+        # and must not be reinterpreted as an ordinal here.
+        time_typed = {
+            name: batch.schema.field(name).type == pa.int64()
+            for name in ("sample_index", "t_rel_ns")
+            if name in batch.schema.names
+        }
+        if time_typed.get("t_rel_ns") and not batch.column("t_rel_ns").null_count:
             column = batch.column("t_rel_ns")
             first = int(column[0].as_py())
             last = int(column[-1].as_py())
@@ -314,7 +320,7 @@ class StreamingValidator:
             return
         strictness = time_monotonicity(self._schema)
         for name in ("sample_index", "t_rel_ns"):
-            if name not in batch.schema.names:
+            if name not in batch.schema.names or not time_typed.get(name):
                 continue
             column = batch.column(name)
             if column.null_count:
