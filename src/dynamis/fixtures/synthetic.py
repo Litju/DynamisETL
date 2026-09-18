@@ -764,12 +764,19 @@ def pose_skeleton_trajectory(
     frame_count: int = 50,
     amplitude_m: float = 0.05,
     frequency_hz: float = 0.5,
+    unavailable_pattern: bool = False,
 ) -> ModalityFixture:
-    """Deterministic lower-limb skeleton with an occluded low-confidence joint."""
+    """Deterministic lower-limb skeleton with an occluded low-confidence joint.
+
+    ``unavailable_pattern`` turns the occluded frames into an explicit
+    availability exercise: the source reports the joint as unavailable, the row
+    carries null coordinates and no error estimate, and the coordinates are never
+    imputed. The default remains a fully observed trajectory.
+    """
     stream_id = make_stream_id(Modality.POSE, 1)
     rows: list[dict[str, Any]] = []
     joint_ids: list[int] = []
-    z_values: list[float] = []
+    z_values: list[float | None] = []
     confidences: list[float | None] = []
     sample_count = frame_count * len(POSE_JOINTS)
 
@@ -780,6 +787,7 @@ def pose_skeleton_trajectory(
             z_base = -0.45 * joint_id
             z_m = z_base + amplitude_m * phase * (1.0 if joint_id else 0.0)
             occluded = joint_id == 2 and frame % 10 == 0
+            unavailable = unavailable_pattern and occluded
             confidence = 0.35 if occluded else 0.98
             rows.append(
                 {
@@ -801,16 +809,17 @@ def pose_skeleton_trajectory(
                     "joint_id": joint_id,
                     "joint_name": joint_name,
                     "parent_joint_id": parent_id,
-                    "x_m": 0.0,
-                    "y_m": 0.0,
-                    "z_m": z_m,
+                    "is_available": not unavailable,
+                    "x_m": None if unavailable else 0.0,
+                    "y_m": None if unavailable else 0.0,
+                    "z_m": None if unavailable else z_m,
                     "confidence": confidence,
-                    "error_m": 0.03 if occluded else None,
+                    "error_m": (None if unavailable else (0.03 if occluded else None)),
                     "is_occluded": occluded,
                 }
             )
             joint_ids.append(joint_id)
-            z_values.append(z_m)
+            z_values.append(None if unavailable else z_m)
             confidences.append(confidence)
 
     table = _build_table(Modality.POSE, rows, rate_hz=rate_hz)
@@ -818,7 +827,7 @@ def pose_skeleton_trajectory(
         "joint_id": tuple(joint_ids),
         "z_m": tuple(z_values),
         "confidence": tuple(confidences),
-        "x_m": tuple(0.0 for _ in range(sample_count)),
+        "x_m": tuple(row["x_m"] for row in rows),
         "parent_joint_id": tuple(parent for _, _, parent in POSE_JOINTS * frame_count),
     }
     return ModalityFixture(

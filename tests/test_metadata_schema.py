@@ -82,6 +82,8 @@ def test_provenance_checks_are_present_in_the_ddl() -> None:
     assert "ck_quality_issue_evidence_required" in relevant["quality_issue"]
     assert "ck_frame_transform_explained_transform" in relevant["frame_transform"]
     assert "ck_sensor_stream_pose_requires_skeleton" in relevant["sensor_stream"]
+    assert "ck_skeleton_definition_topology" in relevant["skeleton_definition"]
+    assert "ck_skeleton_joint_parent_precedes_child" in relevant["skeleton_joint"]
 
 
 def test_ddl_compiles_for_postgresql() -> None:

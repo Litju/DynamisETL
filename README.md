@@ -6,12 +6,13 @@ Compact, reproducible **multimodal human-performance data platform**: heterogene
 sports-science datasets are ingested through source adapters, normalized into
 explicit measurement contracts, validated, and served as interactive 2D/3D analysis.
 
-> **Repository status: RES-97 first real-data slices.** Contracts, registry,
+> **Repository status: RES-99 football/basketball 3D pose.** Contracts, registry,
 > storage conventions, synthetic verification, the PostgreSQL metadata schema,
-> orchestration and CI exist, plus the first two real provider adapters
-> (Women's Soccer Positioning GNSS; DFL/Sportec IDSSE tracking + events).
-> Production metrics, gold marts, ML and the visualization product are later
-> issues.
+> orchestration and CI exist, plus real provider adapters for Women's Soccer
+> Positioning GNSS, DFL/Sportec IDSSE tracking + events, SkillCorner tracking +
+> body pose, and a prepared (rights-gated, not yet acquired) SPL free-throw
+> adapter. Production metrics, gold marts, ML and the visualization product are
+> later issues.
 
 ## V1 product boundary
 
@@ -173,6 +174,53 @@ attribution): keep it local, do not commit it or its derivatives.
 conditional) per the reproducible rights-evidence audit in
 [`sources/rights_evidence.json`](sources/rights_evidence.json). See
 [`DATA_SOURCES.md`](DATA_SOURCES.md).
+
+## 3D pose slices (RES-99)
+
+The 3D movement branch canonicalizes provider/model-estimated pose landmarks
+with explicit coordinate, availability and error semantics. Data lives **outside
+the repository**; CI is structurally synthetic and never downloads it.
+
+| dataset | accepted slice | acquisition | adapter |
+| --- | --- | --- | --- |
+| `skillcorner-opendata` | match `1925299`: metadata + 10 Hz tracking + 25 Hz body pose | GitHub revision `4340d274…` (tracking is Git LFS) + Hugging Face revision `a62e1ec1…` | streaming `json` + direct ZIP-member streaming |
+| `spl-open-data` | `P0001/T0001` at 30 fps and 60 fps (declared, not acquired) | GitHub revision `a3f9cffb…`, behind `--acknowledge-spl-license-restrictions` | tri-file JSON, exact feet → metres |
+
+```bash
+# SkillCorner: acquire the three verified files, then canonicalize.
+uv run dynamis-fetch skillcorner-opendata \
+  --version 4340d274572876239c154c90bc507a9b3250a656 \
+  --key data/matches/1925299/1925299_match.json \
+  --key data/matches/1925299/1925299_tracking_extrapolated.jsonl \
+  --key raw/1925299.jsonl.zip
+uv run dynamis-ingest skillcorner-opendata \
+  --version 4340d274572876239c154c90bc507a9b3250a656 \
+  --key data/matches/1925299/1925299_match.json \
+  --key data/matches/1925299/1925299_tracking_extrapolated.jsonl \
+  --key raw/1925299.jsonl.zip
+```
+
+`pose_joint_sample` contract revision 2 carries an explicit `is_available` flag
+and nullable `x/y/z`: available joints must be finite, unavailable joints carry
+nulls and are never imputed. `SkeletonDefinition` declares either a `tree` or a
+`landmark_set` topology; provider sources that publish no parent graph are
+persisted as landmark sets with no fabricated parentage.
+
+**Semantics preserved.** Both sources are provider/model estimates
+(`MODEL_ESTIMATED`), never raw instrument measurements. SkillCorner pose keeps
+the provider's own match clock, the documented 29-landmark order, the
+`pose_frame = 2.5 * tracking_frame` relation and the 90th-percentile error radius
+(`error_m = p90_mae_cm / 100`); X/Y are pitch-global while Z is
+centroid-relative and is never interpreted as absolute player height. Pose and
+tracking XY are generated separately: documented coincident frames report
+timestamp/ID matching and an XY residual distribution, and are never forced to
+agree. SPL coordinates are converted by the exact `0.3048` factor, session
+participant identity is preserved across sessions, and session-specific keypoint
+availability stays explicit.
+
+**Out of scope here.** No joint angles, angular velocity, ROM, inverse dynamics,
+smoothing, interpolation or RES-100 production metrics; no cross-provider
+fusion and no ball/shot metric canonicalization.
 
 ## Data and license boundary
 

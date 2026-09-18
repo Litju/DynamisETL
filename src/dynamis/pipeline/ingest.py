@@ -20,6 +20,13 @@ import pyarrow as pa
 from dynamis.adapters.gymaware_landmine.adapter import GymAwareAdapter
 from dynamis.adapters.gymaware_landmine.authorities import GYMAWARE_DATASET_ID
 from dynamis.adapters.gymaware_landmine.discovery import discover_gymaware_landmine
+from dynamis.adapters.skillcorner.adapter import SkillCornerMatchAdapter
+from dynamis.adapters.skillcorner.authorities import POSE_LANDMARKS, SKILLCORNER_DATASET_ID
+from dynamis.adapters.skillcorner.discovery import discover_skillcorner
+from dynamis.adapters.skillcorner.metadata import parse_match_metadata
+from dynamis.adapters.spl.adapter import SplFreethrowAdapter, SplTrialSource
+from dynamis.adapters.spl.authorities import SPL_DATASET_ID
+from dynamis.adapters.spl.discovery import discover_spl
 from dynamis.adapters.sportec_idsse.adapter import IdsseMatchAdapter
 from dynamis.adapters.sportec_idsse.authorities import tracking_stream_id
 from dynamis.adapters.sportec_idsse.discovery import discover_idsse
@@ -74,6 +81,33 @@ def assert_local_only_boundary(settings: Settings, dataset_id: str) -> None:
 
     source = source_by_id(validate_registry(), dataset_id)
     assert_dataset_root_outside_repository(source, settings.dataset_root)
+
+
+def license_notice(dataset_id: str, version: str) -> dict[str, Any]:
+    """Rights and attribution facts that must survive into derived receipts."""
+    from dynamis.registry import source_by_id, validate_registry
+
+    source = source_by_id(validate_registry(), dataset_id)
+    try:
+        citation = source.version(version).citation
+    except KeyError:
+        # A non-registry version (synthetic/structural test input) has no pinned
+        # registry metadata to cite; the license facts still survive.
+        citation = None
+    return {
+        "identifier": source.license.identifier,
+        "status": source.license.status.value,
+        "attribution_required": source.license.attribution_required,
+        "noncommercial_only": source.license.noncommercial_only,
+        "share_alike": source.license.share_alike,
+        "restrictions": list(source.license.restrictions),
+        "citation": citation,
+        "upstream_urls": [str(url) for url in source.upstream_urls],
+        "notice": (
+            "source data and derivatives stay outside Git; this receipt preserves the "
+            "license notice for the derived artifacts it describes"
+        ),
+    }
 
 
 WORKBOOK_KEY_J01 = "J01.xlsx"
@@ -166,6 +200,10 @@ def write_discovery_receipts(
     positions_path: Path | None = None,
     npz_path: Path | None = None,
     archive_path: Path | None = None,
+    skillcorner_metadata_path: Path | None = None,
+    skillcorner_tracking_path: Path | None = None,
+    skillcorner_pose_path: Path | None = None,
+    spl_trial_paths: tuple[SplTrialSource, ...] = (),
     name: str,
 ) -> str:
     """Write the structural discovery receipt for a provider slice.
@@ -193,6 +231,24 @@ def write_discovery_receipts(
         if archive_path is None:
             raise ValueError("GymAware discovery requires the .zip path")
         payload = discover_gymaware_landmine(archive_path).to_dict()
+    elif dataset_id == SKILLCORNER_DATASET_ID:
+        if (
+            skillcorner_metadata_path is None
+            or skillcorner_tracking_path is None
+            or (skillcorner_pose_path is None)
+        ):
+            raise ValueError(
+                "SkillCorner discovery requires the match metadata, tracking and pose archive"
+            )
+        payload = discover_skillcorner(
+            metadata=parse_match_metadata(skillcorner_metadata_path),
+            tracking_path=skillcorner_tracking_path,
+            pose_zip_path=skillcorner_pose_path,
+        ).to_dict()
+    elif dataset_id == SPL_DATASET_ID:
+        if not spl_trial_paths:
+            raise ValueError("SPL discovery requires at least one locked trial path")
+        payload = discover_spl(tuple(spl_trial_paths)).to_dict()
     else:
         if match_information_path is None or events_path is None or positions_path is None:
             raise ValueError("IDSSE discovery requires the three XML paths")
@@ -699,6 +755,353 @@ def ingest_white_cmj(
         domain=dict(receipt.domain),
         source_metrics=source_metric_observations,
     )
+
+
+def ingest_skillcorner_match(
+    settings: Settings,
+    *,
+    match_json_path: Path,
+    tracking_path: Path,
+    pose_zip_path: Path,
+    version: str,
+    row_group_size: int = DEFAULT_ROW_GROUP_SIZE,
+    batch_size: int = DEFAULT_BATCH_SIZE,
+) -> IngestResult:
+    """One SkillCorner match -> 10 Hz tracking + 25 Hz pose Silver streams.
+
+    The pose archive member is streamed directly from the ZIP; the ~3.3 GB
+    plaintext file is never expanded and no match-sized Python structure is
+    materialized. Provider/model-estimated coordinates stay labelled
+    ``MODEL_ESTIMATED``; the provider match clock, hybrid pose geometry and
+    p90 error-radius semantics are preserved exactly, and pose/tracking XY
+    disagreement is measured at documented coincidences rather than corrected.
+    """
+    assert_local_only_boundary(settings, SKILLCORNER_DATASET_ID)
+    ensure_dataset_layout(settings)
+
+    adapter = SkillCornerMatchAdapter(
+        match_json_path=match_json_path,
+        tracking_path=tracking_path,
+        pose_zip_path=pose_zip_path,
+        version=version,
+        batch_size=batch_size,
+    )
+    metadata = adapter.metadata
+    source_keys = (
+        f"data/matches/{metadata.match_id}/{metadata.match_id}_match.json",
+        f"data/matches/{metadata.match_id}/{metadata.match_id}_tracking_extrapolated.jsonl",
+        f"raw/{metadata.match_id}.jsonl.zip",
+    )
+
+    streams = (*adapter.tracking_streams(), *adapter.pose_streams())
+    results: list[IngestStreamResult] = [
+        write_canonical_stream(settings, stream, row_group_size=row_group_size)
+        for stream in streams
+    ]
+    result_by_stream = {item.stream_id: item for item in results}
+
+    coincidence = adapter.coincidence_report()
+    sink = QuarantineSink(settings)
+    sink.add_many(adapter.quarantined())
+    quarantine_artifacts = tuple(sink.materialize(name=metadata.match_id)) if sink.total else ()
+
+    reconciliations: list[StreamReconciliation] = []
+    tracking_summaries: dict[str, dict[str, Any]] = {}
+    pose_summaries: dict[str, dict[str, Any]] = {}
+    declared_player_ids = {player.player_id for player in metadata.players}
+    observed_player_ids: set[str] = set()
+    for period in metadata.periods:
+        tracking = adapter.tracking_summary(period.period)
+        pose = adapter.pose_summary(period.period)
+        observed_player_ids |= tracking.seen_player_ids | pose.seen_player_ids
+        tracking_summaries[tracking.stream_id] = tracking.to_dict()
+        pose_summaries[pose.stream_id] = pose.to_dict()
+        tracking_result = result_by_stream[tracking.stream_id]
+        pose_result = result_by_stream[pose.stream_id]
+        reconciliations.append(
+            StreamReconciliation(
+                stream_id=tracking.stream_id,
+                modality=Modality.TRACKING.value,
+                subject_id=None,
+                trial_id=period.name,
+                source_records=tracking.source_records,
+                canonical_rows=tracking.canonical_rows,
+                quarantined_rows=tracking.quarantined_rows,
+                ignored_records=tracking.ignored_ball_without_coordinates,
+                ignored_reasons={
+                    "ball entries with no coordinates at all (explicit non-observation)": (
+                        tracking.ignored_ball_without_coordinates
+                    )
+                },
+                canonical_time_min_ns=tracking_result.t_rel_min_ns,
+                canonical_time_max_ns=tracking_result.t_rel_max_ns,
+                null_counts=tracking_result.null_counts,
+                schema_valid=True,
+                units_valid=True,
+                coordinate_frame_id=tracking_result.coordinate_frame_id,
+                checks={
+                    **tracking.to_dict(),
+                    "frame_range": [period.start_frame, period.end_frame],
+                    "provider_is_detected_semantics": (
+                        "true = detected on screen; false = provider extrapolation"
+                    ),
+                },
+            )
+        )
+        reconciliations.append(
+            StreamReconciliation(
+                stream_id=pose.stream_id,
+                modality=Modality.POSE.value,
+                subject_id=None,
+                trial_id=period.name,
+                source_records=pose.source_records,
+                canonical_rows=pose.canonical_rows,
+                quarantined_rows=pose.quarantined_rows,
+                ignored_records=0,
+                ignored_reasons={},
+                canonical_time_min_ns=pose_result.t_rel_min_ns,
+                canonical_time_max_ns=pose_result.t_rel_max_ns,
+                null_counts=pose_result.null_counts,
+                schema_valid=True,
+                units_valid=True,
+                coordinate_frame_id=pose_result.coordinate_frame_id,
+                checks={
+                    **pose.to_dict(),
+                    "frame_range": [period.start_frame, period.end_frame],
+                    "landmark_order_authority": (
+                        "data/bodypose/README.md at the pinned SkillCorner revision"
+                    ),
+                    "error_source_field": "p90_mae_cm",
+                    "error_source_to_si_scale": 0.01,
+                    "error_semantics": (
+                        "90th-percentile predicted error radius; never a probability or confidence"
+                    ),
+                    "player_frames_without_pose": (
+                        pose.player_frames - pose.player_frames_with_pose
+                    ),
+                    "missing_joints_imputed": False,
+                    "unavailable_joint_rows": pose.unavailable_joints,
+                },
+            )
+        )
+
+    unmatched_player_ids = sorted(declared_player_ids - observed_player_ids)
+    receipt = ReconciliationReceipt(
+        dataset_id=SKILLCORNER_DATASET_ID,
+        version=version,
+        session_id=metadata.session_id,
+        source_keys=source_keys,
+        streams=tuple(reconciliations),
+        domain={
+            "match_id": metadata.match_id,
+            "title": metadata.title,
+            "kickoff_utc": metadata.kickoff_utc.isoformat(),
+            "pitch_size_m": [metadata.pitch_length_m, metadata.pitch_width_m],
+            "stadium": metadata.stadium,
+            "periods": [period.to_dict() for period in metadata.periods],
+            "declared_players": len(metadata.players),
+            "observed_player_id_count": len(observed_player_ids),
+            "unmatched_declared_player_ids": unmatched_player_ids,
+            "tracking": tracking_summaries,
+            "pose": pose_summaries,
+            "pose_tracking_sync": coincidence.to_dict(),
+            "measurement_classes": {
+                "tracking": "MODEL_ESTIMATED",
+                "pose": "MODEL_ESTIMATED",
+            },
+            "geometry": {
+                "tracking": "pitch-centred X/Y metres; source Z preserved unchanged",
+                "pose": (
+                    "hybrid: pitch-global X/Y with source Z relative to the player centroid, "
+                    "not pitch-registered"
+                ),
+                "hidden_corrections": False,
+                "absolute_height_interpretation": False,
+            },
+            "quarantine_by_rule": sink.counts,
+            "landmark_order": list(POSE_LANDMARKS),
+            "license": license_notice(SKILLCORNER_DATASET_ID, version),
+        },
+        silver_artifacts=tuple(result.to_dict() for result in results),
+        quarantine_artifacts=quarantine_artifacts,
+        notes=(
+            "MIT source (attribution requested): inputs and outputs stay outside Git.",
+            "Pose and tracking coordinates are provider broadcast-video model estimates "
+            "(MODEL_ESTIMATED), never raw instrument measurements.",
+            "Provider Z is preserved exactly: no global pitch registration for pose Z, no "
+            "absolute player-height interpretation, no hidden transform.",
+            "Player frames with joints=null remain explicit coverage counts; individual "
+            "missing joints would stay is_available=false rows; nothing is imputed.",
+            "No smoothing, interpolation, joint angle, angular velocity, ROM or inverse "
+            "dynamics runs in RES-99.",
+        ),
+    )
+    assert_reconciled(receipt)
+    receipt_path = write_reconciliation_receipt(
+        settings, receipt, name=f"{metadata.match_id}-match"
+    )
+    return IngestResult(
+        dataset_id=SKILLCORNER_DATASET_ID,
+        version=version,
+        session_id=metadata.session_id,
+        source_keys=source_keys,
+        streams=tuple(results),
+        quarantine_artifacts=quarantine_artifacts,
+        reconciliation=receipt,
+        receipt_path=receipt_path,
+        provider_domain=adapter.domain(),
+        quarantine_records=tuple(sink.all_records()),
+        domain=dict(receipt.domain),
+    )
+
+
+def ingest_spl_trials(
+    settings: Settings,
+    *,
+    trials: tuple[SplTrialSource, ...],
+    version: str,
+    row_group_size: int = DEFAULT_ROW_GROUP_SIZE,
+    batch_size: int = DEFAULT_BATCH_SIZE,
+) -> IngestResult:
+    """Locked SPL free-throw trials -> canonical pose Silver streams.
+
+    The same dataset participant is carried across sessions as one identity while
+    the sessions and their clocks stay distinct. Coordinates are converted from
+    the source's feet to metres with the exact 0.3048 factor; session-specific
+    keypoint availability is preserved with explicit unavailable rows, and no
+    parent graph is invented.
+    """
+    if not trials:
+        raise ValueError("SPL ingestion requires at least one locked trial")
+    assert_local_only_boundary(settings, SPL_DATASET_ID)
+    ensure_dataset_layout(settings)
+
+    adapter = SplFreethrowAdapter(trials=trials, version=version, batch_size=batch_size)
+    source_keys = tuple(source.key for source in trials)
+    # The receipt identity names the participant slice, not one session: the same
+    # participant is deliberately present in every accepted session.
+    participant_ids = sorted({identity.participant_id for identity in adapter.identities()})
+    receipt_scope = participant_ids[0] if len(participant_ids) == 1 else "spl-freethrow"
+
+    results: list[IngestStreamResult] = [
+        write_canonical_stream(settings, stream, row_group_size=row_group_size)
+        for stream in adapter.streams()
+    ]
+    result_by_stream = {item.stream_id: item for item in results}
+
+    sink = QuarantineSink(settings)
+    sink.add_many(adapter.quarantined())
+    quarantine_artifacts = tuple(sink.materialize(name=receipt_scope)) if sink.total else ()
+
+    reconciliations: list[StreamReconciliation] = []
+    trial_receipts: list[dict[str, Any]] = []
+    canonicalizers = adapter.canonicalizers()
+    for source in trials:
+        canonicalizer = canonicalizers[source.key]
+        summary = canonicalizer.summary()
+        result = result_by_stream[summary.stream_id]
+        checks = {
+            **summary.to_dict(),
+            "skeleton_id": canonicalizer.skeleton_id,
+            "source_length_unit": "ft",
+            "source_to_si_scale": 0.3048,
+            "conversion": "value_m = value_ft * 0.3048 (exact documented factor)",
+            "topology": "landmark_set (source publishes no parent graph)",
+            "missing_keypoints_imputed": False,
+            "ball_not_canonicalized": (
+                "ball trajectory and shot-result context are not pose concepts in RES-99 "
+                "and remain in immutable Bronze"
+            ),
+        }
+        trial_receipts.append(checks)
+        reconciliations.append(
+            StreamReconciliation(
+                stream_id=summary.stream_id,
+                modality=Modality.POSE.value,
+                subject_id=summary.identity.participant_id,
+                trial_id=summary.identity.trial_id,
+                source_records=summary.source_records,
+                canonical_rows=summary.canonical_rows,
+                quarantined_rows=summary.quarantined_rows,
+                ignored_records=0,
+                ignored_reasons={},
+                canonical_time_min_ns=result.t_rel_min_ns,
+                canonical_time_max_ns=result.t_rel_max_ns,
+                null_counts=result.null_counts,
+                schema_valid=True,
+                units_valid=True,
+                coordinate_frame_id=result.coordinate_frame_id,
+                checks=checks,
+            )
+        )
+
+    receipt = ReconciliationReceipt(
+        dataset_id=SPL_DATASET_ID,
+        version=version,
+        session_id=receipt_scope,
+        source_keys=source_keys,
+        streams=tuple(reconciliations),
+        domain={
+            "participant_ids": participant_ids,
+            "participant_identity_consistent_across_sessions": True,
+            "sessions": sorted({identity.session_date for identity in adapter.identities()}),
+            "rates_hz": {
+                summary.identity.session_date: summary.sampling_rate_hz
+                for summary in adapter.summaries()
+            },
+            "trials": trial_receipts,
+            "ball_observations_by_trial": {
+                summary.stream_id: summary.ball_observations for summary in adapter.summaries()
+            },
+            "feet_to_metre_scale": 0.3048,
+            "cross_session_synchronization": False,
+            "quarantine_by_rule": sink.counts,
+            "skeletons": [
+                {
+                    "skeleton_id": skeleton.skeleton_id,
+                    "topology": skeleton.topology.value,
+                    "joint_count": skeleton.joint_count,
+                    "joints": [joint.joint_name for joint in skeleton.joints],
+                }
+                for skeleton in adapter.source_authorities().skeletons
+            ],
+            "license": license_notice(SPL_DATASET_ID, version),
+        },
+        silver_artifacts=tuple(result.to_dict() for result in results),
+        quarantine_artifacts=quarantine_artifacts,
+        notes=(
+            "CC BY-NC-SA 4.0 plus the role-dependent exclusion: inputs and outputs stay "
+            "outside Git; NC/SA obligations are never overridden.",
+            "Pose keypoints are provider model estimates (MODEL_ESTIMATED), never raw "
+            "instrument measurements.",
+            "Session-specific keypoint availability is preserved: null/absent keypoints are "
+            "explicit is_available=false rows and are never imputed.",
+            "No parent graph is invented for a source that publishes none.",
+            "No smoothing, interpolation, joint angle, angular velocity, ROM or inverse "
+            "dynamics runs in RES-99.",
+        ),
+    )
+    assert_reconciled(receipt)
+    receipt_path = write_reconciliation_receipt(settings, receipt, name=f"{receipt_scope}-pose")
+    return IngestResult(
+        dataset_id=SPL_DATASET_ID,
+        version=version,
+        session_id=receipt_scope,
+        source_keys=source_keys,
+        streams=tuple(results),
+        quarantine_artifacts=quarantine_artifacts,
+        reconciliation=receipt,
+        receipt_path=receipt_path,
+        provider_domain=adapter.domain(),
+        quarantine_records=tuple(sink.all_records()),
+        domain=dict(receipt.domain),
+    )
+
+
+def _identity_for_source(source: SplTrialSource):
+    from dynamis.adapters.spl.trial import identity_from_key
+
+    return identity_from_key(source.key)
 
 
 def ingest_gymaware_landmine(

@@ -126,6 +126,12 @@ class RetrievalFile(Contract):
     Each checksum field carries only its own algorithm: a 40-hex value belongs in
     ``sha1`` (source-provided SHA-1 or git blob identity), never in ``sha256``.
     ``local_sha256`` is the checksum computed on this machine after acquisition.
+
+    ``upstream_provider``/``upstream_revision`` locate a file that a multi-provider
+    dataset serves from a companion pinned provider (for example a body-pose
+    archive published on Hugging Face next to the GitHub match files). The
+    revision is a pinned provider revision, never a floating branch name, and is
+    resolved explicitly rather than inferred from prose.
     """
 
     key: str = Field(min_length=1)
@@ -133,6 +139,8 @@ class RetrievalFile(Contract):
     md5: Md5Value = "unknown"
     sha1: Sha1Value = "unknown"
     sha256: Sha256Value = "unknown"
+    upstream_provider: str | None = Field(default=None, min_length=1)
+    upstream_revision: str | None = Field(default=None, min_length=1)
     local_sha256: SHA256 | None = None
     retrieved_at: AwareDatetime | None = None
 
@@ -140,6 +148,11 @@ class RetrievalFile(Contract):
     def check_file(self) -> Self:
         if self.local_sha256 is not None and self.retrieved_at is None:
             raise ValueError("a locally computed checksum requires a retrieval timestamp")
+        if self.upstream_revision is not None and self.upstream_provider is None:
+            raise ValueError(
+                "an upstream_revision locates a file on a companion provider and requires "
+                "an explicit upstream_provider"
+            )
         return self
 
 

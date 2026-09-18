@@ -22,6 +22,7 @@ from dynamis.contracts import (
     SensorStream,
     Session,
     SessionParticipant,
+    SkeletonDefinition,
     Subject,
     SyncAlignment,
     SynchronizationSpec,
@@ -79,16 +80,19 @@ class CanonicalStream:
 
 @dataclass(frozen=True, slots=True)
 class SourceAuthorities:
-    """Clock, synchronization, frame and alignment records a provider declares.
+    """Clock, synchronization, frame, skeleton and alignment records a provider declares.
 
     Adapters build these before emitting samples; the pipeline persists them to
-    the control plane so no stream can reference an undeclared authority.
+    the control plane so no stream can reference an undeclared authority. Pose
+    streams resolve their ``skeleton_id`` here, and skeleton definitions are
+    persisted before the streams that reference them.
     """
 
     frames: tuple[CoordinateFrame, ...] = ()
     clocks: tuple[Clock, ...] = ()
     synchronizations: tuple[SynchronizationSpec, ...] = ()
     alignments: tuple[SyncAlignment, ...] = ()
+    skeletons: tuple[SkeletonDefinition, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

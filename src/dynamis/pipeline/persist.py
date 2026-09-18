@@ -25,6 +25,7 @@ from dynamis.contracts import (
     DatasetSource,
     ProcessingRun,
     ProcessingStatus,
+    SkeletonDefinition,
 )
 from dynamis.pipeline.ingest import IngestResult
 from dynamis.pipeline.streams import ProviderDomain
@@ -51,6 +52,8 @@ SAMPLE_ARTIFACT_TABLE = _TABLES["sample_artifact"]
 SENSOR_STREAM_TABLE = _TABLES["sensor_stream"]
 SESSION_TABLE = _TABLES["session"]
 SESSION_PARTICIPANT_TABLE = _TABLES["session_participant"]
+SKELETON_DEFINITION_TABLE = _TABLES["skeleton_definition"]
+SKELETON_JOINT_TABLE = _TABLES["skeleton_joint"]
 SUBJECT_TABLE = _TABLES["subject"]
 SYNC_ALIGNMENT_TABLE = _TABLES["sync_alignment"]
 SYNCHRONIZATION_SPEC_TABLE = _TABLES["synchronization_spec"]
@@ -134,6 +137,86 @@ def _upsert_alignment(connection, rows: list[dict[str, Any]]) -> int:
     # rowcount is not portable for a multi-row upsert, so report the declared
     # count instead of a driver-specific interpretation.
     return len(rows)
+
+
+def _sync_skeletons(connection, skeletons: tuple[SkeletonDefinition, ...]) -> tuple[int, int]:
+    """Converge skeleton definitions and joints to the current declaration.
+
+    A rerun must neither duplicate rows nor leave a stale definition, a stale
+    joint name/parent or a joint the current declaration no longer contains.
+    Definitions and joints are upserted in place; joints absent from the
+    declaration are deleted *after* the upsert, so no remaining row can still
+    reference a deleted parent.
+    """
+    if not skeletons:
+        return 0, 0
+    definitions = [
+        {
+            "skeleton_id": skeleton.skeleton_id,
+            "name": skeleton.name,
+            "topology": skeleton.topology.value,
+            "joint_count": skeleton.joint_count,
+            "description": skeleton.description,
+        }
+        for skeleton in skeletons
+    ]
+    statement = pg_insert(SKELETON_DEFINITION_TABLE).values(definitions)
+    statement = statement.on_conflict_do_update(
+        index_elements=["skeleton_id"],
+        set_={
+            "name": statement.excluded.name,
+            "topology": statement.excluded.topology,
+            "joint_count": statement.excluded.joint_count,
+            "description": statement.excluded.description,
+        },
+    )
+    connection.execute(statement)
+
+    joints = [
+        {
+            "skeleton_id": skeleton.skeleton_id,
+            "joint_id": joint.joint_id,
+            "joint_name": joint.joint_name,
+            "parent_joint_id": joint.parent_joint_id,
+        }
+        for skeleton in skeletons
+        for joint in skeleton.joints
+    ]
+    if joints:
+        insert_joints = pg_insert(SKELETON_JOINT_TABLE).values(joints)
+        insert_joints = insert_joints.on_conflict_do_update(
+            index_elements=["skeleton_id", "joint_id"],
+            set_={
+                "joint_name": insert_joints.excluded.joint_name,
+                "parent_joint_id": insert_joints.excluded.parent_joint_id,
+            },
+        )
+        connection.execute(insert_joints)
+    declared = {
+        (skeleton.skeleton_id, joint.joint_id)
+        for skeleton in skeletons
+        for joint in skeleton.joints
+    }
+    skeleton_ids = [skeleton.skeleton_id for skeleton in skeletons]
+    existing = connection.execute(
+        sa.select(SKELETON_JOINT_TABLE.c.skeleton_id, SKELETON_JOINT_TABLE.c.joint_id).where(
+            SKELETON_JOINT_TABLE.c.skeleton_id.in_(skeleton_ids)
+        )
+    ).fetchall()
+    stale = [
+        (row.skeleton_id, row.joint_id)
+        for row in existing
+        if (row.skeleton_id, row.joint_id) not in declared
+    ]
+    if stale:
+        connection.execute(
+            SKELETON_JOINT_TABLE.delete().where(
+                sa.tuple_(SKELETON_JOINT_TABLE.c.skeleton_id, SKELETON_JOINT_TABLE.c.joint_id).in_(
+                    stale
+                )
+            )
+        )
+    return len(definitions), len(joints)
 
 
 def _alignment_rows(domain: ProviderDomain) -> list[dict[str, Any]]:
@@ -489,6 +572,14 @@ def persist_domain(connection, domain: ProviderDomain) -> dict[str, int]:
             }
             for spec in domain.authorities.synchronizations
         ],
+    )
+    # Skeleton definitions and their joints precede the pose streams that
+    # reference them: a pose stream must never cite an undeclared skeleton, and a
+    # landmark_set skeleton persists its absent parent ids as nulls rather than
+    # fabricating a tree. The sync converges on the current declaration so a
+    # rerun cannot leave a stale definition or stale joints behind.
+    written["skeleton_definition"], written["skeleton_joint"] = _sync_skeletons(
+        connection, domain.authorities.skeletons
     )
     written["sensor_stream"] = _upsert(
         connection,

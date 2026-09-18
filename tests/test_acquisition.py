@@ -33,7 +33,11 @@ from dynamis.acquisition import (
     plan_acquisition,
     select_keys,
 )
-from dynamis.acquisition.resolvers import HuggingFaceResolver, ZenodoResolver
+from dynamis.acquisition.resolvers import (
+    HuggingFaceResolver,
+    RoutedResolver,
+    ZenodoResolver,
+)
 from dynamis.config import Settings
 from dynamis.contracts import (
     DatasetSource,
@@ -534,6 +538,352 @@ def test_hugging_face_resolver_requires_a_pinned_revision() -> None:
         )
 
 
+def test_github_resolver_follows_lfs_pointers_and_git_blob_identities() -> None:
+    import base64
+
+    revision = "c" * 40
+    regular = b'{"id": 9000001}'
+    tracking_bytes = b"tracking-payload" * 32
+    pointer = (
+        f"version https://git-lfs.github.com/spec/v1\n"
+        f"oid sha256:{hashlib.sha256(tracking_bytes).hexdigest()}\n"
+        f"size {len(tracking_bytes)}\n"
+    ).encode()
+    files = (
+        RetrievalFile(
+            key="data/matches/9000001/9000001_match.json",
+            size_bytes=len(regular),
+            sha1=git_blob_sha1_of(regular),
+        ),
+        RetrievalFile(
+            key="data/matches/9000001/9000001_tracking_extrapolated.jsonl",
+            size_bytes=len(tracking_bytes),
+            sha256=hashlib.sha256(tracking_bytes).hexdigest(),
+        ),
+    )
+    registry = synthetic_registry(
+        files=files,
+        provider="SkillCorner / PySport",
+        upstream_urls=(http_url("https://github.com/SkillCorner/opendata"),),
+        doi=None,
+    )
+    registry = registry.model_copy(
+        update={
+            "sources": (
+                registry.sources[0].model_copy(
+                    update={
+                        "versions": (
+                            registry.sources[0]
+                            .versions[0]
+                            .model_copy(update={"version": revision}),
+                        )
+                    }
+                ),
+            )
+        }
+    )
+    blob_sha = "d" * 40
+    regular_blob_sha = git_blob_sha1_of(regular)
+    session = FakeSession(
+        {
+            f"https://api.github.com/repos/SkillCorner/opendata/git/trees/{revision}?recursive=1": {
+                "truncated": False,
+                "tree": [
+                    {
+                        "path": "data/matches/9000001/9000001_match.json",
+                        "type": "blob",
+                        "sha": regular_blob_sha,
+                        "size": len(regular),
+                    },
+                    {
+                        "path": "data/matches/9000001/9000001_tracking_extrapolated.jsonl",
+                        "type": "blob",
+                        "sha": blob_sha,
+                        "size": len(pointer),
+                    },
+                ],
+            },
+            f"https://api.github.com/repos/SkillCorner/opendata/git/blobs/{regular_blob_sha}": {
+                "encoding": "base64",
+                "content": base64.b64encode(regular).decode("ascii"),
+                "size": len(regular),
+            },
+            f"https://api.github.com/repos/SkillCorner/opendata/git/blobs/{blob_sha}": {
+                "encoding": "base64",
+                "content": base64.b64encode(pointer).decode("ascii"),
+                "size": len(pointer),
+            },
+        }
+    )
+    plan = plan_acquisition(
+        "syn-provider",
+        keys=[
+            "data/matches/9000001/9000001_match.json",
+            "data/matches/9000001/9000001_tracking_extrapolated.jsonl",
+        ],
+        registry=registry,
+        session=session,
+    )
+    assert plan.resolver == "github"
+    regular_file, tracking_file = plan.files
+    assert regular_file.url == (
+        f"https://raw.githubusercontent.com/SkillCorner/opendata/{revision}/"
+        "data/matches/9000001/9000001_match.json"
+    )
+    assert regular_file.git_blob_sha1 == git_blob_sha1_of(regular)
+    # The LFS pointer is parsed through the GitHub blob API: the media host is
+    # used and the LFS object identity becomes the verified SHA-256.
+    assert tracking_file.url == (
+        f"https://media.githubusercontent.com/media/SkillCorner/opendata/{revision}/"
+        "data/matches/9000001/9000001_tracking_extrapolated.jsonl"
+    )
+    assert tracking_file.upstream_sha256 == hashlib.sha256(tracking_bytes).hexdigest()
+    assert tracking_file.size_bytes == len(tracking_bytes)
+    assert tracking_file.git_blob_sha1 is None
+    assert plan.total_bytes == len(regular) + len(tracking_bytes)
+
+
+def test_github_resolver_still_detects_lfs_when_a_pointer_sha1_is_declared() -> None:
+    import base64
+
+    revision = "a" * 40
+    content = b"real-lfs-content" * 8
+    pointer = (
+        "version https://git-lfs.github.com/spec/v1\n"
+        f"oid sha256:{hashlib.sha256(content).hexdigest()}\n"
+        f"size {len(content)}\n"
+    ).encode()
+    pointer_sha = git_blob_sha1_of(pointer)
+    registry = synthetic_registry(
+        files=(
+            RetrievalFile(
+                key="tracking.jsonl",
+                size_bytes=len(content),
+                sha1=pointer_sha,
+            ),
+        ),
+        provider="GitHub",
+        upstream_urls=(http_url("https://github.com/owner/repo"),),
+        doi=None,
+    )
+    registry = registry.model_copy(
+        update={
+            "sources": (
+                registry.sources[0].model_copy(
+                    update={
+                        "versions": (
+                            registry.sources[0]
+                            .versions[0]
+                            .model_copy(update={"version": revision}),
+                        )
+                    }
+                ),
+            )
+        }
+    )
+    session = FakeSession(
+        {
+            f"https://api.github.com/repos/owner/repo/git/trees/{revision}?recursive=1": {
+                "truncated": False,
+                "tree": [
+                    {
+                        "path": "tracking.jsonl",
+                        "type": "blob",
+                        "sha": pointer_sha,
+                        "size": len(pointer),
+                    }
+                ],
+            },
+            f"https://api.github.com/repos/owner/repo/git/blobs/{pointer_sha}": {
+                "encoding": "base64",
+                "content": base64.b64encode(pointer).decode("ascii"),
+                "size": len(pointer),
+            },
+        }
+    )
+    plan = plan_acquisition(
+        "syn-provider", keys=["tracking.jsonl"], registry=registry, session=session
+    )
+    assert plan.files[0].url == (
+        f"https://media.githubusercontent.com/media/owner/repo/{revision}/tracking.jsonl"
+    )
+    assert plan.files[0].upstream_sha256 == hashlib.sha256(content).hexdigest()
+    assert plan.files[0].size_bytes == len(content)
+
+
+def test_github_resolver_refuses_truncated_trees() -> None:
+    revision = "c" * 40
+    registry = synthetic_registry(
+        files=(RetrievalFile(key="a.json", size_bytes=10),),
+        provider="GitHub",
+        upstream_urls=(http_url("https://github.com/owner/repo"),),
+        doi=None,
+    )
+    registry = registry.model_copy(
+        update={
+            "sources": (
+                registry.sources[0].model_copy(
+                    update={
+                        "versions": (
+                            registry.sources[0]
+                            .versions[0]
+                            .model_copy(update={"version": revision}),
+                        )
+                    }
+                ),
+            )
+        }
+    )
+    session = FakeSession(
+        {
+            f"https://api.github.com/repos/owner/repo/git/trees/{revision}?recursive=1": {
+                "truncated": True,
+                "tree": [],
+            }
+        }
+    )
+    with pytest.raises(ResolverError, match="truncated"):
+        plan_acquisition("syn-provider", keys=["a.json"], registry=registry, session=session)
+
+
+def test_routed_resolver_uses_each_files_declared_companion_provider() -> None:
+    import base64
+
+    revision = "e" * 40
+    hf_revision = "f" * 40
+    match_bytes = b"{}"
+    archive_sha = "a" * 64
+    files = (
+        RetrievalFile(
+            key="data/match.json",
+            size_bytes=len(match_bytes),
+            sha1=git_blob_sha1_of(match_bytes),
+            upstream_provider="github",
+        ),
+        RetrievalFile(
+            key="raw/1.jsonl.zip",
+            size_bytes=123,
+            sha256=archive_sha,
+            upstream_provider="huggingface",
+            upstream_revision=hf_revision,
+        ),
+    )
+    registry = synthetic_registry(
+        files=files,
+        provider="SkillCorner / PySport",
+        upstream_urls=(
+            http_url("https://github.com/SkillCorner/opendata"),
+            http_url("https://huggingface.co/datasets/SkillCorner/opendata-bodypose"),
+        ),
+        doi=None,
+    )
+    registry = registry.model_copy(
+        update={
+            "sources": (
+                registry.sources[0].model_copy(
+                    update={
+                        "versions": (
+                            registry.sources[0]
+                            .versions[0]
+                            .model_copy(update={"version": revision}),
+                        )
+                    }
+                ),
+            )
+        }
+    )
+    session = FakeSession(
+        {
+            f"https://api.github.com/repos/SkillCorner/opendata/git/trees/{revision}?recursive=1": {
+                "truncated": False,
+                "tree": [
+                    {
+                        "path": "data/match.json",
+                        "type": "blob",
+                        "sha": git_blob_sha1_of(match_bytes),
+                        "size": len(match_bytes),
+                    }
+                ],
+            },
+            f"https://api.github.com/repos/SkillCorner/opendata/git/blobs/"
+            f"{git_blob_sha1_of(match_bytes)}": {
+                "encoding": "base64",
+                "content": base64.b64encode(match_bytes).decode("ascii"),
+                "size": len(match_bytes),
+            },
+            f"https://huggingface.co/api/datasets/SkillCorner/opendata-bodypose/tree/"
+            f"{hf_revision}?recursive=true&expand=true": [
+                {
+                    "type": "file",
+                    "path": "raw/1.jsonl.zip",
+                    "size": 123,
+                    "lfs": {"oid": archive_sha, "size": 123},
+                }
+            ],
+        }
+    )
+    plan = plan_acquisition(
+        "syn-provider",
+        keys=["data/match.json", "raw/1.jsonl.zip"],
+        registry=registry,
+        session=session,
+    )
+    assert plan.resolver == "routed"
+    assert [item.key for item in plan.files] == ["data/match.json", "raw/1.jsonl.zip"]
+    assert plan.files[1].url == (
+        "https://huggingface.co/datasets/SkillCorner/opendata-bodypose/resolve/"
+        f"{hf_revision}/raw/1.jsonl.zip"
+    )
+
+
+def test_routed_resolver_requires_a_pinned_companion_revision() -> None:
+    revision = "e" * 40
+    registry = synthetic_registry(
+        files=(
+            RetrievalFile(
+                key="raw/1.jsonl.zip",
+                size_bytes=123,
+                sha256="a" * 64,
+                upstream_provider="huggingface",
+            ),
+        ),
+        provider="SkillCorner / PySport",
+        upstream_urls=(
+            http_url("https://github.com/SkillCorner/opendata"),
+            http_url("https://huggingface.co/datasets/SkillCorner/opendata-bodypose"),
+        ),
+        doi=None,
+    )
+    registry = registry.model_copy(
+        update={
+            "sources": (
+                registry.sources[0].model_copy(
+                    update={
+                        "versions": (
+                            registry.sources[0]
+                            .versions[0]
+                            .model_copy(update={"version": revision}),
+                        )
+                    }
+                ),
+            )
+        }
+    )
+    with pytest.raises(ResolverError, match="upstream_revision"):
+        RoutedResolver().resolve(
+            FakeSession({}),
+            source=registry.sources[0],
+            version=registry.sources[0].versions[0],
+            keys=["raw/1.jsonl.zip"],
+            timeout=(1.0, 1.0),
+        )
+
+
+def test_companion_revision_requires_an_explicit_provider() -> None:
+    with pytest.raises(ValidationError, match="upstream_provider"):
+        RetrievalFile(key="raw/1.jsonl.zip", size_bytes=123, upstream_revision="a" * 40)
+
+
 def test_zenodo_resolver_requires_a_record_identity() -> None:
     source = DatasetSource(
         dataset_id="syn-provider",
@@ -977,17 +1327,46 @@ def test_spl_plan_fails_closed_without_acknowledgement() -> None:
             registry=registry,
             acknowledgements=("an-unrelated-source-acknowledgement",),
         )
-    # The exact acknowledgement satisfies the gate; SPL still has no resolver
-    # registered in this build, so nothing is fetched and a resolver error (not an
-    # acknowledgement error) is raised next. No HTTP request is made.
-    with pytest.raises(PlanError, match="no acquisition resolver"):
-        plan_acquisition(
-            "spl-open-data",
-            version=version,
-            keys=[key],
-            registry=registry,
-            acknowledgements=(SPL_LICENSE_ACKNOWLEDGEMENT,),
-        )
+    # The exact acknowledgement satisfies the gate; the pinned GitHub resolver is
+    # then exercised offline through an injected metadata session. No real
+    # source payload is downloaded by this test.
+    session = FakeSession(
+        {
+            f"https://api.github.com/repos/Sport-Performance-Lab/SPL-Open-Data/git/trees/"
+            f"{version}?recursive=1": {
+                "truncated": False,
+                "tree": [
+                    {
+                        "path": key,
+                        "type": "blob",
+                        "sha": registry.source("spl-open-data")
+                        .version(version)
+                        .retrieval.files[0]
+                        .sha1,
+                        "size": registry.source("spl-open-data")
+                        .version(version)
+                        .retrieval.files[0]
+                        .size_bytes,
+                    }
+                ],
+            }
+        }
+    )
+    plan = plan_acquisition(
+        "spl-open-data",
+        version=version,
+        keys=[key],
+        registry=registry,
+        session=session,
+        acknowledgements=(SPL_LICENSE_ACKNOWLEDGEMENT,),
+    )
+    assert plan.resolver == "routed"
+    assert plan.files[0].url.startswith(
+        f"https://raw.githubusercontent.com/Sport-Performance-Lab/SPL-Open-Data/{version}/"
+    )
+    assert plan.files[0].git_blob_sha1 == (
+        registry.source("spl-open-data").version(version).retrieval.files[0].sha1
+    )
 
 
 def test_spl_plan_rejects_superstring_acknowledgements() -> None:
@@ -1049,7 +1428,10 @@ def test_acquire_also_rejects_superstring_acknowledgements(tmp_settings: Setting
         )
 
 
-def test_cli_refuses_spl_without_the_explicit_flag(capsys: pytest.CaptureFixture[str]) -> None:
+def test_cli_refuses_spl_without_the_explicit_flag(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from dynamis.acquisition import cli as acquisition_cli
     from dynamis.acquisition.cli import main
 
     version, key = _spl_selection()
@@ -1058,8 +1440,16 @@ def test_cli_refuses_spl_without_the_explicit_flag(capsys: pytest.CaptureFixture
     assert "--acknowledge-spl-license-restrictions" in err
     assert "operator" in err.lower()
 
-    # Passing the flag satisfies the source gate, but SPL has no resolver in this
-    # build: acquisition is still refused and no payload is downloaded.
+    # Passing the flag satisfies the source gate and forwards the exact token to
+    # the planner; this test stops at the planner boundary so no network is used.
+    captured: dict[str, object] = {}
+
+    def stop_after_gate(dataset_id: str, **kwargs: object):
+        captured["dataset_id"] = dataset_id
+        captured.update(kwargs)
+        raise PlanError("planned boundary reached")
+
+    monkeypatch.setattr(acquisition_cli, "plan_acquisition", stop_after_gate)
     assert (
         main(
             [
@@ -1074,7 +1464,8 @@ def test_cli_refuses_spl_without_the_explicit_flag(capsys: pytest.CaptureFixture
         )
         == 2
     )
-    assert "no acquisition resolver" in capsys.readouterr().err
+    assert captured["dataset_id"] == "spl-open-data"
+    assert captured["acknowledgements"] == ("spl-license-restrictions",)
 
 
 def test_cli_json_dry_run_emits_the_plan(

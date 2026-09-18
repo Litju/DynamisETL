@@ -37,6 +37,35 @@ def any_non_null(columns: Sequence[Column]) -> pa.Array:
     return cast(pa.Array, result)
 
 
+def all_valid(columns: Sequence[Column]) -> pa.Array:
+    """Boolean array: True where every one of ``columns`` is non-null."""
+    if not columns:
+        raise ValueError("all_valid requires at least one column")
+    result = _kernels.is_valid(columns[0])
+    for column in columns[1:]:
+        result = _kernels.and_(result, _kernels.is_valid(column))
+    return cast(pa.Array, result)
+
+
+def is_finite(column: Column) -> pa.Array:
+    """Boolean array: True where the value is finite (null yields null)."""
+    return cast(pa.Array, _kernels.is_finite(column))
+
+
+def fill_null_false(column: Column) -> pa.Array:
+    """Boolean array with nulls replaced by ``False``."""
+    return cast(pa.Array, _kernels.fill_null(column, False))
+
+
+def invert(column: Column) -> pa.Array:
+    """Boolean negation (null yields null)."""
+    return cast(pa.Array, _kernels.invert(column))
+
+
+def greater_equal(left: Column, right: object) -> pa.Array:
+    return cast(pa.Array, _kernels.greater_equal(left, right))
+
+
 def and_(left: Column, right: Column) -> pa.Array:
     return cast(pa.Array, _kernels.and_(left, right))
 

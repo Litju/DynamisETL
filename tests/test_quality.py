@@ -167,6 +167,94 @@ def test_mixed_coordinate_frames_in_one_file_are_rejected() -> None:
     assert any(item.rule == "authority.frame_multiple" for item in violations)
 
 
+def _pose_table(*, unavailable: bool = False) -> pa.Table:
+    from dynamis.fixtures import pose_skeleton_trajectory
+
+    return pose_skeleton_trajectory(frame_count=4, unavailable_pattern=unavailable).table
+
+
+def test_pose_availability_and_coordinates_must_agree() -> None:
+    from dynamis.quality.checks import check_pose_payload_completeness
+
+    table = _pose_table()
+    schema = get_schema(Modality.POSE)
+    assert check_pose_payload_completeness(table, schema) == ()
+
+    # An available joint without coordinates is rejected (never imputed).
+    x_index = table.schema.get_field_index("x_m")
+    xs = table.column("x_m").to_pylist()
+    xs[0] = None
+    tampered = table.set_column(x_index, "x_m", pa.array(xs, type=pa.float64()))
+    violations = check_pose_payload_completeness(tampered, schema)
+    assert any(item.rule == "pose.payload.missing_coordinates" for item in violations)
+
+    # An unavailable joint carrying coordinates is contradictory.
+    unavailable_rows = _pose_table(unavailable=True)
+    z_index = unavailable_rows.schema.get_field_index("z_m")
+    zs = unavailable_rows.column("z_m").to_pylist()
+    target = next(
+        index
+        for index, value in enumerate(unavailable_rows.column("is_available").to_pylist())
+        if not value
+    )
+    zs[target] = 1.0
+    tampered = unavailable_rows.set_column(z_index, "z_m", pa.array(zs, type=pa.float64()))
+    violations = check_pose_payload_completeness(tampered, schema)
+    assert any(item.rule == "pose.payload.unexpected_coordinates" for item in violations)
+
+
+def test_pose_available_joint_requires_finite_coordinates() -> None:
+    from dynamis.quality.checks import check_pose_payload_completeness
+
+    table = _pose_table()
+    x_index = table.schema.get_field_index("x_m")
+    xs = table.column("x_m").to_pylist()
+    xs[1] = float("nan")
+    tampered = table.set_column(x_index, "x_m", pa.array(xs, type=pa.float64()))
+    violations = check_pose_payload_completeness(tampered, get_schema(Modality.POSE))
+    assert any(item.rule == "pose.payload.non_finite" for item in violations)
+
+
+def test_pose_payload_checks_skip_structurally_incompatible_data() -> None:
+    from dynamis.quality.checks import check_pose_payload_completeness
+
+    table = _pose_table()
+    schema = get_schema(Modality.POSE)
+    index = table.schema.get_field_index("x_m")
+    tampered = table.set_column(index, "x_m", pa.array([0] * table.num_rows, type=pa.int64()))
+    # The structural violation is reported, and the payload kernels never run
+    # against the incompatible column.
+    assert check_pose_payload_completeness(tampered, schema) == ()
+    assert any(
+        item.rule == "schema.field.type" for item in check_schema_conformance(tampered, schema)
+    )
+
+    from dynamis.quality.streaming import StreamingValidator
+
+    validator = StreamingValidator(schema)
+    for batch in tampered.to_batches(max_chunksize=64):
+        assert batch.schema.field("x_m").type == pa.int64()
+        validator.observe(batch)
+    assert isinstance(validator.finish(), tuple)
+
+    # A non-numeric provider error column is also structurally incompatible.
+    error_index = table.schema.get_field_index("error_m")
+    tampered_error = table.set_column(
+        error_index,
+        "error_m",
+        pa.array(["bad"] * table.num_rows, type=pa.string()),
+    )
+    assert check_pose_payload_completeness(tampered_error, schema) == ()
+    assert any(
+        item.rule == "schema.field.type"
+        for item in check_schema_conformance(tampered_error, schema)
+    )
+    validator = StreamingValidator(schema)
+    for batch in tampered_error.to_batches(max_chunksize=64):
+        validator.observe(batch)
+    assert isinstance(validator.finish(), tuple)
+
+
 def test_null_frame_is_rejected_when_the_modality_requires_one() -> None:
     fixture = force_bodyweight_static(rate_hz=1000.0, duration_s=0.004)
     table = fixture.table.set_column(

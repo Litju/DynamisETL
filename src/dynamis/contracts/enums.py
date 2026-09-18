@@ -87,6 +87,19 @@ class SynchronizationMethod(StrEnum):
     UNKNOWN = "unknown"
 
 
+class SkeletonTopology(StrEnum):
+    """How a skeleton authority publishes its joints.
+
+    ``TREE`` is a published single-root parent graph (the original behaviour).
+    ``LANDMARK_SET`` is a published landmark/keypoint list whose source declares
+    no parent graph at all: parent ids must be absent, and anatomical parentage
+    is never invented to satisfy the tree form.
+    """
+
+    TREE = "tree"
+    LANDMARK_SET = "landmark_set"
+
+
 class FrameKind(StrEnum):
     WORLD_GEODETIC = "world_geodetic"
     LOCAL_ENU = "local_enu"

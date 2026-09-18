@@ -18,7 +18,7 @@ from sqlalchemy.engine import Engine
 from dynamis.config import ENV_DB_SCHEMA, ENV_POSTGRES_URL, repository_root
 from dynamis.storage.tables import EXPECTED_TABLE_NAMES
 
-HEAD_REVISION = "0003_sync_alignment"
+HEAD_REVISION = "0004_skeleton_topology"
 
 
 def _alembic_config(url: str) -> Config:
@@ -70,10 +70,27 @@ def test_offline_downgrade_of_0003_refuses_before_destructive_sql(
 
     capsys.readouterr()  # discard any prior command output
     with pytest.raises(RuntimeError, match="offline"):
-        command.downgrade(config, "head:0002_handedness_unspecified", sql=True)
+        command.downgrade(config, "0003_sync_alignment:0002_handedness_unspecified", sql=True)
 
     emitted = capsys.readouterr().out
     assert "DROP TABLE" not in emitted
+    assert "alembic_version SET" not in emitted
+
+
+def test_offline_downgrade_of_0004_refuses_before_destructive_sql(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The topology column cannot be dropped offline; landmark evidence is invisible."""
+    monkeypatch.setenv(ENV_DB_SCHEMA, "dynamis_offline_check")
+    monkeypatch.delenv(ENV_POSTGRES_URL, raising=False)
+    config = _alembic_config("postgresql+psycopg://placeholder/dynamis")
+
+    capsys.readouterr()
+    with pytest.raises(RuntimeError, match="offline"):
+        command.downgrade(config, "head:0003_sync_alignment", sql=True)
+
+    emitted = capsys.readouterr().out
+    assert "DROP COLUMN" not in emitted
     assert "alembic_version SET" not in emitted
 
 
