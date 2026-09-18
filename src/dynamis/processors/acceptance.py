@@ -419,6 +419,9 @@ SKILLCORNER_POSE_PARAMETERS: dict[str, Any] = {
 }
 
 POSE_REQUIRED_COLUMNS = [
+    "session_id",
+    "trial_id",
+    "stream_id",
     "subject_id",
     "t_rel_ns",
     "sample_index",
