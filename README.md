@@ -147,10 +147,24 @@ uv run dynamis-ingest dfl-sportec-idsse \
 ```
 
 Both commands verify the Bronze manifest before ingesting, are idempotent, and
-never overwrite contradicted evidence. Reconciliation receipts and discovery
+never overwrite contradicted evidence. A verified no-download re-run is a
+provenance no-op: Bronze bytes, their local SHA-256 and their first-entry
+`retrieved_at` are immutable, while the run is recorded separately as a new
+`verified_at` verification event. Reconciliation receipts and discovery
 receipts land under `cache/receipts/`; Silver Parquet under
 `silver/dataset_id=…/modality=…/session_id=…/`. The same pipeline is exposed as
 Dagster assets (`womens_j01_*`, `dfl_j03wpy_*`).
+
+**Domain authorities (audited).** The accepted DFL/Sportec positions slice
+contains **3,362,853 entity-frame observations** (one object at one 25 Hz frame
+tick), not 3,362,853 temporal frames: 146,211 distinct frame ticks (69,131
+first half + 77,080 second half) × 23 entities per tick. The bounded-memory
+constants are frozen in code: provider/spill batch **16,384** rows, merge slice
+**1,024** rows, frame-major merge batch **8,192** rows, Silver Parquet row group
+**65,536** rows. The Women's source publishes geographic GNSS latitude/longitude
+without an explicit geodetic-datum declaration; the canonical interpretation is
+WGS 84, recorded as a documented pipeline inference with no transformation
+applied.
 
 **Licensing.** `womens-soccer-positioning` is **CC BY-NC 4.0** (non-commercial,
 attribution): keep it local, do not commit it or its derivatives.

@@ -37,6 +37,11 @@ unclear-rights data stay outside the code license boundary.
   <https://zenodo.org/records/10913119>, DOI `10.5281/zenodo.10913119`.
 - License **CC BY-NC 4.0**: non-commercial use only, attribution required.
 - Do not relicense source or derived data as project code.
+- The provider publishes geographic GNSS/GPS latitude/longitude but its metadata
+  does **not** explicitly declare a geodetic datum. The pipeline's canonical
+  interpretation is **WGS 84**, recorded as a documented inference (never as a
+  provider declaration); no datum transformation is applied and source
+  coordinate values pass through unchanged.
 
 ### `white-cmj-acc-grf`
 
