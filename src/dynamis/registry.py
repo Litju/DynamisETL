@@ -90,14 +90,21 @@ def required_acknowledgements(dataset_id: str) -> tuple[str, ...]:
     return REQUIRED_ACKNOWLEDGEMENTS.get(dataset_id, ())
 
 
-def assert_acquisition_acknowledged(source: DatasetSource, acknowledged: Collection[str]) -> None:
+def assert_acquisition_acknowledged(
+    source: DatasetSource, acknowledged: Collection[str] | str
+) -> None:
     """Fail closed unless every source-specific acknowledgement was given.
 
+    ``acknowledged`` holds exact acknowledgement tokens. A bare string is
+    normalized to one token (it is never treated as a sequence of characters or
+    as a substring container), and the tokens are materialized into a set so a
+    hostile or custom collection cannot make a superstring satisfy the gate.
     The acknowledgement records that the operator has read the restriction; it
     does not assert legal eligibility and does not override any NC/SA term.
     """
+    tokens = {acknowledged} if isinstance(acknowledged, str) else set(acknowledged)
     required = required_acknowledgements(source.dataset_id)
-    missing = [token for token in required if token not in acknowledged]
+    missing = [token for token in required if token not in tokens]
     if not missing:
         return
     restrictions = " | ".join(source.license.restrictions) or "(restrictions not recorded)"

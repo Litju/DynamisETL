@@ -55,6 +55,28 @@ def test_offline_sql_is_self_contained_and_complete(
     assert "DROP TABLE" not in ddl
 
 
+def test_offline_downgrade_of_0003_refuses_before_destructive_sql(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Offline mode cannot inspect persisted alignment evidence, so it refuses.
+
+    The online row-count guard is covered by the PostgreSQL regression in
+    ``test_sync_alignment.py``; this test proves the ``--sql`` path never emits
+    the destructive drop for 0003.
+    """
+    monkeypatch.setenv(ENV_DB_SCHEMA, "dynamis_offline_check")
+    monkeypatch.delenv(ENV_POSTGRES_URL, raising=False)
+    config = _alembic_config("postgresql+psycopg://placeholder/dynamis")
+
+    capsys.readouterr()  # discard any prior command output
+    with pytest.raises(RuntimeError, match="offline"):
+        command.downgrade(config, "head:0002_handedness_unspecified", sql=True)
+
+    emitted = capsys.readouterr().out
+    assert "DROP TABLE" not in emitted
+    assert "alembic_version SET" not in emitted
+
+
 @pytest.mark.postgres
 def test_migration_lifecycle_on_postgresql(
     postgres_url: str,

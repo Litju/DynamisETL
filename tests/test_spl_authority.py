@@ -94,6 +94,16 @@ def test_spl_acknowledgement_gate_is_source_specific_and_fails_closed() -> None:
         assert_acquisition_acknowledged(spl, ("some-unrelated-acknowledgement",))
     assert_acquisition_acknowledged(spl, (SPL_LICENSE_ACKNOWLEDGEMENT,))
 
+    # Exact token membership: a bare string is one token, never a substring
+    # container, so a superstring containing the required token cannot open the
+    # gate for a direct programmatic caller.
+    superstring = f"invalid-{SPL_LICENSE_ACKNOWLEDGEMENT}-value"
+    assert SPL_LICENSE_ACKNOWLEDGEMENT in superstring
+    for acknowledged in (superstring, [superstring], (superstring,)):
+        with pytest.raises(AcknowledgementRequired, match="fail-closed"):
+            assert_acquisition_acknowledged(spl, acknowledged)
+    assert_acquisition_acknowledged(spl, SPL_LICENSE_ACKNOWLEDGEMENT)
+
     # A source without a gate is not blocked by unrelated acknowledgements.
     assert_acquisition_acknowledged(source_by_id(registry, "dfl-sportec-idsse"), ())
     assert required_acknowledgements("dfl-sportec-idsse") == ()

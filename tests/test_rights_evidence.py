@@ -27,6 +27,16 @@ REQUIRED_FIELDS = {
     "decision",
 }
 IDENTIFIER_TOKEN = re.compile(r"^[A-Za-z0-9.-]+")
+COMMIT_REVISION = re.compile(r"^[0-9a-f]{40}$")
+#: An immutable GitHub reference: /blob/<sha>/, /raw/<sha>/, /tree/<sha>/ or
+#: /commit/<sha> instead of a mutable branch or repository-root URL.
+PINNED_COMPANION_URL = re.compile(
+    r"/(?:blob|raw|tree)/(?P<revision>[0-9a-f]{40})/|/commit/(?P<commit_revision>[0-9a-f]{40})$"
+)
+WHITE_COMPANION_REVISION = "5c0c8b8278b78d1cb1ab2cf931e05693c2f84334"
+WHITE_COMPANION_URL = (
+    f"https://github.com/markgewhite/acc2grf-cmj/blob/{WHITE_COMPANION_REVISION}/README.md"
+)
 
 
 def _document() -> dict[str, Any]:
@@ -66,6 +76,38 @@ def test_observed_identifiers_agree_with_the_registry_policy() -> None:
         assert match is not None
         assert policy.identifier is not None
         assert match.group(0).lower() == policy.identifier.lower()
+
+
+def test_companion_repository_evidence_is_pinned_to_an_immutable_revision() -> None:
+    """Companion-repository rights evidence must stay reproducible.
+
+    A repository-root or branch URL can change after the audit. Every entry that
+    cites companion repository evidence must record the exact commit SHA and a
+    URL that embeds that same revision.
+    """
+    entries = _document()["evidence"]
+    assert any(entry.get("companion_evidence_url") for entry in entries)
+    for entry in entries:
+        url = entry.get("companion_evidence_url")
+        revision = entry.get("companion_evidence_revision")
+        if url is None:
+            assert revision is None, entry["dataset_id"]
+            continue
+        assert revision is not None, entry["dataset_id"]
+        assert COMMIT_REVISION.fullmatch(revision), (entry["dataset_id"], revision)
+        match = PINNED_COMPANION_URL.search(url)
+        assert match is not None, (entry["dataset_id"], url)
+        pinned_revision = match.group("revision") or match.group("commit_revision")
+        assert pinned_revision == revision, (entry["dataset_id"], url)
+
+
+def test_white_companion_readme_evidence_is_commit_pinned() -> None:
+    entry = next(
+        item for item in _document()["evidence"] if item["dataset_id"] == "white-cmj-acc-grf"
+    )
+    assert entry["companion_evidence_revision"] == WHITE_COMPANION_REVISION
+    assert entry["companion_evidence_url"] == WHITE_COMPANION_URL
+    assert WHITE_COMPANION_REVISION in entry["companion_evidence"]
 
 
 def test_evidence_contains_no_machine_specific_state() -> None:
