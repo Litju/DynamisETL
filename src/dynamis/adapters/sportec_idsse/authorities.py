@@ -46,9 +46,14 @@ def tracking_stream_id(period_id: str) -> str:
 
 
 REFERENCE_CLIENT = (
-    "kloppy SportecTrackingDataCoordinateSystem (Origin.CENTER, VerticalOrientation."
-    "BOTTOM_TO_TOP) and SportecEventDataCoordinateSystem (Origin.BOTTOM_LEFT, same "
-    "orientation), both in metres with MetricPitchDimensions X=length, Y=width"
+    "kloppy 3.19.0 SportecTrackingDataCoordinateSystem (Origin.CENTER, "
+    "VerticalOrientation.BOTTOM_TO_TOP) and SportecEventDataCoordinateSystem "
+    "(Origin.BOTTOM_LEFT, same executable orientation), both in metres with "
+    "MetricPitchDimensions X=length, Y=width. Kloppy prose is inconsistent "
+    "(the event docstring says top-to-bottom) but its executable properties are "
+    "authoritative. Independent RES-103 oracle: all 1,387 coordinate-bearing "
+    "canonical J03WPY events agree with the executable Kloppy transform within "
+    "1.8e-15 m (max |dx|) and 0 m (max |dy|)"
 )
 
 
@@ -86,7 +91,9 @@ def corner_to_center_transform(pitch_x_m: float, pitch_y_m: float) -> FrameTrans
             "Pure origin translation between two systems that share axis directions: "
             "the provider publishes event coordinates with a bottom-left origin "
             f"(x in [0, {pitch_x_m:g}], y in [0, {pitch_y_m:g}]) and tracking coordinates "
-            f"with a centre origin. Verified against the reference client. {REFERENCE_CLIENT}."
+            f"with a centre origin. Verified against the executable reference client by an "
+            f"independent RES-103 oracle over all coordinate-bearing J03WPY events. "
+            f"{REFERENCE_CLIENT}."
         ),
     )
 

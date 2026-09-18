@@ -64,6 +64,11 @@ reportMissingTypeStubs = false
 [dependency-groups]
 dev = [
     "hypothesis>=6.168.0",
+    # Pinned executable reference client for the independent Sportec
+    # event-coordinate oracle (RES-103). CI exercises it on structurally
+    # synthetic coordinates only; the real-data oracle runs locally against
+    # immutable Bronze and never commits source rows.
+    "kloppy==3.19.0",
     "pyright>=1.1.414",
     "pytest>=9.1.1",
     "ruff>=0.16.8",

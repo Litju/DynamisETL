@@ -1,7 +1,7 @@
 """Streaming canonicalization of the provider's 25 Hz positions XML.
 
-Design (bounded memory is a hard requirement: the file is 372 MB / 3.36 M
-frames and must never be materialized):
+Design (bounded memory is a hard requirement: the file is 372 MB with 3.36 M
+entity-frame observations and must never be materialized):
 
 1. **Spill pass** - one ``lxml.iterparse`` pass with aggressive element clearing.
    Each ``FrameSet`` (one entity: player or ball, one period) is written to a
@@ -12,6 +12,11 @@ frames and must never be materialized):
    ``t_rel_ns`` is non-decreasing, as the tracking contract requires. Entities
    that joined late (substitutes) are handled by the merge naturally.
 
+Terminology: one ``<Frame>`` element is one *entity-frame observation* (one
+object at one frame tick). The accepted J03WPY slice has 3,362,853 such
+observations over 146,211 distinct temporal frame ticks (69,131 + 77,080) with
+23 entities per tick. "Frames" never means the observation count here.
+
 Canonical frame/time mapping (verified by the discovery receipt and tests):
 
     t_rel_ns(frame) = timestamp_utc_ns - kickoff_utc_ns
@@ -21,15 +26,21 @@ Rows that break the contract are quarantined with an explicit rule id; source
 scalar movement attributes (``S`` km/h, ``A`` clipped at +/-7.99) are *not*
 mapped because the canonical tracking contract has no scalar-movement field and
 fabricating one would misrepresent the source (documented in the receipt).
+
+Coordinates must be finite: ``NaN``/``+Inf``/``-Inf`` (however spelled) are
+quarantined, never published. Off-pitch positions are legitimate and are *not*
+clipped or range-checked. The optional ``Z`` attribute is validated the same
+way and cannot crash the stream.
 """
 
 from __future__ import annotations
 
 import heapq
+import math
 import shutil
 from collections import Counter
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -49,6 +60,7 @@ from dynamis.pipeline.quarantine import (
     RULE_COORDINATE_OUT_OF_RANGE,
     RULE_DUPLICATE_FRAME,
     RULE_FRAME_TIME_MISMATCH,
+    RULE_NON_FINITE_VALUE,
     RULE_REQUIRED_FIELD_NULL,
     RULE_TIMESTAMP_UNPARSABLE,
     QuarantinedRecord,
@@ -87,20 +99,24 @@ class SectionSummary:
     frame_first: int
     frame_last: int
     entity_count: int
-    source_frames: int = 0
+    #: One observation per entity per frame tick (provider ``<Frame>`` element).
+    frame_entity_observations: int = 0
     canonical_rows: int = 0
     ball_object_id: str | None = None
+    #: Distinct source frame numbers seen in this section, recorded from the
+    #: parsed counter before any coordinate validation. O(distinct ticks), which
+    #: stays far below the observation count for a multi-entity stream.
+    frame_numbers: set[int] = field(default_factory=set)
 
     @property
-    def frame_count(self) -> int:
-        if self.frame_first == 0 and self.frame_last == 0:
-            return 0
-        return self.frame_last - self.frame_first + 1
+    def distinct_frame_ticks(self) -> int:
+        """Distinct temporal frame ticks observed by the provider in this section."""
+        return len(self.frame_numbers)
 
 
 @dataclass(frozen=True, slots=True)
 class PositionsSummary:
-    source_frames: int
+    frame_entity_observations: int
     canonical_rows: int
     quarantined_rows: int
     quarantined_by_rule: dict[str, int]
@@ -110,7 +126,7 @@ class PositionsSummary:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "source_frames": self.source_frames,
+            "frame_entity_observations": self.frame_entity_observations,
             "canonical_rows": self.canonical_rows,
             "quarantined_rows": self.quarantined_rows,
             "quarantined_by_rule": self.quarantined_by_rule,
@@ -121,8 +137,8 @@ class PositionsSummary:
                     "period_id": summary.period_id,
                     "frame_first": summary.frame_first,
                     "frame_last": summary.frame_last,
-                    "frame_count": summary.frame_count,
-                    "source_frames": summary.source_frames,
+                    "distinct_frame_ticks": summary.distinct_frame_ticks,
+                    "entity_frame_observations": summary.frame_entity_observations,
                     "canonical_rows": summary.canonical_rows,
                     "entity_count": summary.entity_count,
                     "ball_object_id": summary.ball_object_id,
@@ -169,7 +185,7 @@ class PositionsCanonicalizer:
         self._coordinate_frame_id = coordinate_frame_id
         self._spills: dict[str, dict[str, EntitySpill]] = {}
         self._summaries: dict[str, SectionSummary] = {}
-        self._source_frames = 0
+        self._frame_entity_observations = 0
         self._quarantined: list[QuarantinedRecord] = []
         self._session_id = metadata.match_id
 
@@ -236,9 +252,9 @@ class PositionsCanonicalizer:
                     kickoff_ns=kickoff_ns,
                     section_origin=section_origin,
                 )
-                self._source_frames += 1
+                self._frame_entity_observations += 1
                 summary = self._summaries[spill.section]
-                summary.source_frames += 1
+                summary.frame_entity_observations += 1
                 if row is None and error is not None:
                     self._quarantined.append(error)
                 elif row is not None:
@@ -327,6 +343,9 @@ class PositionsCanonicalizer:
             return None, quarantine(
                 RULE_REQUIRED_FIELD_NULL, "Frame N is not an integer", {"N": n_raw}
             )
+        # The tick exists in the source even when the row is quarantined, so the
+        # distinct-tick evidence is recorded before any coordinate validation.
+        self._summaries[spill.section].frame_numbers.add(frame)
         if time_raw is None:
             return None, quarantine(RULE_REQUIRED_FIELD_NULL, "Frame has no T", {"N": frame})
         parsed = _parse_utc(time_raw)
@@ -365,15 +384,38 @@ class PositionsCanonicalizer:
                     {"frame": frame, "attribute": name},
                 )
             try:
-                coordinates[name] = float(raw)
+                value = float(raw)
             except ValueError:
                 return None, quarantine(
                     RULE_COORDINATE_OUT_OF_RANGE,
                     f"coordinate {name} is not numeric",
                     {"frame": frame, "value": raw},
                 )
+            if not math.isfinite(value):
+                return None, quarantine(
+                    RULE_NON_FINITE_VALUE,
+                    f"coordinate {name} is not a finite number",
+                    {"frame": frame, "value": raw},
+                )
+            coordinates[name] = value
+        z_m: float | None = None
         z_raw = elem.get("Z")
-        z_m = float(z_raw) if z_raw is not None else None
+        if z_raw is not None:
+            try:
+                z_value = float(z_raw)
+            except ValueError:
+                return None, quarantine(
+                    RULE_COORDINATE_OUT_OF_RANGE,
+                    "optional coordinate Z is not numeric",
+                    {"frame": frame, "value": z_raw},
+                )
+            if not math.isfinite(z_value):
+                return None, quarantine(
+                    RULE_NON_FINITE_VALUE,
+                    "optional coordinate Z is not a finite number",
+                    {"frame": frame, "value": z_raw},
+                )
+            z_m = z_value
 
         return (
             {
@@ -487,7 +529,7 @@ class PositionsCanonicalizer:
     def summary(self) -> PositionsSummary:
         by_rule = Counter(record.rule for record in self._quarantined)
         return PositionsSummary(
-            source_frames=self._source_frames,
+            frame_entity_observations=self._frame_entity_observations,
             canonical_rows=sum(summary.canonical_rows for summary in self._summaries.values()),
             quarantined_rows=len(self._quarantined),
             quarantined_by_rule=dict(by_rule),
@@ -520,10 +562,10 @@ def _entity_rows(reader: ipc.RecordBatchReader) -> Iterator[tuple[Any, ...]]:
 
 def _batch_from_rows(rows: list[tuple[Any, ...]], *, start: int) -> pa.RecordBatch:
     columns = []
-    for position, field in enumerate(TRACKING_SCHEMA):
-        if field.name == "sample_index":
+    for position, schema_field in enumerate(TRACKING_SCHEMA):
+        if schema_field.name == "sample_index":
             values: list[Any] = list(range(start, start + len(rows)))
         else:
             values = [row[position] for row in rows]
-        columns.append(pa.array(values, type=field.type))
+        columns.append(pa.array(values, type=schema_field.type))
     return pa.RecordBatch.from_arrays(columns, schema=TRACKING_SCHEMA)

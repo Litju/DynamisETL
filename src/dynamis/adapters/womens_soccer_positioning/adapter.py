@@ -7,7 +7,10 @@ Mapping (derived from the verified workbook discovery, never from memory):
 * ``local_time`` is provider local wall-clock text (``%Y-%m-%d %H:%M:%S.%f``);
   ``t_rel_ns`` is measured from the earliest accepted sample of the workbook and
   ``timestamp_utc_ns`` is null because no UTC truth exists upstream;
-* ``latitude``/``longitude`` are WGS 84 degrees, passed through unchanged;
+* ``latitude``/``longitude`` are geographic GNSS degrees passed through
+  unchanged; the provider does **not** explicitly declare the geodetic datum, so
+  WGS 84 is the canonical interpretation (an inferred pipeline assumption)
+  recorded on the frame, the stream metadata and the reconciliation receipt;
 * ``speed(km/h)`` is converted to SI m/s with the exact scale 1/3.6;
 * ``hr(bpm)`` has no canonical GNSS destination in V1 and is reported as an
   unmapped column (all values are null in the verified workbook).
@@ -70,6 +73,16 @@ WOMENS_SESSION_ID = authorities.WOMENS_SESSION_ID
 #: The single accepted workbook for RES-97.
 WORKBOOK_KEY_J01 = "J01.xlsx"
 
+#: Datum provenance recorded on every canonical stream and receipt: the source
+#: publishes geographic GNSS coordinates without declaring a datum, so WGS 84 is
+#: an explicit pipeline inference, never presented as provider truth.
+DATUM_PROVENANCE: dict[str, str] = {
+    "source_coordinate_representation": authorities.SOURCE_COORDINATE_REPRESENTATION,
+    "source_datum": authorities.SOURCE_DATUM_DECLARATION,
+    "canonical_datum": authorities.CANONICAL_DATUM,
+    "datum_authority": authorities.DATUM_AUTHORITY,
+}
+
 
 def adapter_algorithm_spec() -> AlgorithmSpec:
     """Deterministic algorithm identity for the Women's workbook adapter."""
@@ -80,7 +93,8 @@ def adapter_algorithm_spec() -> AlgorithmSpec:
         kind=AlgorithmKind.ADAPTER,
         description=(
             "Streams the verified J01 workbook into canonical gnss_sample streams "
-            "with SI-unit speed, WGS 84 frame and session-monotonic time."
+            "with SI-unit speed, the WGS 84 canonical frame (source datum not "
+            "explicitly declared) and session-monotonic time."
         ),
     )
 
@@ -226,6 +240,7 @@ class WomenWorkbookAdapter:
                 "speed_source_unit": authorities.SPEED_SOURCE_UNIT,
                 "speed_source_to_si_scale": authorities.SPEED_SOURCE_TO_SI_SCALE,
                 "unmapped_columns": ",".join(UNMAPPED_COLUMNS),
+                **DATUM_PROVENANCE,
             },
             schema=GNSS_SCHEMA,
             batches=self._batches_for_sheet(subject),
@@ -276,6 +291,7 @@ class WomenWorkbookAdapter:
                 stream_metadata={
                     "source_file_key": WORKBOOK_KEY_J01,
                     "provider_sheet": subject.sheet_name,
+                    **DATUM_PROVENANCE,
                 },
             )
             for subject in self.subject_streams()

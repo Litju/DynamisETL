@@ -1,9 +1,13 @@
 """Declared authorities for the Women's Soccer Positioning provider.
 
 Provider truth: the workbook exposes device local wall-clock text timestamps and
-WGS 84 geodetic positions. No timezone, no UTC epoch and no device identity are
-declared upstream, so the clock is session-monotonic and UTC stays null rather
-than being guessed.
+geographic GNSS/GPS latitude/longitude positions. The provider metadata does
+**not** explicitly declare a geodetic datum, so WGS 84 is carried as the
+canonical interpretation --- an explicit, documented pipeline assumption --- not
+as a provider declaration. Coordinates are passed through unchanged; no datum
+transformation is applied. No timezone, no UTC epoch and no device identity are
+declared upstream either, so the clock is session-monotonic and UTC stays null
+rather than being guessed.
 """
 
 from __future__ import annotations
@@ -27,6 +31,15 @@ WGS84_FRAME_ID = "wsp-wgs84-geodetic"
 CLOCK_ID = "wsp-local-clock"
 SYNC_SPEC_ID = "wsp-source-provided"
 
+#: The source representation actually published by the provider.
+SOURCE_COORDINATE_REPRESENTATION = "geographic GNSS latitude/longitude"
+#: The provider publishes no explicit geodetic-datum declaration.
+SOURCE_DATUM_DECLARATION = "not explicitly declared by the provider"
+#: The datum the canonical GNSS contract interprets those values in.
+CANONICAL_DATUM = "WGS 84"
+#: Where that interpretation comes from: an inference, not provider truth.
+DATUM_AUTHORITY = "inferred pipeline assumption"
+
 #: Source sampling interval observed in the verified workbook (0.1 s).
 NOMINAL_RATE_HZ = 10.0
 
@@ -36,23 +49,35 @@ SPEED_SOURCE_TO_SI_SCALE = 1.0 / 3.6
 
 
 def wgs84_frame() -> CoordinateFrame:
-    """Geodetic WGS 84 frame implied by the provider's latitude/longitude pair."""
+    """Canonical geodetic frame for the provider's latitude/longitude columns.
+
+    The provider publishes geographic GNSS/GPS latitude and longitude, but its
+    metadata does not explicitly declare the geodetic datum. WGS 84 is the
+    canonical interpretation (an inferred pipeline assumption), and the source
+    values are passed through unchanged.
+    """
     return CoordinateFrame(
         frame_id=WGS84_FRAME_ID,
-        name="WGS 84 geodetic coordinates (Women's Soccer Positioning)",
+        name=(
+            "WGS 84 geodetic coordinates (canonical interpretation of an "
+            "undeclared source datum; Women's Soccer Positioning)"
+        ),
         kind=FrameKind.WORLD_GEODETIC,
         handedness=Handedness.RIGHT,
         x_direction=AxisDirection.EAST,
         y_direction=AxisDirection.NORTH,
         z_direction=AxisDirection.UP,
         origin_description=(
-            "WGS 84 ellipsoid; geodetic latitude/longitude in degrees, ellipsoidal height "
-            "in metres. Longitude increases east, latitude increases north."
+            "WGS 84 ellipsoid (canonical interpretation); geodetic latitude/longitude in "
+            "degrees, ellipsoidal height in metres. Longitude increases east, latitude "
+            "increases north."
         ),
         length_unit="m",
         description=(
-            "The provider publishes only the (latitude, longitude, speed) triple; the "
-            "geodetic frame is the geometric authority for those columns."
+            f"Source representation: {SOURCE_COORDINATE_REPRESENTATION} in decimal degrees. "
+            f"Source datum: {SOURCE_DATUM_DECLARATION}. Canonical interpretation: "
+            f"{CANONICAL_DATUM} ({DATUM_AUTHORITY}). No datum transformation is applied; "
+            "source coordinate values are passed through unchanged."
         ),
     )
 

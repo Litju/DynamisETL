@@ -4,6 +4,27 @@ The registry states what a dataset *should* contain; the Bronze manifest records
 what was actually retrieved, with upstream checksums and the locally computed
 SHA-256 of every immutable native file. Nothing about a downloaded file is
 believed without a checksum.
+
+Timestamp semantics (schema version ``2``):
+``retrieved_at``
+    when these exact native bytes first entered immutable Bronze. Once recorded
+    it is never rewritten: a later ``already_present`` verification must not
+    move an acquisition timestamp.
+``verified_at``
+    when the recorded digest was last re-checked against the bytes on disk.
+    Every acquisition/verification run advances it; a fresh download records the
+    same instant for retrieval and verification.
+
+Manifest-level semantics are deterministic and order-independent:
+
+* ``retrieved_at`` = earliest non-null acquisition instant among the manifest's
+  files (when this version first entered Bronze); later partial acquisitions
+  that add files can never move it forward;
+* ``verified_at`` = latest non-null verification instant among the files.
+
+Schema version ``1`` manuscripts remain loadable: they simply lack
+``verified_at``. The next acquisition rewrites them as version ``2`` while
+retaining every recorded retrieval fact (nothing is re-timestamped).
 """
 
 from __future__ import annotations
@@ -13,7 +34,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from pydantic import AwareDatetime, Field
+from pydantic import AwareDatetime, Field, field_validator
 
 from dynamis.config import Settings
 from dynamis.contracts.base import MD5, SHA1, SHA256, Contract, DatasetId, Identifier
@@ -22,7 +43,8 @@ from dynamis.contracts.enums import RetrievalStatus
 from dynamis.storage.atomic import atomic_write_text, sha256_file
 from dynamis.storage.paths import bronze_manifest_path, bronze_native_path
 
-BRONZE_MANIFEST_SCHEMA_VERSION = "1"
+BRONZE_MANIFEST_SCHEMA_VERSION = "2"
+SUPPORTED_BRONZE_MANIFEST_SCHEMA_VERSIONS = frozenset({"1", BRONZE_MANIFEST_SCHEMA_VERSION})
 
 
 class BronzeFile(Contract):
@@ -32,7 +54,10 @@ class BronzeFile(Contract):
     upstream_sha1: SHA1 | None = None
     upstream_sha256: SHA256 | None = None
     local_sha256: SHA256 | None = None
+    #: First entry of these exact bytes into immutable Bronze; never rewritten.
     retrieved_at: AwareDatetime | None = None
+    #: Most recent re-hash/revalidation of the bytes; advances on every run.
+    verified_at: AwareDatetime | None = None
     #: Canonical URL a retrieval actually used. Kept per file because a manifest
     #: may cover several upstream files with different resolver links.
     upstream_url: str | None = None
@@ -43,8 +68,21 @@ class BronzeManifest(Contract):
     dataset_id: DatasetId
     version: Identifier
     upstream_url: str = Field(min_length=1)
+    #: Earliest per-file acquisition instant (see module docstring).
     retrieved_at: AwareDatetime | None = None
+    #: Latest per-file verification instant (see module docstring).
+    verified_at: AwareDatetime | None = None
     files: tuple[BronzeFile, ...] = ()
+
+    @field_validator("schema_version")
+    @classmethod
+    def check_supported_schema(cls, value: str) -> str:
+        if value not in SUPPORTED_BRONZE_MANIFEST_SCHEMA_VERSIONS:
+            raise ValueError(
+                f"unsupported Bronze manifest schema_version {value!r}; "
+                f"supported: {sorted(SUPPORTED_BRONZE_MANIFEST_SCHEMA_VERSIONS)}"
+            )
+        return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,15 +176,36 @@ def record_retrieval(
     manifest: BronzeManifest,
     *,
     retrieved_at: datetime,
+    verified_at: datetime | None = None,
     only_keys: tuple[str, ...] = (),
 ) -> BronzeManifest:
     """Stamp locally computed checksums for present files into a new manifest.
 
     Only files that actually exist under Bronze are stamped, so a manifest never
     claims a checksum for a file that was not retrieved.
+
+    ``retrieved_at`` is the acquisition instant of this run: it is recorded only
+    for a file that has never been retrieved, so an ``already_present``
+    verification can never rewrite the first-entry timestamp. A manifest that
+    carries *only* a manifest-level instant (no per-file facts at all, as a
+    schema-1 document may) lends that recorded fact to its files; once any
+    concrete per-file fact exists the manifest value is the earliest among other
+    files and is never copied onto a different file. ``verified_at`` (defaulting
+    to ``retrieved_at``) is the re-validation instant of this run and is recorded
+    for every file this run touched. The manifest's own timestamps are the
+    deterministic earliest/latest derived from its files.
     """
     if retrieved_at.tzinfo is None:
         raise ValueError("retrieved_at must be timezone-aware")
+    if verified_at is not None and verified_at.tzinfo is None:
+        raise ValueError("verified_at must be timezone-aware")
+    verification_time = verified_at if verified_at is not None else retrieved_at
+    manifest_fallback = (
+        manifest.retrieved_at
+        if manifest.retrieved_at is not None
+        and not any(item.retrieved_at is not None for item in manifest.files)
+        else None
+    )
     updated: list[BronzeFile] = []
     for item in manifest.files:
         if only_keys and item.key not in only_keys:
@@ -166,8 +225,33 @@ def record_retrieval(
                 update={
                     "local_sha256": sha256_file(path),
                     "size_bytes": path.stat().st_size,
-                    "retrieved_at": retrieved_at,
+                    "retrieved_at": item.retrieved_at or manifest_fallback or retrieved_at,
+                    "verified_at": verification_time,
                 }
             )
         )
-    return manifest.model_copy(update={"files": tuple(updated), "retrieved_at": retrieved_at})
+    files = tuple(updated)
+    retrievals = [
+        stamp
+        for stamp in (
+            manifest.retrieved_at,
+            *(item.retrieved_at for item in files),
+        )
+        if stamp is not None
+    ]
+    verifications = [
+        stamp
+        for stamp in (
+            manifest.verified_at,
+            *(item.verified_at for item in files),
+        )
+        if stamp is not None
+    ]
+    return manifest.model_copy(
+        update={
+            "schema_version": BRONZE_MANIFEST_SCHEMA_VERSION,
+            "files": files,
+            "retrieved_at": min(retrievals) if retrievals else None,
+            "verified_at": max(verifications) if verifications else None,
+        }
+    )

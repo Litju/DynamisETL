@@ -11,12 +11,13 @@ import json
 import threading
 from collections import Counter
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from types import SimpleNamespace
 
 import pytest
 import requests
-from pydantic import HttpUrl
+from pydantic import HttpUrl, ValidationError
 
 from dynamis.acquisition import (
     AcquisitionPlan,
@@ -42,13 +43,26 @@ from dynamis.contracts import (
     RetrievalState,
     RetrievalStatus,
 )
-from dynamis.storage.manifest import read_bronze_manifest
-from dynamis.storage.paths import bronze_native_path, receipt_path, relative_posix
+from dynamis.storage.manifest import (
+    BRONZE_MANIFEST_SCHEMA_VERSION,
+    read_bronze_manifest,
+)
+from dynamis.storage.paths import (
+    bronze_manifest_path,
+    bronze_native_path,
+    receipt_path,
+    relative_posix,
+)
 from synthetic_providers import FakeSession, synthetic_license, synthetic_registry
 
 PAYLOAD = b"dynamis-acquisition-payload-0123456789" * 64
 PAYLOAD_MD5 = hashlib.md5(PAYLOAD).hexdigest()
 PAYLOAD_SHA256 = hashlib.sha256(PAYLOAD).hexdigest()
+
+#: Deterministic acquisition (T1, T2) and verification (T3) instants.
+T1 = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
+T2 = datetime(2026, 2, 2, 13, 30, tzinfo=UTC)
+T3 = datetime(2026, 3, 3, 10, 15, tzinfo=UTC)
 
 
 # ---------------------------------------------------------------------------
@@ -582,6 +596,247 @@ def test_acquire_promotes_bronze_and_is_idempotent(tmp_settings: Settings, local
     assert second.already_present == (key,)
     assert second.bytes_downloaded == 0
     assert local_server.state.hits["/file"] == hits_before
+
+
+def test_verified_rerun_preserves_retrieval_and_advances_verification(
+    tmp_settings: Settings, local_server
+) -> None:
+    """A verified no-download rerun must not restamp the acquisition instant."""
+    local_server.state.routes["/file"] = Route(body=PAYLOAD)
+    key = "payload.bin"
+    registry = synthetic_registry(
+        files=(RetrievalFile(key=key, size_bytes=len(PAYLOAD), sha256=PAYLOAD_SHA256),)
+    )
+    plan = _plan((_planned_file(key, f"{local_server.base_url}/file"),))
+
+    first = acquire(
+        tmp_settings,
+        plan,
+        session=_session(),
+        registry=registry,
+        allow_insecure=True,
+        now=lambda: T1,
+    )
+    assert first.retrieval_performed
+    assert first.retrieved_at == T1
+    assert first.verified_at == T1
+
+    final = bronze_native_path(tmp_settings, dataset_id="syn-provider", version="v1", key=key)
+    bytes_at_t1 = final.read_bytes()
+    hits_before = local_server.state.hits["/file"]
+
+    second = acquire(
+        tmp_settings,
+        plan,
+        session=_session(),
+        registry=registry,
+        allow_insecure=True,
+        now=lambda: T2,
+    )
+    assert second.already_present == (key,)
+    assert second.bytes_downloaded == 0
+    assert not second.retrieval_performed
+    assert local_server.state.hits["/file"] == hits_before  # zero HTTP payload requests
+    assert final.read_bytes() == bytes_at_t1  # bytes unchanged
+
+    manifest = read_bronze_manifest(tmp_settings, dataset_id="syn-provider", version="v1")
+    assert manifest.schema_version == BRONZE_MANIFEST_SCHEMA_VERSION
+    assert manifest.files[0].local_sha256 == PAYLOAD_SHA256  # digest unchanged
+    assert manifest.files[0].retrieved_at == T1  # acquisition instant immutable
+    assert manifest.files[0].verified_at == T2  # verification advances
+    assert manifest.retrieved_at == T1
+    assert manifest.verified_at == T2
+    assert second.retrieved_at == T1
+    assert second.verified_at == T2
+
+    receipt_file = receipt_path(
+        tmp_settings, dataset_id="syn-provider", kind="acquisition", name="v1"
+    )
+    payload = json.loads(receipt_file.read_text(encoding="utf-8"))
+    assert payload["retrieved_at"] == T1.isoformat()
+    assert payload["verified_at"] == T2.isoformat()
+    assert payload["retrieval_performed"] is False
+    assert payload["bytes_downloaded"] == 0
+    assert payload["files"][0]["retrieved_at"] == T1.isoformat()
+    assert payload["files"][0]["verified_at"] == T2.isoformat()
+
+
+def test_partial_acquisition_preserves_earlier_provenance(
+    tmp_settings: Settings, local_server
+) -> None:
+    """Adding a file later must not erase the earlier file's acquisition facts."""
+    local_server.state.routes["/a"] = Route(body=PAYLOAD)
+    local_server.state.routes["/b"] = Route(body=PAYLOAD + b"-second")
+    registry = synthetic_registry(
+        files=(
+            RetrievalFile(key="a.bin", size_bytes=len(PAYLOAD), sha256=PAYLOAD_SHA256),
+            RetrievalFile(
+                key="b.bin",
+                size_bytes=len(PAYLOAD) + 7,
+                sha256=hashlib.sha256(PAYLOAD + b"-second").hexdigest(),
+            ),
+        )
+    )
+    plan_a = _plan((_planned_file("a.bin", f"{local_server.base_url}/a"),))
+    first = acquire(
+        tmp_settings,
+        plan_a,
+        session=_session(),
+        registry=registry,
+        allow_insecure=True,
+        now=lambda: T1,
+    )
+    assert first.downloaded == ("a.bin",)
+
+    final_a = bronze_native_path(tmp_settings, dataset_id="syn-provider", version="v1", key="a.bin")
+    bytes_at_t1 = final_a.read_bytes()
+    hits_a_before = local_server.state.hits["/a"]
+
+    plan_ab = _plan(
+        (
+            _planned_file("a.bin", f"{local_server.base_url}/a"),
+            _planned_file("b.bin", f"{local_server.base_url}/b", remote=PAYLOAD + b"-second"),
+        )
+    )
+    second = acquire(
+        tmp_settings,
+        plan_ab,
+        session=_session(),
+        registry=registry,
+        allow_insecure=True,
+        now=lambda: T2,
+    )
+    assert second.downloaded == ("b.bin",)
+    assert second.already_present == ("a.bin",)
+    assert local_server.state.hits["/a"] == hits_a_before
+    assert final_a.read_bytes() == bytes_at_t1
+
+    manifest = read_bronze_manifest(tmp_settings, dataset_id="syn-provider", version="v1")
+    by_key = {item.key: item for item in manifest.files}
+    assert by_key["a.bin"].retrieved_at == T1
+    assert by_key["a.bin"].verified_at == T2
+    assert by_key["b.bin"].retrieved_at == T2
+    assert by_key["b.bin"].verified_at == T2
+    # The version first entered Bronze at T1; the partial acquisition must not
+    # move that forward just because its own run happened at T2.
+    assert manifest.retrieved_at == T1
+    assert manifest.verified_at == T2
+
+    # A run whose selection excludes the earlier file reports the selected
+    # set's own earliest acquisition instant, not the manifest-wide minimum.
+    plan_b = _plan(
+        (_planned_file("b.bin", f"{local_server.base_url}/b", remote=PAYLOAD + b"-second"),)
+    )
+    third = acquire(
+        tmp_settings,
+        plan_b,
+        session=_session(),
+        registry=registry,
+        allow_insecure=True,
+        now=lambda: T3,
+    )
+    assert third.already_present == ("b.bin",)
+    assert third.retrieved_at == T2
+    assert third.verified_at == T3
+    assert (
+        read_bronze_manifest(tmp_settings, dataset_id="syn-provider", version="v1").retrieved_at
+        == T1
+    )
+
+
+def test_v1_manifest_stays_readable_and_upgrades_without_reinterpreting_history(
+    tmp_settings: Settings, local_server
+) -> None:
+    """RES-97 Bronze manifests (schema 1) must keep working, values untouched."""
+    local_server.state.routes["/file"] = Route(body=PAYLOAD)
+    key = "payload.bin"
+    registry = synthetic_registry(
+        files=(RetrievalFile(key=key, size_bytes=len(PAYLOAD), sha256=PAYLOAD_SHA256),)
+    )
+    final = bronze_native_path(tmp_settings, dataset_id="syn-provider", version="v1", key=key)
+    final.parent.mkdir(parents=True, exist_ok=True)
+    final.write_bytes(PAYLOAD)
+    legacy_path = bronze_manifest_path(tmp_settings, dataset_id="syn-provider", version="v1")
+    legacy_path.parent.mkdir(parents=True, exist_ok=True)
+    legacy_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "1",
+                "dataset_id": "syn-provider",
+                "version": "v1",
+                "upstream_url": "https://zenodo.org/records/12345",
+                "retrieved_at": T1.isoformat(),
+                "files": [
+                    {
+                        "key": key,
+                        "size_bytes": len(PAYLOAD),
+                        "upstream_md5": PAYLOAD_MD5,
+                        "upstream_sha1": None,
+                        "upstream_sha256": PAYLOAD_SHA256,
+                        "local_sha256": PAYLOAD_SHA256,
+                        "retrieved_at": T1.isoformat(),
+                        "upstream_url": f"{local_server.base_url}/file",
+                    }
+                ],
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    loaded = read_bronze_manifest(tmp_settings, dataset_id="syn-provider", version="v1")
+    assert loaded.schema_version == "1"
+    assert loaded.retrieved_at == T1
+    assert loaded.files[0].retrieved_at == T1
+    assert loaded.files[0].verified_at is None
+
+    plan = _plan((_planned_file(key, f"{local_server.base_url}/file"),))
+    receipt = acquire(
+        tmp_settings,
+        plan,
+        session=_session(),
+        registry=registry,
+        allow_insecure=True,
+        now=lambda: T2,
+    )
+    assert receipt.already_present == (key,)
+    upgraded = read_bronze_manifest(tmp_settings, dataset_id="syn-provider", version="v1")
+    assert upgraded.schema_version == BRONZE_MANIFEST_SCHEMA_VERSION
+    assert upgraded.files[0].retrieved_at == T1  # original retrieval fact retained
+    assert upgraded.files[0].verified_at == T2
+    assert upgraded.retrieved_at == T1
+    assert upgraded.verified_at == T2
+
+    # A future/unknown schema is refused loudly instead of being reinterpreted.
+    payload = json.loads(legacy_path.read_text(encoding="utf-8"))
+    payload["schema_version"] = "99"
+    legacy_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ValidationError, match="unsupported Bronze manifest schema_version"):
+        read_bronze_manifest(tmp_settings, dataset_id="syn-provider", version="v1")
+
+
+def test_unreadable_manifest_blocks_any_bronze_promotion(
+    tmp_settings: Settings, local_server
+) -> None:
+    """A manifest that cannot be loaded must fail before bytes are promoted."""
+    local_server.state.routes["/file"] = Route(body=PAYLOAD)
+    key = "payload.bin"
+    registry = synthetic_registry(
+        files=(RetrievalFile(key=key, size_bytes=len(PAYLOAD), sha256=PAYLOAD_SHA256),)
+    )
+    manifest_path = bronze_manifest_path(tmp_settings, dataset_id="syn-provider", version="v1")
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text('{"schema_version": "99"}\n', encoding="utf-8")
+
+    plan = _plan((_planned_file(key, f"{local_server.base_url}/file"),))
+    with pytest.raises(ValidationError):
+        acquire(tmp_settings, plan, session=_session(), registry=registry, allow_insecure=True)
+    final = bronze_native_path(tmp_settings, dataset_id="syn-provider", version="v1", key=key)
+    assert not final.exists()
+    assert not (final.parent / (final.name + ".partial")).exists()
+    assert local_server.state.hits["/file"] == 0
 
 
 def test_receipt_is_written_outside_the_repository_without_absolute_paths(
