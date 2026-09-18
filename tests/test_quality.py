@@ -215,6 +215,29 @@ def test_pose_available_joint_requires_finite_coordinates() -> None:
     assert any(item.rule == "pose.payload.non_finite" for item in violations)
 
 
+def test_pose_payload_checks_skip_structurally_incompatible_data() -> None:
+    from dynamis.quality.checks import check_pose_payload_completeness
+
+    table = _pose_table()
+    schema = get_schema(Modality.POSE)
+    index = table.schema.get_field_index("x_m")
+    tampered = table.set_column(index, "x_m", pa.array([0] * table.num_rows, type=pa.int64()))
+    # The structural violation is reported, and the payload kernels never run
+    # against the incompatible column.
+    assert check_pose_payload_completeness(tampered, schema) == ()
+    assert any(
+        item.rule == "schema.field.type" for item in check_schema_conformance(tampered, schema)
+    )
+
+    from dynamis.quality.streaming import StreamingValidator
+
+    validator = StreamingValidator(schema)
+    for batch in tampered.to_batches(max_chunksize=64):
+        assert batch.schema.field("x_m").type == pa.int64()
+        validator.observe(batch)
+    assert isinstance(validator.finish(), tuple)
+
+
 def test_null_frame_is_rejected_when_the_modality_requires_one() -> None:
     fixture = force_bodyweight_static(rate_hz=1000.0, duration_s=0.004)
     table = fixture.table.set_column(

@@ -30,6 +30,7 @@ def _inspect_trial(source: SplTrialSource) -> dict[str, Any]:
     frames = document.get("tracking") if isinstance(document, dict) else None
     keypoint_names: list[str] = []
     seen: set[str] = set()
+    player_maps: list[dict[Any, Any]] = []
     frames_with_player = 0
     null_values = 0
     ball_frames = 0
@@ -45,6 +46,7 @@ def _inspect_trial(source: SplTrialSource) -> dict[str, Any]:
         if not isinstance(player, dict):
             continue
         frames_with_player += 1
+        player_maps.append(player)
         for name, value in player.items():
             name = str(name)
             if name not in seen:
@@ -61,7 +63,10 @@ def _inspect_trial(source: SplTrialSource) -> dict[str, Any]:
                 and all(isinstance(component, (int, float)) for component in ball)
             ):
                 ball_with_xyz += 1
-        for name in seen:
+    # Absence is counted against the complete session keypoint set, not against
+    # the names discovered so far, so discovery and canonicalization agree.
+    for player in player_maps:
+        for name in keypoint_names:
             if name not in player:
                 missing_by_keypoint[name] = missing_by_keypoint.get(name, 0) + 1
     return {

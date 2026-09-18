@@ -39,6 +39,37 @@ def _sources(bundle: dict[str, Path]) -> tuple[SplTrialSource, ...]:
     )
 
 
+def test_discovery_absence_counts_agree_with_canonicalization(tmp_path: Path) -> None:
+    import json
+
+    from dynamis.adapters.spl.discovery import discover_spl
+    from dynamis.adapters.spl.trial import SplTrialCanonicalizer, identity_from_key
+
+    frames = [
+        {"data": {"player": {"NOSE": [1.0, 1.0, 1.0], "LEFT_KNEE": [1.0, 1.0, 0.5]}, "ball": None}},
+        # MID_HIP appears only from this frame onward; a growing-seen count would
+        # miss its absence in frame 0.
+        {"data": {"player": {"NOSE": None, "MID_HIP": [1.0, 1.0, 1.0]}, "ball": None}},
+    ]
+    path = tmp_path / "BB_FT_P0001_T0001.json"
+    path.write_text(json.dumps({"tracking": frames}), encoding="utf-8")
+    source = SplTrialSource(key=synthetic_spl.KEY_2024, path=path)
+
+    discovery = discover_spl((source,)).to_dict()["trials"][0]
+    assert discovery["observed_keypoints"] == 3
+    assert discovery["missing_keypoint_observations"] == {
+        "LEFT_KNEE": 1,
+        "MID_HIP": 1,
+    }
+    canonicalizer = SplTrialCanonicalizer(path, identity_from_key(source.key))
+    stream = canonicalizer.stream()
+    list(stream.batches)
+    summary = canonicalizer.summary()
+    assert summary.absent_keypoint_observations == 2
+    assert summary.unavailable_keypoints == 3  # 2 absent + 1 explicit null
+    assert summary.source_records == summary.canonical_rows
+
+
 def test_registry_declares_the_two_locked_trials_exactly() -> None:
     registry = validate_registry()
     source = source_by_id(registry, SPL_DATASET_ID)

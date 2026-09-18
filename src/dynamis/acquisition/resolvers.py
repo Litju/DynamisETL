@@ -514,10 +514,9 @@ def _resolve_github_files(
             raise ResolverError(f"{source.dataset_id}/{key}: tree entry exposes no identity")
         expectation = expectations[key]
         lfs: tuple[str, int] | None = None
-        # A declared SHA-256 must be verified against real content; a tiny blob
-        # with a declared SHA-256 may be a Git LFS pointer and is always
-        # inspected through the API before choosing the download host.
-        if size_bytes <= LFS_POINTER_MAX_BYTES and expectation.sha256 != "unknown":
+        # Every tiny blob is inspected through the API: a Git LFS pointer must
+        # never be mistaken for content, whatever the registry declares.
+        if size_bytes <= LFS_POINTER_MAX_BYTES:
             lfs = _github_lfs_identity(
                 session,
                 source=source,

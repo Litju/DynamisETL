@@ -70,7 +70,7 @@ def test_offline_downgrade_of_0003_refuses_before_destructive_sql(
 
     capsys.readouterr()  # discard any prior command output
     with pytest.raises(RuntimeError, match="offline"):
-        command.downgrade(config, "0004_skeleton_topology:0002_handedness_unspecified", sql=True)
+        command.downgrade(config, "0003_sync_alignment:0002_handedness_unspecified", sql=True)
 
     emitted = capsys.readouterr().out
     assert "DROP TABLE" not in emitted

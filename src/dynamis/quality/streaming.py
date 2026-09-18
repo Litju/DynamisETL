@@ -214,6 +214,16 @@ class StreamingValidator:
         if not self._pose_payload:
             return
         names = set(batch.schema.names)
+        expected_types = {
+            POSE_AVAILABILITY_FIELD: pa.bool_(),
+            **{name: pa.float64() for name in POSE_COORDINATE_FIELDS},
+        }
+        if any(name not in names for name in expected_types):
+            return
+        if any(
+            batch.schema.field(name).type != expected for name, expected in expected_types.items()
+        ):
+            return
         availability = batch.column(POSE_AVAILABILITY_FIELD)
         if availability.null_count:
             self._violations.append(

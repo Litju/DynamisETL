@@ -248,6 +248,7 @@ class PoseCanonicalizer:
     def _batches(self, period: MatchPeriod, summary: PosePeriodSummary) -> Iterator[pa.RecordBatch]:
         rows: list[dict[str, Any]] = []
         sample_index = 0
+        declared_periods = {item.period for item in self._metadata.periods}
         with zipfile.ZipFile(self._zip_path) as archive:
             member = pose_zip_member(archive, match_id=self._metadata.match_id)
             with archive.open(member) as stream:
@@ -258,15 +259,15 @@ class PoseCanonicalizer:
                     players = payload.get("player_data") or []
                     if payload_period != period.period:
                         if (
-                            payload_period is None
+                            payload_period not in declared_periods
                             and period.period == self._metadata.periods[0].period
                             and any(
                                 isinstance(player, dict) and player.get("joints") is not None
                                 for player in players
                             )
                         ):
-                            # A posed frame outside every declared period cannot be
-                            # assigned to a canonical stream; it is quarantined once,
+                            # A posed frame whose period matches no declared stream
+                            # cannot be assigned canonically; it is quarantined once,
                             # by the first period stream, never silently dropped.
                             for player in players:
                                 if not isinstance(player, dict) or player.get("joints") is None:
@@ -280,7 +281,9 @@ class PoseCanonicalizer:
                                 self._quarantine(
                                     summary,
                                     rule=RULE_SCHEMA_FAILURE,
-                                    detail="posed frame declares no period",
+                                    detail=(
+                                        f"posed frame declares undeclared period {payload_period!r}"
+                                    ),
                                     source_record_id=f"frame={frame}",
                                     subject_id=(
                                         None
@@ -461,6 +464,17 @@ class PoseCanonicalizer:
         unavailable = value is None
         xyz: list[Any] = [None, None, None]
         p90 = None
+        if value is not None and not isinstance(value, dict):
+            self._malformed_joint(
+                summary,
+                name,
+                frame,
+                subject_id,
+                timestamp,
+                "landmark value is neither null nor an object",
+                rule=RULE_SCHEMA_FAILURE,
+            )
+            return None
         if isinstance(value, dict):
             p90 = value.get(POSE_ERROR_SOURCE_FIELD)
             raw_xyz = value.get("xyz")

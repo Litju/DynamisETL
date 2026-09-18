@@ -437,6 +437,15 @@ def check_pose_payload_completeness(table: pa.Table, schema: pa.Schema) -> tuple
     missing_columns = [name for name in POSE_COORDINATE_FIELDS if name not in table.column_names]
     if missing_columns:
         return ()
+    # A structurally non-conforming table is reported by the schema checks; the
+    # payload kernels below must never run against incompatible column types.
+    expected_types: dict[str, pa.DataType] = {
+        POSE_AVAILABILITY_FIELD: pa.bool_(),
+        **{name: pa.float64() for name in POSE_COORDINATE_FIELDS},
+    }
+    for name, expected in expected_types.items():
+        if table.schema.field(name).type != expected:
+            return ()
     violations: list[Violation] = []
     availability = table.column(POSE_AVAILABILITY_FIELD)
     if availability.null_count:

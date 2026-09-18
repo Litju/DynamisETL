@@ -138,8 +138,10 @@ def test_skeleton_authorities_round_trip_and_are_idempotent(
 
         assert first["skeleton_definition"] == 2
         assert first["skeleton_joint"] == 5
-        assert second["skeleton_definition"] == 0  # idempotent, never duplicated
-        assert second["skeleton_joint"] == 0
+        # A rerun converges on the current declaration: it never duplicates rows
+        # and never leaves a stale definition or joint behind.
+        assert second["skeleton_definition"] == 2
+        assert second["skeleton_joint"] == 5
         assert first["sensor_stream"] == 1  # the pose stream precedes nothing wrongly
 
         with control.connect() as connection:
@@ -171,6 +173,48 @@ def test_skeleton_authorities_round_trip_and_are_idempotent(
             ("skel-tree", 1, "knee_right", 0),
         ]
         assert stream == "skel-landmarks"
+
+        # A changed declaration under the same skeleton identity replaces stale
+        # definition fields and drops joints the new declaration no longer has.
+        modified = SkeletonDefinition(
+            skeleton_id=LANDMARKS.skeleton_id,
+            name="landmark set v2",
+            topology=SkeletonTopology.LANDMARK_SET,
+            joint_count=2,
+            joints=(
+                JointDefinition(joint_id=0, joint_name="left_ankle", parent_joint_id=None),
+                JointDefinition(joint_id=1, joint_name="right_knee", parent_joint_id=None),
+            ),
+            description="Revised landmark list for the convergence regression.",
+        )
+        revised_domain = ProviderDomain(
+            session=None,
+            sessions=(Session(dataset_id=DATASET_ID, session_id=SESSION_ID),),
+            subjects=(),
+            participants=(),
+            trials=(),
+            streams=_domain(pose_stream=True).streams,
+            authorities=SourceAuthorities(
+                clocks=_domain(pose_stream=True).authorities.clocks,
+                synchronizations=_domain(pose_stream=True).authorities.synchronizations,
+                skeletons=(TREE, modified),
+            ),
+        )
+        with control.begin() as connection:
+            persist_domain(connection, revised_domain)
+        with control.connect() as connection:
+            revised = connection.execute(
+                text(
+                    "SELECT d.name, d.joint_count, j.joint_id, j.joint_name, j.parent_joint_id "
+                    "FROM skeleton_definition d JOIN skeleton_joint j USING (skeleton_id) "
+                    "WHERE d.skeleton_id = :id ORDER BY j.joint_id"
+                ),
+                {"id": LANDMARKS.skeleton_id},
+            ).fetchall()
+        assert revised == [
+            ("landmark set v2", 2, 0, "left_ankle", None),
+            ("landmark set v2", 2, 1, "right_knee", None),
+        ]
     finally:
         control.dispose()
         with admin.begin() as connection:

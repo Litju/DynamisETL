@@ -227,19 +227,55 @@ def test_pose_quarantines_posed_frames_outside_declared_periods(
     payload["period"] = None
     payload["player_data"][0]["joints"] = ["not", "a", "mapping"]
     payload["player_data"][1]["joints"] = synth.joints_for(player_id=102, frame=0)
+    undeclared = synth.pose_frame(1, period=1)
+    undeclared["period"] = 99
+    undeclared["player_data"][0]["joints"] = synth.joints_for(player_id=101, frame=1)
+    zip_path = tmp_path / "9000001.jsonl.zip"
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "9000001.jsonl", json.dumps(payload) + "\n" + json.dumps(undeclared) + "\n"
+        )
+
+    canonicalizer = PoseCanonicalizer(zip_path, parse_match_metadata(match_json))
+    stream = canonicalizer.stream(1)
+    assert list(stream.batches) == []
+    summary = canonicalizer.summary(1)
+    # One malformed container (29 authority slots) + one 29-joint mapping + the
+    # undeclared-period frame's 29 joints.
+    assert summary.declared_joint_records == 87
+    assert summary.malformed_joints == 87
+    assert summary.canonical_rows == 0
+    assert len(summary.quarantined) == 3
+    assert any("undeclared period 99" in record.detail for record in summary.quarantined)
+
+
+def test_pose_quarantines_non_object_landmark_values(
+    tmp_path: Path,
+) -> None:
+    import json
+    import zipfile
+
+    import synthetic_skillcorner as synth
+    from dynamis.adapters.skillcorner.metadata import parse_match_metadata
+    from dynamis.adapters.skillcorner.pose import PoseCanonicalizer
+
+    match_json = synth.write_match_json(tmp_path / "9000001_match.json")
+    payload = synth.pose_frame(0, period=1)
+    joints = dict(payload["player_data"][0]["joints"])
+    joints["nose"] = "not-a-position"
+    payload["player_data"][0]["joints"] = joints
     zip_path = tmp_path / "9000001.jsonl.zip"
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("9000001.jsonl", json.dumps(payload) + "\n")
 
     canonicalizer = PoseCanonicalizer(zip_path, parse_match_metadata(match_json))
     stream = canonicalizer.stream(1)
-    assert list(stream.batches) == []
+    rows = list(stream.batches)
+    assert rows
     summary = canonicalizer.summary(1)
-    # One malformed container (29 authority slots) + one 29-joint mapping.
-    assert summary.declared_joint_records == 58
-    assert summary.malformed_joints == 58
-    assert summary.canonical_rows == 0
-    assert len(summary.quarantined) == 2
+    assert summary.malformed_joints == 1
+    assert summary.canonical_rows == 57  # 2 player-frames x 29 joints minus the bad one
+    assert any("neither null nor an object" in record.detail for record in summary.quarantined)
 
 
 def test_ingest_never_regenerates_plaintext_and_is_deterministic(
@@ -315,8 +351,9 @@ def test_skillcorner_skeleton_and_alignment_provenance_is_idempotent(
         assert first["skeleton_definition"] == 1
         assert first["skeleton_joint"] == 29
         assert first["sync_alignment"] == 2
-        assert second["skeleton_definition"] == 0
-        assert second["skeleton_joint"] == 0
+        # The sync converges on the current declaration without duplicating rows.
+        assert second["skeleton_definition"] == 1
+        assert second["skeleton_joint"] == 29
         assert second["sync_alignment"] == 2  # refreshed in place, never duplicated
         with control.connect() as connection:
             topology = connection.execute(

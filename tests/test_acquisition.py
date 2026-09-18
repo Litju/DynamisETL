@@ -583,6 +583,7 @@ def test_github_resolver_follows_lfs_pointers_and_git_blob_identities() -> None:
         }
     )
     blob_sha = "d" * 40
+    regular_blob_sha = git_blob_sha1_of(regular)
     session = FakeSession(
         {
             f"https://api.github.com/repos/SkillCorner/opendata/git/trees/{revision}?recursive=1": {
@@ -591,7 +592,7 @@ def test_github_resolver_follows_lfs_pointers_and_git_blob_identities() -> None:
                     {
                         "path": "data/matches/9000001/9000001_match.json",
                         "type": "blob",
-                        "sha": git_blob_sha1_of(regular),
+                        "sha": regular_blob_sha,
                         "size": len(regular),
                     },
                     {
@@ -601,6 +602,11 @@ def test_github_resolver_follows_lfs_pointers_and_git_blob_identities() -> None:
                         "size": len(pointer),
                     },
                 ],
+            },
+            f"https://api.github.com/repos/SkillCorner/opendata/git/blobs/{regular_blob_sha}": {
+                "encoding": "base64",
+                "content": base64.b64encode(regular).decode("ascii"),
+                "size": len(regular),
             },
             f"https://api.github.com/repos/SkillCorner/opendata/git/blobs/{blob_sha}": {
                 "encoding": "base64",
@@ -654,7 +660,6 @@ def test_github_resolver_still_detects_lfs_when_a_pointer_sha1_is_declared() -> 
                 key="tracking.jsonl",
                 size_bytes=len(content),
                 sha1=pointer_sha,
-                sha256=hashlib.sha256(content).hexdigest(),
             ),
         ),
         provider="GitHub",
@@ -742,6 +747,8 @@ def test_github_resolver_refuses_truncated_trees() -> None:
 
 
 def test_routed_resolver_uses_each_files_declared_companion_provider() -> None:
+    import base64
+
     revision = "e" * 40
     hf_revision = "f" * 40
     match_bytes = b"{}"
@@ -797,6 +804,12 @@ def test_routed_resolver_uses_each_files_declared_companion_provider() -> None:
                         "size": len(match_bytes),
                     }
                 ],
+            },
+            f"https://api.github.com/repos/SkillCorner/opendata/git/blobs/"
+            f"{git_blob_sha1_of(match_bytes)}": {
+                "encoding": "base64",
+                "content": base64.b64encode(match_bytes).decode("ascii"),
+                "size": len(match_bytes),
             },
             f"https://huggingface.co/api/datasets/SkillCorner/opendata-bodypose/tree/"
             f"{hf_revision}?recursive=true&expand=true": [
