@@ -28,6 +28,40 @@ from dynamis.storage.parquet import read_parquet_table
 _TABLES = build_metadata().tables
 SAMPLE_ARTIFACT_TABLE = _TABLES["sample_artifact"]
 SENSOR_STREAM_TABLE = _TABLES["sensor_stream"]
+SYNC_ALIGNMENT_TABLE = _TABLES["sync_alignment"]
+
+
+@dataclass(frozen=True, slots=True)
+class SyncPairRef:
+    """One declared dataset-scoped alignment between two canonical streams."""
+
+    dataset_id: str
+    source_stream_id: str
+    target_stream_id: str
+    sync_spec_id: str
+
+
+def list_sync_pairs(connection, *, dataset_id: str) -> tuple[SyncPairRef, ...]:
+    """Declared synchronizations in deterministic order (never inferred)."""
+    rows = connection.execute(
+        sa.select(
+            SYNC_ALIGNMENT_TABLE.c.dataset_id,
+            SYNC_ALIGNMENT_TABLE.c.source_stream_id,
+            SYNC_ALIGNMENT_TABLE.c.target_stream_id,
+            SYNC_ALIGNMENT_TABLE.c.sync_spec_id,
+        )
+        .where(SYNC_ALIGNMENT_TABLE.c.dataset_id == dataset_id)
+        .order_by(SYNC_ALIGNMENT_TABLE.c.source_stream_id, SYNC_ALIGNMENT_TABLE.c.target_stream_id)
+    ).fetchall()
+    return tuple(
+        SyncPairRef(
+            dataset_id=row.dataset_id,
+            source_stream_id=row.source_stream_id,
+            target_stream_id=row.target_stream_id,
+            sync_spec_id=row.sync_spec_id,
+        )
+        for row in rows
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,4 +172,10 @@ def load_silver(
     )
 
 
-__all__ = ["SilverStreamRef", "list_silver_streams", "load_silver"]
+__all__ = [
+    "SilverStreamRef",
+    "SyncPairRef",
+    "list_silver_streams",
+    "list_sync_pairs",
+    "load_silver",
+]

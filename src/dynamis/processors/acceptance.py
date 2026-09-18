@@ -50,12 +50,18 @@ class DatasetProcessing:
     metric_units: dict[str, str]
     processed_stream_ids: tuple[str, ...] = ()
     run_ids: tuple[str, ...] = ()
+    algorithm_version: str = ""
+    parameters_hash: str = ""
+    code_git_sha: str | None = None
     diagnostics: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "dataset_id": self.dataset_id,
             "algorithm_id": self.algorithm_id,
+            "algorithm_version": self.algorithm_version,
+            "parameters_hash": self.parameters_hash,
+            "code_git_sha": self.code_git_sha,
             "streams": self.streams,
             "runs": self.runs,
             "series_checksums": self.series_checksums,
@@ -495,26 +501,20 @@ def womens_gnss_acceptance(
     return receipt
 
 
-def tracking_acceptance(
+def corpus_acceptance(
     settings: Settings,
     engine: Engine,
     *,
     dataset_id: str,
+    modality: str,
+    processor: Callable[[Any], Any],
     parameters: dict[str, Any],
     kind: str,
+    extra: dict[str, Any] | None = None,
     progress: Callable[[int, int], None] | None = None,
 ) -> dict[str, Any]:
-    """Process one tracking corpus, prove deterministic reruns, record configuration."""
-    from dynamis.processors.locomotor import process_locomotor
-
-    def processor(table: Any) -> Any:
-        return process_locomotor(table, parameters=parameters)
-
-    plan = StreamProcessorPlan(
-        dataset_id=dataset_id,
-        modality="tracking",
-        processor=processor,
-    )
+    """Process one canonical corpus, prove deterministic reruns, seal the receipt."""
+    plan = StreamProcessorPlan(dataset_id=dataset_id, modality=modality, processor=processor)
     first = process_corpus(settings, engine, plan=plan, progress=progress)
     second = process_corpus(settings, engine, plan=plan)
     rerun_matches = sum(
@@ -522,9 +522,13 @@ def tracking_acceptance(
         for key, checksum in first.series_checksums.items()
         if second.series_checksums.get(key) == checksum
     )
-    receipt = {
+    receipt: dict[str, Any] = {
         "dataset_id": dataset_id,
+        "modality": modality,
         "algorithm_id": first.algorithm_id,
+        "algorithm_version": first.algorithm_version,
+        "parameters_hash": first.parameters_hash,
+        "code_git_sha": first.code_git_sha,
         "configuration": parameters,
         "streams": first.streams,
         "runs": first.runs,
@@ -540,7 +544,154 @@ def tracking_acceptance(
         "pose_tracking_fusion": False,
         "per_stream": first.diagnostics.get("per_stream"),
     }
+    if extra:
+        receipt.update(extra)
     target = receipt_path(settings, dataset_id=dataset_id, kind="acceptance", name=kind)
+    atomic_write_text(target, json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+    receipt["receipt_path"] = relative_posix(settings.dataset_root, target)
+    return receipt
+
+
+def tracking_acceptance(
+    settings: Settings,
+    engine: Engine,
+    *,
+    dataset_id: str,
+    parameters: dict[str, Any],
+    kind: str,
+    progress: Callable[[int, int], None] | None = None,
+) -> dict[str, Any]:
+    """Process one tracking corpus with the locomotor processor."""
+    from dynamis.processors.locomotor import process_locomotor
+
+    return corpus_acceptance(
+        settings,
+        engine,
+        dataset_id=dataset_id,
+        modality="tracking",
+        processor=lambda table: process_locomotor(table, parameters=parameters),
+        parameters=parameters,
+        kind=kind,
+        progress=progress,
+    )
+
+
+def white_imu_acceptance(
+    settings: Settings,
+    engine: Engine,
+    *,
+    parameters: dict[str, Any] | None = None,
+    progress: Callable[[int, int], None] | None = None,
+) -> dict[str, Any]:
+    """Process all registered White CMJ accelerometer streams."""
+    from dynamis.processors.imu import process_imu
+
+    return corpus_acceptance(
+        settings,
+        engine,
+        dataset_id=WHITE_DATASET_ID,
+        modality="imu",
+        processor=lambda table: process_imu(table, parameters=parameters),
+        parameters=dict(parameters or {}),
+        kind="res100-white-imu",
+        extra={
+            "algorithm_scope": (
+                "sensor-frame resultant and explicitly specified derivative features; no "
+                "anatomical axis relabelling and no vendor equivalence claim"
+            )
+        },
+        progress=progress,
+    )
+
+
+def white_cross_sensor_acceptance(
+    settings: Settings,
+    engine: Engine,
+    *,
+    progress: Callable[[int, int], None] | None = None,
+) -> dict[str, Any]:
+    """Run the paired force/IMU association diagnostic on persisted sync pairs only."""
+    from dynamis.processors.corpus import list_sync_pairs
+    from dynamis.processors.cross_sensor import process_cross_sensor
+
+    with engine.connect() as connection:
+        pairs = list_sync_pairs(connection, dataset_id=WHITE_DATASET_ID)
+        refs = list_silver_streams(connection, dataset_id=WHITE_DATASET_ID)
+    by_stream = {ref.stream_id: ref for ref in refs}
+    if not pairs:
+        raise ValueError(f"{WHITE_DATASET_ID}: no persisted synchronization pairs")
+
+    run_ids: set[str] = set()
+    code_sha: str | None = None
+    algorithm_id = ""
+    algorithm_version = ""
+    parameters_hash = ""
+    paired_total = 0
+    correlations: list[float] = []
+    processed = 0
+    for index, pair in enumerate(pairs):
+        source = by_stream.get(pair.source_stream_id)
+        target = by_stream.get(pair.target_stream_id)
+        if source is None or target is None:
+            raise ValueError(
+                f"sync pair references an unregistered stream: {pair.source_stream_id} / "
+                f"{pair.target_stream_id}"
+            )
+        if source.modality == "force" and target.modality == "imu":
+            force_ref, imu_ref = source, target
+        elif source.modality == "imu" and target.modality == "force":
+            force_ref, imu_ref = target, source
+        else:
+            raise ValueError(
+                f"sync pair {pair.source_stream_id}->{pair.target_stream_id} does not join "
+                "force and IMU streams"
+            )
+        force_table, force_input = load_silver(settings, force_ref)
+        imu_table, imu_input = load_silver(settings, imu_ref)
+        result = process_cross_sensor(imu_table, force_table)
+        run = execute_processor(
+            settings,
+            result=result,
+            dataset_id=WHITE_DATASET_ID,
+            inputs=(imu_input, force_input),
+            series_key=pair.source_stream_id,
+            engine=engine,
+        )
+        run_ids.add(run.run_id)
+        code_sha = run.code_git_sha
+        algorithm_id = result.spec.algorithm_id
+        algorithm_version = result.spec.version
+        parameters_hash = result.spec.parameters_hash
+        paired_total += int(result.diagnostics["paired_samples"])
+        if result.diagnostics["pearson_r"] is not None:
+            correlations.append(float(result.diagnostics["pearson_r"]))
+        processed += 1
+        if progress is not None and (index + 1 == len(pairs) or (index + 1) % 100 == 0):
+            progress(index + 1, len(pairs))
+    receipt = {
+        "dataset_id": WHITE_DATASET_ID,
+        "algorithm_id": algorithm_id,
+        "algorithm_version": algorithm_version,
+        "parameters_hash": parameters_hash,
+        "code_git_sha": code_sha,
+        "pairs": len(pairs),
+        "processed_pairs": processed,
+        "runs": len(run_ids),
+        "paired_samples_total": paired_total,
+        "correlation_pairs": len(correlations),
+        "correlation_mean": (
+            float(sum(correlations) / len(correlations)) if correlations else None
+        ),
+        "sync_authority": (
+            "only persisted SyncAlignment pairs are processed; no stream is paired by "
+            "convention or timing guesswork"
+        ),
+        "equivalence_claimed": False,
+        "interpolation": "none",
+    }
+    target = receipt_path(
+        settings, dataset_id=WHITE_DATASET_ID, kind="acceptance", name="res100-cross-sensor"
+    )
     atomic_write_text(target, json.dumps(receipt, indent=2, sort_keys=True) + "\n")
     receipt["receipt_path"] = relative_posix(settings.dataset_root, target)
     return receipt
@@ -585,6 +736,9 @@ def process_corpus(
     metric_units: dict[str, str] = {}
     run_ids: set[str] = set()
     algorithm_id = ""
+    algorithm_version = ""
+    parameters_hash = ""
+    code_sha: str | None = None
     per_stream: list[dict[str, Any]] = []
     total_samples = 0
     total_entities = 0
@@ -592,6 +746,8 @@ def process_corpus(
         table, processor_input = load_silver(settings, ref)
         result = plan.processor(table)
         algorithm_id = result.spec.algorithm_id
+        algorithm_version = result.spec.version
+        parameters_hash = result.spec.parameters_hash
         run = execute_processor(
             settings,
             result=result,
@@ -601,6 +757,7 @@ def process_corpus(
             engine=engine,
         )
         run_ids.add(run.run_id)
+        code_sha = run.code_git_sha
         for series in run.series:
             checksums[f"{ref.stream_id}.{series.name}"] = series.artifact.checksum_sha256
         for metric in result.metrics:
@@ -634,6 +791,9 @@ def process_corpus(
         metric_units=metric_units,
         processed_stream_ids=tuple(ref.stream_id for ref in refs),
         run_ids=tuple(sorted(run_ids)),
+        algorithm_version=algorithm_version,
+        parameters_hash=parameters_hash,
+        code_git_sha=code_sha,
         diagnostics={
             "samples": total_samples,
             "entities": total_entities,
