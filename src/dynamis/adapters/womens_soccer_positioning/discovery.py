@@ -109,10 +109,23 @@ class WorkbookDiscovery:
                 "declared upstream"
             ),
             "units": {
-                "latitude": "degrees (WGS84 geodetic, source declares none)",
-                "longitude": "degrees (WGS84 geodetic, source declares none)",
+                "latitude": (
+                    "degrees; geographic GNSS latitude, source datum not explicitly "
+                    "declared (canonical interpretation: WGS 84)"
+                ),
+                "longitude": (
+                    "degrees; geographic GNSS longitude, source datum not explicitly "
+                    "declared (canonical interpretation: WGS 84)"
+                ),
                 "speed(km/h)": "km/h as declared by the column name",
                 "hr(bpm)": "bpm as declared by the column name",
+            },
+            "geodetic_datum": {
+                "source_representation": "geographic GNSS latitude/longitude",
+                "source_datum": "not explicitly declared by the provider",
+                "canonical_interpretation": "WGS 84",
+                "authority": "inferred pipeline assumption",
+                "transformation": "none; source coordinate values pass through unchanged",
             },
             "vendor_derived_columns": list(VENDOR_DERIVED_COLUMNS),
             "unmapped_columns": list(UNMAPPED_COLUMNS),

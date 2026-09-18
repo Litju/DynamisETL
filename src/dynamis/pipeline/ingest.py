@@ -21,7 +21,13 @@ from dynamis.adapters.sportec_idsse.adapter import IdsseMatchAdapter
 from dynamis.adapters.sportec_idsse.authorities import tracking_stream_id
 from dynamis.adapters.sportec_idsse.discovery import discover_idsse
 from dynamis.adapters.womens_soccer_positioning.adapter import canonical_gnss_streams
-from dynamis.adapters.womens_soccer_positioning.authorities import WOMENS_DATASET_ID
+from dynamis.adapters.womens_soccer_positioning.authorities import (
+    CANONICAL_DATUM,
+    DATUM_AUTHORITY,
+    SOURCE_COORDINATE_REPRESENTATION,
+    SOURCE_DATUM_DECLARATION,
+    WOMENS_DATASET_ID,
+)
 from dynamis.adapters.womens_soccer_positioning.discovery import discover_workbook
 from dynamis.config import Settings
 from dynamis.contracts import Modality
@@ -261,6 +267,10 @@ def ingest_womens_j01(
                     "speed_source_to_si_scale": 1.0 / 3.6,
                     "timestamp_representation": "provider local wall-clock text",
                     "identity_representation": "sheet name is the provider athlete id",
+                    "source_coordinate_representation": SOURCE_COORDINATE_REPRESENTATION,
+                    "source_datum": SOURCE_DATUM_DECLARATION,
+                    "canonical_datum": CANONICAL_DATUM,
+                    "datum_authority": DATUM_AUTHORITY,
                 },
             )
         )
@@ -282,6 +292,13 @@ def ingest_womens_j01(
                 "contains no non-null value in that column"
             ),
             "session_origin_local": adapter.session_origin.isoformat(sep=" "),
+            "geodetic_datum": {
+                "source_coordinate_representation": SOURCE_COORDINATE_REPRESENTATION,
+                "source_datum": SOURCE_DATUM_DECLARATION,
+                "canonical_interpretation": CANONICAL_DATUM,
+                "authority": DATUM_AUTHORITY,
+                "transformation": "none; source coordinate values pass through unchanged",
+            },
             "sheet_rows": {
                 subject.sheet_name: subject.row_count for subject in adapter.subject_streams()
             },
@@ -375,7 +392,7 @@ def ingest_dfl_match(
                     modality=Modality.TRACKING.value,
                     subject_id=None,
                     trial_id=section.period_id,
-                    source_records=section.source_frames,
+                    source_records=section.frame_entity_observations,
                     canonical_rows=section.canonical_rows,
                     quarantined_rows=quarantine_by_stream.get(stream_id, 0),
                     ignored_records=0,
@@ -390,7 +407,8 @@ def ingest_dfl_match(
                     coordinate_frame_id=result.coordinate_frame_id,
                     checks={
                         "frame_number_range": [section.frame_first, section.frame_last],
-                        "frame_count": section.frame_count,
+                        "distinct_frame_ticks": section.distinct_frame_ticks,
+                        "entity_frame_observations": section.frame_entity_observations,
                         "entities": section.entity_count,
                         "ball_object_id": section.ball_object_id,
                         "frame_major_ordering": True,

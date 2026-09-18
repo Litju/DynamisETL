@@ -145,9 +145,11 @@ class EventsDiscovery:
 class PositionsDiscovery:
     sections: tuple[str, ...]
     framesets: int
-    frames: int
+    #: One provider ``<Frame>`` element per entity per tick: entity-frame
+    #: observations, never the distinct temporal frame count.
+    entity_frame_observations: int
     distinct_frame_numbers: int
-    frames_per_period: dict[str, int]
+    entity_frame_observations_per_period: dict[str, int]
     frame_entity_count_distribution: dict[str, int]
     entity_kinds: dict[str, int]
     ball_entities: tuple[str, ...]
@@ -172,9 +174,9 @@ class PositionsDiscovery:
             "file_kind": "positions",
             "sections": list(self.sections),
             "framesets": self.framesets,
-            "frames": self.frames,
+            "entity_frame_observations": self.entity_frame_observations,
             "distinct_frame_numbers": self.distinct_frame_numbers,
-            "frames_per_period": self.frames_per_period,
+            "entity_frame_observations_per_period": self.entity_frame_observations_per_period,
             "frame_entity_count_distribution": self.frame_entity_count_distribution,
             "entity_kinds": self.entity_kinds,
             "ball_entity_ids": list(self.ball_entities),
@@ -202,6 +204,9 @@ class PositionsDiscovery:
                 "X/Y/Z are provider-observed positions in metres (no conversion applied).",
                 "D/A/M have no published semantics; kloppy (the reference client) does not "
                 "decode them; they remain in Bronze and are not mapped canonically.",
+                "entity_frame_observations counts provider <Frame> elements (one object at "
+                "one tick), not temporal frames: divide by the per-tick entity count for "
+                "the distinct 25 Hz frame-tick count.",
             ],
         }
 
@@ -304,8 +309,8 @@ def discover_events(path: Path) -> EventsDiscovery:
 def discover_positions(path: Path) -> PositionsDiscovery:
     sections: list[str] = []
     framesets = 0
-    frames = 0
-    frames_per_period: Counter[str] = Counter()
+    entity_frame_observations = 0
+    entity_frame_observations_per_period: Counter[str] = Counter()
     entity_counts_per_frame: Counter[int] = Counter()
     entity_kinds: Counter[str] = Counter()
     ball_entities: list[str] = []
@@ -360,8 +365,8 @@ def discover_positions(path: Path) -> PositionsDiscovery:
                     del elem.getparent()[0]
             continue
         section, _, _ = current
-        frames += 1
-        frames_per_period[section] += 1
+        entity_frame_observations += 1
+        entity_frame_observations_per_period[section] += 1
         n_raw = elem.get("N")
         if n_raw is None:
             raise DiscoveryError(f"{path.name}: Frame without N in {section}")
@@ -433,9 +438,9 @@ def discover_positions(path: Path) -> PositionsDiscovery:
     return PositionsDiscovery(
         sections=tuple(sections),
         framesets=framesets,
-        frames=frames,
+        entity_frame_observations=entity_frame_observations,
         distinct_frame_numbers=len(entity_counts_per_frame),
-        frames_per_period=dict(frames_per_period),
+        entity_frame_observations_per_period=dict(entity_frame_observations_per_period),
         frame_entity_count_distribution={
             str(count): number
             for count, number in Counter(entity_counts_per_frame.values()).items()

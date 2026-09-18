@@ -8,6 +8,7 @@ PR and the Linear receipt.
 
 from __future__ import annotations
 
+import math
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from xml.etree import ElementTree as ET
@@ -93,6 +94,10 @@ def test_workbook_discovery_describes_the_synthetic_structure(
     hr = next(column for column in first.columns if column.name == "hr(bpm)")
     assert hr.null_count == hr.non_null + hr.null_count
     assert discovery.to_dict()["unmapped_columns"] == ["hr(bpm)"]
+    datum = discovery.to_dict()["geodetic_datum"]
+    assert datum["source_datum"] == "not explicitly declared by the provider"
+    assert datum["canonical_interpretation"] == "WGS 84"
+    assert datum["authority"] == "inferred pipeline assumption"
 
 
 def test_womens_ingest_maps_rows_and_quarantines_bad_ones(
@@ -133,6 +138,14 @@ def test_womens_ingest_maps_rows_and_quarantines_bad_ones(
     assert payload[0]["coordinate_frame_id"] == "wsp-wgs84-geodetic"
     assert payload[0]["measurement_class"] == "RAW_MEASURED"
 
+    # Datum provenance is explicit in the reconciliation receipt: the source
+    # declares no datum and WGS 84 is the documented canonical interpretation.
+    checks = result.reconciliation.streams[0].checks
+    assert checks["source_datum"] == "not explicitly declared by the provider"
+    assert checks["canonical_datum"] == "WGS 84"
+    assert checks["datum_authority"] == "inferred pipeline assumption"
+    assert result.domain["geodetic_datum"]["canonical_interpretation"] == "WGS 84"
+
 
 def test_womens_stream_counters_and_authorities(
     tmp_settings: Settings, womens_workbook: Path
@@ -142,10 +155,19 @@ def test_womens_stream_counters_and_authorities(
     authorities = adapter.source_authorities()
     assert authorities.clocks[0].timebase.value == "session_monotonic"
     assert authorities.frames[0].kind.value == "world_geodetic"
+    frame = authorities.frames[0]
+    # The source does not declare a datum; WGS 84 is an explicit inference.
+    assert frame.description is not None
+    assert "not explicitly declared by the provider" in frame.description
+    assert "inferred pipeline assumption" in frame.description
+    assert "WGS 84" in frame.description
     assert authorities.synchronizations[0].method.value == "source_provided"
     subjects = adapter.subject_streams()
     assert [subject.stream_id for subject in subjects] == ["gnss-p01", "gnss-p02"]
     stream = adapter.canonical_stream(subjects[0])
+    assert stream.stream_metadata["source_datum"] == "not explicitly declared by the provider"
+    assert stream.stream_metadata["canonical_datum"] == "WGS 84"
+    assert stream.stream_metadata["datum_authority"] == "inferred pipeline assumption"
     batches = list(stream.batches)
     total = sum(batch.num_rows for batch in batches)
     assert total == 5
@@ -206,7 +228,8 @@ def test_idsse_discovery_measures_frames_and_defects(
     discovery = discover_idsse(dfl_files["info"], dfl_files["events"], dfl_files["positions"])
     positions = discovery.positions
     assert positions.sections == ("firstHalf", "secondHalf")
-    assert positions.frames == 100
+    assert positions.entity_frame_observations == 100
+    assert positions.distinct_frame_numbers == 30
     assert positions.framesets == 7
     assert positions.frame_number_range == (10_000, 100_009)
     assert positions.time_step_s == pytest.approx(0.04)
@@ -394,7 +417,7 @@ def test_idsse_spill_files_are_removed_after_cleanup(
 ) -> None:
     adapter = _adapter(tmp_path, dfl_files)
     summary = adapter.parse_positions()
-    assert summary.source_frames == 100
+    assert summary.frame_entity_observations == 100
     assert summary.quarantined_rows == 3
     assert summary.spill_dir.is_dir()
     adapter.cleanup()
@@ -462,6 +485,145 @@ def test_idsse_malformed_documents_are_quarantined_not_dropped(
     assert tracking.quarantined_rows == 3
     assert tracking.source_records == 70
     assert "quarantine" in result.quarantine_artifacts[0]["relative_path"]
+
+
+def test_idsse_non_finite_positions_are_quarantined_not_published(tmp_path: Path) -> None:
+    """NaN/Inf X/Y, and a malformed or non-finite optional Z, never publish."""
+    from dynamis.adapters.sportec_idsse.matchinfo import parse_match_information
+    from dynamis.adapters.sportec_idsse.positions import PositionsCanonicalizer
+
+    info = providers.write_match_information(tmp_path / "info.xml", kickoff_utc=KICKOFF)
+    metadata = parse_match_information(info)
+    start = KICKOFF + timedelta(seconds=1)
+    root = ET.Element("PutDataRequest")
+    positions = ET.SubElement(root, "Positions", {"EventTime": start.isoformat()})
+    frameset = ET.SubElement(
+        positions,
+        "FrameSet",
+        {
+            "GameSection": "firstHalf",
+            "MatchId": "DFL-MAT-SYNTH1",
+            "TeamId": "DFL-CLU-00000H",
+            "PersonId": "DFL-OBJ-H001",
+        },
+    )
+    raw_frames: tuple[tuple[int, str, str, str | None], ...] = (
+        (10_000, "0.00", "0.00", None),
+        (10_001, "NaN", "1.00", None),
+        (10_002, "1.00", "inf", None),
+        (10_003, "2.00", "3.00", "not-a-number"),
+        (10_004, "4.00", "5.00", "NaN"),
+        (10_005, "6.00", "7.00", "0.50"),
+    )
+    for number, x_raw, y_raw, z_raw in raw_frames:
+        stamp = start + timedelta(milliseconds=40 * (number - 10_000))
+        attributes = {
+            "N": str(number),
+            "T": stamp.strftime("%Y-%m-%dT%H:%M:%S.") + f"{stamp.microsecond // 1000:03d}Z",
+            "X": x_raw,
+            "Y": y_raw,
+        }
+        if z_raw is not None:
+            attributes["Z"] = z_raw
+        ET.SubElement(frameset, "Frame", attributes)
+    target = tmp_path / "positions.xml"
+    ET.ElementTree(root).write(str(target), encoding="UTF-8", xml_declaration=True)
+
+    canonicalizer = PositionsCanonicalizer(
+        target,
+        metadata,
+        spill_dir=tmp_path / "spill",
+        batch_size=2,
+        dataset_id="dfl-sportec-idsse",
+        clock_id="dfl-sportec-utc",
+        synchronization_spec_id="dfl-source-provided",
+        coordinate_frame_id="dfl-pitch-center-m",
+    )
+    summary = canonicalizer.spill()
+    assert summary.frame_entity_observations == 6
+    assert summary.canonical_rows == 2  # first and last frames only
+    assert summary.quarantined_rows == 4
+    assert summary.quarantined_by_rule == {
+        "non_finite_value": 3,
+        "coordinate_out_of_range": 1,
+    }
+    rows = [
+        row
+        for batch in canonicalizer.streams(session_id=metadata.match_id)[0].batches
+        for row in batch.to_pylist()
+    ]
+    assert [row["x_m"] for row in rows] == [0.0, 6.0]
+    assert all(
+        math.isfinite(row["x_m"]) and math.isfinite(row["y_m"]) and math.isfinite(row["z_m"] or 0.0)
+        for row in rows
+    )
+    assert rows[1]["z_m"] == pytest.approx(0.5)
+    # Off-pitch positions are legitimate and are never clipped or rejected.
+    assert all(row["x_m"] is not None for row in rows)
+    canonicalizer.cleanup()
+
+
+def test_idsse_non_finite_event_coordinates_are_quarantined(tmp_path: Path) -> None:
+    from dynamis.adapters.sportec_idsse.authorities import corner_to_center_transform
+    from dynamis.adapters.sportec_idsse.events import EventsCanonicalizer
+    from dynamis.adapters.sportec_idsse.matchinfo import parse_match_information
+
+    info = providers.write_match_information(tmp_path / "info.xml", kickoff_utc=KICKOFF)
+    metadata = parse_match_information(info)
+    root = ET.Element("PutDataRequest")
+
+    def event(event_id: str, when: datetime, x_raw: str | None, y_raw: str | None) -> ET.Element:
+        attributes = {
+            "EventId": event_id,
+            "EventTime": when.isoformat(),
+            "MatchId": "DFL-MAT-SYNTH1",
+        }
+        if x_raw is not None and y_raw is not None:
+            attributes["X-Position"] = x_raw
+            attributes["Y-Position"] = y_raw
+        return ET.Element("Event", attributes)
+
+    for element in (
+        event("SYN-EV-1002", KICKOFF + timedelta(seconds=5), "70.0", "20.0"),
+        event("SYN-EV-1003", KICKOFF + timedelta(seconds=6), "NaN", "1.0"),
+        event("SYN-EV-1004", KICKOFF + timedelta(seconds=7), "1.0", "inf"),
+        event("SYN-EV-1005", KICKOFF + timedelta(seconds=8), "abc", "1.0"),
+    ):
+        ET.SubElement(element, "Play", {"Team": "DFL-CLU-00000H", "Player": "DFL-OBJ-H001"})
+        root.append(element)
+    kickoff = event("SYN-EV-1001", KICKOFF, None, None)
+    ET.SubElement(
+        kickoff,
+        "KickOff",
+        {
+            "TeamLeft": "DFL-CLU-00000H",
+            "TeamRight": "DFL-CLU-00000A",
+            "GameSection": "firstHalf",
+        },
+    )
+    root.insert(0, kickoff)
+    target = tmp_path / "events.xml"
+    ET.ElementTree(root).write(str(target), encoding="UTF-8", xml_declaration=True)
+
+    canonicalizer = EventsCanonicalizer(
+        target,
+        metadata,
+        transform=corner_to_center_transform(metadata.pitch_x_m, metadata.pitch_y_m),
+        dataset_id="dfl-sportec-idsse",
+        session_id=metadata.match_id,
+        clock_id="dfl-sportec-utc",
+        synchronization_spec_id="dfl-source-provided",
+        coordinate_frame_id="dfl-pitch-center-m",
+    )
+    canonicalizer.parse()
+    summary = canonicalizer.summary
+    assert summary.source_events == 5
+    assert summary.canonical_rows == 2  # kick-off and the single valid position
+    assert summary.events_with_coordinates == 1
+    assert {record.rule for record in summary.quarantined} == {
+        "non_finite_value",
+        "coordinate_out_of_range",
+    }
 
 
 def test_reconciliation_receipt_is_written_for_both_providers(

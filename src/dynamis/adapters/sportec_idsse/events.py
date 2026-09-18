@@ -17,6 +17,7 @@ Two provider realities shape the canonical output:
 from __future__ import annotations
 
 import json
+import math
 from collections import Counter, defaultdict
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -32,6 +33,7 @@ from dynamis.contracts import EVENT_SCHEMA, FrameTransform, MeasurementClass, Mo
 from dynamis.contracts.frames import transform_points
 from dynamis.pipeline.quarantine import (
     RULE_COORDINATE_OUT_OF_RANGE,
+    RULE_NON_FINITE_VALUE,
     RULE_REQUIRED_FIELD_NULL,
     RULE_SCHEMA_FAILURE,
     RULE_TIMESTAMP_UNPARSABLE,
@@ -391,10 +393,7 @@ class EventsCanonicalizer:
         y_raw = event.y_raw
         if x_raw is not None and y_raw is not None:
             try:
-                ((x_center, y_center, _),) = transform_points(
-                    self._transform, ((float(x_raw), float(y_raw), 0.0),)
-                )
-                x_m, y_m = x_center, y_center
+                x_value, y_value = float(x_raw), float(y_raw)
             except ValueError:
                 self._summary.quarantined.append(
                     QuarantinedRecord(
@@ -409,6 +408,24 @@ class EventsCanonicalizer:
                     )
                 )
                 return None
+            if not (math.isfinite(x_value) and math.isfinite(y_value)):
+                self._summary.quarantined.append(
+                    QuarantinedRecord(
+                        rule=RULE_NON_FINITE_VALUE,
+                        detail="event position is not a finite number",
+                        dataset_id=self._dataset_id,
+                        session_id=self._session_id,
+                        stream_id="events",
+                        source_record_id=event_id,
+                        source_time=parsed_time.isoformat(),
+                        evidence={"X-Position": x_raw, "Y-Position": y_raw},
+                    )
+                )
+                return None
+            ((x_center, y_center, _),) = transform_points(
+                self._transform, ((x_value, y_value, 0.0),)
+            )
+            x_m, y_m = x_center, y_center
         event_ns = int(parsed_time.timestamp() * 1_000_000_000)
         t_rel_ns = event_ns - kickoff_ns
         period_id = None
