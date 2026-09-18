@@ -218,6 +218,8 @@ class StreamingValidator:
             POSE_AVAILABILITY_FIELD: pa.bool_(),
             **{name: pa.float64() for name in POSE_COORDINATE_FIELDS},
         }
+        if POSE_ERROR_FIELD in names:
+            expected_types[POSE_ERROR_FIELD] = pa.float64()
         if any(name not in names for name in expected_types):
             return
         if any(

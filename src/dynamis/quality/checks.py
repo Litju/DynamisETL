@@ -443,6 +443,8 @@ def check_pose_payload_completeness(table: pa.Table, schema: pa.Schema) -> tuple
         POSE_AVAILABILITY_FIELD: pa.bool_(),
         **{name: pa.float64() for name in POSE_COORDINATE_FIELDS},
     }
+    if POSE_ERROR_FIELD in table.column_names:
+        expected_types[POSE_ERROR_FIELD] = pa.float64()
     for name, expected in expected_types.items():
         if table.schema.field(name).type != expected:
             return ()

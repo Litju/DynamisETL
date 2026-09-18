@@ -237,6 +237,23 @@ def test_pose_payload_checks_skip_structurally_incompatible_data() -> None:
         validator.observe(batch)
     assert isinstance(validator.finish(), tuple)
 
+    # A non-numeric provider error column is also structurally incompatible.
+    error_index = table.schema.get_field_index("error_m")
+    tampered_error = table.set_column(
+        error_index,
+        "error_m",
+        pa.array(["bad"] * table.num_rows, type=pa.string()),
+    )
+    assert check_pose_payload_completeness(tampered_error, schema) == ()
+    assert any(
+        item.rule == "schema.field.type"
+        for item in check_schema_conformance(tampered_error, schema)
+    )
+    validator = StreamingValidator(schema)
+    for batch in tampered_error.to_batches(max_chunksize=64):
+        validator.observe(batch)
+    assert isinstance(validator.finish(), tuple)
+
 
 def test_null_frame_is_rejected_when_the_modality_requires_one() -> None:
     fixture = force_bodyweight_static(rate_hz=1000.0, duration_s=0.004)
