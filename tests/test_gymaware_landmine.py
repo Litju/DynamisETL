@@ -277,6 +277,32 @@ def test_non_finite_metric_value_is_quarantined(tmp_path: Path) -> None:
     assert "non_finite_value" in rules
 
 
+def test_colliding_set_numbers_are_rejected(tmp_path: Path) -> None:
+    import zipfile
+
+    workbook = providers.write_vision_workbook(
+        tmp_path / "vision.xlsx",
+        rows=((1, "Synthetic Alpha", "站姿", "20kg", 1, (1.0, 1.0, 100.0)),),
+    )
+    path = tmp_path / "collision.zip"
+    payload = providers.gymaware_csv(set_id=1, reps=((1.0, 1.0, 100.0, 50.0, 200.0, 100.0),))
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("LP_data/GymAware_rawdata/001.csv", payload)
+        archive.writestr("LP_data/GymAware_rawdata/old/001.csv", payload)
+        archive.writestr("LP_data/GA_vision_data.xlsx", workbook.read_bytes())
+    with pytest.raises(GymAwareSourceError, match="same set number"):
+        discover_gymaware_landmine(path)
+
+
+def test_observations_are_cached_after_the_first_call(gymaware_zip: Path) -> None:
+    adapter = GymAwareAdapter(discover_gymaware_landmine(gymaware_zip))
+    first = adapter.observations()
+    quarantined_after_first = len(adapter.counters.quarantined)
+    second = adapter.observations()
+    assert first == second
+    assert len(adapter.counters.quarantined) == quarantined_after_first
+
+
 def test_missing_accepted_member_is_reported(tmp_path: Path) -> None:
     import zipfile
 

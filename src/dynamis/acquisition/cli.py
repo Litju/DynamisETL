@@ -128,7 +128,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         resolved_settings = settings()
-        receipt = acquire(resolved_settings, plan)
+        receipt = acquire(resolved_settings, plan, registry=registry)
     except (ConfigurationError, DownloadError, OSError) as exc:
         print(f"dynamis-fetch: acquisition failed: {exc}", file=sys.stderr)
         return EXIT_FAILURE

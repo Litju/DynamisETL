@@ -37,6 +37,14 @@ def any_non_null(columns: Sequence[Column]) -> pa.Array:
     return cast(pa.Array, result)
 
 
+def and_(left: Column, right: Column) -> pa.Array:
+    return cast(pa.Array, _kernels.and_(left, right))
+
+
+def or_(left: Column, right: Column) -> pa.Array:
+    return cast(pa.Array, _kernels.or_(left, right))
+
+
 def count_true(column: Column) -> int:
     """Number of True values in a boolean column."""
     if len(column) == 0:

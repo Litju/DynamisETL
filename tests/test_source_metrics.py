@@ -38,6 +38,23 @@ def test_observation_rejects_non_source_classes() -> None:
         _observation(measurement_class=MeasurementClass.RAW_MEASURED)
     with pytest.raises(ValueError, match="SOURCE_DERIVED"):
         _observation(measurement_class=MeasurementClass.MODEL_ESTIMATED)
+    with pytest.raises(ValueError, match="SOURCE_DERIVED"):
+        _observation(measurement_class=MeasurementClass.PIPELINE_DERIVED)
+
+
+def test_origin_fields_cannot_be_overwritten_by_caller_provenance() -> None:
+    provenance = _observation(
+        provenance={
+            "origin": "pipeline-computed",
+            "imported_by": "someone-else",
+            "source_field": "fabricated",
+            "source_key": "fabricated",
+        }
+    ).origin_provenance
+    assert provenance["origin"] == "source-provided"
+    assert provenance["imported_by"] == "dynamis"
+    assert provenance["source_field"] == "jump_height"
+    assert provenance["source_key"] == "cmj_dataset_both.npz"
 
 
 def test_observation_rejects_non_finite_values_and_bad_units() -> None:
@@ -75,6 +92,22 @@ def test_persistence_requires_a_verified_input_checksum() -> None:
             run_id="run-x",
             observations=(_observation(),),
             input_checksums=("bad",),
+            computed_at=datetime(2026, 9, 18, tzinfo=UTC),
+        )
+
+
+def test_persistence_rejects_a_different_dataset_identity() -> None:
+    class _Connection:
+        def execute(self, *_args, **_kwargs):  # pragma: no cover - must not be reached
+            raise AssertionError("no statement may run for a mismatched dataset")
+
+    with pytest.raises(ValueError, match="dataset identity"):
+        persist_source_metrics(
+            _Connection(),
+            dataset_id="gymaware-landmine-vision",
+            run_id="run-x",
+            observations=(_observation(),),
+            input_checksums=(CHECKSUM,),
             computed_at=datetime(2026, 9, 18, tzinfo=UTC),
         )
 
@@ -192,6 +225,15 @@ def test_source_metric_persistence_is_idempotent(
             provenance = connection.execute(
                 text("SELECT provenance FROM derived_metric LIMIT 1")
             ).scalar_one()
+            with pytest.raises(ValueError, match="already exists with different"):
+                persist_source_metrics(
+                    connection,
+                    dataset_id="white-cmj-acc-grf",
+                    run_id="run-test",
+                    observations=(_observation(name="A different scientific name"),),
+                    input_checksums=(CHECKSUM,),
+                    computed_at=datetime(2026, 9, 18, tzinfo=UTC),
+                )
         control.dispose()
         assert first["derived_metric"] == 1
         assert second["derived_metric"] == 0  # idempotent on the same identity

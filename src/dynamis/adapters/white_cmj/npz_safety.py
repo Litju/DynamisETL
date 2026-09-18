@@ -33,6 +33,13 @@ import numpy as np
 MAX_RESTRICTED_ARRAY_ELEMENTS = 1 << 26
 #: Numeric dtype kinds the canonical pipeline accepts from a source member.
 NUMERIC_KINDS = frozenset("fiu")
+#: Decompression bounds: the verified release is ~18 MB across 12 members.
+MAX_NPZ_MEMBERS = 256
+MAX_MEMBER_UNCOMPRESSED_BYTES = 64 << 20
+MAX_ARCHIVE_UNCOMPRESSED_BYTES = 256 << 20
+#: A member may not claim an unreasonable expansion ratio when it is not tiny.
+MAX_MEMBER_EXPANSION_RATIO = 200.0
+EXPANSION_RATIO_FLOOR_BYTES = 1 << 20
 
 
 class NpzSecurityError(ValueError):
@@ -99,9 +106,23 @@ def read_member_data(archive: zipfile.ZipFile, member: str) -> tuple[NpzMemberHe
         raise NpzSecurityError(f"{member!r} is not a member of the archive") from exc
     if info.is_dir():
         raise NpzSecurityError(f"{member!r} is a directory, not an array member")
+    if info.file_size > MAX_MEMBER_UNCOMPRESSED_BYTES:
+        raise NpzSecurityError(
+            f"{member!r}: declared size {info.file_size} exceeds the member bound"
+        )
     with archive.open(member) as stream:
         shape, fortran_order, dtype = _read_member_header_stream(stream, member)
-        data = stream.read()
+        chunks: list[bytes] = []
+        written = 0
+        while chunk := stream.read(1 << 20):
+            written += len(chunk)
+            if written > MAX_MEMBER_UNCOMPRESSED_BYTES:
+                # Defends against a central directory that understates the size.
+                raise NpzSecurityError(
+                    f"{member!r}: decoded bytes exceed the {MAX_MEMBER_UNCOMPRESSED_BYTES} bound"
+                )
+            chunks.append(chunk)
+        data = b"".join(chunks)
     header = NpzMemberHeader(
         name=member,
         shape=shape,
@@ -127,7 +148,37 @@ def inspect_npz(path: Path | str) -> tuple[NpzMemberHeader, ...]:
         return inspect_npz_archive(archive)
 
 
+def _assert_archive_bounds(archive: zipfile.ZipFile) -> None:
+    """Reject a container whose declared sizes or expansion ratios are unsafe."""
+    infos = [info for info in archive.infolist() if info.filename.endswith(".npy")]
+    if len(infos) > MAX_NPZ_MEMBERS:
+        raise NpzSecurityError(
+            f"the container exposes {len(infos)} .npy members, above the {MAX_NPZ_MEMBERS} bound"
+        )
+    total = 0
+    for info in infos:
+        if info.file_size > MAX_MEMBER_UNCOMPRESSED_BYTES:
+            raise NpzSecurityError(
+                f"{info.filename}: declared size {info.file_size} exceeds the "
+                f"{MAX_MEMBER_UNCOMPRESSED_BYTES}-byte member bound"
+            )
+        if info.compress_size > 0 and info.file_size > EXPANSION_RATIO_FLOOR_BYTES:
+            ratio = info.file_size / info.compress_size
+            if ratio > MAX_MEMBER_EXPANSION_RATIO:
+                raise NpzSecurityError(
+                    f"{info.filename}: expansion ratio {ratio:.1f} exceeds "
+                    f"{MAX_MEMBER_EXPANSION_RATIO}"
+                )
+        total += info.file_size
+    if total > MAX_ARCHIVE_UNCOMPRESSED_BYTES:
+        raise NpzSecurityError(
+            f"the container's uncompressed size {total} exceeds the "
+            f"{MAX_ARCHIVE_UNCOMPRESSED_BYTES}-byte archive bound"
+        )
+
+
 def inspect_npz_archive(archive: zipfile.ZipFile) -> tuple[NpzMemberHeader, ...]:
+    _assert_archive_bounds(archive)
     members = [name for name in archive.namelist() if name.endswith(".npy")]
     if not members:
         raise NpzSecurityError("the container exposes no .npy members")
@@ -141,13 +192,16 @@ def load_numeric_member(archive: zipfile.ZipFile, member: str) -> np.ndarray:
         raise NpzSecurityError(
             f"{member!r} is an object array; use load_object_member_numeric instead"
         )
+    dtype = np.dtype(header.dtype)
+    if dtype.kind not in NUMERIC_KINDS:
+        raise NpzSecurityError(f"{member!r} has forbidden dtype {dtype.str!r}")
     expected = int(np.prod(header.shape, dtype=np.int64)) if header.shape else 1
     if expected > MAX_RESTRICTED_ARRAY_ELEMENTS:
         raise NpzSecurityError(
             f"{member!r}: {expected} elements exceed the structural element bound"
         )
-    array = np.frombuffer(payload, dtype=np.dtype(header.dtype), count=expected)
-    return array.reshape(header.shape)
+    array = np.frombuffer(payload, dtype=dtype, count=expected)
+    return array.reshape(header.shape, order="F" if header.fortran_order else "C")
 
 
 def _numpy_reconstruct() -> Any:

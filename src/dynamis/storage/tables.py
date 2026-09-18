@@ -407,6 +407,11 @@ class CoordinateFrame(Base):
             "unknown_needs_description",
             "kind <> 'unknown' OR description IS NOT NULL",
         ),
+        _ck(
+            "coordinate_frame",
+            "unspecified_handedness_needs_description",
+            "handedness <> 'unspecified' OR (description IS NOT NULL AND btrim(description) <> '')",
+        ),
     )
 
 

@@ -126,6 +126,7 @@ class GymAwareAdapter:
         self._trials: dict[tuple[int, int], GymAwareTrial] = {}
         self._excluded_sets: dict[int, str] = {}
         self._hashes = discovery.structured_member_hashes
+        self._observations: tuple[SourceMetricObservation, ...] | None = None
         self._build()
 
     @property
@@ -141,7 +142,13 @@ class GymAwareAdapter:
         return dict(self._excluded_sets)
 
     def observations(self) -> tuple[SourceMetricObservation, ...]:
-        return (*self._gymaware_observations(), *self._vision_observations())
+        """Source-metric observations, computed once (the import mutates counters)."""
+        if self._observations is None:
+            self._observations = (
+                *self._gymaware_observations(),
+                *self._vision_observations(),
+            )
+        return self._observations
 
     def domain(self) -> ProviderDomain:
         sessions: dict[str, Session] = {}

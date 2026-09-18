@@ -41,6 +41,7 @@ DATASET_SOURCE_TABLE = _TABLES["dataset_source"]
 DATASET_SOURCE_MODALITY_TABLE = _TABLES["dataset_source_modality"]
 DATASET_VERSION_TABLE = _TABLES["dataset_version"]
 DATASET_VERSION_FILE_TABLE = _TABLES["dataset_version_file"]
+DERIVED_METRIC_TABLE = _TABLES["derived_metric"]
 DEVICE_TABLE = _TABLES["device"]
 LICENSE_POLICY_TABLE = _TABLES["license_policy"]
 PROCESSING_ARTIFACT_TABLE = _TABLES["processing_artifact"]
@@ -463,7 +464,9 @@ def persist_ingest_run(
             {
                 "artifact_id": f"{stream.stream_id}-{stream.checksum_sha256[:12]}",
                 "dataset_id": dataset_id,
-                "session_id": result.session_id,
+                # The artifact belongs to the stream's own session; a provider
+                # slice may materialize many sessions (one per laboratory subject).
+                "session_id": stream.session_id,
                 "stream_id": stream.stream_id,
                 "layer": "silver",
                 "relative_path": stream.relative_path,
@@ -528,6 +531,11 @@ def persist_ingest_run(
     issues = _quality_issues(dataset_id, run_id, result)
     connection.execute(QUALITY_ISSUE_TABLE.delete().where(QUALITY_ISSUE_TABLE.c.run_id == run_id))
     written["quality_issue"] = _upsert(connection, QUALITY_ISSUE_TABLE, issues)
+    # Source-derived observations are the current materialization of this run:
+    # replacing them makes a rerun that removes or quarantines an observation, or
+    # that changes a value under an unchanged identity, converge to the current
+    # source state instead of preserving stale rows.
+    connection.execute(DERIVED_METRIC_TABLE.delete().where(DERIVED_METRIC_TABLE.c.run_id == run_id))
     if result.source_metrics:
         from dynamis.pipeline.source_metrics import persist_source_metrics
 

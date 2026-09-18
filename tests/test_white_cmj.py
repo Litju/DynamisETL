@@ -69,6 +69,53 @@ def load_object_member_numeric_safe(path: Path):
         return load_object_member_numeric(archive, "acc_signals.npy", expected_ndim=2)
 
 
+def test_npz_member_decompression_is_bounded(tmp_path: Path) -> None:
+    import zipfile
+
+    path = tmp_path / "bomb.npz"
+    with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("acc_signals.npy", b"\x00" * (65 << 20))
+    with pytest.raises(NpzSecurityError, match="member bound"):
+        inspect_npz(path)
+
+
+def test_npz_expansion_ratio_is_bounded(tmp_path: Path) -> None:
+    import zipfile
+
+    path = tmp_path / "ratio.npz"
+    with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("acc_signals.npy", b"\x00" * (2 << 20))
+    with pytest.raises(NpzSecurityError, match="expansion ratio"):
+        inspect_npz(path)
+
+
+def test_numeric_member_rejects_a_string_dtype(tmp_path: Path) -> None:
+    import zipfile
+
+    path = tmp_path / "strings.npz"
+    np.savez(path, jump_height=np.array(["a", "bb"]), allow_pickle=False)
+    with zipfile.ZipFile(path) as archive:
+        with pytest.raises(NpzSecurityError, match="forbidden dtype"):
+            from dynamis.adapters.white_cmj.npz_safety import load_numeric_member
+
+            load_numeric_member(archive, "jump_height.npy")
+
+
+def test_numeric_member_preserves_fortran_order(tmp_path: Path) -> None:
+    import zipfile
+
+    path = tmp_path / "fortran.npz"
+    values = np.asfortranarray(np.arange(12, dtype=np.float64).reshape(3, 4))
+    np.savez(path, matrix=values, allow_pickle=False)
+    with zipfile.ZipFile(path) as archive:
+        from dynamis.adapters.white_cmj.npz_safety import load_numeric_member
+
+        header = inspect_npz(path)
+        assert header[0].shape == (3, 4)
+        loaded = load_numeric_member(archive, "matrix.npy")
+    assert np.array_equal(loaded, values)
+
+
 def test_bundle_loader_requires_the_verified_member_set(white_npz: Path) -> None:
     bundle = load_white_cmj_bundle(white_npz)
     assert bundle.trial_count == 6
@@ -187,6 +234,19 @@ def test_canonical_units_timing_and_force_representation(
     # Per-contract schema revisions survive materialization.
     assert result.streams[0].schema_version in {"2"}
     assert result.streams[-1].schema_version in {"2"}
+
+
+def test_ingest_stream_results_carry_the_stream_session(
+    tmp_settings: Settings, white_npz: Path
+) -> None:
+    result = ingest_white_cmj(tmp_settings, npz_path=white_npz, version="v1")
+    assert result.streams
+    for stream in result.streams:
+        matching = next(
+            trial for trial in result.provider_domain.trials if trial.trial_id == stream.trial_id
+        )
+        assert stream.session_id == matching.session_id
+        assert stream.session_id.startswith("white-s")
 
 
 def test_source_metrics_are_imported_not_recomputed(

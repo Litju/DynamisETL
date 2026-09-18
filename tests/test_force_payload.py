@@ -76,6 +76,13 @@ def test_row_with_neither_representation_is_rejected() -> None:
     assert violations[0].severity.value == "ERROR"
 
 
+def test_row_with_both_representations_is_rejected_as_ambiguous() -> None:
+    table = _table(_row(0, force_z_n=1000.0, force_z_body_weight_ratio=1.4))
+    violations = validate(table, FORCE_SCHEMA)
+    assert [item.rule for item in violations] == ["force.payload.ambiguous"]
+    assert violations[0].evidence["rows_with_both_representations"] == 1
+
+
 def test_streaming_validator_agrees_with_the_table_authority() -> None:
     good = pa.RecordBatch.from_pylist([_row(0, force_z_body_weight_ratio=1.0)], schema=FORCE_SCHEMA)
     bad = pa.RecordBatch.from_pylist([_row(1)], schema=FORCE_SCHEMA)
@@ -85,6 +92,15 @@ def test_streaming_validator_agrees_with_the_table_authority() -> None:
     validator.observe(bad)
     rules = {violation.rule for violation in validator.finish()}
     assert "force.payload.missing" in rules
+
+    ambiguous = pa.RecordBatch.from_pylist(
+        [_row(0, force_z_n=1000.0, force_z_body_weight_ratio=1.4)], schema=FORCE_SCHEMA
+    )
+    ambiguous_validator = StreamingValidator(FORCE_SCHEMA)
+    ambiguous_validator.observe(ambiguous)
+    assert {violation.rule for violation in ambiguous_validator.finish()} == {
+        "force.payload.ambiguous"
+    }
 
 
 def test_ratio_and_newton_are_never_aliased() -> None:

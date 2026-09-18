@@ -17,11 +17,12 @@ persisted in a receipt, a metric or any repository artifact.
 from __future__ import annotations
 
 import hashlib
+import io
 import re
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO
 
 import openpyxl
 
@@ -173,7 +174,7 @@ def parse_gymaware_csv(member_name: str, raw: bytes) -> GymAwareSet:
         cells = [cell.strip() for cell in line.split(",")]
         if not cells or cells[0] != "Rep":
             continue
-        if len(cells) <= max(index_by_metric.values(), default=0):
+        if len(cells) <= max(1, max(index_by_metric.values(), default=0)):
             issues.append(f"short rep row: {line!r}")
             continue
         rep_number = parse_numeric(cells[1])
@@ -232,16 +233,18 @@ class VisionWorkbook:
 
 
 def parse_vision_workbook(
-    workbook_path: Path,
+    workbook_source: Path | BinaryIO,
     *,
     sheet_to_metric: dict[str, str],
 ) -> VisionWorkbook:
     """Parse the vision workbook with the same defensive reading used for CSVs.
 
+    The source may be an in-memory binary stream: the workbook contains
+    participant display names, so it is never persisted to a temporary file.
     Display names are consumed only to assign stable pseudonymous subject
     ordinals inside this function; they are not retained in the returned object.
     """
-    workbook = openpyxl.load_workbook(workbook_path, read_only=True, data_only=True)
+    workbook = openpyxl.load_workbook(workbook_source, read_only=True, data_only=True)
     try:
         sheet_names = tuple(workbook.sheetnames)
         issues: list[str] = []
@@ -447,17 +450,20 @@ def discover_gymaware_landmine(zip_path: Path | str) -> GymAwareDiscovery:
         raise GymAwareSourceError(
             f"the verified vision workbook {authorities.VISION_WORKBOOK_KEY!r} is missing"
         )
-    from tempfile import NamedTemporaryFile
-
-    with NamedTemporaryFile(suffix=".xlsx", delete=False) as handle:
-        handle.write(vision_bytes)
-        temporary = Path(handle.name)
-    try:
-        vision = parse_vision_workbook(
-            temporary, sheet_to_metric=dict(authorities.VISION_SHEET_METRICS)
+    collisions: dict[int, list[str]] = {}
+    for item in csv_sets:
+        collisions.setdefault(item.set_number, []).append(item.member_name)
+    duplicated = {number: names for number, names in collisions.items() if len(names) > 1}
+    if duplicated:
+        raise GymAwareSourceError(
+            "the archive maps multiple CSV members onto the same set number: "
+            + "; ".join(
+                f"{number}: {sorted(names)}" for number, names in sorted(duplicated.items())
+            )
         )
-    finally:
-        temporary.unlink(missing_ok=True)
+    vision = parse_vision_workbook(
+        io.BytesIO(vision_bytes), sheet_to_metric=dict(authorities.VISION_SHEET_METRICS)
+    )
     present = tuple(sorted(item.set_number for item in csv_sets))
     missing = tuple(sorted(set(range(1, max(present) + 1)) - set(present))) if present else ()
     return GymAwareDiscovery(

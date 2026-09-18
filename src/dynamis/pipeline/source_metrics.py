@@ -38,9 +38,9 @@ _TABLES = build_metadata().tables
 DERIVED_METRIC_TABLE = _TABLES["derived_metric"]
 METRIC_DEFINITION_TABLE = _TABLES["metric_definition"]
 
-_ALLOWED_MEASUREMENT_CLASSES = frozenset(
-    {MeasurementClass.SOURCE_DERIVED, MeasurementClass.PIPELINE_DERIVED}
-)
+#: This module imports provider-supplied values only; a pipeline computation has
+#: its own processors and must never borrow the "source-provided" provenance.
+_ALLOWED_MEASUREMENT_CLASSES = frozenset({MeasurementClass.SOURCE_DERIVED})
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,12 +81,14 @@ class SourceMetricObservation:
 
     @property
     def origin_provenance(self) -> dict[str, Any]:
+        # Reserved origin keys win over caller provenance: a caller must never be
+        # able to overwrite how the value was produced.
         payload = {
+            **self.provenance,
             "origin": "source-provided",
             "imported_by": "dynamis",
             "source_field": self.source_field,
             "source_key": self.source_key,
-            **self.provenance,
         }
         return payload
 
@@ -108,6 +110,44 @@ class SourceMetricObservation:
         return f"dm-{hashlib.sha256(identity).hexdigest()[:32]}"
 
 
+def _assert_existing_definitions_match(connection, definitions: dict[str, dict[str, Any]]) -> None:
+    """Refuse an import whose metric identity already means something else.
+
+    ``ON CONFLICT DO NOTHING`` protects a definition from being overwritten; it
+    would also silently accept a different unit or name under the same global
+    metric id. Every existing row touched by this batch is therefore compared
+    against the incoming definition before anything is inserted.
+    """
+    if not definitions:
+        return
+    existing_rows = connection.execute(
+        sa.select(
+            METRIC_DEFINITION_TABLE.c.metric_id,
+            METRIC_DEFINITION_TABLE.c.name,
+            METRIC_DEFINITION_TABLE.c.si_unit,
+            METRIC_DEFINITION_TABLE.c.measurement_class,
+            METRIC_DEFINITION_TABLE.c.value_kind,
+        ).where(METRIC_DEFINITION_TABLE.c.metric_id.in_(sorted(definitions)))
+    ).fetchall()
+    for row in existing_rows:
+        incoming = definitions[row.metric_id]
+        conflicts = [
+            field
+            for field, value in (
+                ("name", row.name),
+                ("si_unit", row.si_unit),
+                ("measurement_class", row.measurement_class),
+                ("value_kind", row.value_kind),
+            )
+            if value != incoming[field]
+        ]
+        if conflicts:
+            raise ValueError(
+                f"metric definition {row.metric_id!r} already exists with different "
+                f"{', '.join(conflicts)}; refusing to reuse a scientific definition"
+            )
+
+
 def persist_source_metrics(
     connection,
     *,
@@ -124,6 +164,18 @@ def persist_source_metrics(
     usable_checksums = [checksum for checksum in input_checksums if len(checksum) == 64]
     if not usable_checksums:
         raise ValueError("source-derived metrics must cite at least one verified Bronze checksum")
+    mismatched_datasets = sorted(
+        {
+            observation.dataset_id
+            for observation in observations
+            if observation.dataset_id != dataset_id
+        }
+    )
+    if mismatched_datasets:
+        raise ValueError(
+            f"observations declare dataset(s) {mismatched_datasets} but the run is bound to "
+            f"{dataset_id!r}; dataset identity must never be mixed"
+        )
     definitions: dict[str, dict[str, Any]] = {}
     for observation in observations:
         existing = definitions.get(observation.metric_id)
@@ -142,6 +194,7 @@ def persist_source_metrics(
         if existing is not None and existing != definition:
             raise ValueError(f"conflicting definitions for metric {observation.metric_id!r}")
         definitions[observation.metric_id] = definition
+    _assert_existing_definitions_match(connection, definitions)
     inserted_definitions = connection.execute(
         pg_insert(METRIC_DEFINITION_TABLE)
         .values(list(definitions.values()))

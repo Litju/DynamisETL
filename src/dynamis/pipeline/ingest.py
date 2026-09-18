@@ -83,6 +83,7 @@ WORKBOOK_KEY_J01 = "J01.xlsx"
 class IngestStreamResult:
     stream_id: str
     modality: str
+    session_id: str
     subject_id: str | None
     trial_id: str | None
     relative_path: str
@@ -105,6 +106,7 @@ class IngestStreamResult:
         return {
             "stream_id": self.stream_id,
             "modality": self.modality,
+            "session_id": self.session_id,
             "subject_id": self.subject_id,
             "trial_id": self.trial_id,
             "relative_path": self.relative_path,
@@ -238,6 +240,7 @@ def write_canonical_stream(
     return IngestStreamResult(
         stream_id=stream.stream_id,
         modality=stream.modality.value,
+        session_id=stream.session_id,
         subject_id=stream.subject_id,
         trial_id=stream.trial_id,
         relative_path=artifact.relative_path or "",

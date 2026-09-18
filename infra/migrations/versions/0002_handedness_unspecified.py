@@ -18,7 +18,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 import sqlalchemy as sa
-from alembic import op
+from alembic import context, op
 
 revision: str = "0002_handedness_unspecified"
 down_revision: str | None = "0001_bootstrap"
@@ -64,9 +64,44 @@ def upgrade() -> None:
         "coordinate_frame",
         DISTINCT_AXES_RELAXED,
     )
+    op.create_check_constraint(
+        op.f("ck_coordinate_frame_unspecified_handedness_needs_description"),
+        "coordinate_frame",
+        "handedness <> 'unspecified' OR (description IS NOT NULL AND btrim(description) <> '')",
+    )
+
+
+def _incompatible_row_count() -> int:
+    bind = op.get_bind()
+    return int(
+        bind.execute(
+            sa.text(
+                "SELECT count(*) FROM coordinate_frame WHERE handedness = 'unspecified' "
+                "OR NOT ("
+                "x_direction <> y_direction AND x_direction <> z_direction "
+                "AND y_direction <> z_direction)"
+            )
+        ).scalar_one()
+    )
 
 
 def downgrade() -> None:
+    # The pre-0002 constraints cannot represent an unspecified handedness or a
+    # duplicated undirected axis. Refuse explicitly instead of silently
+    # rewriting or dropping provenance rows; the operator must migrate them.
+    if not context.is_offline_mode():
+        incompatible = _incompatible_row_count()
+        if incompatible:
+            raise RuntimeError(
+                f"cannot downgrade 0002_handedness_unspecified: {incompatible} "
+                "coordinate_frame row(s) use unspecified handedness or a duplicated "
+                "undirected axis. Migrate or explicitly delete those rows first."
+            )
+    op.drop_constraint(
+        op.f("ck_coordinate_frame_unspecified_handedness_needs_description"),
+        "coordinate_frame",
+        type_="check",
+    )
     op.drop_constraint(op.f("ck_coordinate_frame_distinct_axes"), "coordinate_frame", type_="check")
     op.create_check_constraint(
         op.f("ck_coordinate_frame_distinct_axes"),
