@@ -545,10 +545,20 @@ class SkeletonDefinition(Base):
 
     skeleton_id: Mapped[str] = mapped_column(String(128), primary_key=True)
     name: Mapped[str] = mapped_column(String(256), nullable=False)
+    #: ``tree`` (single-root parent graph) or ``landmark_set`` (source publishes
+    #: an ordered landmark list with no parent graph at all).
+    topology: Mapped[str] = mapped_column(String(16), nullable=False, server_default=text("'tree'"))
     joint_count: Mapped[int] = mapped_column(Integer, nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
 
-    __table_args__ = (_ck("skeleton_definition", "positive_joint_count", "joint_count > 0"),)
+    __table_args__ = (
+        _ck("skeleton_definition", "positive_joint_count", "joint_count > 0"),
+        _ck(
+            "skeleton_definition",
+            "topology",
+            "topology IN ('tree', 'landmark_set')",
+        ),
+    )
 
 
 class SkeletonJoint(Base):

@@ -341,6 +341,11 @@ FORCE_NEWTON_FIELDS = ("force_x_n", "force_y_n", "force_z_n")
 #: Explicit dimensionless alternative: vertical force divided by body weight.
 FORCE_BODY_WEIGHT_RATIO_FIELD = "force_z_body_weight_ratio"
 
+#: Pose coordinate components gated by the availability flag.
+POSE_COORDINATE_FIELDS = ("x_m", "y_m", "z_m")
+POSE_AVAILABILITY_FIELD = "is_available"
+POSE_ERROR_FIELD = "error_m"
+
 
 def force_payload_fields(schema: pa.Schema) -> tuple[str, ...]:
     """Payload fields that can satisfy the force contract on their own."""
@@ -417,6 +422,90 @@ def check_payload_completeness(table: pa.Table, schema: pa.Schema) -> tuple[Viol
     return tuple(violations)
 
 
+def check_pose_payload_completeness(table: pa.Table, schema: pa.Schema) -> tuple[Violation, ...]:
+    """Pose coordinates exist exactly when the row declares its joint available.
+
+    Availability is a source declaration, not a confidence: an unavailable joint
+    carries null coordinates and is never imputed, while an available joint must
+    carry three finite coordinates. Provider error, when present, is a finite
+    non-negative length (its provider-specific semantics stay in metadata).
+    """
+    if contract_of(schema) != "pose_joint_sample":
+        return ()
+    if POSE_AVAILABILITY_FIELD not in table.column_names:
+        return ()
+    missing_columns = [name for name in POSE_COORDINATE_FIELDS if name not in table.column_names]
+    if missing_columns:
+        return ()
+    violations: list[Violation] = []
+    availability = table.column(POSE_AVAILABILITY_FIELD)
+    if availability.null_count:
+        violations.append(
+            Violation(
+                rule="pose.availability.null",
+                detail="every pose row must declare whether its joint is available",
+                evidence={"null_rows": availability.null_count, "rows": table.num_rows},
+            )
+        )
+    observed = kernels.fill_null_false(availability)
+    coordinates = [table.column(name) for name in POSE_COORDINATE_FIELDS]
+    observed_valid = kernels.all_valid(coordinates)
+    missing_coordinates = kernels.count_true(kernels.and_(observed, kernels.invert(observed_valid)))
+    if missing_coordinates:
+        violations.append(
+            Violation(
+                rule="pose.payload.missing_coordinates",
+                detail=(
+                    "an available joint must carry finite x/y/z; missing joints are declared "
+                    "unavailable instead of imputed"
+                ),
+                evidence={"rows_without_coordinates": missing_coordinates, "rows": table.num_rows},
+            )
+        )
+    presented = kernels.any_non_null(coordinates)
+    unavailable_with_coordinates = kernels.count_true(
+        kernels.and_(kernels.invert(observed), presented)
+    )
+    if unavailable_with_coordinates:
+        violations.append(
+            Violation(
+                rule="pose.payload.unexpected_coordinates",
+                detail="an unavailable joint must not carry coordinates",
+                evidence={
+                    "rows_with_coordinates": unavailable_with_coordinates,
+                    "rows": table.num_rows,
+                },
+            )
+        )
+    finite = kernels.is_finite(coordinates[0])
+    for column in coordinates[1:]:
+        finite = kernels.and_(finite, kernels.is_finite(column))
+    non_finite = kernels.count_true(observed) - kernels.count_true(kernels.and_(observed, finite))
+    if non_finite:
+        violations.append(
+            Violation(
+                rule="pose.payload.non_finite",
+                detail="an available joint must carry finite coordinates",
+                evidence={"non_finite_rows": non_finite, "rows": table.num_rows},
+            )
+        )
+    if POSE_ERROR_FIELD in table.column_names:
+        error = table.column(POSE_ERROR_FIELD)
+        valid_error = kernels.and_(kernels.is_finite(error), kernels.greater_equal(error, 0))
+        invalid_error = kernels.count_true(
+            kernels.and_(kernels.any_non_null([error]), kernels.invert(valid_error))
+        )
+        if invalid_error:
+            violations.append(
+                Violation(
+                    rule="pose.error.invalid",
+                    detail="a provided pose error estimate must be finite and non-negative",
+                    evidence={"invalid_rows": invalid_error, "rows": table.num_rows},
+                )
+            )
+    return tuple(violations)
+
+
 def check_measurement_class(table: pa.Table) -> tuple[Violation, ...]:
     if "measurement_class" not in table.column_names:
         return ()
@@ -455,6 +544,7 @@ def validate(table: pa.Table, schema: pa.Schema) -> tuple[Violation, ...]:
     violations.extend(check_time_monotonic(table, schema))
     violations.extend(check_measurement_class(table))
     violations.extend(check_payload_completeness(table, schema))
+    violations.extend(check_pose_payload_completeness(table, schema))
     return tuple(violations)
 
 

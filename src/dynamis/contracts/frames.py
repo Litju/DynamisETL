@@ -23,7 +23,7 @@ from dynamis.contracts.base import (
     Quaternion,
     Vec3,
 )
-from dynamis.contracts.enums import AxisDirection, FrameKind, Handedness
+from dynamis.contracts.enums import AxisDirection, FrameKind, Handedness, SkeletonTopology
 from dynamis.contracts.units import assert_si_unit
 
 _QUATERNION_NORM_TOLERANCE = 1e-6
@@ -120,10 +120,23 @@ class SkeletonDefinition(Contract):
 
     Joint indices are meaningless without the skeleton they belong to, so pose
     rows carry ``skeleton_id`` and resolution is always explicit.
+
+    ``topology`` distinguishes the two honest source forms:
+
+    ``tree``
+        the source publishes a parent graph; exactly one root is required and
+        every parent must precede its child. This is the original behaviour and
+        stays the default.
+    ``landmark_set``
+        the source publishes an ordered landmark list without any parent graph
+        (football body-pose landmarks, basketball markerless keypoints). Parent
+        ids must be absent: parentage is unspecified, and inventing an
+        anatomical tree to satisfy the tree form is forbidden.
     """
 
     skeleton_id: Identifier
     name: str = Field(min_length=1)
+    topology: SkeletonTopology = SkeletonTopology.TREE
     joint_count: int = Field(gt=0)
     joints: tuple[JointDefinition, ...] = Field(min_length=1)
     description: str | None = None
@@ -147,12 +160,26 @@ class SkeletonDefinition(Contract):
             names.add(joint.joint_name)
             if joint.parent_joint_id is None:
                 roots += 1
-            elif joint.parent_joint_id >= joint.joint_id:
-                raise ValueError(
-                    f"joint {joint.joint_name!r} must reference an earlier parent joint"
-                )
-        if roots != 1:
+            else:
+                if self.topology is SkeletonTopology.LANDMARK_SET:
+                    raise ValueError(
+                        f"joint {joint.joint_name!r} declares parent "
+                        f"{joint.parent_joint_id}: a landmark_set skeleton has no source "
+                        "parent graph, so parent ids must be absent (never invented)"
+                    )
+                if joint.parent_joint_id >= joint.joint_id:
+                    raise ValueError(
+                        f"joint {joint.joint_name!r} must reference an earlier parent joint"
+                    )
+        if self.topology is SkeletonTopology.TREE and roots != 1:
             raise ValueError(f"skeleton must declare exactly one root joint, found {roots}")
+        if self.topology is SkeletonTopology.LANDMARK_SET and not (
+            self.description and self.description.strip()
+        ):
+            raise ValueError(
+                "a landmark_set skeleton has no source parent graph and requires an explicit "
+                "description documenting what the landmark list is"
+            )
         return self
 
 

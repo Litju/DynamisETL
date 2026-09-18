@@ -508,3 +508,54 @@ def test_skeleton_topology_is_validated() -> None:
                 JointDefinition(joint_id=1, joint_name="a", parent_joint_id=0),
             ),
         )
+
+
+def test_landmark_set_skeleton_declares_no_parent_graph() -> None:
+    from dynamis.contracts import JointDefinition, SkeletonDefinition, SkeletonTopology
+
+    landmarks = (
+        JointDefinition(joint_id=0, joint_name="left_ankle", parent_joint_id=None),
+        JointDefinition(joint_id=1, joint_name="right_ankle", parent_joint_id=None),
+    )
+    skeleton = SkeletonDefinition(
+        skeleton_id="syn-skeleton-landmarks",
+        name="29-landmark body pose",
+        topology=SkeletonTopology.LANDMARK_SET,
+        joint_count=2,
+        joints=landmarks,
+        description="Source publishes an ordered landmark list without a parent graph.",
+    )
+    assert skeleton.topology is SkeletonTopology.LANDMARK_SET
+    assert all(joint.parent_joint_id is None for joint in skeleton.joints)
+
+    # Parent ids must not be fabricated for a landmark set.
+    with pytest.raises(ValidationError, match="landmark_set"):
+        SkeletonDefinition(
+            skeleton_id="s",
+            name="invented tree",
+            topology=SkeletonTopology.LANDMARK_SET,
+            joint_count=2,
+            joints=(
+                JointDefinition(joint_id=0, joint_name="a", parent_joint_id=None),
+                JointDefinition(joint_id=1, joint_name="b", parent_joint_id=0),
+            ),
+            description="documented",
+        )
+    # A landmark set is a deliberate declaration and must be documented.
+    with pytest.raises(ValidationError, match="description"):
+        SkeletonDefinition(
+            skeleton_id="s",
+            name="undocumented landmarks",
+            topology=SkeletonTopology.LANDMARK_SET,
+            joint_count=2,
+            joints=landmarks,
+        )
+    # The tree form still enforces exactly one root and earlier parents.
+    with pytest.raises(ValidationError, match="exactly one root"):
+        SkeletonDefinition(
+            skeleton_id="s",
+            name="two roots",
+            topology=SkeletonTopology.TREE,
+            joint_count=2,
+            joints=landmarks,
+        )

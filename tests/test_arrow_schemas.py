@@ -169,7 +169,7 @@ def test_expected_payload_columns_exist_per_modality() -> None:
         Modality.LPT: {"position_m", "velocity_m_s"},
         Modality.TRACKING: {"object_id", "x_m", "confidence"},
         Modality.EVENT: {"event_id", "event_type", "provider_player_id"},
-        Modality.POSE: {"skeleton_id", "joint_id", "confidence", "error_m"},
+        Modality.POSE: {"skeleton_id", "joint_id", "is_available", "confidence", "error_m"},
     }
     for modality, columns in expectations.items():
         assert columns <= set(get_schema(modality).names)
@@ -227,13 +227,17 @@ def test_event_records_have_no_sampling_rate_concept() -> None:
 # Pinned at RES-103 (commit a165728) before the RES-98 additive contract work.
 # A mismatch means an unrelated modality's schema identity silently changed and
 # every already-materialized Silver artifact for that modality is invalidated.
+# Pose was deliberately re-versioned by RES-99 (landmark-set topology and
+# explicit joint availability), so it carries its own pinned identity below.
 RES103_FINGERPRINTS = {
     Modality.GNSS: "9e6888ce09fc901219cd8876e65e2909822d8f7d40aa7820732f264b437e86bc",
     Modality.LPT: "2ca7c89cbfd39b734e2a0bd96a8015f381df41307328400946955264651980b2",
     Modality.TRACKING: "00670b561c77866de51abe70e705081538c2da8bc877df429b8d5eae39653d90",
     Modality.EVENT: "4ce5b3ddc4f976586b0b918dd859f05d5b6c797bde18acf5daa61f329e252048",
-    Modality.POSE: "52a1b31ec06dcf7b64a8949858d1868085b6a638ed9c8e1957460324255419eb",
 }
+
+#: Pose contract revision 2, pinned the moment RES-99 sealed it.
+POSE_V2_FINGERPRINT = "c9406ad450940e6ca546f7d05e1b13a656cfb2f7339089b33f76cdc31798a880"
 
 
 @pytest.mark.parametrize("modality", list(RES103_FINGERPRINTS))
@@ -242,11 +246,38 @@ def test_untouched_modality_schemas_keep_their_res103_identity(modality: Modalit
     assert schema_version_of(get_schema(modality)) == SCHEMA_VERSION
 
 
+def test_pose_contract_v2_represents_unavailable_joints_honestly() -> None:
+    pose = get_schema(Modality.POSE)
+    assert schema_version_of(pose) == "2"
+    assert schema_fingerprint(pose) == POSE_V2_FINGERPRINT
+
+    availability = pose.field("is_available")
+    assert availability.type == pa.bool_()
+    assert not availability.nullable
+
+    for name in ("x_m", "y_m", "z_m"):
+        field_ = pose.field(name)
+        assert field_.nullable
+        assert nullable_reason_of(field_)
+        assert si_unit_of(field_) == "m"
+        assert axis_of(field_) == name[0]
+
+    parent = pose.field("parent_joint_id")
+    assert parent.nullable
+    assert "landmark_set" in (nullable_reason_of(parent) or "")
+
+    error = pose.field("error_m")
+    assert error.nullable
+    assert "90th-percentile" in (error.metadata or {}).get(b"dynamis.description", b"").decode()
+
+
 def test_revised_contracts_are_versioned_and_additive() -> None:
     # RES-98 added force_z_body_weight_ratio and made accelerometer-only IMU
-    # gyro channels nullable; both contracts carry their own revision.
+    # gyro channels nullable; RES-99 made pose coordinates availability-gated.
+    # Each contract carries its own revision.
     assert schema_version_of(get_schema(Modality.IMU)) == "2"
     assert schema_version_of(get_schema(Modality.FORCE)) == "2"
+    assert schema_version_of(get_schema(Modality.POSE)) == "2"
     imu = get_schema(Modality.IMU)
     assert imu.field("gyro_x_rad_s").nullable
     assert nullable_reason_of(imu.field("gyro_x_rad_s"))

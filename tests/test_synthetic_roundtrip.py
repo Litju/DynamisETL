@@ -336,6 +336,7 @@ def test_pose_skeleton_has_explicit_topology_confidence_and_error() -> None:
         assert [int(item["joint_id"]) for item in block] == [0, 1, 2]
         assert [item["joint_name"] for item in block] == ["pelvis", "knee_right", "ankle_right"]
         assert [item["parent_joint_id"] for item in block] == [None, 0, 1]
+        assert all(item["is_available"] for item in block)
 
     occluded = [row for row in rows if row["is_occluded"]]
     assert occluded, "the fixture must exercise occlusion metadata"
@@ -345,6 +346,26 @@ def test_pose_skeleton_has_explicit_topology_confidence_and_error() -> None:
     for row in rows:
         assert 0.0 <= float(row["confidence"]) <= 1.0
         assert row["x_m"] == 0.0
+
+
+def test_pose_unavailable_joints_carry_null_coordinates_and_are_never_imputed() -> None:
+    fixture = pose_skeleton_trajectory(rate_hz=25.0, frame_count=10, unavailable_pattern=True)
+    rows = fixture.table.to_pylist()
+    unavailable = [row for row in rows if not row["is_available"]]
+    assert unavailable, "the fixture must exercise explicit unavailability"
+    for row in unavailable:
+        assert row["x_m"] is None
+        assert row["y_m"] is None
+        assert row["z_m"] is None
+        assert row["error_m"] is None
+        assert row["is_occluded"] is True
+    observed = [row for row in rows if row["is_available"]]
+    assert observed
+    for row in observed:
+        assert row["x_m"] is not None and row["y_m"] is not None and row["z_m"] is not None
+    from dynamis.quality.checks import check_pose_payload_completeness
+
+    assert check_pose_payload_completeness(fixture.table, fixture.schema) == ()
 
 
 def test_fixtures_cover_every_modality() -> None:

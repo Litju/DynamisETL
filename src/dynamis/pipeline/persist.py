@@ -51,6 +51,8 @@ SAMPLE_ARTIFACT_TABLE = _TABLES["sample_artifact"]
 SENSOR_STREAM_TABLE = _TABLES["sensor_stream"]
 SESSION_TABLE = _TABLES["session"]
 SESSION_PARTICIPANT_TABLE = _TABLES["session_participant"]
+SKELETON_DEFINITION_TABLE = _TABLES["skeleton_definition"]
+SKELETON_JOINT_TABLE = _TABLES["skeleton_joint"]
 SUBJECT_TABLE = _TABLES["subject"]
 SYNC_ALIGNMENT_TABLE = _TABLES["sync_alignment"]
 SYNCHRONIZATION_SPEC_TABLE = _TABLES["synchronization_spec"]
@@ -488,6 +490,38 @@ def persist_domain(connection, domain: ProviderDomain) -> dict[str, int]:
                 "notes": spec.notes,
             }
             for spec in domain.authorities.synchronizations
+        ],
+    )
+    # Skeleton definitions and their joints precede the pose streams that
+    # reference them: a pose stream must never cite an undeclared skeleton, and a
+    # landmark_set skeleton persists its absent parent ids as nulls rather than
+    # fabricating a tree.
+    written["skeleton_definition"] = _upsert(
+        connection,
+        SKELETON_DEFINITION_TABLE,
+        [
+            {
+                "skeleton_id": skeleton.skeleton_id,
+                "name": skeleton.name,
+                "topology": skeleton.topology.value,
+                "joint_count": skeleton.joint_count,
+                "description": skeleton.description,
+            }
+            for skeleton in domain.authorities.skeletons
+        ],
+    )
+    written["skeleton_joint"] = _upsert(
+        connection,
+        SKELETON_JOINT_TABLE,
+        [
+            {
+                "skeleton_id": skeleton.skeleton_id,
+                "joint_id": joint.joint_id,
+                "joint_name": joint.joint_name,
+                "parent_joint_id": joint.parent_joint_id,
+            }
+            for skeleton in domain.authorities.skeletons
+            for joint in skeleton.joints
         ],
     )
     written["sensor_stream"] = _upsert(

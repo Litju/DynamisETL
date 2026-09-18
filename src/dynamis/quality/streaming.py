@@ -32,6 +32,9 @@ from dynamis.quality import arrow_kernels as kernels
 from dynamis.quality.checks import (
     FORCE_BODY_WEIGHT_RATIO_FIELD,
     FORCE_NEWTON_FIELDS,
+    POSE_AVAILABILITY_FIELD,
+    POSE_COORDINATE_FIELDS,
+    POSE_ERROR_FIELD,
     Violation,
     check_schema_conformance,
     check_units,
@@ -68,6 +71,11 @@ class StreamingValidator:
         self._previous_t_rel_ns: int | None = None
         self._first_sample_index: int | None = None
         self._force_payload_fields = force_payload_fields(schema)
+        self._pose_payload = (
+            contract_of(schema) == "pose_joint_sample"
+            and POSE_AVAILABILITY_FIELD in schema.names
+            and all(name in schema.names for name in POSE_COORDINATE_FIELDS)
+        )
         self.t_rel_min_ns: int | None = None
         self.t_rel_max_ns: int | None = None
 
@@ -101,6 +109,7 @@ class StreamingValidator:
         self._observe_authorities(batch)
         self._observe_measurement_class(batch)
         self._observe_payload_completeness(batch)
+        self._observe_pose_payload(batch)
         self._observe_time(batch)
 
     def _observe_identity(self, batch: pa.RecordBatch) -> None:
@@ -197,6 +206,84 @@ class StreamingValidator:
                             "rows_with_both_representations": both_rows,
                             "rows": batch.num_rows,
                         },
+                    )
+                )
+
+    def _observe_pose_payload(self, batch: pa.RecordBatch) -> None:
+        """Availability gates pose coordinates batch by batch (same rules as tables)."""
+        if not self._pose_payload:
+            return
+        names = set(batch.schema.names)
+        availability = batch.column(POSE_AVAILABILITY_FIELD)
+        if availability.null_count:
+            self._violations.append(
+                Violation(
+                    rule="pose.availability.null",
+                    detail="every pose row must declare whether its joint is available",
+                    evidence={"null_rows": availability.null_count, "rows": batch.num_rows},
+                )
+            )
+        observed = kernels.fill_null_false(availability)
+        coordinates = [batch.column(name) for name in POSE_COORDINATE_FIELDS]
+        observed_valid = kernels.all_valid(coordinates)
+        missing_coordinates = kernels.count_true(
+            kernels.and_(observed, kernels.invert(observed_valid))
+        )
+        if missing_coordinates:
+            self._violations.append(
+                Violation(
+                    rule="pose.payload.missing_coordinates",
+                    detail=(
+                        "an available joint must carry finite x/y/z; missing joints are "
+                        "declared unavailable instead of imputed"
+                    ),
+                    evidence={
+                        "rows_without_coordinates": missing_coordinates,
+                        "rows": batch.num_rows,
+                    },
+                )
+            )
+        presented = kernels.any_non_null(coordinates)
+        unavailable_with_coordinates = kernels.count_true(
+            kernels.and_(kernels.invert(observed), presented)
+        )
+        if unavailable_with_coordinates:
+            self._violations.append(
+                Violation(
+                    rule="pose.payload.unexpected_coordinates",
+                    detail="an unavailable joint must not carry coordinates",
+                    evidence={
+                        "rows_with_coordinates": unavailable_with_coordinates,
+                        "rows": batch.num_rows,
+                    },
+                )
+            )
+        finite = kernels.is_finite(coordinates[0])
+        for column in coordinates[1:]:
+            finite = kernels.and_(finite, kernels.is_finite(column))
+        non_finite = kernels.count_true(observed) - kernels.count_true(
+            kernels.and_(observed, finite)
+        )
+        if non_finite:
+            self._violations.append(
+                Violation(
+                    rule="pose.payload.non_finite",
+                    detail="an available joint must carry finite coordinates",
+                    evidence={"non_finite_rows": non_finite, "rows": batch.num_rows},
+                )
+            )
+        if POSE_ERROR_FIELD in names:
+            error = batch.column(POSE_ERROR_FIELD)
+            valid_error = kernels.and_(kernels.is_finite(error), kernels.greater_equal(error, 0))
+            invalid_error = kernels.count_true(
+                kernels.and_(kernels.any_non_null([error]), kernels.invert(valid_error))
+            )
+            if invalid_error:
+                self._violations.append(
+                    Violation(
+                        rule="pose.error.invalid",
+                        detail="a provided pose error estimate must be finite and non-negative",
+                        evidence={"invalid_rows": invalid_error, "rows": batch.num_rows},
                     )
                 )
 

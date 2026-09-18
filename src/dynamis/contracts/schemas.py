@@ -40,9 +40,13 @@ DEFAULT_CONTRACT_SCHEMA_VERSION: Final = SCHEMA_VERSION
 #: so the gyro channels became nullable.
 #: ``force_sample`` 2: dimensionless body-weight-normalized vertical force was
 #: added because a source can distribute normalized force without body mass.
+#: ``pose_joint_sample`` 2: source landmarks are not necessarily a parent tree
+#: (``landmark_set`` skeletons publish no parent graph), individual joints can be
+#: explicitly unavailable, and provider error is not confidence.
 CONTRACT_SCHEMA_VERSIONS: Final[dict[str, str]] = {
     "imu_sample": "2",
     "force_sample": "2",
+    "pose_joint_sample": "2",
 }
 
 SCHEMA_VERSION_KEY: Final = b"dynamis.schema_version"
@@ -950,6 +954,10 @@ POSE_SCHEMA: Final[pa.Schema] = _build(
     subject_required=True,
     coordinate_frame_required=True,
     monotonicity=MONOTONICITY_NON_DECREASING,
+    payload_completeness=(
+        "every pose row declares is_available; is_available=true rows require finite x/y/z; "
+        "is_available=false rows must carry null x/y/z and are never imputed"
+    ),
     payload=[
         _f(
             "skeleton_id",
@@ -973,9 +981,25 @@ POSE_SCHEMA: Final[pa.Schema] = _build(
             "parent_joint_id",
             pa.int32(),
             si_unit="1",
-            description="Parent joint ordinal, resolved from the skeleton authority.",
+            description=(
+                "Parent joint ordinal, resolved from the skeleton authority; null for the "
+                "root of a tree skeleton and for every joint of a landmark_set skeleton "
+                "whose source declares no parent graph."
+            ),
             nullable=True,
-            nullable_reason="The root joint has no parent.",
+            nullable_reason=(
+                "A tree root has no parent, and a landmark_set source publishes no parent "
+                "graph at all; parentage is never invented to fill the column."
+            ),
+        ),
+        _f(
+            "is_available",
+            pa.bool_(),
+            description=(
+                "Source availability of this joint at this frame. False means the source "
+                "reports the joint as unavailable/undetected and the coordinates are null. "
+                "This is availability, not confidence."
+            ),
         ),
         _f(
             "x_m",
@@ -983,6 +1007,11 @@ POSE_SCHEMA: Final[pa.Schema] = _build(
             si_unit="m",
             axis="x",
             description="Joint position along the declared frame X axis.",
+            nullable=True,
+            nullable_reason=(
+                "An explicitly unavailable joint carries no coordinate; available joints "
+                "carry finite coordinates and missing joints are never imputed."
+            ),
         ),
         _f(
             "y_m",
@@ -990,13 +1019,26 @@ POSE_SCHEMA: Final[pa.Schema] = _build(
             si_unit="m",
             axis="y",
             description="Joint position along the declared frame Y axis.",
+            nullable=True,
+            nullable_reason=(
+                "An explicitly unavailable joint carries no coordinate; available joints "
+                "carry finite coordinates and missing joints are never imputed."
+            ),
         ),
         _f(
             "z_m",
             pa.float64(),
             si_unit="m",
             axis="z",
-            description="Joint position along the declared frame Z axis.",
+            description=(
+                "Joint position along the declared frame Z axis. The frame authority "
+                "describes exactly what Z is relative to; it is never reinterpreted."
+            ),
+            nullable=True,
+            nullable_reason=(
+                "An explicitly unavailable joint carries no coordinate; available joints "
+                "carry finite coordinates and missing joints are never imputed."
+            ),
         ),
         _f(
             "confidence",
@@ -1010,7 +1052,11 @@ POSE_SCHEMA: Final[pa.Schema] = _build(
             "error_m",
             pa.float64(),
             si_unit="m",
-            description="Per-joint position uncertainty when the provider quantifies it.",
+            description=(
+                "Provider error estimate for this joint with the provider's own semantics "
+                "(for example a 90th-percentile predicted error radius). Never a "
+                "probability or confidence."
+            ),
             nullable=True,
             nullable_reason="Providers rarely publish per-joint metric error.",
         ),
