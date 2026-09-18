@@ -134,6 +134,20 @@ documented mapping between them is published, so no reduction is fabricated.
   <https://huggingface.co/datasets/SkillCorner/opendata-bodypose>.
 - License **MIT**, matching the repository and dataset card. Keep attribution and
   notices. SkillCorner requests that SkillCorner be credited when the data is used.
+- Accepted slice: match `1925299` only — match metadata and 10 Hz tracking from
+  the GitHub revision `4340d274572876239c154c90bc507a9b3250a656` (tracking is
+  Git LFS; the resolver follows the pointer through
+  `media.githubusercontent.com`), and the 25 Hz body-pose archive from the
+  Hugging Face revision `a62e1ec1e3b82952042a7f7fa9dafd77c0e0822a`. The pose
+  archive is streamed directly from its ZIP member; the ~3.3 GB plaintext file is
+  never expanded. Bronze manifests and reconciliation receipts keep the license
+  notice.
+- Pose semantics preserved, not reinterpreted: 29 landmarks at 25 fps with
+  `pose_frame = 2.5 * tracking_frame`; `p90_mae_cm` becomes `error_m` with the
+  90th-percentile predicted-error-radius meaning; X/Y are pitch-global while Z is
+  accurate relative to the player centroid and is **not** registered in the pitch
+  coordinate system, so it is never presented as absolute player height; frame
+  Y/Z disagreements are measured at documented coincidences and never corrected.
 
 ### `spl-open-data`
 
@@ -147,13 +161,22 @@ documented mapping between them is published, so no reduction is fabricated.
   analysis firm is forbidden to use SPL Open Data for any use whatsoever without a
   specific written commercial (paid) license. This restriction is SPL's own; it is
   quoted here from the pinned `LICENSE` and is not copied from OpenBiomechanics.
+- Accepted slice (declared, not yet acquired): the first trial of participant
+  `P0001` from each acquisition generation —
+  `basketball/freethrow/data/2024-08-28/P0001/BB_FT_P0001_T0001.json` (30 fps)
+  and `basketball/freethrow/data/2025-12-18/P0001/BB_FT_P0001_T0001.json`
+  (60 fps). Participant ids are consistent across sessions, keypoint availability
+  is session-specific, and coordinates are converted from feet to metres with the
+  exact `0.3048` factor; null/absent keypoints stay explicit and no parent graph
+  is invented.
 - Acquisition **fails closed**: `dynamis-fetch spl-open-data` refuses to plan or
   fetch until the operator passes
   `--acknowledge-spl-license-restrictions`. The acknowledgement records that the
   operator has read the restriction; it does not assert legal eligibility, does
   not override the NC/SA obligations, and eligibility remains the operator's
   responsibility. The acknowledgement is source-specific so it cannot silently
-  satisfy any unrelated future license.
+  satisfy any unrelated future license. No real SPL file is acquired by this
+  repository's CI or verification runs.
 
 ### `tackle-workload`
 

@@ -83,6 +83,33 @@ def assert_local_only_boundary(settings: Settings, dataset_id: str) -> None:
     assert_dataset_root_outside_repository(source, settings.dataset_root)
 
 
+def license_notice(dataset_id: str, version: str) -> dict[str, Any]:
+    """Rights and attribution facts that must survive into derived receipts."""
+    from dynamis.registry import source_by_id, validate_registry
+
+    source = source_by_id(validate_registry(), dataset_id)
+    try:
+        citation = source.version(version).citation
+    except KeyError:
+        # A non-registry version (synthetic/structural test input) has no pinned
+        # registry metadata to cite; the license facts still survive.
+        citation = None
+    return {
+        "identifier": source.license.identifier,
+        "status": source.license.status.value,
+        "attribution_required": source.license.attribution_required,
+        "noncommercial_only": source.license.noncommercial_only,
+        "share_alike": source.license.share_alike,
+        "restrictions": list(source.license.restrictions),
+        "citation": citation,
+        "upstream_urls": [str(url) for url in source.upstream_urls],
+        "notice": (
+            "source data and derivatives stay outside Git; this receipt preserves the "
+            "license notice for the derived artifacts it describes"
+        ),
+    }
+
+
 WORKBOOK_KEY_J01 = "J01.xlsx"
 
 
@@ -893,6 +920,7 @@ def ingest_skillcorner_match(
             },
             "quarantine_by_rule": sink.counts,
             "landmark_order": list(POSE_LANDMARKS),
+            "license": license_notice(SKILLCORNER_DATASET_ID, version),
         },
         silver_artifacts=tuple(result.to_dict() for result in results),
         quarantine_artifacts=quarantine_artifacts,
@@ -1037,6 +1065,7 @@ def ingest_spl_trials(
                 }
                 for skeleton in adapter.source_authorities().skeletons
             ],
+            "license": license_notice(SPL_DATASET_ID, version),
         },
         silver_artifacts=tuple(result.to_dict() for result in results),
         quarantine_artifacts=quarantine_artifacts,
