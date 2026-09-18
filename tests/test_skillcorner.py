@@ -212,6 +212,36 @@ def test_pose_quarantines_malformed_landmark_mappings(tmp_path: Path, tmp_settin
     assert any("invented" in detail for detail in details)
 
 
+def test_pose_quarantines_posed_frames_outside_declared_periods(
+    tmp_path: Path,
+) -> None:
+    import json
+    import zipfile
+
+    import synthetic_skillcorner as synth
+    from dynamis.adapters.skillcorner.metadata import parse_match_metadata
+    from dynamis.adapters.skillcorner.pose import PoseCanonicalizer
+
+    match_json = synth.write_match_json(tmp_path / "9000001_match.json")
+    payload = synth.pose_frame(0, period=1)
+    payload["period"] = None
+    payload["player_data"][0]["joints"] = ["not", "a", "mapping"]
+    payload["player_data"][1]["joints"] = synth.joints_for(player_id=102, frame=0)
+    zip_path = tmp_path / "9000001.jsonl.zip"
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("9000001.jsonl", json.dumps(payload) + "\n")
+
+    canonicalizer = PoseCanonicalizer(zip_path, parse_match_metadata(match_json))
+    stream = canonicalizer.stream(1)
+    assert list(stream.batches) == []
+    summary = canonicalizer.summary(1)
+    # One malformed container (29 authority slots) + one 29-joint mapping.
+    assert summary.declared_joint_records == 58
+    assert summary.malformed_joints == 58
+    assert summary.canonical_rows == 0
+    assert len(summary.quarantined) == 2
+
+
 def test_ingest_never_regenerates_plaintext_and_is_deterministic(
     tmp_settings, bundle: dict[str, Path]
 ) -> None:

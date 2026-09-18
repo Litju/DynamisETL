@@ -271,8 +271,12 @@ class PoseCanonicalizer:
                             for player in players:
                                 if not isinstance(player, dict) or player.get("joints") is None:
                                     continue
-                                summary.declared_joint_records += len(player["joints"])
-                                summary.malformed_joints += len(player["joints"])
+                                joints = player["joints"]
+                                declared = (
+                                    len(joints) if isinstance(joints, dict) else _LANDMARK_COUNT
+                                )
+                                summary.declared_joint_records += declared
+                                summary.malformed_joints += declared
                                 self._quarantine(
                                     summary,
                                     rule=RULE_SCHEMA_FAILURE,
