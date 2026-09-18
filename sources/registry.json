@@ -272,7 +272,8 @@
         "restrictions": [
           "Non-commercial use only.",
           "Attribution required.",
-          "Share-alike applies to data derivatives."
+          "Share-alike applies to data derivatives.",
+          "Additional role-dependent exclusion at pinned revision a3f9cffbde917b1e1747cedd6ec25dfab18c6051 (SPL's own LICENSE): any employee or contractor employed by, associated with, or a significant shareholder of a professional sports organization or financial analysis firm is forbidden to use SPL Open Data for any use whatsoever without a specific written commercial (paid) license."
         ]
       },
       "versions": [

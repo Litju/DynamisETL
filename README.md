@@ -181,9 +181,14 @@ licenses and are **never committed to Git**. `sources/registry.json` is the
 machine-readable authority; [`DATA_SOURCES.md`](DATA_SOURCES.md) is the
 human-readable notice, and a test enforces agreement between them.
 
-Unclear-rights sources stay local-only, and the OpenBiomechanics
+Unclear-rights sources stay local-only. The OpenBiomechanics
 professional-sports-organization / financial-analysis exclusion is preserved
-verbatim. NC/SA data stay outside the code license boundary.
+verbatim, and **SPL Open Data carries its own role-dependent exclusion** from its
+`LICENSE` at the pinned revision (employees/contractors/associates/significant
+shareholders of professional sports organizations or financial analysis firms
+need a specific written commercial license); SPL acquisition fails closed until
+the operator passes `--acknowledge-spl-license-restrictions`. NC/SA data stay
+outside the code license boundary.
 
 ## Out of scope so far
 

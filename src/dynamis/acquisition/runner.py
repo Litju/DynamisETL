@@ -11,7 +11,7 @@ recorded as a new verification event (``verified_at``).
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -27,7 +27,12 @@ from dynamis.acquisition.download import (
 from dynamis.acquisition.plan import AcquisitionPlan, PlannedFile
 from dynamis.config import Settings
 from dynamis.contracts import DatasetRegistry
-from dynamis.registry import RegistryError, source_by_id, validate_registry
+from dynamis.registry import (
+    RegistryError,
+    assert_acquisition_acknowledged,
+    source_by_id,
+    validate_registry,
+)
 from dynamis.rights import assert_dataset_root_outside_repository
 from dynamis.storage.atomic import atomic_write_text
 from dynamis.storage.manifest import (
@@ -210,12 +215,15 @@ def acquire(
     session: requests.Session | None = None,
     registry: DatasetRegistry | None = None,
     allow_insecure: bool = False,
+    acknowledgements: Collection[str] = (),
     now: Callable[[], datetime] = lambda: datetime.now(UTC),
 ) -> AcquisitionReceipt:
     """Fetch every planned file into immutable Bronze and verify the manifest.
 
-    ``allow_insecure`` exists for loopback test servers only; production
-    provider URLs are always required to be HTTPS.
+    ``acknowledgements`` re-checks the source-specific eligibility gate so a
+    programmatic caller cannot bypass the planner; ``allow_insecure`` exists for
+    loopback test servers only, and production provider URLs are always required
+    to be HTTPS.
 
     One deterministic run instant is captured up front and reused for every
     file, so a run has a single, reproducible acquisition/verification stamp.
@@ -234,6 +242,7 @@ def acquire(
             f"registry has no dataset {plan.dataset_id!r}; the plan was not built from "
             "this registry"
         ) from exc
+    assert_acquisition_acknowledged(source, acknowledgements)
     assert_dataset_root_outside_repository(source, settings.dataset_root)
     ensure_dataset_layout(settings)
     run_at = now()

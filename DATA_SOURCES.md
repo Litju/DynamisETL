@@ -25,7 +25,7 @@ unclear-rights data stay outside the code license boundary.
 | `gymaware-landmine-vision` | Zenodo | CC-BY-4.0 | conditional | LPT/VBT + video agreement |
 | `dfl-sportec-idsse` | Hugging Face (pysport) | CC-BY-4.0 | conditional | Elite optical tracking + synchronized events |
 | `skillcorner-opendata` | SkillCorner / PySport | MIT | conditional | Broadcast tracking/events/phases + football 3D pose |
-| `spl-open-data` | MLSE Sport Performance Lab | CC-BY-NC-SA-4.0 | conditional | Markerless sports 3D kinematics |
+| `spl-open-data` | MLSE Sport Performance Lab | CC-BY-NC-SA-4.0 (+ role-dependent exclusion) | conditional | Markerless sports 3D kinematics |
 | `tackle-workload` | Zenodo | unclear | prohibited (local-only) | Optional longitudinal workload extension |
 | `openbiomechanics` | Driveline Baseball R&D | CC-BY-NC-SA-4.0 (+ additional exclusion) | conditional | Optional force/mocap/high-performance validation |
 
@@ -119,12 +119,23 @@ is fetched to inspect rights.
 
 ### `spl-open-data`
 
-- <https://github.com/Sport-Performance-Lab/SPL-Open-Data>.
+- <https://github.com/Sport-Performance-Lab/SPL-Open-Data>, pinned revision
+  `a3f9cffbde917b1e1747cedd6ec25dfab18c6051`.
 - License **CC BY-NC-SA 4.0**: non-commercial use only, attribution required, and
   **share-alike applies to data derivatives**.
-- Note: this source is governed **only** by CC BY-NC-SA 4.0. The OpenBiomechanics
-  professional-sports-organization / financial-analysis exclusion does **not**
-  apply here and must not be attached to SPL Open Data.
+- **Additional role-dependent exclusion, present in SPL's own `LICENSE` at the
+  pinned revision:** any employee or contractor employed by, associated with, or a
+  significant shareholder of a professional sports organization or financial
+  analysis firm is forbidden to use SPL Open Data for any use whatsoever without a
+  specific written commercial (paid) license. This restriction is SPL's own; it is
+  quoted here from the pinned `LICENSE` and is not copied from OpenBiomechanics.
+- Acquisition **fails closed**: `dynamis-fetch spl-open-data` refuses to plan or
+  fetch until the operator passes
+  `--acknowledge-spl-license-restrictions`. The acknowledgement records that the
+  operator has read the restriction; it does not assert legal eligibility, does
+  not override the NC/SA obligations, and eligibility remains the operator's
+  responsibility. The acknowledgement is source-specific so it cannot silently
+  satisfy any unrelated future license.
 
 ### `tackle-workload`
 

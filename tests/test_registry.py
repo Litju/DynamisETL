@@ -81,18 +81,6 @@ def test_res104_promotes_white_and_gymaware_to_declared_cc_by() -> None:
         assert "rendered" in text
 
 
-def test_spl_license_excludes_the_openbiomechanics_exclusion() -> None:
-    registry = validate_registry()
-    spl = source_by_id(registry, "spl-open-data")
-    assert spl.license.identifier == "CC-BY-NC-SA-4.0"
-    assert spl.license.noncommercial_only
-    assert spl.license.share_alike
-    text = " ".join(spl.license.restrictions).lower()
-    assert "share-alike" in text
-    assert "professional sports organization" not in text
-    assert "financial analysis" not in text
-
-
 def test_openbiomechanics_keeps_its_additional_exclusion() -> None:
     registry = validate_registry()
     obp = source_by_id(registry, "openbiomechanics")
@@ -157,28 +145,6 @@ def test_dfl_pinned_revision_declares_verified_upstream_identities() -> None:
     # manifest under DYNAMIS_DATASET_ROOT.
     assert version.retrieval.status.value == "not_fetched"
     assert all(item.local_sha256 is None for item in version.retrieval.files)
-
-
-def test_audit_detects_a_tampered_spl_policy() -> None:
-    registry = validate_registry()
-    spl = source_by_id(registry, "spl-open-data")
-    tampered_policy = LicensePolicy(
-        identifier="CC-BY-NC-SA-4.0",
-        status=spl.license.status,
-        attribution_required=True,
-        noncommercial_only=True,
-        share_alike=True,
-        redistribution=spl.license.redistribution,
-        local_only=False,
-        restrictions=(
-            "Non-commercial use only.",
-            "Share-alike applies to data derivatives.",
-            "Professional sports organization employees are forbidden any use.",
-        ),
-    )
-    tampered = DatasetSource.model_copy(spl, update={"license": tampered_policy})
-    problems = audit_registry(DatasetRegistry.model_copy(registry, update={"sources": (tampered,)}))
-    assert any("must not be attached to SPL" in problem for problem in problems)
 
 
 def test_audit_detects_missing_openbiomechanics_exclusion() -> None:
