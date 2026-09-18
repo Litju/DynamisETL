@@ -1,0 +1,89 @@
+version: 2
+
+models:
+  - name: stg_derived_metric_current
+    description: Latest computed revision per scientific metric identity.
+    columns:
+      - name: derived_metric_id
+        tests:
+          - unique
+          - not_null
+      - name: metric_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_metric_definition')
+              field: metric_id
+      - name: run_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_processing_run')
+              field: run_id
+      - name: measurement_class
+        tests:
+          - not_null
+          - accepted_values:
+              values: ["SOURCE_DERIVED", "PIPELINE_DERIVED", "MODEL_ESTIMATED"]
+
+  - name: gold_trial_metrics
+    description: Curated scalar metrics with full identity and provenance keys.
+    columns:
+      - name: derived_metric_id
+        tests:
+          - unique
+          - not_null
+      - name: dataset_id
+        tests:
+          - not_null
+      - name: run_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_processing_run')
+              field: run_id
+      - name: measurement_class
+        tests:
+          - accepted_values:
+              values: ["SOURCE_DERIVED", "PIPELINE_DERIVED", "MODEL_ESTIMATED"]
+
+  - name: gold_session_player_load
+    description: Aggregated locomotor load per session/subject/entity.
+    columns:
+      - name: dataset_id
+        tests:
+          - not_null
+      - name: algorithm_id
+        tests:
+          - not_null
+
+  - name: gold_cmj_metrics
+    description: CMJ trial metrics pivoted from versioned processor output.
+    columns:
+      - name: dataset_id
+        tests:
+          - not_null
+      - name: run_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_processing_run')
+              field: run_id
+
+  - name: gold_pose_kinematics_summary
+    description: Pose geometry availability/quality summary.
+    columns:
+      - name: dataset_id
+        tests:
+          - not_null
+
+  - name: gold_processing_provenance
+    description: Full provenance chain per currently served processing run.
+    columns:
+      - name: run_id
+        tests:
+          - unique
+          - not_null
+      - name: algorithm_id
+        tests:
+          - not_null

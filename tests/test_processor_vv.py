@@ -26,6 +26,7 @@ from dynamis.processors.locomotor import (
 from dynamis.processors.pose import process_pose
 from dynamis.processors.signals import (
     EDGE_ONE_SIDED_FIRST_ORDER,
+    EffortParameters,
     SpeedZone,
     cumulative_trapezoid,
     derivative,
@@ -376,16 +377,12 @@ def test_effort_duration_matches_the_constructed_span(speed: float, duration_s: 
     distance_step = np.concatenate(([0.0], values[1:] * step_s))
     times = np.arange(values.size) * step_s
     durations = np.full(values.size, step_s)
-    parameters = type(
-        "P",
-        (),
-        {
-            "threshold_m_s": speed * 0.8,
-            "min_duration_s": 0.3,
-            "merge_gap_s": 0.0,
-            "hysteresis_m_s": 0.0,
-        },
-    )()
+    parameters = EffortParameters(
+        threshold_m_s=speed * 0.8,
+        min_duration_s=0.3,
+        merge_gap_s=0.0,
+        hysteresis_m_s=0.0,
+    )
     efforts = effort_segments(
         values, distance_step, times_s=times, sample_duration_s=durations, parameters=parameters
     )
