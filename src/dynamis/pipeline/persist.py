@@ -178,6 +178,34 @@ def _alignment_rows(domain: ProviderDomain) -> list[dict[str, Any]]:
     return rows
 
 
+def _update_source(connection, table: Table, row: dict[str, Any]) -> int:
+    """Upsert one registry source so its rights authority tracks the registry.
+
+    ``dataset_source`` is a mirror of registry authority, not immutable
+    evidence: when a license is clarified or a scope is corrected, a rerun must
+    converge the control-plane link to the current policy instead of leaving the
+    source bound to a stale one. Policy rows stay content-addressed, so the
+    superseded policy remains auditable.
+    """
+    statement = pg_insert(table).values([row])
+    statement = statement.on_conflict_do_update(
+        index_elements=["dataset_id"],
+        set_={
+            "name": statement.excluded.name,
+            "provider": statement.excluded.provider,
+            "upstream_urls": statement.excluded.upstream_urls,
+            "doi": statement.excluded.doi,
+            "domain": statement.excluded.domain,
+            "adapter_id": statement.excluded.adapter_id,
+            "v1_role": statement.excluded.v1_role,
+            "initial_scope": statement.excluded.initial_scope,
+            "license_policy_id": statement.excluded.license_policy_id,
+        },
+    )
+    result = connection.execute(statement)
+    return int(result.rowcount if result.rowcount and result.rowcount > 0 else 1)
+
+
 def _update_run(connection, table: Table, row: dict[str, Any]) -> int:
     """Upsert one processing run so a re-run refreshes its state."""
     statement = pg_insert(table).values([row])
@@ -241,23 +269,21 @@ def persist_source(connection, source: DatasetSource) -> dict[str, int]:
             }
         ],
     )
-    written["dataset_source"] = _upsert(
+    written["dataset_source"] = _update_source(
         connection,
         DATASET_SOURCE_TABLE,
-        [
-            {
-                "dataset_id": source.dataset_id,
-                "name": source.name,
-                "provider": source.provider,
-                "upstream_urls": [str(url) for url in source.upstream_urls],
-                "doi": source.doi,
-                "domain": source.domain,
-                "adapter_id": source.adapter_id,
-                "v1_role": source.v1_role,
-                "initial_scope": source.initial_scope,
-                "license_policy_id": source.license.policy_id,
-            }
-        ],
+        {
+            "dataset_id": source.dataset_id,
+            "name": source.name,
+            "provider": source.provider,
+            "upstream_urls": [str(url) for url in source.upstream_urls],
+            "doi": source.doi,
+            "domain": source.domain,
+            "adapter_id": source.adapter_id,
+            "v1_role": source.v1_role,
+            "initial_scope": source.initial_scope,
+            "license_policy_id": source.license.policy_id,
+        },
     )
     written["dataset_source_modality"] = _upsert(
         connection,
