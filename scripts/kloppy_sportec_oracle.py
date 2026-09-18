@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from collections.abc import Sequence
 from datetime import UTC, datetime
@@ -59,11 +60,16 @@ DEFAULT_TOLERANCE_M = 1e-9
 PINNED_KLOPPY_VERSION = "3.19.0"
 
 
-def _key_for(manifest: BronzeManifest, token: str) -> str:
-    key = next((item.key for item in manifest.files if token in item.key), None)
-    if key is None:
-        raise SystemExit(f"no Bronze file matches {token!r} in {DATASET_ID}")
-    return key
+def _key_for(manifest: BronzeManifest, token: str, match: str) -> str:
+    """Exactly one Bronze key must carry both the match token and the file kind."""
+    keys = [item.key for item in manifest.files if token in item.key and match in item.key]
+    if not keys:
+        raise SystemExit(f"no Bronze file matches {token!r} and match {match!r} in {DATASET_ID}")
+    if len(keys) > 1:
+        raise SystemExit(
+            f"ambiguous Bronze selection for {token!r} and match {match!r}: {sorted(keys)}"
+        )
+    return keys[0]
 
 
 def _dynamisetl_event_points(adapter: IdsseMatchAdapter) -> dict[str, tuple[float, float]]:
@@ -137,7 +143,10 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    args = _build_parser().parse_args(argv)
+    parser = _build_parser()
+    args = parser.parse_args(argv)
+    if not math.isfinite(args.tolerance_m) or args.tolerance_m < 0:
+        parser.error("--tolerance-m must be a finite, non-negative number")
     try:
         import kloppy
     except ImportError:
@@ -156,6 +165,18 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     resolved = settings()
     manifest = read_bronze_manifest(resolved, dataset_id=DATASET_ID, version=args.version)
+    events_key = _key_for(manifest, "_events_", args.match)
+    information_key = _key_for(manifest, "_matchinformation_", args.match)
+    selected = {
+        item.key: item for item in manifest.files if item.key in {events_key, information_key}
+    }
+    unhashed = sorted(key for key, item in selected.items() if item.local_sha256 is None)
+    if unhashed:
+        print(
+            f"selected Bronze files carry no recorded local SHA-256: {unhashed}",
+            file=sys.stderr,
+        )
+        return 2
     verification = verify_manifest(resolved, manifest)
     if not verification.ok:
         print(
@@ -166,8 +187,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 2
 
-    events_key = _key_for(manifest, "_events_")
-    information_key = _key_for(manifest, "_matchinformation_")
     events_path = bronze_native_path(
         resolved, dataset_id=DATASET_ID, version=args.version, key=events_key
     )

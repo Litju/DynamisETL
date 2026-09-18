@@ -186,16 +186,26 @@ def record_retrieval(
 
     ``retrieved_at`` is the acquisition instant of this run: it is recorded only
     for a file that has never been retrieved, so an ``already_present``
-    verification can never rewrite the first-entry timestamp.
-    ``verified_at`` (defaulting to ``retrieved_at``) is the re-validation instant
-    of this run and is recorded for every file this run touched. The manifest's
-    own timestamps are the deterministic earliest/latest derived from its files.
+    verification can never rewrite the first-entry timestamp. A manifest that
+    carries *only* a manifest-level instant (no per-file facts at all, as a
+    schema-1 document may) lends that recorded fact to its files; once any
+    concrete per-file fact exists the manifest value is the earliest among other
+    files and is never copied onto a different file. ``verified_at`` (defaulting
+    to ``retrieved_at``) is the re-validation instant of this run and is recorded
+    for every file this run touched. The manifest's own timestamps are the
+    deterministic earliest/latest derived from its files.
     """
     if retrieved_at.tzinfo is None:
         raise ValueError("retrieved_at must be timezone-aware")
     if verified_at is not None and verified_at.tzinfo is None:
         raise ValueError("verified_at must be timezone-aware")
     verification_time = verified_at if verified_at is not None else retrieved_at
+    manifest_fallback = (
+        manifest.retrieved_at
+        if manifest.retrieved_at is not None
+        and not any(item.retrieved_at is not None for item in manifest.files)
+        else None
+    )
     updated: list[BronzeFile] = []
     for item in manifest.files:
         if only_keys and item.key not in only_keys:
@@ -215,7 +225,7 @@ def record_retrieval(
                 update={
                     "local_sha256": sha256_file(path),
                     "size_bytes": path.stat().st_size,
-                    "retrieved_at": item.retrieved_at or retrieved_at,
+                    "retrieved_at": item.retrieved_at or manifest_fallback or retrieved_at,
                     "verified_at": verification_time,
                 }
             )

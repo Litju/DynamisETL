@@ -218,9 +218,13 @@ def acquire(
 
     One deterministic run instant is captured up front and reused for every
     file, so a run has a single, reproducible acquisition/verification stamp.
+    The existing manifest is loaded (and schema-validated) before any byte is
+    promoted, so an unreadable manifest can never leave a freshly downloaded
+    immutable file without its manifest update.
     """
     ensure_dataset_layout(settings)
     run_at = now()
+    manifest = _load_or_expect(settings, plan, registry)
     owns_session = session is None
     http = session if session is not None else requests.Session()
     http.headers.setdefault("User-Agent", USER_AGENT)
@@ -290,7 +294,6 @@ def acquire(
         if owns_session:
             http.close()
 
-    manifest = _load_or_expect(settings, plan, registry)
     manifest = _stamp_upstream_urls(manifest, {item.key: item.url for item in plan.files})
     stamped = record_retrieval(
         settings,
@@ -332,6 +335,11 @@ def acquire(
         )
         for item in outcomes
     )
+    # Receipt-level acquisition provenance is the earliest first-entry instant
+    # of the selected file set (never a manifest-wide value from unrelated keys).
+    selection_retrievals = [
+        item.retrieved_at for item in final_outcomes if item.retrieved_at is not None
+    ]
     receipt = AcquisitionReceipt(
         dataset_id=plan.dataset_id,
         version=plan.version,
@@ -340,7 +348,7 @@ def acquire(
         license_local_only=plan.license_local_only,
         attribution_required=plan.attribution_required,
         citation=plan.citation,
-        retrieved_at=stamped.retrieved_at if stamped.retrieved_at is not None else run_at,
+        retrieved_at=min(selection_retrievals) if selection_retrievals else run_at,
         verified_at=run_at,
         retrieval_performed=any(item.action == ACTION_DOWNLOADED for item in final_outcomes),
         outcomes=final_outcomes,

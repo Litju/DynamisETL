@@ -15,6 +15,8 @@ from dynamis.registry import source_by_id, validate_registry
 from dynamis.storage.atomic import sha256_bytes, sha256_file
 from dynamis.storage.duckdb import connect, null_counts, observe_parquet, query
 from dynamis.storage.manifest import (
+    BronzeFile,
+    BronzeManifest,
     manifest_from_registry,
     read_bronze_manifest,
     record_retrieval,
@@ -340,6 +342,36 @@ def test_v1_manifest_document_loads_without_verification_field(tmp_settings: Set
     assert loaded.retrieved_at == datetime(2026, 9, 17, 21, 29, 24, 58121, tzinfo=UTC)
     assert loaded.files[0].retrieved_at == datetime(2026, 9, 17, 21, 29, 24, 58121, tzinfo=UTC)
     assert loaded.files[0].verified_at is None
+
+
+def test_record_retrieval_inherits_manifest_instant_when_file_lacks_one(
+    tmp_settings: Settings,
+) -> None:
+    """A schema-1 manifest may record only a manifest-level acquisition instant."""
+    registry = validate_registry()
+    source = source_by_id(registry, "tackle-workload")
+    version = source.versions[0]
+    key = version.retrieval.files[0].key
+    target = bronze_native_path(
+        tmp_settings, dataset_id=source.dataset_id, version=version.version, key=key
+    )
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(b"c" * 8)
+    manifest = BronzeManifest(
+        schema_version="1",
+        dataset_id=source.dataset_id,
+        version=version.version,
+        upstream_url=str(version.upstream_url),
+        retrieved_at=datetime(2025, 5, 5, 8, 0, tzinfo=UTC),
+        files=(BronzeFile(key=key, size_bytes=8),),
+    )
+    stamped = record_retrieval(
+        tmp_settings, manifest, retrieved_at=datetime(2026, 9, 17, tzinfo=UTC)
+    )
+    # The manifest-level recorded fact beats the run instant for first entry.
+    assert stamped.files[0].retrieved_at == datetime(2025, 5, 5, 8, 0, tzinfo=UTC)
+    assert stamped.files[0].verified_at == datetime(2026, 9, 17, tzinfo=UTC)
+    assert stamped.retrieved_at == datetime(2025, 5, 5, 8, 0, tzinfo=UTC)
 
 
 def test_parquet_write_accepts_plain_tables(tmp_settings: Settings) -> None:

@@ -59,9 +59,10 @@ PAYLOAD = b"dynamis-acquisition-payload-0123456789" * 64
 PAYLOAD_MD5 = hashlib.md5(PAYLOAD).hexdigest()
 PAYLOAD_SHA256 = hashlib.sha256(PAYLOAD).hexdigest()
 
-#: Deterministic acquisition (T1) and verification (T2) instants.
+#: Deterministic acquisition (T1, T2) and verification (T3) instants.
 T1 = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
 T2 = datetime(2026, 2, 2, 13, 30, tzinfo=UTC)
+T3 = datetime(2026, 3, 3, 10, 15, tzinfo=UTC)
 
 
 # ---------------------------------------------------------------------------
@@ -721,6 +722,27 @@ def test_partial_acquisition_preserves_earlier_provenance(
     assert manifest.retrieved_at == T1
     assert manifest.verified_at == T2
 
+    # A run whose selection excludes the earlier file reports the selected
+    # set's own earliest acquisition instant, not the manifest-wide minimum.
+    plan_b = _plan(
+        (_planned_file("b.bin", f"{local_server.base_url}/b", remote=PAYLOAD + b"-second"),)
+    )
+    third = acquire(
+        tmp_settings,
+        plan_b,
+        session=_session(),
+        registry=registry,
+        allow_insecure=True,
+        now=lambda: T3,
+    )
+    assert third.already_present == ("b.bin",)
+    assert third.retrieved_at == T2
+    assert third.verified_at == T3
+    assert (
+        read_bronze_manifest(tmp_settings, dataset_id="syn-provider", version="v1").retrieved_at
+        == T1
+    )
+
 
 def test_v1_manifest_stays_readable_and_upgrades_without_reinterpreting_history(
     tmp_settings: Settings, local_server
@@ -793,6 +815,28 @@ def test_v1_manifest_stays_readable_and_upgrades_without_reinterpreting_history(
     legacy_path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(ValidationError, match="unsupported Bronze manifest schema_version"):
         read_bronze_manifest(tmp_settings, dataset_id="syn-provider", version="v1")
+
+
+def test_unreadable_manifest_blocks_any_bronze_promotion(
+    tmp_settings: Settings, local_server
+) -> None:
+    """A manifest that cannot be loaded must fail before bytes are promoted."""
+    local_server.state.routes["/file"] = Route(body=PAYLOAD)
+    key = "payload.bin"
+    registry = synthetic_registry(
+        files=(RetrievalFile(key=key, size_bytes=len(PAYLOAD), sha256=PAYLOAD_SHA256),)
+    )
+    manifest_path = bronze_manifest_path(tmp_settings, dataset_id="syn-provider", version="v1")
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text('{"schema_version": "99"}\n', encoding="utf-8")
+
+    plan = _plan((_planned_file(key, f"{local_server.base_url}/file"),))
+    with pytest.raises(ValidationError):
+        acquire(tmp_settings, plan, session=_session(), registry=registry, allow_insecure=True)
+    final = bronze_native_path(tmp_settings, dataset_id="syn-provider", version="v1", key=key)
+    assert not final.exists()
+    assert not (final.parent / (final.name + ".partial")).exists()
+    assert local_server.state.hits["/file"] == 0
 
 
 def test_receipt_is_written_outside_the_repository_without_absolute_paths(

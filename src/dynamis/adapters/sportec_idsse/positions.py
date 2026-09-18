@@ -40,7 +40,7 @@ import math
 import shutil
 from collections import Counter
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -103,13 +103,15 @@ class SectionSummary:
     frame_entity_observations: int = 0
     canonical_rows: int = 0
     ball_object_id: str | None = None
+    #: Distinct source frame numbers seen in this section, recorded from the
+    #: parsed counter before any coordinate validation. O(distinct ticks), which
+    #: stays far below the observation count for a multi-entity stream.
+    frame_numbers: set[int] = field(default_factory=set)
 
     @property
     def distinct_frame_ticks(self) -> int:
-        """Temporal frame ticks covered by this section (contiguous counter)."""
-        if self.frame_first == 0 and self.frame_last == 0:
-            return 0
-        return self.frame_last - self.frame_first + 1
+        """Distinct temporal frame ticks observed by the provider in this section."""
+        return len(self.frame_numbers)
 
 
 @dataclass(frozen=True, slots=True)
@@ -341,6 +343,9 @@ class PositionsCanonicalizer:
             return None, quarantine(
                 RULE_REQUIRED_FIELD_NULL, "Frame N is not an integer", {"N": n_raw}
             )
+        # The tick exists in the source even when the row is quarantined, so the
+        # distinct-tick evidence is recorded before any coordinate validation.
+        self._summaries[spill.section].frame_numbers.add(frame)
         if time_raw is None:
             return None, quarantine(RULE_REQUIRED_FIELD_NULL, "Frame has no T", {"N": frame})
         parsed = _parse_utc(time_raw)
@@ -557,10 +562,10 @@ def _entity_rows(reader: ipc.RecordBatchReader) -> Iterator[tuple[Any, ...]]:
 
 def _batch_from_rows(rows: list[tuple[Any, ...]], *, start: int) -> pa.RecordBatch:
     columns = []
-    for position, field in enumerate(TRACKING_SCHEMA):
-        if field.name == "sample_index":
+    for position, schema_field in enumerate(TRACKING_SCHEMA):
+        if schema_field.name == "sample_index":
             values: list[Any] = list(range(start, start + len(rows)))
         else:
             values = [row[position] for row in rows]
-        columns.append(pa.array(values, type=field.type))
+        columns.append(pa.array(values, type=schema_field.type))
     return pa.RecordBatch.from_arrays(columns, schema=TRACKING_SCHEMA)

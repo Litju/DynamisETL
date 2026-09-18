@@ -228,7 +228,10 @@ def persist_bronze_state(
                     DATASET_VERSION_FILE_TABLE.c.version == version,
                     DATASET_VERSION_FILE_TABLE.c.key == item.key,
                 )
-                .values(local_sha256=item.local_sha256, retrieved_at=item.retrieved_at)
+                .values(
+                    local_sha256=item.local_sha256,
+                    retrieved_at=item.retrieved_at or manifest.retrieved_at,
+                )
             )
     return tuple(item.local_sha256 or "" for item in retrieved)
 
