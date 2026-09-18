@@ -256,7 +256,7 @@ class SkillCornerMatchAdapter:
                 },
                 "stadium": metadata.stadium,
                 "declared_players": len(metadata.players),
-                "observed_player_ids": self._observed_player_ids(),
+                "declared_player_ids": self._declared_player_ids(),
                 "periods": [period.to_dict() for period in metadata.periods],
                 "pose_geometry": authorities.HYBRID_GEOMETRY_STATEMENT,
                 "pose_tracking_alignment": authorities.ALIGNMENT_STATEMENT,
@@ -267,9 +267,9 @@ class SkillCornerMatchAdapter:
             },
         )
 
-    def _observed_player_ids(self) -> list[str]:
-        # Cheap structural fact derived from the metadata squad; sample-level
-        # observation coverage is reported by the canonicalizers.
+    def _declared_player_ids(self) -> list[str]:
+        # Squad identities declared by the match metadata; sample-level
+        # observation coverage is reported by the canonicalizers and receipts.
         return [player.player_id for player in self.metadata.players]
 
     # -- canonical streams ----------------------------------------------

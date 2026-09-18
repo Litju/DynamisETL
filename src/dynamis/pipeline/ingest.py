@@ -900,7 +900,7 @@ def ingest_skillcorner_match(
             "stadium": metadata.stadium,
             "periods": [period.to_dict() for period in metadata.periods],
             "declared_players": len(metadata.players),
-            "observed_player_ids": len(observed_player_ids),
+            "observed_player_id_count": len(observed_player_ids),
             "unmatched_declared_player_ids": unmatched_player_ids,
             "tracking": tracking_summaries,
             "pose": pose_summaries,

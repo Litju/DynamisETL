@@ -110,7 +110,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--batch-size",
         type=int,
         default=None,
-        help="Adapter batch size (rows) for the DFL positions stream",
+        help="Adapter batch size (rows) for streaming providers (DFL positions, SkillCorner pose)",
     )
     parser.add_argument(
         "--spill-dir",
