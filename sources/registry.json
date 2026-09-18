@@ -115,7 +115,7 @@
       ],
       "adapter_id": "zenodo_gymaware_landmine",
       "v1_role": "LPT/VBT + video agreement",
-      "initial_scope": "24 athletes, 325.3 MB",
+      "initial_scope": "Verified archive: 254 GymAware set exports / 653 rep rows (325.3 MB); the related article reports a separate 24-athlete / 247-valid-trial analysis population. Archive population != paper population.",
       "license": {
         "identifier": "CC-BY-4.0",
         "status": "declared",

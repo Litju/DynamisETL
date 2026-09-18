@@ -74,11 +74,34 @@ def test_document_records_the_res104_white_and_gymaware_rights_decisions(doc_tex
         assert "rights_evidence.json" in section
 
 
+def _normalized_section(doc_text: str, dataset_id: str) -> str:
+    section = doc_text.split(f"### `{dataset_id}`", 1)[1].split("###", 1)[0]
+    return " ".join(section.replace("*", "").split()).lower()
+
+
 def test_document_preserves_the_openbiomechanics_exclusion(doc_text: str) -> None:
     section = doc_text.split("### `openbiomechanics`", 1)[1].split("##", 1)[0].lower()
     assert "professional sports organization" in section
     assert "financial analysis" in section
     assert "optional and license-gated" in section
+
+
+def test_document_separates_the_gymaware_archive_and_paper_populations(doc_text: str) -> None:
+    section = _normalized_section(doc_text, "gymaware-landmine-vision")
+    for token in (
+        "24 male athletes",
+        "247 valid method-comparison trials",
+        "254 GymAware set exports",
+        "653 GymAware rep rows",
+        "275 numbered rows",
+        "51 display-name identities",
+        "52 pseudonymous/unresolved subject identities",
+        "653 canonical rep trials",
+        "source set `059`",
+        "not the paper's 247",
+        "not the paper's 24",
+    ):
+        assert token.lower() in section, token
 
 
 def test_document_excludes_soccermon_and_states_the_frame_neutrality(doc_text: str) -> None:

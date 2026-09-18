@@ -102,6 +102,24 @@ is fetched to inspect rights.
   (≈2.20 m), the GymAware attachment/effective radius is ≈2.05 m. No cross-method
   correction is applied in RES-98.
 
+**Archive population vs paper population (do not merge).** The verified
+distributed archive and the study's reported analysis population are different
+things:
+
+| population | count |
+| --- | --- |
+| Study/article | 24 male athletes, 247 valid method-comparison trials |
+| Verified distributed archive | 254 GymAware set exports, 653 GymAware rep rows; 325.3 MB |
+| Vision workbook | 275 numbered rows, 51 display-name identities, numeric values for inclusion `001` only (18 populated numeric values) |
+| Canonical control plane | 52 pseudonymous/unresolved subject identities, 653 canonical rep trials |
+
+The canonical 52 subject identities are **51 workbook identities plus one
+GymAware-only source set (source set `059`) that has no workbook identity**.
+The 653 canonical rep trials are the archive's rep rows, **not** the paper's 247
+valid trials, and the 52 canonical identities are **not** the paper's 24
+athletes: the archive contains more sets/reps than the analysis table, and no
+documented mapping between them is published, so no reduction is fabricated.
+
 ### `dfl-sportec-idsse`
 
 - Hugging Face dataset <https://huggingface.co/datasets/pysport/idsse-data>;
