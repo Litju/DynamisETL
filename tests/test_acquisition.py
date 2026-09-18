@@ -637,6 +637,75 @@ def test_github_resolver_follows_lfs_pointers_and_git_blob_identities() -> None:
     assert plan.total_bytes == len(regular) + len(tracking_bytes)
 
 
+def test_github_resolver_still_detects_lfs_when_a_pointer_sha1_is_declared() -> None:
+    import base64
+
+    revision = "a" * 40
+    content = b"real-lfs-content" * 8
+    pointer = (
+        "version https://git-lfs.github.com/spec/v1\n"
+        f"oid sha256:{hashlib.sha256(content).hexdigest()}\n"
+        f"size {len(content)}\n"
+    ).encode()
+    pointer_sha = git_blob_sha1_of(pointer)
+    registry = synthetic_registry(
+        files=(
+            RetrievalFile(
+                key="tracking.jsonl",
+                size_bytes=len(content),
+                sha1=pointer_sha,
+                sha256=hashlib.sha256(content).hexdigest(),
+            ),
+        ),
+        provider="GitHub",
+        upstream_urls=(http_url("https://github.com/owner/repo"),),
+        doi=None,
+    )
+    registry = registry.model_copy(
+        update={
+            "sources": (
+                registry.sources[0].model_copy(
+                    update={
+                        "versions": (
+                            registry.sources[0]
+                            .versions[0]
+                            .model_copy(update={"version": revision}),
+                        )
+                    }
+                ),
+            )
+        }
+    )
+    session = FakeSession(
+        {
+            f"https://api.github.com/repos/owner/repo/git/trees/{revision}?recursive=1": {
+                "truncated": False,
+                "tree": [
+                    {
+                        "path": "tracking.jsonl",
+                        "type": "blob",
+                        "sha": pointer_sha,
+                        "size": len(pointer),
+                    }
+                ],
+            },
+            f"https://api.github.com/repos/owner/repo/git/blobs/{pointer_sha}": {
+                "encoding": "base64",
+                "content": base64.b64encode(pointer).decode("ascii"),
+                "size": len(pointer),
+            },
+        }
+    )
+    plan = plan_acquisition(
+        "syn-provider", keys=["tracking.jsonl"], registry=registry, session=session
+    )
+    assert plan.files[0].url == (
+        f"https://media.githubusercontent.com/media/owner/repo/{revision}/tracking.jsonl"
+    )
+    assert plan.files[0].upstream_sha256 == hashlib.sha256(content).hexdigest()
+    assert plan.files[0].size_bytes == len(content)
+
+
 def test_github_resolver_refuses_truncated_trees() -> None:
     revision = "c" * 40
     registry = synthetic_registry(
