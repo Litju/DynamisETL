@@ -22,7 +22,9 @@ The table is a declaration, not an accuracy claim: scale 1 / offset 0 states a
 shared released coordinate, never zero original-instrument timing error.
 
 Downgrade drops the additive table only while it is empty; persisted alignment
-evidence is never silently discarded.
+evidence is never silently discarded. Offline (``--sql``) downgrade is refused
+outright because the persisted evidence cannot be inspected without a live
+connection, so no destructive DDL is ever emitted for this revision offline.
 """
 
 from __future__ import annotations
@@ -84,15 +86,23 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     # The revision is purely additive, but its rows are persisted synchronization
-    # evidence. Refuse to discard them silently; the operator must delete them
-    # deliberately (or re-run the deterministic ingestion after downgrading).
-    if not context.is_offline_mode():
-        bind = op.get_bind()
-        persisted = int(bind.execute(sa.text("SELECT count(*) FROM sync_alignment")).scalar_one())
-        if persisted:
-            raise RuntimeError(
-                f"cannot downgrade 0003_sync_alignment: {persisted} sync_alignment "
-                "row(s) hold persisted synchronization evidence. Delete or migrate "
-                "those rows deliberately before downgrading."
-            )
+    # evidence. Offline mode cannot inspect them, so refuse before any destructive
+    # DDL is emitted; online, refuse while any row is still present. In both cases
+    # the operator must delete the rows deliberately (or re-run the deterministic
+    # ingestion after downgrading).
+    if context.is_offline_mode():
+        raise RuntimeError(
+            "cannot downgrade 0003_sync_alignment in offline (--sql) mode: persisted "
+            "synchronization evidence cannot be inspected without a live database, so "
+            "DROP TABLE sync_alignment is refused. Run the downgrade against a live "
+            "database where the persisted row count can be checked."
+        )
+    bind = op.get_bind()
+    persisted = int(bind.execute(sa.text("SELECT count(*) FROM sync_alignment")).scalar_one())
+    if persisted:
+        raise RuntimeError(
+            f"cannot downgrade 0003_sync_alignment: {persisted} sync_alignment "
+            "row(s) hold persisted synchronization evidence. Delete or migrate "
+            "those rows deliberately before downgrading."
+        )
     op.drop_table("sync_alignment")
