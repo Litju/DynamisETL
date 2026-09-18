@@ -676,7 +676,8 @@ def ingest_white_cmj(
         silver_artifacts=tuple(result.to_dict() for result in results),
         quarantine_artifacts=quarantine_artifacts,
         notes=(
-            "Unclear-rights local-only source: inputs and outputs stay outside Git.",
+            "CC BY 4.0 source (attribution required; redistribution conditional): inputs "
+            "and outputs stay outside Git.",
             "No RES-100 biomechanical processor runs; only canonicalization and unit conversion.",
             "Each CMJ is an independent takeoff-relative trial clock; no cross-trial "
             "concatenation exists.",
@@ -807,7 +808,8 @@ def ingest_gymaware_landmine(
         silver_artifacts=(),
         quarantine_artifacts=quarantine_artifacts,
         notes=(
-            "Unclear-rights local-only source: inputs and outputs stay outside Git.",
+            "CC BY 4.0 source (attribution required; redistribution conditional): inputs "
+            "and outputs stay outside Git.",
             "The archive exposes summary indicators only; no dense LPT stream exists and "
             "none is fabricated.",
             "No cross-method correction (Deming, bias, scaling, smoothing) is applied; "

@@ -30,9 +30,11 @@ from dynamis.registry import (
 
 EXPECTED_SOURCE_COUNT = 8
 UNCLEAR_RIGHTS = {
+    "tackle-workload",
+}
+RES104_DECLARED_CC_BY = {
     "white-cmj-acc-grf",
     "gymaware-landmine-vision",
-    "tackle-workload",
 }
 
 
@@ -60,6 +62,23 @@ def test_unclear_rights_sources_stay_local_only() -> None:
         assert policy.redistribution.value == "prohibited"
     local_only = {source.dataset_id for source in registry.sources if source.license.local_only}
     assert local_only == UNCLEAR_RIGHTS
+
+
+def test_res104_promotes_white_and_gymaware_to_declared_cc_by() -> None:
+    """Zenodo API + rendered record evidence (plus the White companion repo)."""
+    registry = validate_registry()
+    for dataset_id in RES104_DECLARED_CC_BY:
+        policy = source_by_id(registry, dataset_id).license
+        assert policy.identifier == "CC-BY-4.0"
+        assert policy.status.value == "declared"
+        assert policy.attribution_required
+        assert not policy.noncommercial_only
+        assert not policy.share_alike
+        assert not policy.local_only
+        assert policy.redistribution.value == "conditional"
+        text = " ".join(policy.restrictions).lower()
+        assert "cc-by-4.0" in text
+        assert "rendered" in text
 
 
 def test_spl_license_excludes_the_openbiomechanics_exclusion() -> None:

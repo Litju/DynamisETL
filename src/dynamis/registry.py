@@ -34,19 +34,19 @@ from dynamis.contracts.invariants import InvariantError
 # Sources whose upstream record exposes no explicit license value. They stay
 # local-only until rights are clarified; this list is the audit anchor for
 # DATA_SOURCES.md and is asserted by tests so rights drift cannot pass silently.
+# RES-104 captured the Zenodo API license id AND the rendered record Rights/
+# License display for White and GymAware as cc-by-4.0, so those two sources
+# moved to declared CC-BY-4.0; only TACKLE remains unclear/local-only.
 LOCAL_ONLY_WHEN_RIGHTS_UNCLEAR = frozenset(
     {
-        "white-cmj-acc-grf",
-        "gymaware-landmine-vision",
         "tackle-workload",
     }
 )
 
-# SPL Open Data is CC BY-NC-SA 4.0. The OpenBiomechanics professional-sports /
-# financial-analysis exclusion belongs to OpenBiomechanics only and must never
-# be attached to SPL.
 REQUIRED_LICENSE_IDENTIFIERS = {
     "womens-soccer-positioning": "CC-BY-NC-4.0",
+    "white-cmj-acc-grf": "CC-BY-4.0",
+    "gymaware-landmine-vision": "CC-BY-4.0",
     "dfl-sportec-idsse": "CC-BY-4.0",
     "skillcorner-opendata": "MIT",
     "spl-open-data": "CC-BY-NC-SA-4.0",

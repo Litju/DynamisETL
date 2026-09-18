@@ -168,7 +168,10 @@ applied.
 
 **Licensing.** `womens-soccer-positioning` is **CC BY-NC 4.0** (non-commercial,
 attribution): keep it local, do not commit it or its derivatives.
-`dfl-sportec-idsse` is **CC BY 4.0** (attribution). See
+`dfl-sportec-idsse` is **CC BY 4.0** (attribution). `white-cmj-acc-grf` and
+`gymaware-landmine-vision` are **CC BY 4.0** (attribution, redistribution
+conditional) per the reproducible rights-evidence audit in
+[`sources/rights_evidence.json`](sources/rights_evidence.json). See
 [`DATA_SOURCES.md`](DATA_SOURCES.md).
 
 ## Data and license boundary
