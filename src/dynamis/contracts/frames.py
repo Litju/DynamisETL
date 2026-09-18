@@ -99,6 +99,13 @@ class CoordinateFrame(Contract):
             )
         if self.kind is FrameKind.UNKNOWN and not (self.description and self.description.strip()):
             raise ValueError("an unknown frame kind requires an explicit description")
+        if self.handedness is Handedness.UNSPECIFIED and not (
+            self.description and self.description.strip()
+        ):
+            raise ValueError(
+                "an unspecified handedness is a deliberate declaration and requires "
+                "an explicit description"
+            )
         return self
 
 

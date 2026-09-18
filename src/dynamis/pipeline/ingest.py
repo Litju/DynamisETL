@@ -17,9 +17,20 @@ from typing import Any
 
 import pyarrow as pa
 
+from dynamis.adapters.gymaware_landmine.adapter import GymAwareAdapter
+from dynamis.adapters.gymaware_landmine.authorities import GYMAWARE_DATASET_ID
+from dynamis.adapters.gymaware_landmine.discovery import discover_gymaware_landmine
 from dynamis.adapters.sportec_idsse.adapter import IdsseMatchAdapter
 from dynamis.adapters.sportec_idsse.authorities import tracking_stream_id
 from dynamis.adapters.sportec_idsse.discovery import discover_idsse
+from dynamis.adapters.white_cmj.adapter import (
+    WHITE_DATASET_ID,
+    WhiteCmjAdapter,
+    force_stream_id,
+    imu_stream_id,
+)
+from dynamis.adapters.white_cmj.authorities import WHITE_NPZ_KEY
+from dynamis.adapters.white_cmj.discovery import load_white_cmj_bundle
 from dynamis.adapters.womens_soccer_positioning.adapter import canonical_gnss_streams
 from dynamis.adapters.womens_soccer_positioning.authorities import (
     CANONICAL_DATUM,
@@ -31,7 +42,7 @@ from dynamis.adapters.womens_soccer_positioning.authorities import (
 from dynamis.adapters.womens_soccer_positioning.discovery import discover_workbook
 from dynamis.config import Settings
 from dynamis.contracts import Modality
-from dynamis.contracts.schemas import schema_fingerprint
+from dynamis.contracts.schemas import schema_fingerprint, schema_version_of
 from dynamis.pipeline.quarantine import QuarantinedRecord, QuarantineSink
 from dynamis.pipeline.reconcile import (
     ReconciliationReceipt,
@@ -39,6 +50,7 @@ from dynamis.pipeline.reconcile import (
     assert_reconciled,
     write_reconciliation_receipt,
 )
+from dynamis.pipeline.source_metrics import SourceMetricObservation
 from dynamis.pipeline.streams import (
     DEFAULT_BATCH_SIZE,
     DEFAULT_ROW_GROUP_SIZE,
@@ -47,12 +59,22 @@ from dynamis.pipeline.streams import (
 )
 from dynamis.quality.checks import QualityError
 from dynamis.quality.streaming import StreamingValidator
+from dynamis.rights import assert_dataset_root_outside_repository
 from dynamis.storage.parquet import write_parquet_streaming_atomic
 from dynamis.storage.paths import (
     ensure_dataset_layout,
     partition_values,
     silver_parquet_path,
 )
+
+
+def assert_local_only_boundary(settings: Settings, dataset_id: str) -> None:
+    """Refuse to materialize a local-only source inside the repository."""
+    from dynamis.registry import source_by_id, validate_registry
+
+    source = source_by_id(validate_registry(), dataset_id)
+    assert_dataset_root_outside_repository(source, settings.dataset_root)
+
 
 WORKBOOK_KEY_J01 = "J01.xlsx"
 
@@ -70,6 +92,7 @@ class IngestStreamResult:
     checksum_sha256: str
     schema_fingerprint: str
     contract_schema_fingerprint: str
+    schema_version: str
     partition: dict[str, str]
     coordinate_frame_id: str | None
     synchronization_spec_id: str
@@ -90,6 +113,7 @@ class IngestStreamResult:
             "checksum_sha256": self.checksum_sha256,
             "schema_fingerprint": self.schema_fingerprint,
             "contract_schema_fingerprint": self.contract_schema_fingerprint,
+            "schema_version": self.schema_version,
             "partition": self.partition,
             "coordinate_frame_id": self.coordinate_frame_id,
             "synchronization_spec_id": self.synchronization_spec_id,
@@ -113,6 +137,7 @@ class IngestResult:
     provider_domain: ProviderDomain
     quarantine_records: tuple[QuarantinedRecord, ...] = ()
     domain: dict[str, Any] = field(default_factory=dict)
+    source_metrics: tuple[SourceMetricObservation, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -137,13 +162,17 @@ def write_discovery_receipts(
     match_information_path: Path | None = None,
     events_path: Path | None = None,
     positions_path: Path | None = None,
+    npz_path: Path | None = None,
+    archive_path: Path | None = None,
     name: str,
 ) -> str:
     """Write the structural discovery receipt for a provider slice.
 
     Nothing here is assumed from memory: the receipt records sheets/rows/columns/
-    null patterns for the workbook or namespaces/hierarchy/frames/entities/units
-    and the undecoded vendor attributes for the XML set.
+    null patterns for the workbook, namespaces/hierarchy/frames/entities/units
+    and the undecoded vendor attributes for the XML set, NPZ member headers plus
+    restricted-pickle safety results for the laboratory release, and the ZIP
+    central directory plus structured-member hashes for the GymAware archive.
     """
     from dynamis.storage.atomic import atomic_write_text
     from dynamis.storage.paths import receipt_path
@@ -152,6 +181,16 @@ def write_discovery_receipts(
         if workbook_path is None:
             raise ValueError("Women's discovery requires the workbook path")
         payload = discover_workbook(workbook_path).to_dict()
+    elif dataset_id == WHITE_DATASET_ID:
+        if npz_path is None:
+            raise ValueError("White CMJ discovery requires the .npz path")
+        from dynamis.adapters.white_cmj.discovery import discover_white_cmj_file
+
+        payload = discover_white_cmj_file(npz_path).to_dict()
+    elif dataset_id == GYMAWARE_DATASET_ID:
+        if archive_path is None:
+            raise ValueError("GymAware discovery requires the .zip path")
+        payload = discover_gymaware_landmine(archive_path).to_dict()
     else:
         if match_information_path is None or events_path is None or positions_path is None:
             raise ValueError("IDSSE discovery requires the three XML paths")
@@ -208,6 +247,7 @@ def write_canonical_stream(
         checksum_sha256=artifact.checksum_sha256,
         schema_fingerprint=artifact.schema_fingerprint,
         contract_schema_fingerprint=schema_fingerprint(stream.schema),
+        schema_version=schema_version_of(stream.schema),
         partition=partition_values(
             stream.dataset_id, modality=stream.modality, session_id=stream.session_id
         ),
@@ -229,6 +269,7 @@ def ingest_womens_j01(
     row_group_size: int = DEFAULT_ROW_GROUP_SIZE,
 ) -> IngestResult:
     """Women's ``J01.xlsx`` -> canonical GNSS Silver streams + reconciliation."""
+    assert_local_only_boundary(settings, WOMENS_DATASET_ID)
     ensure_dataset_layout(settings)
     discovery = discover_workbook(workbook_path, workbook_key=WORKBOOK_KEY_J01)
     adapter, streams = canonical_gnss_streams(workbook_path, discovery)
@@ -345,6 +386,7 @@ def ingest_dfl_match(
     row_group_size: int = DEFAULT_ROW_GROUP_SIZE,
 ) -> IngestResult:
     """One complete IDSSE match -> tracking + event Silver streams + reconciliation."""
+    assert_local_only_boundary(settings, "dfl-sportec-idsse")
     ensure_dataset_layout(settings)
 
     adapter = IdsseMatchAdapter(
@@ -493,4 +535,295 @@ def ingest_dfl_match(
         provider_domain=domain,
         quarantine_records=tuple(quarantined),
         domain=dict(receipt.domain),
+    )
+
+
+def ingest_white_cmj(
+    settings: Settings,
+    *,
+    npz_path: Path,
+    version: str,
+    row_group_size: int = DEFAULT_ROW_GROUP_SIZE,
+) -> IngestResult:
+    """White CMJ release -> per-trial canonical IMU + force Silver streams.
+
+    The released arrays are canonicalized exactly as distributed: full-length
+    accelerometer at 250 Hz into ``imu_sample`` (g -> m/s**2) and pre-takeoff
+    vGRF at 1000 Hz into ``force_sample`` as a dimensionless body-weight ratio.
+    Every trial is an independent takeoff-relative clock; nothing is
+    concatenated and no biomechanical processor runs.
+    """
+    assert_local_only_boundary(settings, WHITE_DATASET_ID)
+    ensure_dataset_layout(settings)
+    bundle = load_white_cmj_bundle(npz_path)
+    adapter = WhiteCmjAdapter(bundle)
+    sink = QuarantineSink(settings)
+    results: list[IngestStreamResult] = []
+    reconciliations: list[StreamReconciliation] = []
+    for trial in adapter.trials:
+        acc = bundle.acc_signals[trial.row_index]
+        grf = bundle.grf_signals[trial.row_index]
+        valid = adapter.trial_is_valid(trial)
+        for modality, source_samples, stream_id in (
+            (Modality.IMU, int(acc.shape[0]), imu_stream_id(trial.trial_id)),
+            (Modality.FORCE, int(grf.shape[0]), force_stream_id(trial.trial_id)),
+        ):
+            stream = adapter.canonical_stream(trial, modality)
+            if valid:
+                result = write_canonical_stream(settings, stream, row_group_size=row_group_size)
+                results.append(result)
+                canonical_rows = source_samples
+                quarantined_rows = 0
+            else:
+                canonical_rows = 0
+                quarantined_rows = source_samples
+            if modality is Modality.IMU:
+                ns_per_sample = 1_000_000_000 // bundle.acc_sampling_rate_hz
+                first_index = 0
+                last_index = source_samples - 1
+                takeoff = int(bundle.acc_takeoff[trial.row_index])
+            else:
+                ns_per_sample = 1_000_000_000 // bundle.grf_sampling_rate_hz
+                takeoff = source_samples - 1
+                first_index = 0
+                last_index = source_samples - 1
+            reconciliations.append(
+                StreamReconciliation(
+                    stream_id=stream_id,
+                    modality=modality.value,
+                    subject_id=trial.subject_id,
+                    trial_id=trial.trial_id,
+                    source_records=source_samples,
+                    canonical_rows=canonical_rows,
+                    quarantined_rows=quarantined_rows,
+                    ignored_records=0,
+                    ignored_reasons={},
+                    source_time_min=None,
+                    source_time_max=None,
+                    canonical_time_min_ns=(
+                        (first_index - takeoff) * ns_per_sample if valid else None
+                    ),
+                    canonical_time_max_ns=(
+                        (last_index - takeoff) * ns_per_sample if valid else None
+                    ),
+                    null_counts={},
+                    schema_valid=True,
+                    units_valid=True,
+                    coordinate_frame_id=stream.coordinate_frame_id,
+                    checks={
+                        "measurement_class": "SOURCE_DERIVED",
+                        "source_rate_hz": (
+                            bundle.acc_sampling_rate_hz
+                            if modality is Modality.IMU
+                            else bundle.grf_sampling_rate_hz
+                        ),
+                        "source_samples": source_samples,
+                        "condition": trial.condition,
+                        "source_row_index": trial.row_index,
+                        "takeoff_relative": True,
+                        "quarantined_trial": not valid,
+                    },
+                )
+            )
+    valid_trials = sum(1 for trial in adapter.trials if adapter.trial_is_valid(trial))
+    # Importing source metrics may add quarantine records for non-finite scalars;
+    # collect every trial's findings once, then materialize.
+    source_metric_observations = adapter.source_metrics()
+    for trial in adapter.trials:
+        sink.add_many(adapter.counters(trial.trial_id).quarantined)
+    quarantine_artifacts = tuple(sink.materialize(name="white-cmj-trials")) if sink.total else ()
+    domain_records = adapter.domain()
+    receipt = ReconciliationReceipt(
+        dataset_id=WHITE_DATASET_ID,
+        version=version,
+        session_id="white-cmj-release",
+        source_keys=(WHITE_NPZ_KEY,),
+        streams=tuple(reconciliations),
+        domain={
+            "source_key": WHITE_NPZ_KEY,
+            "trial_count": len(adapter.trials),
+            "valid_trials": valid_trials,
+            "quarantined_trials": len(adapter.trials) - valid_trials,
+            "subject_id_count": adapter.discovery.subject_id_count,
+            "declared_n_subjects_member": bundle.declared_n_subjects,
+            "condition_counts": adapter.discovery.condition_counts,
+            "acc_rate_hz": bundle.acc_sampling_rate_hz,
+            "grf_rate_hz": bundle.grf_sampling_rate_hz,
+            "acc_sample_counts": adapter.discovery.acc_sample_counts,
+            "grf_sample_counts": adapter.discovery.grf_sample_counts,
+            "source_metric_observations": len(source_metric_observations),
+            "sensor_placement": {
+                "distributed_record": "L5",
+                "original_paper": "L4",
+                "authority": "conflicting source documentation",
+            },
+            "timing_convention": (
+                "accelerometer t_rel_ns = (sample_index - acc_takeoff) * 4 ms; "
+                "vGRF t_rel_ns = (sample_index - (samples-1)) * 1 ms (final sample = takeoff). "
+                "The provider's grf_takeoff member is an original-source index and is not "
+                "used to index the distributed curve."
+            ),
+            "released_form": (
+                "The deposit distributes full signals, not the 500-sample 2000 ms window "
+                "described by the record prose; the window extraction belongs to the "
+                "reference consumer, so RES-98 canonicalizes the distributed arrays."
+            ),
+            "quarantine_by_rule": sink.counts,
+        },
+        silver_artifacts=tuple(result.to_dict() for result in results),
+        quarantine_artifacts=quarantine_artifacts,
+        notes=(
+            "Unclear-rights local-only source: inputs and outputs stay outside Git.",
+            "No RES-100 biomechanical processor runs; only canonicalization and unit conversion.",
+            "Each CMJ is an independent takeoff-relative trial clock; no cross-trial "
+            "concatenation exists.",
+        ),
+    )
+    assert_reconciled(receipt)
+    receipt_path = write_reconciliation_receipt(settings, receipt, name="white-cmj-release")
+    return IngestResult(
+        dataset_id=WHITE_DATASET_ID,
+        version=version,
+        session_id="white-cmj-release",
+        source_keys=(WHITE_NPZ_KEY,),
+        streams=tuple(results),
+        quarantine_artifacts=quarantine_artifacts,
+        reconciliation=receipt,
+        receipt_path=receipt_path,
+        provider_domain=domain_records,
+        quarantine_records=tuple(sink.all_records()),
+        domain=dict(receipt.domain),
+        source_metrics=source_metric_observations,
+    )
+
+
+def ingest_gymaware_landmine(
+    settings: Settings,
+    *,
+    zip_path: Path,
+    version: str,
+) -> IngestResult:
+    """GymAware landmine archive -> source-derived trial metrics only.
+
+    Discovery proves the archive distributes no sample-level LPT trajectory, so
+    no dense stream is fabricated. Rep-level GymAware indicators and the
+    populated vision-workbook values are imported as source-derived scalar
+    observations; pairing is proved by the source inclusion number and rep id.
+    """
+    assert_local_only_boundary(settings, GYMAWARE_DATASET_ID)
+    ensure_dataset_layout(settings)
+    discovery = discover_gymaware_landmine(zip_path)
+    adapter = GymAwareAdapter(discovery)
+    observations = adapter.observations()
+    sink = QuarantineSink(settings)
+    sink.add_many(adapter.counters.quarantined)
+    quarantine_artifacts = tuple(sink.materialize(name="gymaware-landmine")) if sink.total else ()
+    gymaware_source_values = sum(
+        len(rep.values) for item in discovery.gymaware_sets for rep in item.reps
+    )
+    gymaware_observations = len(
+        [item for item in observations if item.metric_id.startswith("gymaware_")]
+    )
+    vision_observations = len(
+        [item for item in observations if item.metric_id.startswith("vision_")]
+    )
+    stream_rows = (
+        StreamReconciliation(
+            stream_id="gymaware-sets",
+            modality=Modality.LPT.value,
+            subject_id=None,
+            trial_id=None,
+            source_records=adapter.counters.source_sets,
+            canonical_rows=adapter.counters.gymaware_sets,
+            quarantined_rows=0,
+            ignored_records=len(adapter.excluded_sets),
+            ignored_reasons={
+                "vision workbook rows without a GymAware export and without any "
+                "distributed numeric value (documented exclusions)": len(adapter.excluded_sets)
+            },
+            checks={"excluded_sets": sorted(adapter.excluded_sets)},
+        ),
+        StreamReconciliation(
+            stream_id="gymaware-rep-rows",
+            modality=Modality.LPT.value,
+            subject_id=None,
+            trial_id=None,
+            source_records=adapter.counters.source_rep_rows,
+            canonical_rows=adapter.counters.canonical_trials,
+            quarantined_rows=adapter.counters.quarantined_rep_rows,
+            ignored_records=0,
+            ignored_reasons={},
+        ),
+        StreamReconciliation(
+            stream_id="gymaware-metric-values",
+            modality=Modality.LPT.value,
+            subject_id=None,
+            trial_id=None,
+            source_records=gymaware_source_values,
+            canonical_rows=gymaware_observations,
+            quarantined_rows=gymaware_source_values - gymaware_observations,
+            ignored_records=0,
+            ignored_reasons={},
+            checks={"method_radius_m": 2.05, "correction_applied": False},
+        ),
+        StreamReconciliation(
+            stream_id="vision-metric-values",
+            modality=Modality.LPT.value,
+            subject_id=None,
+            trial_id=None,
+            source_records=discovery.vision.populated_value_count,
+            canonical_rows=vision_observations,
+            quarantined_rows=discovery.vision.populated_value_count - vision_observations,
+            ignored_records=0,
+            ignored_reasons={},
+            checks={"method_radius_m": 2.20, "correction_applied": False},
+        ),
+    )
+    receipt = ReconciliationReceipt(
+        dataset_id=GYMAWARE_DATASET_ID,
+        version=version,
+        session_id="gymaware-landmine-release",
+        source_keys=(discovery.inspection.archive_name,),
+        streams=stream_rows,
+        domain={
+            "archive": discovery.inspection.to_dict()["archive"],
+            "gymaware_sets": len(discovery.gymaware_sets),
+            "gymaware_rep_rows": discovery.gymaware_rep_rows,
+            "canonical_trials": adapter.counters.canonical_trials,
+            "vision_workbook_rows": discovery.vision.populated_row_count,
+            "vision_populated_values": discovery.vision.populated_value_count,
+            "source_metric_observations": len(observations),
+            "dense_lpt_stream_present": False,
+            "method_metadata": {
+                "vision_effective_radius_m": 2.20,
+                "gymaware_effective_radius_m": 2.05,
+                "correction_applied": False,
+            },
+            "quarantine_by_rule": sink.counts,
+        },
+        silver_artifacts=(),
+        quarantine_artifacts=quarantine_artifacts,
+        notes=(
+            "Unclear-rights local-only source: inputs and outputs stay outside Git.",
+            "The archive exposes summary indicators only; no dense LPT stream exists and "
+            "none is fabricated.",
+            "No cross-method correction (Deming, bias, scaling, smoothing) is applied; "
+            "method radii are preserved as metadata.",
+        ),
+    )
+    assert_reconciled(receipt)
+    receipt_path = write_reconciliation_receipt(settings, receipt, name="gymaware-landmine-release")
+    return IngestResult(
+        dataset_id=GYMAWARE_DATASET_ID,
+        version=version,
+        session_id="gymaware-landmine-release",
+        source_keys=(discovery.inspection.archive_name,),
+        streams=(),
+        quarantine_artifacts=quarantine_artifacts,
+        reconciliation=receipt,
+        receipt_path=receipt_path,
+        provider_domain=adapter.domain(),
+        quarantine_records=tuple(adapter.counters.quarantined),
+        domain=dict(receipt.domain),
+        source_metrics=observations,
     )

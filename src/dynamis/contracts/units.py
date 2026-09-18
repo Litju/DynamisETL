@@ -30,6 +30,8 @@ SI_UNITS: Final[tuple[str, ...]] = (
     "rad/s",
     "N",
     "N*m",
+    "W",
+    "W/kg",
     "kg",
     "Hz",
     "deg",

@@ -336,6 +336,54 @@ def check_declared_authorities(table: pa.Table, schema: pa.Schema) -> tuple[Viol
     return tuple(violations)
 
 
+#: Newton-valued vertical/horizontal force components of the force contract.
+FORCE_NEWTON_FIELDS = ("force_x_n", "force_y_n", "force_z_n")
+#: Explicit dimensionless alternative: vertical force divided by body weight.
+FORCE_BODY_WEIGHT_RATIO_FIELD = "force_z_body_weight_ratio"
+
+
+def force_payload_fields(schema: pa.Schema) -> tuple[str, ...]:
+    """Payload fields that can satisfy the force contract on their own."""
+    if contract_of(schema) != "force_sample":
+        return ()
+    names = set(schema.names)
+    return tuple(
+        name for name in (*FORCE_NEWTON_FIELDS, FORCE_BODY_WEIGHT_RATIO_FIELD) if name in names
+    )
+
+
+def check_payload_completeness(table: pa.Table, schema: pa.Schema) -> tuple[Violation, ...]:
+    """A force sample must carry a newton component or the explicit BW ratio.
+
+    ``1 BW`` is never ``1 N``: the normalized representation is a legitimate,
+    separately named field, so a row that carries neither representation is
+    rejected instead of being read as either.
+    """
+    fields = force_payload_fields(schema)
+    if not fields:
+        return ()
+    missing_columns = [name for name in fields if name not in table.column_names]
+    if len(missing_columns) == len(fields):
+        return ()
+    present = [name for name in fields if name in table.column_names]
+    if not present:
+        return ()
+    valid = kernels.any_non_null([table.column(name) for name in present])
+    invalid_count = table.num_rows - kernels.count_true(valid)
+    if invalid_count:
+        return (
+            Violation(
+                rule="force.payload.missing",
+                detail=(
+                    "a force sample must provide at least one newton component "
+                    f"{FORCE_NEWTON_FIELDS} or {FORCE_BODY_WEIGHT_RATIO_FIELD}"
+                ),
+                evidence={"rows_without_payload": invalid_count, "rows": table.num_rows},
+            ),
+        )
+    return ()
+
+
 def check_measurement_class(table: pa.Table) -> tuple[Violation, ...]:
     if "measurement_class" not in table.column_names:
         return ()
@@ -373,6 +421,7 @@ def validate(table: pa.Table, schema: pa.Schema) -> tuple[Violation, ...]:
     violations.extend(check_declared_authorities(table, schema))
     violations.extend(check_time_monotonic(table, schema))
     violations.extend(check_measurement_class(table))
+    violations.extend(check_payload_completeness(table, schema))
     return tuple(violations)
 
 

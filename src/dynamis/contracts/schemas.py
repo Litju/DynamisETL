@@ -30,6 +30,21 @@ from dynamis.contracts.units import assert_si_unit
 
 SCHEMA_VERSION: Final = CONTRACT_SCHEMA_VERSION
 
+#: Per-contract schema revision. A contract starts at :data:`SCHEMA_VERSION` and
+#: is bumped only by a deliberate additive/breaking change to that one modality,
+#: so an unrelated modality's schema identity and materialized artifacts are
+#: never invalidated by another contract's revision.
+DEFAULT_CONTRACT_SCHEMA_VERSION: Final = SCHEMA_VERSION
+
+#: ``imu_sample`` 2: accelerometer-only sources legitimately provide no gyroscope,
+#: so the gyro channels became nullable.
+#: ``force_sample`` 2: dimensionless body-weight-normalized vertical force was
+#: added because a source can distribute normalized force without body mass.
+CONTRACT_SCHEMA_VERSIONS: Final[dict[str, str]] = {
+    "imu_sample": "2",
+    "force_sample": "2",
+}
+
 SCHEMA_VERSION_KEY: Final = b"dynamis.schema_version"
 CONTRACT_KEY: Final = b"dynamis.contract"
 MODALITY_KEY: Final = b"dynamis.modality"
@@ -222,9 +237,10 @@ def _schema_metadata(
     measurement_class: MeasurementClass,
     monotonicity: str,
     payload_completeness: str | None = None,
+    schema_version: str | None = None,
 ) -> dict[bytes, bytes]:
     metadata: dict[bytes, bytes] = {
-        SCHEMA_VERSION_KEY: SCHEMA_VERSION.encode(),
+        SCHEMA_VERSION_KEY: (schema_version or SCHEMA_VERSION).encode(),
         CONTRACT_KEY: contract.encode(),
         MODALITY_KEY: modality.value.encode(),
         UNITS_KEY: b"SI",
@@ -252,6 +268,7 @@ def _build(
     measurement_class: MeasurementClass = MeasurementClass.RAW_MEASURED,
     monotonicity: str = MONOTONICITY_STRICT,
     payload_completeness: str | None = None,
+    schema_version: str | None = None,
 ) -> pa.Schema:
     if monotonicity not in {MONOTONICITY_STRICT, MONOTONICITY_NON_DECREASING}:
         raise ValueError(f"{contract}: unsupported monotonicity {monotonicity!r}")
@@ -259,6 +276,9 @@ def _build(
     names = [item.name for item in fields]
     if len(set(names)) != len(names):
         raise ValueError(f"{contract}: duplicate field names")
+    version = schema_version or CONTRACT_SCHEMA_VERSIONS.get(
+        contract, DEFAULT_CONTRACT_SCHEMA_VERSION
+    )
     return pa.schema(
         fields,
         metadata=_schema_metadata(
@@ -270,6 +290,7 @@ def _build(
             measurement_class=measurement_class,
             monotonicity=monotonicity,
             payload_completeness=payload_completeness,
+            schema_version=version,
         ),
     )
 
@@ -434,6 +455,8 @@ IMU_SCHEMA: Final[pa.Schema] = _build(
             si_unit="rad/s",
             axis="x",
             description="Angular velocity about the sensor frame X axis.",
+            nullable=True,
+            nullable_reason="Accelerometer-only sources distribute no gyroscope channel.",
         ),
         _f(
             "gyro_y_rad_s",
@@ -441,6 +464,8 @@ IMU_SCHEMA: Final[pa.Schema] = _build(
             si_unit="rad/s",
             axis="y",
             description="Angular velocity about the sensor frame Y axis.",
+            nullable=True,
+            nullable_reason="Accelerometer-only sources distribute no gyroscope channel.",
         ),
         _f(
             "gyro_z_rad_s",
@@ -448,6 +473,8 @@ IMU_SCHEMA: Final[pa.Schema] = _build(
             si_unit="rad/s",
             axis="z",
             description="Angular velocity about the sensor frame Z axis.",
+            nullable=True,
+            nullable_reason="Accelerometer-only sources distribute no gyroscope channel.",
         ),
         _f(
             "mag_x_ut",
@@ -505,8 +532,10 @@ FORCE_SCHEMA: Final[pa.Schema] = _build(
     subject_required=True,
     coordinate_frame_required=True,
     payload_completeness=(
-        "at least one of force_x_n, force_y_n, force_z_n must be present per row; "
-        "single-axis load cells legitimately provide only one channel"
+        "at least one of force_x_n, force_y_n, force_z_n must be present per row, or the "
+        "explicit dimensionless force_z_body_weight_ratio when the source distributes "
+        "body-weight-normalized vertical force and provides no body mass; single-axis load "
+        "cells legitimately provide only one channel"
     ),
     payload=[
         _f(
@@ -542,6 +571,23 @@ FORCE_SCHEMA: Final[pa.Schema] = _build(
             description="Ground reaction force along the plate frame Z axis (vertical).",
             nullable=True,
             nullable_reason="Single-axis load cells cannot provide orthogonal channels.",
+        ),
+        _f(
+            "force_z_body_weight_ratio",
+            pa.float64(),
+            si_unit="1",
+            axis="z",
+            description=(
+                "Vertical ground reaction force divided by the participant's body weight. "
+                "Use only when the source distributes a body-weight-normalized vertical "
+                "force and supplies no participant mass; never convert to newtons without "
+                "a documented body mass."
+            ),
+            nullable=True,
+            nullable_reason=(
+                "Newton-valued force plates and normalized sources are mutually exclusive "
+                "representations of the same physical quantity."
+            ),
         ),
         _f(
             "moment_x_n_m",
@@ -1035,6 +1081,11 @@ def modality_of(schema: pa.Schema) -> Modality:
 
 def contract_of(schema: pa.Schema) -> str:
     return _read_metadata(schema, CONTRACT_KEY)
+
+
+def schema_version_of(schema: pa.Schema) -> str:
+    """Contract revision of this schema (per modality, not a global constant)."""
+    return _read_metadata(schema, SCHEMA_VERSION_KEY)
 
 
 SCHEMA_BY_CONTRACT: Final[dict[str, pa.Schema]] = {

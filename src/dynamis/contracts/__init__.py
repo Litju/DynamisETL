@@ -83,6 +83,8 @@ from dynamis.contracts.invariants import (
     assert_trial_subject_is_participant,
 )
 from dynamis.contracts.schemas import (
+    CONTRACT_SCHEMA_VERSIONS,
+    DEFAULT_CONTRACT_SCHEMA_VERSION,
     EVENT_SCHEMA,
     FORCE_SCHEMA,
     GNSS_SCHEMA,
@@ -103,6 +105,7 @@ from dynamis.contracts.schemas import (
     modality_of,
     nullable_reason_of,
     schema_fingerprint,
+    schema_version_of,
     si_unit_of,
     source_scale_of,
     source_unit_of,
@@ -127,6 +130,8 @@ from dynamis.contracts.units import (
 
 __all__ = [
     "CONTRACT_SCHEMA_VERSION",
+    "CONTRACT_SCHEMA_VERSIONS",
+    "DEFAULT_CONTRACT_SCHEMA_VERSION",
     "EVENT_SCHEMA",
     "FORCE_SCHEMA",
     "GNSS_SCHEMA",
@@ -229,6 +234,7 @@ __all__ = [
     "nullable_reason_of",
     "parse_unit",
     "schema_fingerprint",
+    "schema_version_of",
     "schemas",
     "si_unit_bases",
     "si_unit_of",

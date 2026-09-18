@@ -395,8 +395,8 @@ def test_idsse_domain_registers_players_and_periods(
     adapter = _adapter(tmp_path, dfl_files)
     adapter.parse_positions()
     domain = adapter.domain()
-    assert domain.session.session_id == "DFL-MAT-SYNTH1"
-    assert domain.session.kind.value == "match"
+    assert [session.session_id for session in domain.all_sessions] == ["DFL-MAT-SYNTH1"]
+    assert domain.all_sessions[0].kind.value == "match"
     assert len(domain.subjects) == 4
     assert len(domain.participants) == 4
     assert [trial.trial_id for trial in domain.trials] == ["period-1", "period-2"]

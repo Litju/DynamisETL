@@ -102,6 +102,7 @@ class FrameKind(StrEnum):
 class Handedness(StrEnum):
     RIGHT = "right"
     LEFT = "left"
+    UNSPECIFIED = "unspecified"
 
 
 class AxisDirection(StrEnum):

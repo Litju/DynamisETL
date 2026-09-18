@@ -358,7 +358,7 @@ class CoordinateFrame(Base):
     frame_id: Mapped[str] = mapped_column(String(128), primary_key=True)
     name: Mapped[str] = mapped_column(String(256), nullable=False)
     kind: Mapped[str] = mapped_column(String(32), nullable=False)
-    handedness: Mapped[str] = mapped_column(String(8), nullable=False)
+    handedness: Mapped[str] = mapped_column(String(16), nullable=False)
     x_direction: Mapped[str] = mapped_column(String(32), nullable=False)
     y_direction: Mapped[str] = mapped_column(String(32), nullable=False)
     z_direction: Mapped[str] = mapped_column(String(32), nullable=False)
@@ -376,12 +376,26 @@ class CoordinateFrame(Base):
             "kind IN ('world_geodetic', 'local_enu', 'pitch', 'body', 'sensor', 'camera', "
             "'laboratory', 'joint_local', 'unknown')",
         ),
-        _ck("coordinate_frame", "handedness", "handedness IN ('right', 'left')"),
+        _ck(
+            "coordinate_frame",
+            "handedness",
+            "handedness IN ('right', 'left', 'unspecified')",
+        ),
+        # Mirror the contract's semantic rule: two axes may share a direction only
+        # when that direction is explicitly undirected (unspecified/origin-dependent).
         _ck(
             "coordinate_frame",
             "distinct_axes",
-            "x_direction <> y_direction AND x_direction <> z_direction "
-            "AND y_direction <> z_direction",
+            "("
+            "x_direction <> y_direction OR x_direction IN ('unspecified','origin_dependent') "
+            "OR y_direction IN ('unspecified','origin_dependent')"
+            ") AND ("
+            "x_direction <> z_direction OR x_direction IN ('unspecified','origin_dependent') "
+            "OR z_direction IN ('unspecified','origin_dependent')"
+            ") AND ("
+            "y_direction <> z_direction OR y_direction IN ('unspecified','origin_dependent') "
+            "OR z_direction IN ('unspecified','origin_dependent')"
+            ")",
         ),
         _ck(
             "coordinate_frame",

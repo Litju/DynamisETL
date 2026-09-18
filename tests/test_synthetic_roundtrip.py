@@ -15,7 +15,13 @@ from typing import Any
 import pytest
 
 from dynamis.config import Settings
-from dynamis.contracts import Modality, get_schema, schema_fingerprint, time_monotonicity
+from dynamis.contracts import (
+    Modality,
+    get_schema,
+    schema_fingerprint,
+    schema_version_of,
+    time_monotonicity,
+)
 from dynamis.fixtures.synthetic import (
     EARTH_MEAN_RADIUS_M,
     STANDARD_GRAVITY_M_S2,
@@ -106,7 +112,7 @@ def test_roundtrip_preserves_schema_rows_and_provenance(
         )
         assert observed.metadata["dynamis.modality"] == fixture.modality.value
         assert observed.metadata["dynamis.units"] == "SI"
-        assert observed.metadata["dynamis.schema_version"] == "1"
+        assert observed.metadata["dynamis.schema_version"] == schema_version_of(fixture.schema)
 
         rows = query(
             connection,
