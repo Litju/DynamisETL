@@ -36,6 +36,13 @@ from dynamis.adapters.skillcorner.authorities import (
 from dynamis.adapters.skillcorner.authorities import (
     adapter_algorithm_spec as skillcorner_algorithm_spec,
 )
+from dynamis.adapters.spl.adapter import SplTrialSource
+from dynamis.adapters.spl.authorities import (
+    SPL_DATASET_ID,
+)
+from dynamis.adapters.spl.authorities import (
+    adapter_algorithm_spec as spl_algorithm_spec,
+)
 from dynamis.adapters.sportec_idsse.adapter import adapter_algorithm_spec as idsse_algorithm_spec
 from dynamis.adapters.white_cmj.adapter import (
     adapter_algorithm_spec as white_algorithm_spec,
@@ -52,6 +59,7 @@ from dynamis.pipeline.ingest import (
     ingest_dfl_match,
     ingest_gymaware_landmine,
     ingest_skillcorner_match,
+    ingest_spl_trials,
     ingest_white_cmj,
     ingest_womens_j01,
 )
@@ -67,12 +75,14 @@ EXIT_FAILURE = 2
 
 MATCH_TOKEN = re.compile(r"DFL-MAT-([A-Z0-9]+)")
 SKILLCORNER_MATCH_TOKEN = re.compile(r"matches/(?P<match>\d+)/")
+SPL_PARTICIPANT_TOKEN = re.compile(r"/(?P<participant>P\d+)/BB_FT_")
 SUPPORTED_DATASETS = {
     "womens-soccer-positioning": "womens soccer positioning (GNSS)",
     "dfl-sportec-idsse": "DFL/Sportec IDSSE (tracking + events)",
     "white-cmj-acc-grf": "White CMJ accelerometer + vGRF (per-trial IMU + force)",
     "gymaware-landmine-vision": "GymAware landmine press + vision (source metrics)",
     "skillcorner-opendata": "SkillCorner Open Data (tracking + body pose)",
+    "spl-open-data": "SPL Open Data (basketball free-throw pose)",
 }
 
 
@@ -142,6 +152,12 @@ def _default_session(dataset_id: str, keys: Sequence[str]) -> str:
             if match:
                 return match.group("match")
         raise PlanError("cannot derive the SkillCorner match identity from the selected keys")
+    if dataset_id == SPL_DATASET_ID:
+        for key in keys:
+            match = SPL_PARTICIPANT_TOKEN.search(key)
+            if match:
+                return match.group("participant")
+        raise PlanError("cannot derive the SPL participant identity from the selected keys")
     for key in keys:
         match = MATCH_TOKEN.search(key)
         if match:
@@ -234,6 +250,22 @@ def _write_discovery(
             name=f"{session_id}-match",
         )
         return
+    if args.dataset_id == SPL_DATASET_ID:
+        spl_trials = tuple(
+            SplTrialSource(key=key, path=path)
+            for key, path in paths.items()
+            if key.endswith(".json")
+        )
+        if not spl_trials:
+            raise PlanError("no accepted SPL trial key selected")
+        write_discovery_receipts(
+            config,
+            dataset_id=args.dataset_id,
+            version=args.version,
+            spl_trial_paths=spl_trials,
+            name=f"{session_id}-pose",
+        )
+        return
     write_discovery_receipts(
         config,
         dataset_id=args.dataset_id,
@@ -315,6 +347,20 @@ def _ingest(args: argparse.Namespace) -> tuple[IngestResult, str]:
             batch_size=args.batch_size or 16384,
         )
         return result, session_id
+    if args.dataset_id == SPL_DATASET_ID:
+        spl_trials = tuple(
+            SplTrialSource(key=key, path=path)
+            for key, path in paths.items()
+            if key.endswith(".json")
+        )
+        if not spl_trials:
+            raise PlanError("no accepted SPL trial key selected")
+        result = ingest_spl_trials(
+            config,
+            trials=spl_trials,
+            version=args.version,
+        )
+        return result, session_id
 
     positions = next((path for key, path in paths.items() if "_positions_" in key), None)
     events = next((path for key, path in paths.items() if "_events_" in key), None)
@@ -353,7 +399,7 @@ def _persist(args: argparse.Namespace, result: IngestResult, session_id: str) ->
     suffix = "res97"
     if args.dataset_id in {WHITE_DATASET_ID, GYMAWARE_DATASET_ID}:
         suffix = "res98"
-    elif args.dataset_id == SKILLCORNER_DATASET_ID:
+    elif args.dataset_id in {SKILLCORNER_DATASET_ID, SPL_DATASET_ID}:
         suffix = "res99"
     return persist_ingest(
         config,
@@ -376,6 +422,8 @@ def _adapter_algorithm(dataset_id: str):
         return gymaware_algorithm_spec()
     if dataset_id == SKILLCORNER_DATASET_ID:
         return skillcorner_algorithm_spec()
+    if dataset_id == SPL_DATASET_ID:
+        return spl_algorithm_spec()
     return idsse_algorithm_spec()
 
 

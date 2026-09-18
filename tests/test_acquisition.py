@@ -1245,17 +1245,46 @@ def test_spl_plan_fails_closed_without_acknowledgement() -> None:
             registry=registry,
             acknowledgements=("an-unrelated-source-acknowledgement",),
         )
-    # The exact acknowledgement satisfies the gate; SPL still has no resolver
-    # registered in this build, so nothing is fetched and a resolver error (not an
-    # acknowledgement error) is raised next. No HTTP request is made.
-    with pytest.raises(PlanError, match="no acquisition resolver"):
-        plan_acquisition(
-            "spl-open-data",
-            version=version,
-            keys=[key],
-            registry=registry,
-            acknowledgements=(SPL_LICENSE_ACKNOWLEDGEMENT,),
-        )
+    # The exact acknowledgement satisfies the gate; the pinned GitHub resolver is
+    # then exercised offline through an injected metadata session. No real
+    # source payload is downloaded by this test.
+    session = FakeSession(
+        {
+            f"https://api.github.com/repos/Sport-Performance-Lab/SPL-Open-Data/git/trees/"
+            f"{version}?recursive=1": {
+                "truncated": False,
+                "tree": [
+                    {
+                        "path": key,
+                        "type": "blob",
+                        "sha": registry.source("spl-open-data")
+                        .version(version)
+                        .retrieval.files[0]
+                        .sha1,
+                        "size": registry.source("spl-open-data")
+                        .version(version)
+                        .retrieval.files[0]
+                        .size_bytes,
+                    }
+                ],
+            }
+        }
+    )
+    plan = plan_acquisition(
+        "spl-open-data",
+        version=version,
+        keys=[key],
+        registry=registry,
+        session=session,
+        acknowledgements=(SPL_LICENSE_ACKNOWLEDGEMENT,),
+    )
+    assert plan.resolver == "routed"
+    assert plan.files[0].url.startswith(
+        f"https://raw.githubusercontent.com/Sport-Performance-Lab/SPL-Open-Data/{version}/"
+    )
+    assert plan.files[0].git_blob_sha1 == (
+        registry.source("spl-open-data").version(version).retrieval.files[0].sha1
+    )
 
 
 def test_spl_plan_rejects_superstring_acknowledgements() -> None:
@@ -1317,7 +1346,10 @@ def test_acquire_also_rejects_superstring_acknowledgements(tmp_settings: Setting
         )
 
 
-def test_cli_refuses_spl_without_the_explicit_flag(capsys: pytest.CaptureFixture[str]) -> None:
+def test_cli_refuses_spl_without_the_explicit_flag(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from dynamis.acquisition import cli as acquisition_cli
     from dynamis.acquisition.cli import main
 
     version, key = _spl_selection()
@@ -1326,8 +1358,16 @@ def test_cli_refuses_spl_without_the_explicit_flag(capsys: pytest.CaptureFixture
     assert "--acknowledge-spl-license-restrictions" in err
     assert "operator" in err.lower()
 
-    # Passing the flag satisfies the source gate, but SPL has no resolver in this
-    # build: acquisition is still refused and no payload is downloaded.
+    # Passing the flag satisfies the source gate and forwards the exact token to
+    # the planner; this test stops at the planner boundary so no network is used.
+    captured: dict[str, object] = {}
+
+    def stop_after_gate(dataset_id: str, **kwargs: object):
+        captured["dataset_id"] = dataset_id
+        captured.update(kwargs)
+        raise PlanError("planned boundary reached")
+
+    monkeypatch.setattr(acquisition_cli, "plan_acquisition", stop_after_gate)
     assert (
         main(
             [
@@ -1342,7 +1382,8 @@ def test_cli_refuses_spl_without_the_explicit_flag(capsys: pytest.CaptureFixture
         )
         == 2
     )
-    assert "no acquisition resolver" in capsys.readouterr().err
+    assert captured["dataset_id"] == "spl-open-data"
+    assert captured["acknowledgements"] == ("spl-license-restrictions",)
 
 
 def test_cli_json_dry_run_emits_the_plan(

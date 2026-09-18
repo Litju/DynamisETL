@@ -24,6 +24,9 @@ from dynamis.adapters.skillcorner.adapter import SkillCornerMatchAdapter
 from dynamis.adapters.skillcorner.authorities import POSE_LANDMARKS, SKILLCORNER_DATASET_ID
 from dynamis.adapters.skillcorner.discovery import discover_skillcorner
 from dynamis.adapters.skillcorner.metadata import parse_match_metadata
+from dynamis.adapters.spl.adapter import SplFreethrowAdapter, SplTrialSource
+from dynamis.adapters.spl.authorities import SPL_DATASET_ID
+from dynamis.adapters.spl.discovery import discover_spl
 from dynamis.adapters.sportec_idsse.adapter import IdsseMatchAdapter
 from dynamis.adapters.sportec_idsse.authorities import tracking_stream_id
 from dynamis.adapters.sportec_idsse.discovery import discover_idsse
@@ -173,6 +176,7 @@ def write_discovery_receipts(
     skillcorner_metadata_path: Path | None = None,
     skillcorner_tracking_path: Path | None = None,
     skillcorner_pose_path: Path | None = None,
+    spl_trial_paths: tuple[SplTrialSource, ...] = (),
     name: str,
 ) -> str:
     """Write the structural discovery receipt for a provider slice.
@@ -214,6 +218,10 @@ def write_discovery_receipts(
             tracking_path=skillcorner_tracking_path,
             pose_zip_path=skillcorner_pose_path,
         ).to_dict()
+    elif dataset_id == SPL_DATASET_ID:
+        if not spl_trial_paths:
+            raise ValueError("SPL discovery requires at least one locked trial path")
+        payload = discover_spl(tuple(spl_trial_paths)).to_dict()
     else:
         if match_information_path is None or events_path is None or positions_path is None:
             raise ValueError("IDSSE discovery requires the three XML paths")
@@ -917,6 +925,154 @@ def ingest_skillcorner_match(
         quarantine_records=tuple(sink.all_records()),
         domain=dict(receipt.domain),
     )
+
+
+def ingest_spl_trials(
+    settings: Settings,
+    *,
+    trials: tuple[SplTrialSource, ...],
+    version: str,
+    row_group_size: int = DEFAULT_ROW_GROUP_SIZE,
+    batch_size: int = DEFAULT_BATCH_SIZE,
+) -> IngestResult:
+    """Locked SPL free-throw trials -> canonical pose Silver streams.
+
+    The same dataset participant is carried across sessions as one identity while
+    the sessions and their clocks stay distinct. Coordinates are converted from
+    the source's feet to metres with the exact 0.3048 factor; session-specific
+    keypoint availability is preserved with explicit unavailable rows, and no
+    parent graph is invented.
+    """
+    if not trials:
+        raise ValueError("SPL ingestion requires at least one locked trial")
+    assert_local_only_boundary(settings, SPL_DATASET_ID)
+    ensure_dataset_layout(settings)
+
+    adapter = SplFreethrowAdapter(trials=trials, version=version, batch_size=batch_size)
+    source_keys = tuple(source.key for source in trials)
+    # The receipt identity names the participant slice, not one session: the same
+    # participant is deliberately present in every accepted session.
+    participant_ids = sorted({identity.participant_id for identity in adapter.identities()})
+    receipt_scope = participant_ids[0] if len(participant_ids) == 1 else "spl-freethrow"
+
+    results: list[IngestStreamResult] = [
+        write_canonical_stream(settings, stream, row_group_size=row_group_size)
+        for stream in adapter.streams()
+    ]
+    result_by_stream = {item.stream_id: item for item in results}
+
+    sink = QuarantineSink(settings)
+    sink.add_many(adapter.quarantined())
+    quarantine_artifacts = tuple(sink.materialize(name=receipt_scope)) if sink.total else ()
+
+    reconciliations: list[StreamReconciliation] = []
+    trial_receipts: list[dict[str, Any]] = []
+    canonicalizers = adapter.canonicalizers()
+    for source in trials:
+        canonicalizer = canonicalizers[source.key]
+        summary = canonicalizer.summary()
+        result = result_by_stream[summary.stream_id]
+        checks = {
+            **summary.to_dict(),
+            "skeleton_id": canonicalizer.skeleton_id,
+            "source_length_unit": "ft",
+            "source_to_si_scale": 0.3048,
+            "conversion": "value_m = value_ft * 0.3048 (exact documented factor)",
+            "topology": "landmark_set (source publishes no parent graph)",
+            "missing_keypoints_imputed": False,
+            "ball_not_canonicalized": (
+                "ball trajectory and shot-result context are not pose concepts in RES-99 "
+                "and remain in immutable Bronze"
+            ),
+        }
+        trial_receipts.append(checks)
+        reconciliations.append(
+            StreamReconciliation(
+                stream_id=summary.stream_id,
+                modality=Modality.POSE.value,
+                subject_id=summary.identity.participant_id,
+                trial_id=summary.identity.trial_id,
+                source_records=summary.source_records,
+                canonical_rows=summary.canonical_rows,
+                quarantined_rows=summary.quarantined_rows,
+                ignored_records=0,
+                ignored_reasons={},
+                canonical_time_min_ns=result.t_rel_min_ns,
+                canonical_time_max_ns=result.t_rel_max_ns,
+                null_counts=result.null_counts,
+                schema_valid=True,
+                units_valid=True,
+                coordinate_frame_id=result.coordinate_frame_id,
+                checks=checks,
+            )
+        )
+
+    receipt = ReconciliationReceipt(
+        dataset_id=SPL_DATASET_ID,
+        version=version,
+        session_id=receipt_scope,
+        source_keys=source_keys,
+        streams=tuple(reconciliations),
+        domain={
+            "participant_ids": participant_ids,
+            "participant_identity_consistent_across_sessions": True,
+            "sessions": sorted({identity.session_date for identity in adapter.identities()}),
+            "rates_hz": {
+                summary.identity.session_date: summary.sampling_rate_hz
+                for summary in adapter.summaries()
+            },
+            "trials": trial_receipts,
+            "ball_observations_by_trial": {
+                summary.stream_id: summary.ball_observations for summary in adapter.summaries()
+            },
+            "feet_to_metre_scale": 0.3048,
+            "cross_session_synchronization": False,
+            "quarantine_by_rule": sink.counts,
+            "skeletons": [
+                {
+                    "skeleton_id": skeleton.skeleton_id,
+                    "topology": skeleton.topology.value,
+                    "joint_count": skeleton.joint_count,
+                    "joints": [joint.joint_name for joint in skeleton.joints],
+                }
+                for skeleton in adapter.source_authorities().skeletons
+            ],
+        },
+        silver_artifacts=tuple(result.to_dict() for result in results),
+        quarantine_artifacts=quarantine_artifacts,
+        notes=(
+            "CC BY-NC-SA 4.0 plus the role-dependent exclusion: inputs and outputs stay "
+            "outside Git; NC/SA obligations are never overridden.",
+            "Pose keypoints are provider model estimates (MODEL_ESTIMATED), never raw "
+            "instrument measurements.",
+            "Session-specific keypoint availability is preserved: null/absent keypoints are "
+            "explicit is_available=false rows and are never imputed.",
+            "No parent graph is invented for a source that publishes none.",
+            "No smoothing, interpolation, joint angle, angular velocity, ROM or inverse "
+            "dynamics runs in RES-99.",
+        ),
+    )
+    assert_reconciled(receipt)
+    receipt_path = write_reconciliation_receipt(settings, receipt, name=f"{receipt_scope}-pose")
+    return IngestResult(
+        dataset_id=SPL_DATASET_ID,
+        version=version,
+        session_id=receipt_scope,
+        source_keys=source_keys,
+        streams=tuple(results),
+        quarantine_artifacts=quarantine_artifacts,
+        reconciliation=receipt,
+        receipt_path=receipt_path,
+        provider_domain=adapter.domain(),
+        quarantine_records=tuple(sink.all_records()),
+        domain=dict(receipt.domain),
+    )
+
+
+def _identity_for_source(source: SplTrialSource):
+    from dynamis.adapters.spl.trial import identity_from_key
+
+    return identity_from_key(source.key)
 
 
 def ingest_gymaware_landmine(
