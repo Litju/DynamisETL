@@ -263,11 +263,29 @@ class GymAwareAdapter:
             subject_id = _subject_id(
                 vision_row.subject_ordinal if vision_row else None, item.set_number
             )
+            counters.source_rep_rows += item.source_rep_lines
+            if item.malformed_rep_rows:
+                counters.quarantined_rep_rows += item.malformed_rep_rows
+                counters.quarantined.append(
+                    QuarantinedRecord(
+                        rule=RULE_SCHEMA_FAILURE,
+                        detail="GymAware set export contains malformed rep rows",
+                        dataset_id=GYMAWARE_DATASET_ID,
+                        session_id=_session_id(subject_id),
+                        subject_id=subject_id,
+                        source_record_id=item.member_name,
+                        evidence={
+                            "source_rep_lines": item.source_rep_lines,
+                            "parsed_rep_rows": len(item.reps),
+                            "issues": list(item.issues),
+                        },
+                    )
+                )
             if not item.reps:
                 counters.quarantined.append(
                     QuarantinedRecord(
                         rule=RULE_SCHEMA_FAILURE,
-                        detail="GymAware set export contains no rep rows",
+                        detail="GymAware set export contains no usable rep rows",
                         dataset_id=GYMAWARE_DATASET_ID,
                         session_id=_session_id(subject_id),
                         stream_id=None,
@@ -278,7 +296,6 @@ class GymAwareAdapter:
                 )
                 continue
             for rep in item.reps:
-                counters.source_rep_rows += 1
                 if not math.isfinite(float(rep.rep_number)):
                     counters.quarantined_rep_rows += 1
                     counters.quarantined.append(

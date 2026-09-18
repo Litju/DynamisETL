@@ -178,8 +178,9 @@ def test_ingest_reconciles_sets_reps_and_metric_values(
     assert balances["gymaware-sets"].source_records == 5
     assert balances["gymaware-sets"].canonical_rows == 4
     assert balances["gymaware-sets"].ignored_records == 1
-    assert balances["gymaware-rep-rows"].source_records == 5
+    assert balances["gymaware-rep-rows"].source_records == 6
     assert balances["gymaware-rep-rows"].canonical_rows == 5
+    assert balances["gymaware-rep-rows"].quarantined_rows == 1
     assert balances["gymaware-metric-values"].source_records == 30
     assert balances["gymaware-metric-values"].canonical_rows == 30
     assert balances["vision-metric-values"].source_records == 36
@@ -224,6 +225,34 @@ def test_metric_import_is_idempotent_by_identity(
     assert [item.derived_metric_id for item in first.source_metrics] == [
         item.derived_metric_id for item in second.source_metrics
     ]
+
+
+def test_partially_malformed_set_keeps_valid_reps_and_quarantines_the_bad_one(
+    tmp_path: Path,
+) -> None:
+    archive = providers.write_gymaware_zip(
+        tmp_path / "LP_partial.zip",
+        sets=(
+            providers.GymAwareFixtureSpec(
+                set_number=1,
+                display_name="Synthetic Alpha",
+                activity="站姿",
+                load_raw="20kg",
+                reps=(
+                    (1.0, 1.5, 300.0, 150.0, 400.0, 200.0),
+                    (1.1, 1.6, 320.0, 160.0, 410.0, 205.0),
+                ),
+                malformed_row="Rep,not-a-number,1.0,1.0,1.0,1.0,1.0,1.0",
+                vision_rep_values=(1.0, 1.5, 300.0),
+            ),
+        ),
+    )
+    adapter = GymAwareAdapter(discover_gymaware_landmine(archive))
+    assert adapter.counters.source_rep_rows == 3
+    assert adapter.counters.canonical_trials == 2
+    assert adapter.counters.quarantined_rep_rows == 1
+    rules = {record.rule for record in adapter.counters.quarantined}
+    assert rules == {"schema_failure"}
 
 
 def test_non_finite_metric_value_is_quarantined(tmp_path: Path) -> None:

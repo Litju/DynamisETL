@@ -89,10 +89,16 @@ class GymAwareSet:
     source_time: str | None
     reps: tuple[GymAwareRep, ...]
     issues: tuple[str, ...] = ()
+    #: Every source line whose first cell is ``Rep`` (valid, malformed or short).
+    source_rep_lines: int = 0
 
     @property
     def rep_rows(self) -> int:
         return len(self.reps)
+
+    @property
+    def malformed_rep_rows(self) -> int:
+        return max(self.source_rep_lines - len(self.reps), 0)
 
 
 def parse_numeric(text: str | None) -> float | None:
@@ -137,6 +143,7 @@ def parse_gymaware_csv(member_name: str, raw: bytes) -> GymAwareSet:
         for key, value in _ASCII_FIELD.findall(lines[0] if lines else ""):
             metadata[key.strip().lower()] = value.strip()
     issues: list[str] = []
+    source_rep_lines = sum(1 for line in lines if line.split(",", 1)[0].strip() == "Rep")
     if header_line is None:
         return GymAwareSet(
             set_number=set_number,
@@ -150,6 +157,7 @@ def parse_gymaware_csv(member_name: str, raw: bytes) -> GymAwareSet:
             source_time=metadata.get("time"),
             reps=(),
             issues=("no Row Type header found",),
+            source_rep_lines=source_rep_lines,
         )
     header = [cell.strip() for cell in header_line.split(",")]
     index_by_metric: dict[str, int] = {}
@@ -195,6 +203,7 @@ def parse_gymaware_csv(member_name: str, raw: bytes) -> GymAwareSet:
         source_time=metadata.get("time"),
         reps=tuple(reps),
         issues=tuple(issues),
+        source_rep_lines=source_rep_lines,
     )
 
 
