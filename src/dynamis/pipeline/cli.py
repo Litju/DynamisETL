@@ -30,6 +30,12 @@ from dynamis.adapters.gymaware_landmine.adapter import (
     adapter_algorithm_spec as gymaware_algorithm_spec,
 )
 from dynamis.adapters.gymaware_landmine.authorities import GYMAWARE_DATASET_ID
+from dynamis.adapters.skillcorner.authorities import (
+    SKILLCORNER_DATASET_ID,
+)
+from dynamis.adapters.skillcorner.authorities import (
+    adapter_algorithm_spec as skillcorner_algorithm_spec,
+)
 from dynamis.adapters.sportec_idsse.adapter import adapter_algorithm_spec as idsse_algorithm_spec
 from dynamis.adapters.white_cmj.adapter import (
     adapter_algorithm_spec as white_algorithm_spec,
@@ -45,6 +51,7 @@ from dynamis.pipeline.ingest import (
     IngestResult,
     ingest_dfl_match,
     ingest_gymaware_landmine,
+    ingest_skillcorner_match,
     ingest_white_cmj,
     ingest_womens_j01,
 )
@@ -59,11 +66,13 @@ EXIT_OK = 0
 EXIT_FAILURE = 2
 
 MATCH_TOKEN = re.compile(r"DFL-MAT-([A-Z0-9]+)")
+SKILLCORNER_MATCH_TOKEN = re.compile(r"matches/(?P<match>\d+)/")
 SUPPORTED_DATASETS = {
     "womens-soccer-positioning": "womens soccer positioning (GNSS)",
     "dfl-sportec-idsse": "DFL/Sportec IDSSE (tracking + events)",
     "white-cmj-acc-grf": "White CMJ accelerometer + vGRF (per-trial IMU + force)",
     "gymaware-landmine-vision": "GymAware landmine press + vision (source metrics)",
+    "skillcorner-opendata": "SkillCorner Open Data (tracking + body pose)",
 }
 
 
@@ -127,6 +136,12 @@ def _default_session(dataset_id: str, keys: Sequence[str]) -> str:
         return "white-cmj-release"
     if dataset_id == GYMAWARE_DATASET_ID:
         return "gymaware-landmine-release"
+    if dataset_id == SKILLCORNER_DATASET_ID:
+        for key in keys:
+            match = SKILLCORNER_MATCH_TOKEN.search(key)
+            if match:
+                return match.group("match")
+        raise PlanError("cannot derive the SkillCorner match identity from the selected keys")
     for key in keys:
         match = MATCH_TOKEN.search(key)
         if match:
@@ -196,6 +211,29 @@ def _write_discovery(
             name=f"{session_id}-zip",
         )
         return
+    if args.dataset_id == SKILLCORNER_DATASET_ID:
+        metadata_path = next(
+            (path for key, path in paths.items() if key.endswith("_match.json")), None
+        )
+        tracking = next(
+            (path for key, path in paths.items() if key.endswith("_tracking_extrapolated.jsonl")),
+            None,
+        )
+        pose = next((path for key, path in paths.items() if key.endswith(".jsonl.zip")), None)
+        if metadata_path is None or tracking is None or pose is None:
+            raise PlanError(
+                "SkillCorner discovery requires the match metadata, tracking and pose archive"
+            )
+        write_discovery_receipts(
+            config,
+            dataset_id=args.dataset_id,
+            version=args.version,
+            skillcorner_metadata_path=metadata_path,
+            skillcorner_tracking_path=tracking,
+            skillcorner_pose_path=pose,
+            name=f"{session_id}-match",
+        )
+        return
     write_discovery_receipts(
         config,
         dataset_id=args.dataset_id,
@@ -245,6 +283,38 @@ def _ingest(args: argparse.Namespace) -> tuple[IngestResult, str]:
             raise PlanError("no accepted .zip key selected for the GymAware source")
         result = ingest_gymaware_landmine(config, zip_path=archive, version=args.version)
         return result, session_id
+    if args.dataset_id == SKILLCORNER_DATASET_ID:
+        metadata_path = next(
+            (path for key, path in paths.items() if key.endswith("_match.json")), None
+        )
+        tracking = next(
+            (path for key, path in paths.items() if key.endswith("_tracking_extrapolated.jsonl")),
+            None,
+        )
+        pose = next((path for key, path in paths.items() if key.endswith(".jsonl.zip")), None)
+        missing_skillcorner = [
+            name
+            for name, value in (
+                ("match metadata", metadata_path),
+                ("tracking", tracking),
+                ("pose archive", pose),
+            )
+            if value is None
+        ]
+        if missing_skillcorner:
+            raise PlanError(
+                f"SkillCorner ingestion requires the full match set; missing: {missing_skillcorner}"
+            )
+        assert metadata_path is not None and tracking is not None and pose is not None
+        result = ingest_skillcorner_match(
+            config,
+            match_json_path=metadata_path,
+            tracking_path=tracking,
+            pose_zip_path=pose,
+            version=args.version,
+            batch_size=args.batch_size or 16384,
+        )
+        return result, session_id
 
     positions = next((path for key, path in paths.items() if "_positions_" in key), None)
     events = next((path for key, path in paths.items() if "_events_" in key), None)
@@ -283,6 +353,8 @@ def _persist(args: argparse.Namespace, result: IngestResult, session_id: str) ->
     suffix = "res97"
     if args.dataset_id in {WHITE_DATASET_ID, GYMAWARE_DATASET_ID}:
         suffix = "res98"
+    elif args.dataset_id == SKILLCORNER_DATASET_ID:
+        suffix = "res99"
     return persist_ingest(
         config,
         dataset_id=args.dataset_id,
@@ -302,6 +374,8 @@ def _adapter_algorithm(dataset_id: str):
         return white_algorithm_spec()
     if dataset_id == GYMAWARE_DATASET_ID:
         return gymaware_algorithm_spec()
+    if dataset_id == SKILLCORNER_DATASET_ID:
+        return skillcorner_algorithm_spec()
     return idsse_algorithm_spec()
 
 
