@@ -60,3 +60,43 @@ def test_redistributable_sources_are_not_blocked(tmp_path: Path) -> None:
     source = source_by_id(validate_registry(), "dfl-sportec-idsse")
     assert_dataset_root_outside_repository(source, repository_root() / "data")
     assert_export_allowed(source, tmp_path / "out.parquet")
+
+
+def test_acquisition_refuses_a_local_only_source_inside_the_repository(
+    tmp_path: Path,
+) -> None:
+    from dynamis.acquisition.plan import AcquisitionPlan, PlannedFile
+    from dynamis.acquisition.runner import acquire
+
+    settings = Settings(
+        dataset_root=repository_root() / "res98-fetch-should-not-exist",
+        database_root=tmp_path / "db",
+        duckdb_path=tmp_path / "db" / "d.duckdb",
+        db_schema="guard_test",
+    )
+    plan = AcquisitionPlan(
+        dataset_id="white-cmj-acc-grf",
+        version="v1",
+        provider="Zenodo",
+        resolver="zenodo",
+        license_identifier=None,
+        license_local_only=True,
+        attribution_required=True,
+        citation=None,
+        upstream_url="https://zenodo.org/records/19136480",
+        selection="keys",
+        files=(
+            PlannedFile(
+                key="cmj_dataset_both.npz",
+                url="https://zenodo.org/api/records/19136480/files/cmj_dataset_both.npz/content",
+                size_bytes=1,
+                upstream_md5=None,
+                upstream_sha1=None,
+                upstream_sha256=None,
+                git_blob_sha1=None,
+            ),
+        ),
+    )
+    with pytest.raises(RightsError, match="inside the repository"):
+        acquire(settings, plan, registry=validate_registry())
+    assert not (repository_root() / "res98-fetch-should-not-exist").exists()
