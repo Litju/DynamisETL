@@ -88,3 +88,8 @@ pgdata/
 Thumbs.db
 desktop.ini
 *~
+
+# dbt build artifacts (regenerated locally)
+analytics/target/
+analytics/logs/
+
