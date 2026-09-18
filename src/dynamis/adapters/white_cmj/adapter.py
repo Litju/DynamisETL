@@ -253,6 +253,9 @@ class WhiteCmjAdapter:
         return tuple(observations)
 
     def source_authorities(self) -> SourceAuthorities:
+        # One alignment per *accepted* trial: a quarantined trial materializes no
+        # streams, so persisting an alignment for it would reference endpoints
+        # that do not exist and would misstate the canonical corpus.
         alignments = tuple(
             SyncAlignment(
                 source_stream_id=force_stream_id(trial.trial_id),
@@ -266,6 +269,7 @@ class WhiteCmjAdapter:
                 ),
             )
             for trial in self._trials
+            if self._validate_trial(trial)
         )
         return SourceAuthorities(
             frames=(authorities.sensor_frame(), authorities.plate_frame()),

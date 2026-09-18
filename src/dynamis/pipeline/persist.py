@@ -52,8 +52,18 @@ SENSOR_STREAM_TABLE = _TABLES["sensor_stream"]
 SESSION_TABLE = _TABLES["session"]
 SESSION_PARTICIPANT_TABLE = _TABLES["session_participant"]
 SUBJECT_TABLE = _TABLES["subject"]
+SYNC_ALIGNMENT_TABLE = _TABLES["sync_alignment"]
 SYNCHRONIZATION_SPEC_TABLE = _TABLES["synchronization_spec"]
 TRIAL_TABLE = _TABLES["trial"]
+
+#: Identity columns of ``sync_alignment``; the alignment is deterministic and
+#: never generates a random identifier.
+SYNC_ALIGNMENT_KEY = (
+    "dataset_id",
+    "source_stream_id",
+    "target_stream_id",
+    "sync_spec_id",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,6 +94,74 @@ def _upsert(connection, table: Table, rows: list[dict[str, Any]]) -> int:
         .returning(*primary_keys)
     )
     return len(connection.execute(statement).fetchall())
+
+
+def _upsert_alignment(connection, rows: list[dict[str, Any]]) -> int:
+    """Insert-or-refresh one declared alignment per deterministic identity.
+
+    The identity (dataset, source stream, target stream, sync spec) never
+    changes; a rerun whose declared offset, scale or notes changed under the
+    same identity converges to the current declaration instead of leaving a
+    stale row behind.
+    """
+    if not rows:
+        return 0
+    statement = pg_insert(SYNC_ALIGNMENT_TABLE).values(rows)
+    statement = statement.on_conflict_do_update(
+        index_elements=list(SYNC_ALIGNMENT_KEY),
+        set_={
+            "offset_ns": statement.excluded.offset_ns,
+            "scale": statement.excluded.scale,
+            "notes": statement.excluded.notes,
+        },
+    )
+    connection.execute(statement)
+    # Every row was inserted or refreshed to the current declaration; a driver
+    # rowcount is not portable for a multi-row upsert, so report the declared
+    # count instead of a driver-specific interpretation.
+    return len(rows)
+
+
+def _alignment_rows(domain: ProviderDomain) -> list[dict[str, Any]]:
+    """Resolve declared alignments against the domain's own streams.
+
+    An alignment is dataset-scoped by construction, so both endpoints must be
+    streams of *this* domain; a dangling reference is a programming error, not
+    something to persist for a foreign key to reject later.
+    """
+    stream_dataset = {stream.stream_id: stream.dataset_id for stream in domain.streams}
+    rows: list[dict[str, Any]] = []
+    for alignment in domain.authorities.alignments:
+        source_dataset = stream_dataset.get(alignment.source_stream_id)
+        target_dataset = stream_dataset.get(alignment.target_stream_id)
+        missing = [
+            stream_id
+            for stream_id, dataset in (
+                (alignment.source_stream_id, source_dataset),
+                (alignment.target_stream_id, target_dataset),
+            )
+            if dataset is None
+        ]
+        if missing:
+            raise ValueError(
+                f"declared sync alignment references stream(s) outside the domain: {missing}"
+            )
+        if source_dataset != target_dataset:
+            raise ValueError(
+                f"declared sync alignment spans datasets: {source_dataset!r} -> {target_dataset!r}"
+            )
+        rows.append(
+            {
+                "dataset_id": source_dataset,
+                "source_stream_id": alignment.source_stream_id,
+                "target_stream_id": alignment.target_stream_id,
+                "sync_spec_id": alignment.sync_spec_id,
+                "offset_ns": alignment.offset_ns,
+                "scale": alignment.scale,
+                "notes": alignment.notes,
+            }
+        )
+    return rows
 
 
 def _update_run(connection, table: Table, row: dict[str, Any]) -> int:
@@ -397,6 +475,9 @@ def persist_domain(connection, domain: ProviderDomain) -> dict[str, int]:
             for stream in domain.streams
         ],
     )
+    # Alignments are persisted only after their endpoints and sync spec exist;
+    # the composite foreign keys then prove the dataset-scoped pairing.
+    written["sync_alignment"] = _upsert_alignment(connection, _alignment_rows(domain))
     return written
 
 
