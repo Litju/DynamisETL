@@ -30,11 +30,13 @@ def test_export_of_local_only_records_is_refused(dataset_id: str) -> None:
         assert_export_allowed(source, Path("exports/out.parquet"))
 
 
-def test_repository_root_is_never_a_valid_dataset_root_for_local_only_sources() -> None:
+def test_repository_root_is_never_a_valid_dataset_root_for_local_only_sources(
+    tmp_path: Path,
+) -> None:
     source = source_by_id(validate_registry(), "white-cmj-acc-grf")
     with pytest.raises(RightsError, match="inside the repository"):
         assert_dataset_root_outside_repository(source, repository_root() / "data")
-    assert_dataset_root_outside_repository(source, Path("E:/scientific-data"))
+    assert_dataset_root_outside_repository(source, tmp_path / "scientific-data")
 
 
 def test_ingest_refuses_to_materialize_local_only_sources_in_the_repository(
