@@ -1,7 +1,8 @@
 """GymAware landmine press + vision anti-corruption adapter.
 
-Provider: Zenodo record 10.5281/zenodo.18598087 (v1; unclear rights,
-local-only). The verified archive distributes rep-level summary indicators and
+Provider: Zenodo record 10.5281/zenodo.18598087 (v1; declared CC-BY-4.0,
+attribution required, redistribution conditional, per the RES-104 rights
+audit). The verified archive distributes rep-level summary indicators and
 one populated vision-workbook example row; it contains no sample-level
 trajectory. Canonical targets are source-derived scalar metric observations
 only — no dense LPT stream is fabricated.

@@ -16,7 +16,7 @@ matches the upstream record fails the plan (drift), and there is no implicit
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 
 import requests
@@ -27,7 +27,12 @@ from dynamis.acquisition.resolvers import (
     resolver_for,
 )
 from dynamis.contracts import DatasetRegistry, DatasetSource, DatasetVersion
-from dynamis.registry import RegistryError, latest_version, validate_registry
+from dynamis.registry import (
+    RegistryError,
+    assert_acquisition_acknowledged,
+    latest_version,
+    validate_registry,
+)
 
 DEFAULT_METADATA_TIMEOUT_S = (15.0, 60.0)
 
@@ -154,8 +159,14 @@ def plan_acquisition(
     registry: DatasetRegistry | None = None,
     session: requests.Session | None = None,
     timeout: tuple[float, float] = DEFAULT_METADATA_TIMEOUT_S,
+    acknowledgements: Collection[str] = (),
 ) -> AcquisitionPlan:
-    """Resolve a registry source into a canonical, revision-pinned fetch plan."""
+    """Resolve a registry source into a canonical, revision-pinned fetch plan.
+
+    ``acknowledgements`` carries source-specific eligibility acknowledgements.
+    The gate fails closed before any resolver or metadata request runs, so an
+    unacknowledged restricted source can never be planned, let alone fetched.
+    """
     document = registry if registry is not None else validate_registry()
     try:
         source = document.source(dataset_id)
@@ -166,6 +177,7 @@ def plan_acquisition(
     except KeyError as exc:
         raise PlanError(str(exc)) from exc
 
+    assert_acquisition_acknowledged(source, acknowledgements)
     selected = select_keys(selected_version, keys=keys, match=match, all_files=all_files)
     mode = _selection_mode(keys=keys, match=match, all_files=all_files, count=len(selected))
     if not source.license.local_only and not source.license.identifier:

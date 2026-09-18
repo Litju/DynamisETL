@@ -48,7 +48,7 @@ EXPECTED_ASSET_CHECKS = {
 def test_registry_summary_validates_and_reports_rights() -> None:
     summary = registry_summary()
     assert summary["source_count"] == 8
-    assert "white-cmj-acc-grf" in summary["local_only"]
+    assert summary["local_only"] == ["tackle-workload"]
     assert "openbiomechanics" in summary["optional"]
     assert "modality coverage: complete" in summary["summary"]
 

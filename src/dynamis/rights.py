@@ -10,6 +10,13 @@ Two independent obligations are enforced here:
 The gate is deliberately conservative: it can only block, never relax. Being
 stricter than a provider's eventual clarification is always safe; the reverse is
 not.
+
+Deferred hardening (RES-104): the path check resolves the configured
+``dataset_root`` before any write, so a concurrently swapped symlink could in
+principle redirect a later write back into the repository (TOCTOU). Under the
+current trusted single-user local-workstation threat model this is accepted as
+deferred defense-in-depth; a full ``openat``/``dir_fd`` no-follow storage
+architecture is tracked separately rather than bolted onto this bounded closure.
 """
 
 from __future__ import annotations

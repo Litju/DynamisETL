@@ -16,7 +16,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -34,19 +34,19 @@ from dynamis.contracts.invariants import InvariantError
 # Sources whose upstream record exposes no explicit license value. They stay
 # local-only until rights are clarified; this list is the audit anchor for
 # DATA_SOURCES.md and is asserted by tests so rights drift cannot pass silently.
+# RES-104 captured the Zenodo API license id AND the rendered record Rights/
+# License display for White and GymAware as cc-by-4.0, so those two sources
+# moved to declared CC-BY-4.0; only TACKLE remains unclear/local-only.
 LOCAL_ONLY_WHEN_RIGHTS_UNCLEAR = frozenset(
     {
-        "white-cmj-acc-grf",
-        "gymaware-landmine-vision",
         "tackle-workload",
     }
 )
 
-# SPL Open Data is CC BY-NC-SA 4.0. The OpenBiomechanics professional-sports /
-# financial-analysis exclusion belongs to OpenBiomechanics only and must never
-# be attached to SPL.
 REQUIRED_LICENSE_IDENTIFIERS = {
     "womens-soccer-positioning": "CC-BY-NC-4.0",
+    "white-cmj-acc-grf": "CC-BY-4.0",
+    "gymaware-landmine-vision": "CC-BY-4.0",
     "dfl-sportec-idsse": "CC-BY-4.0",
     "skillcorner-opendata": "MIT",
     "spl-open-data": "CC-BY-NC-SA-4.0",
@@ -54,11 +54,62 @@ REQUIRED_LICENSE_IDENTIFIERS = {
 }
 
 OPENBIOMECHANICS_EXCLUSION_MARKER = "professional sports organization"
-SPL_FORBIDDEN_EXCLUSION_MARKER = "professional sports organization"
+#: SPL's own LICENSE at the pinned revision carries a role-dependent exclusion
+#: in addition to CC BY-NC-SA 4.0; both must be preserved.
+SPL_EXCLUSION_MARKERS = (
+    "professional sports organization",
+    "financial analysis",
+    "significant shareholder",
+)
+
+# ---------------------------------------------------------------------------
+# Acquisition eligibility acknowledgement
+# ---------------------------------------------------------------------------
+
+SPL_DATASET_ID = "spl-open-data"
+SPL_LICENSE_ACKNOWLEDGEMENT = "spl-license-restrictions"
+
+#: Source-specific acknowledgement tokens. The acknowledgement is deliberately
+#: source-scoped so that satisfying one source's gate can never silently satisfy
+#: an unrelated future license, and it is never inferred from stored profile or
+#: context: absence refuses acquisition.
+REQUIRED_ACKNOWLEDGEMENTS: dict[str, tuple[str, ...]] = {
+    SPL_DATASET_ID: (SPL_LICENSE_ACKNOWLEDGEMENT,),
+}
 
 
 class RegistryError(ValueError):
     """Raised when the registry document is invalid or fails an audit rule."""
+
+
+class AcknowledgementRequired(RegistryError):
+    """An acquisition gate requires an explicit operator acknowledgement."""
+
+
+def required_acknowledgements(dataset_id: str) -> tuple[str, ...]:
+    return REQUIRED_ACKNOWLEDGEMENTS.get(dataset_id, ())
+
+
+def assert_acquisition_acknowledged(source: DatasetSource, acknowledged: Collection[str]) -> None:
+    """Fail closed unless every source-specific acknowledgement was given.
+
+    The acknowledgement records that the operator has read the restriction; it
+    does not assert legal eligibility and does not override any NC/SA term.
+    """
+    required = required_acknowledgements(source.dataset_id)
+    missing = [token for token in required if token not in acknowledged]
+    if not missing:
+        return
+    restrictions = " | ".join(source.license.restrictions) or "(restrictions not recorded)"
+    flags = ", ".join(f"--acknowledge-{token}" for token in missing)
+    raise AcknowledgementRequired(
+        f"{source.dataset_id}: acquisition refused (fail-closed). The source's own "
+        "license carries restrictions that the operator must acknowledge explicitly: "
+        f"{restrictions} Acknowledge with {flags}. Eligibility to use the source "
+        "remains the operator's responsibility; this acknowledgement does not "
+        "override the non-commercial or share-alike obligations and does not assert "
+        "that the operator is legally eligible."
+    )
 
 
 def default_registry_path() -> Path:
@@ -125,16 +176,23 @@ def audit_registry(registry: DatasetRegistry) -> tuple[str, ...]:
                 f"{source.dataset_id}: an unclear-rights source must not assert a license "
                 f"identifier (found {policy.identifier!r})"
             )
-        if source.dataset_id == "spl-open-data":
-            if SPL_FORBIDDEN_EXCLUSION_MARKER in _restriction_text(policy):
+        if source.dataset_id == SPL_DATASET_ID:
+            text = _restriction_text(policy)
+            for marker in SPL_EXCLUSION_MARKERS:
+                if marker not in text:
+                    problems.append(
+                        f"{SPL_DATASET_ID}: the role-dependent exclusion present in SPL's own "
+                        f"LICENSE at the pinned revision must be preserved (missing {marker!r})"
+                    )
+            if "share-alike" not in text:
                 problems.append(
-                    "spl-open-data: the OpenBiomechanics professional-organization / "
-                    "financial-analysis exclusion must not be attached to SPL Open Data"
+                    f"{SPL_DATASET_ID}: CC BY-NC-SA 4.0 share-alike obligations must be recorded"
                 )
-            if "share-alike" not in _restriction_text(policy):
-                problems.append(
-                    "spl-open-data: CC BY-NC-SA 4.0 share-alike obligations must be recorded"
-                )
+        if source.dataset_id in REQUIRED_ACKNOWLEDGEMENTS and not policy.restrictions:
+            problems.append(
+                f"{source.dataset_id}: an acquisition acknowledgement gate exists but no "
+                "source-specific restrictions are recorded for it"
+            )
         if source.dataset_id == "openbiomechanics":
             if OPENBIOMECHANICS_EXCLUSION_MARKER not in _restriction_text(policy):
                 problems.append(
@@ -159,6 +217,9 @@ def audit_registry(registry: DatasetRegistry) -> tuple[str, ...]:
                 )
         if not source.adapter_id or not source.adapter_id.strip():
             problems.append(f"{source.dataset_id}: adapter id must be a non-empty value")
+    for dataset_id, tokens in REQUIRED_ACKNOWLEDGEMENTS.items():
+        if not tokens:
+            problems.append(f"{dataset_id}: an acknowledgement gate must name a token")
     return tuple(problems)
 
 

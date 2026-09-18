@@ -676,6 +676,52 @@ class SensorStream(Base):
     )
 
 
+class SyncAlignment(Base):
+    """Declared affine alignment between two streams of one dataset.
+
+    ``t_target = t_source * scale + offset_ns``. The row is a *declaration*,
+    never a timing-accuracy claim: a scale of 1 and an offset of 0 state that the
+    two streams share a released time coordinate, not that the original
+    instruments had zero synchronization error. Both stream references are
+    dataset-scoped composite foreign keys, so an alignment can never pair
+    streams across datasets.
+    """
+
+    __tablename__ = "sync_alignment"
+
+    dataset_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    source_stream_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    target_stream_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    sync_spec_id: Mapped[str] = mapped_column(
+        String(128), ForeignKey("synchronization_spec.sync_spec_id"), primary_key=True
+    )
+    offset_ns: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    scale: Mapped[float] = mapped_column(Float, nullable=False, server_default=text("1.0"))
+    notes: Mapped[str | None] = mapped_column(Text)
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["dataset_id", "source_stream_id"],
+            ["sensor_stream.dataset_id", "sensor_stream.stream_id"],
+            name="fk_sync_alignment_source_stream",
+        ),
+        ForeignKeyConstraint(
+            ["dataset_id", "target_stream_id"],
+            ["sensor_stream.dataset_id", "sensor_stream.stream_id"],
+            name="fk_sync_alignment_target_stream",
+        ),
+        _ck("sync_alignment", "not_self_referential", "source_stream_id <> target_stream_id"),
+        # PostgreSQL orders NaN above every other float and accepts Infinity, so
+        # a bare "scale > 0" would admit both; reject them explicitly.
+        _ck(
+            "sync_alignment",
+            "positive_finite_scale",
+            "scale > 0 AND scale <> 'NaN'::double precision "
+            "AND scale <> 'Infinity'::double precision",
+        ),
+    )
+
+
 class SampleArtifact(Base):
     """Materialized canonical sample file (Parquet+Zstd) for one stream."""
 
@@ -950,6 +996,7 @@ EXPECTED_TABLE_NAMES = frozenset(
         "skeleton_definition",
         "skeleton_joint",
         "subject",
+        "sync_alignment",
         "synchronization_spec",
         "trial",
     }

@@ -168,7 +168,10 @@ applied.
 
 **Licensing.** `womens-soccer-positioning` is **CC BY-NC 4.0** (non-commercial,
 attribution): keep it local, do not commit it or its derivatives.
-`dfl-sportec-idsse` is **CC BY 4.0** (attribution). See
+`dfl-sportec-idsse` is **CC BY 4.0** (attribution). `white-cmj-acc-grf` and
+`gymaware-landmine-vision` are **CC BY 4.0** (attribution, redistribution
+conditional) per the reproducible rights-evidence audit in
+[`sources/rights_evidence.json`](sources/rights_evidence.json). See
 [`DATA_SOURCES.md`](DATA_SOURCES.md).
 
 ## Data and license boundary
@@ -178,9 +181,14 @@ licenses and are **never committed to Git**. `sources/registry.json` is the
 machine-readable authority; [`DATA_SOURCES.md`](DATA_SOURCES.md) is the
 human-readable notice, and a test enforces agreement between them.
 
-Unclear-rights sources stay local-only, and the OpenBiomechanics
+Unclear-rights sources stay local-only. The OpenBiomechanics
 professional-sports-organization / financial-analysis exclusion is preserved
-verbatim. NC/SA data stay outside the code license boundary.
+verbatim, and **SPL Open Data carries its own role-dependent exclusion** from its
+`LICENSE` at the pinned revision (employees/contractors/associates/significant
+shareholders of professional sports organizations or financial analysis firms
+need a specific written commercial license); SPL acquisition fails closed until
+the operator passes `--acknowledge-spl-license-restrictions`. NC/SA data stay
+outside the code license boundary.
 
 ## Out of scope so far
 

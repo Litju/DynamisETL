@@ -950,6 +950,89 @@ def test_cli_dry_run_plans_without_acquiring(
     assert "27.70" in out
 
 
+def _spl_selection() -> tuple[str, str]:
+    from dynamis.registry import source_by_id, validate_registry
+
+    source = source_by_id(validate_registry(), "spl-open-data")
+    version = source.versions[0]
+    return version.version, version.retrieval.files[0].key
+
+
+def test_spl_plan_fails_closed_without_acknowledgement() -> None:
+    from dynamis.registry import (
+        SPL_LICENSE_ACKNOWLEDGEMENT,
+        AcknowledgementRequired,
+        validate_registry,
+    )
+
+    version, key = _spl_selection()
+    registry = validate_registry()
+    with pytest.raises(AcknowledgementRequired, match="fail-closed"):
+        plan_acquisition("spl-open-data", version=version, keys=[key], registry=registry)
+    with pytest.raises(AcknowledgementRequired):
+        plan_acquisition(
+            "spl-open-data",
+            version=version,
+            keys=[key],
+            registry=registry,
+            acknowledgements=("an-unrelated-source-acknowledgement",),
+        )
+    # The exact acknowledgement satisfies the gate; SPL still has no resolver
+    # registered in this build, so nothing is fetched and a resolver error (not an
+    # acknowledgement error) is raised next. No HTTP request is made.
+    with pytest.raises(PlanError, match="no acquisition resolver"):
+        plan_acquisition(
+            "spl-open-data",
+            version=version,
+            keys=[key],
+            registry=registry,
+            acknowledgements=(SPL_LICENSE_ACKNOWLEDGEMENT,),
+        )
+
+
+def test_acquire_also_refuses_spl_without_acknowledgement(
+    tmp_settings: Settings,
+) -> None:
+    from dynamis.registry import AcknowledgementRequired, validate_registry
+
+    version, key = _spl_selection()
+    plan = _plan(
+        (_planned_file(key, "https://github.com/Sport-Performance-Lab/SPL-Open-Data/raw/pin/x"),),
+        dataset_id="spl-open-data",
+        version=version,
+    )
+    with pytest.raises(AcknowledgementRequired, match="fail-closed"):
+        acquire(tmp_settings, plan, registry=validate_registry())
+
+
+def test_cli_refuses_spl_without_the_explicit_flag(capsys: pytest.CaptureFixture[str]) -> None:
+    from dynamis.acquisition.cli import main
+
+    version, key = _spl_selection()
+    assert main(["spl-open-data", "--version", version, "--key", key, "--dry-run"]) == 2
+    err = capsys.readouterr().err
+    assert "--acknowledge-spl-license-restrictions" in err
+    assert "operator" in err.lower()
+
+    # Passing the flag satisfies the source gate, but SPL has no resolver in this
+    # build: acquisition is still refused and no payload is downloaded.
+    assert (
+        main(
+            [
+                "spl-open-data",
+                "--version",
+                version,
+                "--key",
+                key,
+                "--acknowledge-spl-license-restrictions",
+                "--dry-run",
+            ]
+        )
+        == 2
+    )
+    assert "no acquisition resolver" in capsys.readouterr().err
+
+
 def test_cli_json_dry_run_emits_the_plan(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

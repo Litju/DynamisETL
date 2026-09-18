@@ -60,10 +60,23 @@ def test_per_source_sections_exist_for_every_dataset(doc_text: str) -> None:
 
 def test_document_states_the_local_only_boundary(doc_text: str) -> None:
     assert doc_text.lower().count("local") >= 3
-    for dataset_id in ("white-cmj-acc-grf", "gymaware-landmine-vision", "tackle-workload"):
-        section = doc_text.split(f"### `{dataset_id}`", 1)[1].split("###", 1)[0].lower()
-        assert "no explicit license value" in section
-        assert "local" in section
+    section = doc_text.split("### `tackle-workload`", 1)[1].split("###", 1)[0].lower()
+    assert "no explicit license value" in section
+    assert "local" in section
+
+
+def test_document_records_the_res104_white_and_gymaware_rights_decisions(doc_text: str) -> None:
+    registry = validate_registry()
+    for dataset_id in ("white-cmj-acc-grf", "gymaware-landmine-vision"):
+        section = doc_text.split(f"### `{dataset_id}`", 1)[1].split("###", 1)[0]
+        assert registry.source(dataset_id).license.identifier == "CC-BY-4.0"
+        assert "CC BY 4.0" in section.replace("CC-BY-4.0", "CC BY 4.0")
+        assert "rights_evidence.json" in section
+
+
+def _normalized_section(doc_text: str, dataset_id: str) -> str:
+    section = doc_text.split(f"### `{dataset_id}`", 1)[1].split("###", 1)[0]
+    return " ".join(section.replace("*", "").split()).lower()
 
 
 def test_document_preserves_the_openbiomechanics_exclusion(doc_text: str) -> None:
@@ -71,6 +84,24 @@ def test_document_preserves_the_openbiomechanics_exclusion(doc_text: str) -> Non
     assert "professional sports organization" in section
     assert "financial analysis" in section
     assert "optional and license-gated" in section
+
+
+def test_document_separates_the_gymaware_archive_and_paper_populations(doc_text: str) -> None:
+    section = _normalized_section(doc_text, "gymaware-landmine-vision")
+    for token in (
+        "24 male athletes",
+        "247 valid method-comparison trials",
+        "254 GymAware set exports",
+        "653 GymAware rep rows",
+        "275 numbered rows",
+        "51 display-name identities",
+        "52 pseudonymous/unresolved subject identities",
+        "653 canonical rep trials",
+        "source set `059`",
+        "not the paper's 247",
+        "not the paper's 24",
+    ):
+        assert token.lower() in section, token
 
 
 def test_document_excludes_soccermon_and_states_the_frame_neutrality(doc_text: str) -> None:

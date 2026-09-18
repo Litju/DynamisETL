@@ -26,7 +26,13 @@ from dynamis.acquisition.plan import AcquisitionPlan, PlanError, plan_acquisitio
 from dynamis.acquisition.resolvers import ResolverError
 from dynamis.acquisition.runner import acquire
 from dynamis.config import ConfigurationError, settings
-from dynamis.registry import assert_registry_valid, load_registry, validate_registry
+from dynamis.registry import (
+    SPL_LICENSE_ACKNOWLEDGEMENT,
+    RegistryError,
+    assert_registry_valid,
+    load_registry,
+    validate_registry,
+)
 
 EXIT_OK = 0
 EXIT_FAILURE = 2
@@ -81,9 +87,29 @@ def build_parser() -> argparse.ArgumentParser:
         help="Alternate registry.json path (defaults to the committed registry)",
     )
     parser.add_argument(
+        "--acknowledge-spl-license-restrictions",
+        action="store_true",
+        help=(
+            "Explicitly acknowledge the SPL Open Data role-dependent license restrictions "
+            "(employees/contractors/associates/significant shareholders of professional "
+            "sports organizations or financial analysis firms). Without this flag SPL "
+            "acquisition is refused. Eligibility to use the source remains the operator's "
+            "responsibility; this acknowledgement does not override the CC BY-NC-SA "
+            "obligations and does not assert legal eligibility."
+        ),
+    )
+    parser.add_argument(
         "--quiet", action="store_true", help="Suppress the human-readable plan summary"
     )
     return parser
+
+
+def _acknowledgements(args: argparse.Namespace) -> tuple[str, ...]:
+    """Source-specific acknowledgement tokens the operator explicitly gave."""
+    tokens: list[str] = []
+    if args.acknowledge_spl_license_restrictions:
+        tokens.append(SPL_LICENSE_ACKNOWLEDGEMENT)
+    return tuple(tokens)
 
 
 def _print_plan(plan: AcquisitionPlan, *, quiet: bool) -> None:
@@ -113,8 +139,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             match=args.match,
             all_files=args.all_files,
             registry=registry,
+            acknowledgements=_acknowledgements(args),
         )
-    except (PlanError, ResolverError, DownloadError) as exc:
+    except (PlanError, RegistryError, ResolverError, DownloadError) as exc:
         print(f"dynamis-fetch: {exc}", file=sys.stderr)
         return EXIT_FAILURE
 
@@ -128,8 +155,13 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         resolved_settings = settings()
-        receipt = acquire(resolved_settings, plan, registry=registry)
-    except (ConfigurationError, DownloadError, OSError) as exc:
+        receipt = acquire(
+            resolved_settings,
+            plan,
+            registry=registry,
+            acknowledgements=_acknowledgements(args),
+        )
+    except (ConfigurationError, DownloadError, OSError, RegistryError) as exc:
         print(f"dynamis-fetch: acquisition failed: {exc}", file=sys.stderr)
         return EXIT_FAILURE
 

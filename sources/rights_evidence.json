@@ -1,0 +1,45 @@
+{
+  "schema_version": "1",
+  "note": "Reproducible rights-evidence authority for RES-104. The audit path queries licensing metadata only (provider record APIs and rendered record pages, plus repository LICENSE files at pinned revisions); no dataset payload is fetched to inspect rights. Machine-specific state is deliberately excluded.",
+  "evidence": [
+    {
+      "dataset_id": "white-cmj-acc-grf",
+      "source_url": "https://zenodo.org/records/19136480",
+      "doi": "10.5281/zenodo.19136480",
+      "authority_type": "zenodo_api_record_metadata + rendered_record_page + author_companion_repository",
+      "license_identifier_observed": "cc-by-4.0",
+      "source_revision": "Zenodo record 19136480 (v1, published 2026-03-20)",
+      "companion_evidence_url": "https://github.com/markgewhite/acc2grf-cmj",
+      "companion_evidence": "Author-controlled README: 'The preprocessed data are deposited separately under CC-BY-4.0: https://doi.org/10.5281/zenodo.19136480'; it also states the deposited data are CC-BY-4.0 and carry their own terms.",
+      "rendered_record_discrepancy": "RES-98's audit recorded a blank rendered Rights/License display; RES-104 did not reproduce that on 2026-09-18: the rendered page shows a cc-by-4.0 badge and links https://creativecommons.org/licenses/by/4.0/legalcode.",
+      "observed_at": "2026-09-18",
+      "decision": "Promote to declared CC-BY-4.0 (attribution required, redistribution conditional, not local-only). The related PLOS article license was not used as authority."
+    },
+    {
+      "dataset_id": "gymaware-landmine-vision",
+      "source_url": "https://zenodo.org/records/18598087",
+      "doi": "10.5281/zenodo.18598087",
+      "authority_type": "zenodo_api_record_metadata + rendered_record_page",
+      "license_identifier_observed": "cc-by-4.0",
+      "source_revision": "Zenodo record 18598087 (v1, published 2026-02-10)",
+      "companion_evidence_url": null,
+      "companion_evidence": "No author-controlled companion statement for the deposit was located; the record's own metadata is the authority.",
+      "rendered_record_discrepancy": "RES-98's audit recorded a blank rendered Rights/License display; RES-104 did not reproduce that on 2026-09-18: the rendered page shows a cc-by-4.0 badge and links https://creativecommons.org/licenses/by/4.0/legalcode.",
+      "observed_at": "2026-09-18",
+      "decision": "Promote to declared CC-BY-4.0 (attribution required, redistribution conditional, not local-only) on the deposit's own API and rendered authority. The related open-access article license was not used as authority."
+    },
+    {
+      "dataset_id": "spl-open-data",
+      "source_url": "https://github.com/Sport-Performance-Lab/SPL-Open-Data",
+      "doi": null,
+      "authority_type": "repository_LICENSE_at_pinned_revision",
+      "license_identifier_observed": "CC-BY-NC-SA-4.0 plus role-dependent exclusion",
+      "source_revision": "a3f9cffbde917b1e1747cedd6ec25dfab18c6051",
+      "companion_evidence_url": null,
+      "companion_evidence": null,
+      "rendered_record_discrepancy": null,
+      "observed_at": "2026-09-18",
+      "decision": "Keep declared CC-BY-NC-SA-4.0 and record SPL's own additional exclusion verbatim: any employee or contractor employed by, associated with, or a significant shareholder of a professional sports organization or financial analysis firm is forbidden to use SPL Open Data for any use whatsoever without a specific written commercial (paid) license. Acquisition fails closed behind the source-specific --acknowledge-spl-license-restrictions gate."
+    }
+  ]
+}

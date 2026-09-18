@@ -21,13 +21,24 @@ unclear-rights data stay outside the code license boundary.
 | dataset_id | provider | license | redistribution | v1 role |
 | --- | --- | --- | --- | --- |
 | `womens-soccer-positioning` | Zenodo | CC-BY-NC-4.0 | conditional | Compact GNSS/player-positioning ingestion |
-| `white-cmj-acc-grf` | Zenodo | unclear | prohibited (local-only) | Synchronized accelerometer/force validation |
-| `gymaware-landmine-vision` | Zenodo | unclear | prohibited (local-only) | LPT/VBT + video agreement |
+| `white-cmj-acc-grf` | Zenodo | CC-BY-4.0 | conditional | Synchronized accelerometer/force validation |
+| `gymaware-landmine-vision` | Zenodo | CC-BY-4.0 | conditional | LPT/VBT + video agreement |
 | `dfl-sportec-idsse` | Hugging Face (pysport) | CC-BY-4.0 | conditional | Elite optical tracking + synchronized events |
 | `skillcorner-opendata` | SkillCorner / PySport | MIT | conditional | Broadcast tracking/events/phases + football 3D pose |
-| `spl-open-data` | MLSE Sport Performance Lab | CC-BY-NC-SA-4.0 | conditional | Markerless sports 3D kinematics |
+| `spl-open-data` | MLSE Sport Performance Lab | CC-BY-NC-SA-4.0 (+ role-dependent exclusion) | conditional | Markerless sports 3D kinematics |
 | `tackle-workload` | Zenodo | unclear | prohibited (local-only) | Optional longitudinal workload extension |
 | `openbiomechanics` | Driveline Baseball R&D | CC-BY-NC-SA-4.0 (+ additional exclusion) | conditional | Optional force/mocap/high-performance validation |
+
+## Rights evidence
+
+[`sources/rights_evidence.json`](sources/rights_evidence.json) is the
+reproducible authority/provenance receipt for the RES-104 rights decisions. For
+each audited dataset it records the source URL/DOI, authority type, observed
+license identifier, source/revision/date, any rendered-record discrepancy and
+the resulting decision; `tests/test_rights_evidence.py` keeps it in agreement
+with the registry. The audit path fetches **licensing metadata only** (for
+example the Zenodo record API and the rendered record page); no dataset payload
+is fetched to inspect rights.
 
 ## Per-source notices
 
@@ -49,11 +60,16 @@ unclear-rights data stay outside the code license boundary.
   `10.5281/zenodo.19136480`. The record's own `code:codeRepository` metadata links
   <https://github.com/markgewhite/acc2grf_prediction> (currently 404); the verified
   companion pipeline for the same deposit is <https://github.com/markgewhite/acc2grf-cmj>.
-- The upstream record exposes **no explicit license value** in its Rights section
-  as audited for this mission; the Zenodo API record metadata nevertheless carries
-  a `cc-by-4.0` license id. The conservative position is retained: **no explicit
-  license value**, **local research input only** --- do not redistribute or commit
-  source or derived data pending explicit rights clarification.
+- Rights: **CC BY 4.0** (attribution required; redistribution conditional),
+  promoted by RES-104 on reproducible evidence recorded in
+  [`sources/rights_evidence.json`](sources/rights_evidence.json): the Zenodo API
+  record's `metadata.license.id` is `cc-by-4.0`, the rendered record Rights/License
+  display shows Creative Commons Attribution 4.0 International, and the
+  author-controlled companion repository states that the preprocessed data are
+  deposited separately under CC-BY-4.0 for this exact DOI. RES-98's audit reported
+  a blank rendered Rights/License display; RES-104 did not reproduce that
+  observation on 2026-09-18 and records the discrepancy rather than inferring from
+  the PLOS article license.
 - Verified v1 structure: `cmj_dataset_both.npz` holds 663 trials (67 distinct
   distributed subject ids), a full per-trial triaxial accelerometer member at
   250 Hz in `g`, and a per-trial pre-takeoff vGRF member at 1000 Hz normalized by
@@ -68,10 +84,15 @@ unclear-rights data stay outside the code license boundary.
 
 - Zenodo record <https://zenodo.org/records/18598087>, version **v1**, DOI
   `10.5281/zenodo.18598087`.
-- As with the White deposit, the record exposes **no explicit license value** in
-  its Rights section while the Zenodo API metadata carries a `cc-by-4.0` id; the
-  conservative **local research input only** policy is retained and no
-  redistribution of source or derived data is permitted.
+- Rights: **CC BY 4.0** (attribution required; redistribution conditional),
+  promoted by RES-104 on the deposit's own authority recorded in
+  [`sources/rights_evidence.json`](sources/rights_evidence.json): the Zenodo API
+  record's `metadata.license.id` is `cc-by-4.0` and the rendered record
+  Rights/License display shows Creative Commons Attribution 4.0 International.
+  No author-controlled companion statement for the deposit was located. The
+  related article's open-access license is **not** used as authority; RES-98's
+  reported blank rendered Rights/License display was not reproduced on
+  2026-09-18 and the discrepancy is recorded.
 - Verified v1 structure: `LP_data.zip` contains per-set GymAware CSV exports with
   rep-level summary indicators only (no sample-level trajectory), a vision
   workbook whose numeric values are populated for one example row, YOLO training
@@ -80,6 +101,24 @@ unclear-rights data stay outside the code license boundary.
 - Method metadata preserved from the study protocol: vision uses the full bar
   (≈2.20 m), the GymAware attachment/effective radius is ≈2.05 m. No cross-method
   correction is applied in RES-98.
+
+**Archive population vs paper population (do not merge).** The verified
+distributed archive and the study's reported analysis population are different
+things:
+
+| population | count |
+| --- | --- |
+| Study/article | 24 male athletes, 247 valid method-comparison trials |
+| Verified distributed archive | 254 GymAware set exports, 653 GymAware rep rows; 325.3 MB |
+| Vision workbook | 275 numbered rows, 51 display-name identities, numeric values for inclusion `001` only (18 populated numeric values) |
+| Canonical control plane | 52 pseudonymous/unresolved subject identities, 653 canonical rep trials |
+
+The canonical 52 subject identities are **51 workbook identities plus one
+GymAware-only source set (source set `059`) that has no workbook identity**.
+The 653 canonical rep trials are the archive's rep rows, **not** the paper's 247
+valid trials, and the 52 canonical identities are **not** the paper's 24
+athletes: the archive contains more sets/reps than the analysis table, and no
+documented mapping between them is published, so no reduction is fabricated.
 
 ### `dfl-sportec-idsse`
 
@@ -98,12 +137,23 @@ unclear-rights data stay outside the code license boundary.
 
 ### `spl-open-data`
 
-- <https://github.com/Sport-Performance-Lab/SPL-Open-Data>.
+- <https://github.com/Sport-Performance-Lab/SPL-Open-Data>, pinned revision
+  `a3f9cffbde917b1e1747cedd6ec25dfab18c6051`.
 - License **CC BY-NC-SA 4.0**: non-commercial use only, attribution required, and
   **share-alike applies to data derivatives**.
-- Note: this source is governed **only** by CC BY-NC-SA 4.0. The OpenBiomechanics
-  professional-sports-organization / financial-analysis exclusion does **not**
-  apply here and must not be attached to SPL Open Data.
+- **Additional role-dependent exclusion, present in SPL's own `LICENSE` at the
+  pinned revision:** any employee or contractor employed by, associated with, or a
+  significant shareholder of a professional sports organization or financial
+  analysis firm is forbidden to use SPL Open Data for any use whatsoever without a
+  specific written commercial (paid) license. This restriction is SPL's own; it is
+  quoted here from the pinned `LICENSE` and is not copied from OpenBiomechanics.
+- Acquisition **fails closed**: `dynamis-fetch spl-open-data` refuses to plan or
+  fetch until the operator passes
+  `--acknowledge-spl-license-restrictions`. The acknowledgement records that the
+  operator has read the restriction; it does not assert legal eligibility, does
+  not override the NC/SA obligations, and eligibility remains the operator's
+  responsibility. The acknowledgement is source-specific so it cannot silently
+  satisfy any unrelated future license.
 
 ### `tackle-workload`
 
@@ -180,9 +230,11 @@ Attribution:
 The laboratory slices are White CMJ `white-cmj-acc-grf` **v1**
 (`cmj_dataset_both.npz` only; the per-condition archives duplicate the same
 accepted corpus) and GymAware landmine `gymaware-landmine-vision` **v1**
-(`LP_data.zip`). Both are **local-only**: the registry keeps source versions and
-upstream checksums, while retrieval timestamps and locally computed SHA-256 live
-only in the external Bronze manifests.
+(`LP_data.zip`). Both are declared **CC BY 4.0** (attribution required,
+redistribution conditional) after the RES-104 rights audit; the registry keeps
+source versions and upstream checksums, while retrieval timestamps and locally
+computed SHA-256 live only in the external Bronze manifests. Raw source payloads
+and derived canonical outputs are still **never committed to Git**.
 
 ```bash
 uv run dynamis-fetch  white-cmj-acc-grf --version v1 --key cmj_dataset_both.npz

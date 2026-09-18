@@ -279,7 +279,13 @@ def test_white_ingest_is_byte_deterministic(tmp_settings: Settings, white_npz: P
 def test_adapter_alignments_declare_shared_takeoff_axis(white_npz: Path) -> None:
     adapter = WhiteCmjAdapter(load_white_cmj_bundle(white_npz))
     authorities = adapter.source_authorities()
-    assert len(authorities.alignments) == 6
+    valid_trial_ids = {trial.trial_id for trial in adapter.trials if adapter.trial_is_valid(trial)}
+    # One alignment per accepted trial only: quarantined trials materialize no
+    # streams, so they can carry no persisted alignment either.
+    assert len(authorities.alignments) == len(valid_trial_ids) == 3
+    assert {
+        alignment.target_stream_id.removeprefix("imu-") for alignment in authorities.alignments
+    } == valid_trial_ids
     alignment = authorities.alignments[0]
     assert alignment.scale == 1.0
     assert alignment.offset_ns == 0

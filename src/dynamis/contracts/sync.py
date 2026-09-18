@@ -96,7 +96,10 @@ class SyncAlignment(Contract):
     """Optional explicit affine time alignment between two streams.
 
     ``t_target = t_source * scale + offset_ns``. Declared, never inferred, so an
-    event-aligned or correlation-aligned offset is always auditable.
+    event-aligned or correlation-aligned offset is always auditable. The scale is
+    always strictly positive and finite, and an alignment never pairs a stream
+    with itself; a scale of 1 and an offset of 0 describe a shared released time
+    coordinate, never an instrument-accuracy claim.
     """
 
     source_stream_id: Identifier
@@ -105,6 +108,12 @@ class SyncAlignment(Contract):
     scale: float = Field(default=1.0, gt=0, allow_inf_nan=False)
     sync_spec_id: Identifier
     notes: str | None = None
+
+    @model_validator(mode="after")
+    def check_alignment(self) -> SyncAlignment:
+        if self.source_stream_id == self.target_stream_id:
+            raise ValueError("a sync alignment cannot pair a stream with itself")
+        return self
 
     def apply(self, t_source_ns: int) -> int:
         return int(round(t_source_ns * self.scale + self.offset_ns))

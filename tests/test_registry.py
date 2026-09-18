@@ -30,9 +30,11 @@ from dynamis.registry import (
 
 EXPECTED_SOURCE_COUNT = 8
 UNCLEAR_RIGHTS = {
+    "tackle-workload",
+}
+RES104_DECLARED_CC_BY = {
     "white-cmj-acc-grf",
     "gymaware-landmine-vision",
-    "tackle-workload",
 }
 
 
@@ -62,16 +64,21 @@ def test_unclear_rights_sources_stay_local_only() -> None:
     assert local_only == UNCLEAR_RIGHTS
 
 
-def test_spl_license_excludes_the_openbiomechanics_exclusion() -> None:
+def test_res104_promotes_white_and_gymaware_to_declared_cc_by() -> None:
+    """Zenodo API + rendered record evidence (plus the White companion repo)."""
     registry = validate_registry()
-    spl = source_by_id(registry, "spl-open-data")
-    assert spl.license.identifier == "CC-BY-NC-SA-4.0"
-    assert spl.license.noncommercial_only
-    assert spl.license.share_alike
-    text = " ".join(spl.license.restrictions).lower()
-    assert "share-alike" in text
-    assert "professional sports organization" not in text
-    assert "financial analysis" not in text
+    for dataset_id in RES104_DECLARED_CC_BY:
+        policy = source_by_id(registry, dataset_id).license
+        assert policy.identifier == "CC-BY-4.0"
+        assert policy.status.value == "declared"
+        assert policy.attribution_required
+        assert not policy.noncommercial_only
+        assert not policy.share_alike
+        assert not policy.local_only
+        assert policy.redistribution.value == "conditional"
+        text = " ".join(policy.restrictions).lower()
+        assert "cc-by-4.0" in text
+        assert "rendered" in text
 
 
 def test_openbiomechanics_keeps_its_additional_exclusion() -> None:
@@ -138,28 +145,6 @@ def test_dfl_pinned_revision_declares_verified_upstream_identities() -> None:
     # manifest under DYNAMIS_DATASET_ROOT.
     assert version.retrieval.status.value == "not_fetched"
     assert all(item.local_sha256 is None for item in version.retrieval.files)
-
-
-def test_audit_detects_a_tampered_spl_policy() -> None:
-    registry = validate_registry()
-    spl = source_by_id(registry, "spl-open-data")
-    tampered_policy = LicensePolicy(
-        identifier="CC-BY-NC-SA-4.0",
-        status=spl.license.status,
-        attribution_required=True,
-        noncommercial_only=True,
-        share_alike=True,
-        redistribution=spl.license.redistribution,
-        local_only=False,
-        restrictions=(
-            "Non-commercial use only.",
-            "Share-alike applies to data derivatives.",
-            "Professional sports organization employees are forbidden any use.",
-        ),
-    )
-    tampered = DatasetSource.model_copy(spl, update={"license": tampered_policy})
-    problems = audit_registry(DatasetRegistry.model_copy(registry, update={"sources": (tampered,)}))
-    assert any("must not be attached to SPL" in problem for problem in problems)
 
 
 def test_audit_detects_missing_openbiomechanics_exclusion() -> None:

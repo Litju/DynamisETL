@@ -70,16 +70,16 @@
       "v1_role": "Synchronized accelerometer/force validation",
       "initial_scope": "67 participants, 663 CMJs, 36.1 MB; 250 Hz distributed signals",
       "license": {
-        "identifier": null,
-        "status": "unclear",
+        "identifier": "CC-BY-4.0",
+        "status": "declared",
         "attribution_required": true,
         "noncommercial_only": false,
         "share_alike": false,
-        "redistribution": "prohibited",
-        "local_only": true,
+        "redistribution": "conditional",
+        "local_only": false,
         "restrictions": [
-          "Zenodo record exposes no explicit license value; rights not clarified.",
-          "Local research input only; do not redistribute or commit source or derived data pending explicit rights clarification."
+          "Attribution required.",
+          "RES-104 rights evidence (2026-09-18): the Zenodo API record metadata license id is cc-by-4.0, the rendered record Rights/License display shows Creative Commons Attribution 4.0 International, and the author-controlled companion repository markgewhite/acc2grf-cmj states the deposited data are CC-BY-4.0 for this exact DOI."
         ]
       },
       "versions": [
@@ -115,18 +115,18 @@
       ],
       "adapter_id": "zenodo_gymaware_landmine",
       "v1_role": "LPT/VBT + video agreement",
-      "initial_scope": "24 athletes, 325.3 MB",
+      "initial_scope": "Verified archive: 254 GymAware set exports / 653 rep rows (325.3 MB); the related article reports a separate 24-athlete / 247-valid-trial analysis population. Archive population != paper population.",
       "license": {
-        "identifier": null,
-        "status": "unclear",
+        "identifier": "CC-BY-4.0",
+        "status": "declared",
         "attribution_required": true,
         "noncommercial_only": false,
         "share_alike": false,
-        "redistribution": "prohibited",
-        "local_only": true,
+        "redistribution": "conditional",
+        "local_only": false,
         "restrictions": [
-          "Zenodo record exposes no explicit license value; rights not clarified.",
-          "Local research input only; do not redistribute or commit source or derived data pending explicit rights clarification."
+          "Attribution required.",
+          "RES-104 rights evidence (2026-09-18): the Zenodo API record metadata license id is cc-by-4.0 and the rendered record Rights/License display shows Creative Commons Attribution 4.0 International; no author-controlled companion statement for the deposit was located, and the related article license is not used as authority."
         ]
       },
       "versions": [
@@ -272,7 +272,8 @@
         "restrictions": [
           "Non-commercial use only.",
           "Attribution required.",
-          "Share-alike applies to data derivatives."
+          "Share-alike applies to data derivatives.",
+          "Additional role-dependent exclusion at pinned revision a3f9cffbde917b1e1747cedd6ec25dfab18c6051 (SPL's own LICENSE): any employee or contractor employed by, associated with, or a significant shareholder of a professional sports organization or financial analysis firm is forbidden to use SPL Open Data for any use whatsoever without a specific written commercial (paid) license."
         ]
       },
       "versions": [
