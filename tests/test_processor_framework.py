@@ -109,6 +109,7 @@ def test_derived_and_run_identities_are_content_addressed() -> None:
         "dataset_id": "white-cmj-acc-grf",
         "metric_id": "test.scalar",
         "algorithm_id": spec.algorithm_id,
+        "algorithm_version": spec.version,
         "parameters_hash": spec.parameters_hash,
         "session_id": "s1",
         "stream_id": "stream-1",
@@ -117,6 +118,8 @@ def test_derived_and_run_identities_are_content_addressed() -> None:
     assert base == derived_metric_id(**common)
     assert base != derived_metric_id(**{**common, "parameters_hash": "0" * 64})
     assert base != derived_metric_id(**{**common, "stream_id": "stream-2"})
+    assert base != derived_metric_id(**{**common, "algorithm_version": "2.0.0"})
+    assert base != derived_metric_id(**{**common, "code_sha": "a" * 40})
 
     run_common = {
         "dataset_id": "white-cmj-acc-grf",

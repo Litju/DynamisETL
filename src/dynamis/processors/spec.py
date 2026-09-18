@@ -220,7 +220,9 @@ def derived_metric_id(
     dataset_id: str,
     metric_id: str,
     algorithm_id: str,
+    algorithm_version: str,
     parameters_hash: str,
+    code_sha: str | None = None,
     subject_id: str | None = None,
     session_id: str | None = None,
     trial_id: str | None = None,
@@ -228,17 +230,21 @@ def derived_metric_id(
 ) -> str:
     """Content-addressed identity of one pipeline-derived metric value.
 
-    The processor identity and parameter hash are part of the identity, so a
-    changed algorithm or a changed parameter produces a *new* metric row instead
-    of silently overwriting the old value. Re-running the same inputs with the
-    same code is therefore idempotent.
+    Algorithm id, algorithm version, parameters hash and code revision are part
+    of the identity, so a changed algorithm, parameter or code revision produces
+    a *new* metric row bound to its own run instead of silently overwriting a
+    value that a different revision produced. Re-running the same inputs with
+    the same code revision and parameters is therefore idempotent, and every
+    stored row resolves to exactly one code revision and processing run.
     """
     identity = json.dumps(
         {
             "dataset_id": dataset_id,
             "metric_id": metric_id,
             "algorithm_id": algorithm_id,
+            "algorithm_version": algorithm_version,
             "parameters_hash": parameters_hash,
+            "code_sha": code_sha,
             "subject_id": subject_id,
             "session_id": session_id,
             "trial_id": trial_id,
