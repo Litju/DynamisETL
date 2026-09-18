@@ -49,6 +49,7 @@ class DatasetProcessing:
     metric_values: dict[str, float]
     metric_units: dict[str, str]
     processed_stream_ids: tuple[str, ...] = ()
+    run_ids: tuple[str, ...] = ()
     diagnostics: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -272,6 +273,279 @@ def white_force_acceptance(
     return receipt
 
 
+WOMENS_DATASET_ID = "womens-soccer-positioning"
+
+#: Explicit geodetic configuration for the Women's consumer-GNSS release.
+#: The datum is the pipeline's documented WGS 84 inference, not a provider
+#: declaration; no datum transform is applied. The derivative edge policy is
+#: ``nan`` so no value is claimed where a central difference would need
+#: extrapolation, and no filter is applied.
+WOMENS_GEODETIC_PARAMETERS: dict[str, Any] = {
+    "position_domain": "geodetic",
+    "distance_method": "haversine_wgs84_mean_radius",
+    "enu_method": "equirectangular_tangent_plane_wgs84_mean_radius",
+    "earth_radius_m": 6_371_008.8,
+    "derivative": {
+        "filter": {
+            "family": "none",
+            "order": None,
+            "cutoff_hz": None,
+            "phase": "zero_phase",
+            "padding": "odd",
+            "padlen": None,
+        },
+        "edge_policy": "nan",
+    },
+    "filter_applies_to": "kinematics_only",
+    # Explicit run configuration for a consumer-GNSS release whose positions
+    # contain isolated acquisition glitches (up to kilometres in one 100 ms
+    # step) while the provider speed channel stays smooth. A step above this
+    # supplied SI bound is excluded from kinematics AND from the distance
+    # accumulation; the record itself is never modified and the raw input
+    # checksum is preserved. This is supplied configuration, not a universal
+    # sport constant.
+    "step_speed_gate": {
+        "max_m_s": 15.0,
+        "excluded_step_policy": "drop_step_from_distance",
+    },
+    "resample_method": "none",
+    "interpolation": "none",
+    "zones": [],
+    "effort": None,
+    "rolling_windows_s": [],
+}
+
+#: Explicit planar tracking configuration used for the DFL and SkillCorner
+#: acceptance runs. Zones, effort rules and rolling windows are supplied run
+#: configuration in SI units, never universal scientific constants.
+TRACKING_ACCEPTANCE_PARAMETERS: dict[str, Any] = {
+    "position_domain": "planar",
+    "derivative": {
+        "filter": {
+            "family": "none",
+            "order": None,
+            "cutoff_hz": None,
+            "phase": "zero_phase",
+            "padding": "odd",
+            "padlen": None,
+        },
+        "edge_policy": "nan",
+    },
+    "step_speed_gate": {
+        "max_m_s": 15.0,
+        "excluded_step_policy": "keep_step_in_distance",
+    },
+    "zones": [
+        {"name": "low", "lower_m_s": 0.0, "upper_m_s": 2.0},
+        {"name": "medium", "lower_m_s": 2.0, "upper_m_s": 5.5},
+        {"name": "high", "lower_m_s": 5.5, "upper_m_s": None},
+    ],
+    "effort": {
+        "threshold_m_s": 5.0,
+        "min_duration_s": 1.0,
+        "merge_gap_s": 0.5,
+        "hysteresis_m_s": 0.5,
+    },
+    "rolling_windows_s": [1.0, 5.0, 10.0],
+}
+
+#: SkillCorner declares is_detected on every sample, so its acceptance run also
+#: honors the provider's own detection declaration for kinematics.
+SKILLCORNER_ACCEPTANCE_PARAMETERS: dict[str, Any] = {
+    **TRACKING_ACCEPTANCE_PARAMETERS,
+    "detection_gate": "require_is_detected",
+}
+
+DATUM_INFERENCE_NOTE = (
+    "The provider does not declare a geodetic datum for the Women's GNSS release. The "
+    "pipeline interpretation is WGS 84 recorded as a documented inference; no datum "
+    "transformation is applied and source coordinates pass through unchanged."
+)
+
+
+def _optional_float_array(column: Any) -> Any:
+    import numpy as np
+
+    return np.asarray(
+        [float(value) if value is not None else float("nan") for value in column.to_pylist()],
+        dtype=np.float64,
+    )
+
+
+def womens_gnss_acceptance(
+    settings: Settings,
+    engine: Engine,
+    *,
+    progress: Callable[[int, int], None] | None = None,
+) -> dict[str, Any]:
+    """Process the Women's GNSS corpus and compare derived speed to source speed."""
+    import numpy as np
+
+    from dynamis.processors.locomotor import process_locomotor
+
+    with engine.connect() as connection:
+        refs = list_silver_streams(connection, dataset_id=WOMENS_DATASET_ID, modality="gnss")
+    if not refs:
+        raise ValueError(f"{WOMENS_DATASET_ID}: no registered GNSS streams to process")
+
+    pooled_derived: list[np.ndarray] = []
+    pooled_source: list[np.ndarray] = []
+    per_stream: list[dict[str, Any]] = []
+    checksums: dict[str, str] = {}
+    run_ids: set[str] = set()
+    metric_totals: dict[str, list[float]] = {}
+
+    def execute(ref: SilverStreamRef) -> tuple[Any, Any, ProcessorRunResult]:
+        table, processor_input = load_silver(settings, ref)
+        result = process_locomotor(table, parameters=WOMENS_GEODETIC_PARAMETERS)
+        run = execute_processor(
+            settings,
+            result=result,
+            dataset_id=WOMENS_DATASET_ID,
+            inputs=(processor_input,),
+            series_key=ref.stream_id,
+            engine=engine,
+        )
+        return table, result, run
+
+    first_pass: dict[str, ProcessorRunResult] = {}
+    for index, ref in enumerate(refs):
+        table, result, run = execute(ref)
+        derived_speed = _optional_float_array(result.series[0].table.column("speed_m_s"))
+        source_speed = _optional_float_array(table.column("speed_m_s"))
+        finite = np.isfinite(derived_speed) & np.isfinite(source_speed)
+        pooled_derived.append(derived_speed[finite])
+        pooled_source.append(source_speed[finite])
+        per_stream.append(
+            {
+                "stream_id": ref.stream_id,
+                "samples": int(table.num_rows),
+                "paired_samples": int(np.count_nonzero(finite)),
+            }
+        )
+        for metric in result.metrics:
+            metric_totals.setdefault(metric.declaration.metric_id, []).append(metric.value)
+        first_pass[ref.stream_id] = run
+        checksums[ref.stream_id] = run.series[0].artifact.checksum_sha256
+        run_ids.add(run.run_id)
+        del table
+        if progress is not None:
+            progress(index + 1, len(refs))
+
+    # Deterministic rerun over the same verified Silver inputs.
+    rerun_matches = 0
+    rerun_run_ids: set[str] = set()
+    for ref in refs:
+        _, _, rerun = execute(ref)
+        rerun_run_ids.add(rerun.run_id)
+        if rerun.series[0].artifact.checksum_sha256 == checksums[ref.stream_id]:
+            rerun_matches += 1
+
+    derived_all = np.concatenate(pooled_derived) if pooled_derived else np.zeros(0)
+    source_all = np.concatenate(pooled_source) if pooled_source else np.zeros(0)
+    comparison = paired_comparison(derived_all, source_all)
+    payload = comparison.to_dict()
+    payload.update(
+        {
+            "paired_samples": int(derived_all.size),
+            "comparison_scope": (
+                "dense per-sample comparison of pipeline-derived speed and the source "
+                "speed channel over each player's full stream"
+            ),
+            "bland_altman_omitted": (
+                "per-sample speeds within a time series are strongly autocorrelated, so "
+                "Bland-Altman limits would overstate the independent sample size"
+            ),
+            "interchangeability_claimed": False,
+            "reference_semantics": (
+                "source speed is a provider SOURCE_DERIVED channel; agreement does not "
+                "establish interchangeability with pipeline-derived speed"
+            ),
+            "verdict": None,
+        }
+    )
+    receipt = {
+        "dataset_id": WOMENS_DATASET_ID,
+        "algorithm_id": first_pass[refs[0].stream_id].spec.algorithm_id,
+        "algorithm_version": first_pass[refs[0].stream_id].spec.version,
+        "parameters_hash": first_pass[refs[0].stream_id].parameters_hash,
+        "code_git_sha": first_pass[refs[0].stream_id].code_git_sha,
+        "parameters": WOMENS_GEODETIC_PARAMETERS,
+        "datum_inference": DATUM_INFERENCE_NOTE,
+        "streams": len(refs),
+        "runs": len(run_ids),
+        "rerun_series_matches": rerun_matches,
+        "rerun_run_ids_stable": run_ids == rerun_run_ids,
+        "per_stream": per_stream,
+        "speed_comparison": payload,
+        "aggregate_metrics": {
+            metric_id: {
+                "sum": float(sum(values)),
+                "mean": float(sum(values) / len(values)),
+                "n": len(values),
+            }
+            for metric_id, values in sorted(metric_totals.items())
+        },
+    }
+    target = receipt_path(
+        settings, dataset_id=WOMENS_DATASET_ID, kind="acceptance", name="res100-womens-gnss"
+    )
+    atomic_write_text(target, json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+    receipt["receipt_path"] = relative_posix(settings.dataset_root, target)
+    return receipt
+
+
+def tracking_acceptance(
+    settings: Settings,
+    engine: Engine,
+    *,
+    dataset_id: str,
+    parameters: dict[str, Any],
+    kind: str,
+    progress: Callable[[int, int], None] | None = None,
+) -> dict[str, Any]:
+    """Process one tracking corpus, prove deterministic reruns, record configuration."""
+    from dynamis.processors.locomotor import process_locomotor
+
+    def processor(table: Any) -> Any:
+        return process_locomotor(table, parameters=parameters)
+
+    plan = StreamProcessorPlan(
+        dataset_id=dataset_id,
+        modality="tracking",
+        processor=processor,
+    )
+    first = process_corpus(settings, engine, plan=plan, progress=progress)
+    second = process_corpus(settings, engine, plan=plan)
+    rerun_matches = sum(
+        1
+        for key, checksum in first.series_checksums.items()
+        if second.series_checksums.get(key) == checksum
+    )
+    receipt = {
+        "dataset_id": dataset_id,
+        "algorithm_id": first.algorithm_id,
+        "configuration": parameters,
+        "streams": first.streams,
+        "runs": first.runs,
+        "series_artifacts": len(first.series_checksums),
+        "samples": first.diagnostics.get("samples"),
+        "entities": first.diagnostics.get("entities"),
+        "rerun_series_matches": rerun_matches,
+        "rerun_run_ids_stable": first.run_ids == second.run_ids,
+        "configuration_semantics": (
+            "zones, effort thresholds and rolling windows are explicit supplied run "
+            "configuration in SI units; they are not universal scientific constants"
+        ),
+        "pose_tracking_fusion": False,
+        "per_stream": first.diagnostics.get("per_stream"),
+    }
+    target = receipt_path(settings, dataset_id=dataset_id, kind="acceptance", name=kind)
+    atomic_write_text(target, json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+    receipt["receipt_path"] = relative_posix(settings.dataset_root, target)
+    return receipt
+
+
 @dataclass(frozen=True, slots=True)
 class StreamProcessorPlan:
     """One corpus to process with one pure function."""
@@ -311,7 +585,9 @@ def process_corpus(
     metric_units: dict[str, str] = {}
     run_ids: set[str] = set()
     algorithm_id = ""
-    diagnostics: dict[str, Any] = {}
+    per_stream: list[dict[str, Any]] = []
+    total_samples = 0
+    total_entities = 0
     for index, ref in enumerate(refs):
         table, processor_input = load_silver(settings, ref)
         result = plan.processor(table)
@@ -328,10 +604,24 @@ def process_corpus(
         for series in run.series:
             checksums[f"{ref.stream_id}.{series.name}"] = series.artifact.checksum_sha256
         for metric in result.metrics:
-            key = f"{ref.stream_id}|{metric.declaration.metric_id}|{metric.subject_id or ''}"
+            key = (
+                f"{ref.stream_id}|{metric.declaration.metric_id}|"
+                f"{metric.entity_id or ''}|{metric.subject_id or ''}"
+            )
             metric_values[key] = metric.value
             metric_units[metric.declaration.metric_id] = metric.declaration.si_unit
-        diagnostics.update(dict(result.diagnostics))
+        total_samples += int(result.diagnostics.get("samples", 0))
+        total_entities += int(result.diagnostics.get("entities", 0))
+        per_stream.append(
+            {
+                "stream_id": ref.stream_id,
+                "samples": int(result.diagnostics.get("samples", 0)),
+                "entities": int(result.diagnostics.get("entities", 0)),
+                "metrics": len(result.metrics),
+                "series": {series.name: series.artifact.checksum_sha256 for series in run.series},
+            }
+        )
+        del table
         if progress is not None:
             progress(index + 1, len(refs))
     return DatasetProcessing(
@@ -343,7 +633,12 @@ def process_corpus(
         metric_values=metric_values,
         metric_units=metric_units,
         processed_stream_ids=tuple(ref.stream_id for ref in refs),
-        diagnostics=diagnostics,
+        run_ids=tuple(sorted(run_ids)),
+        diagnostics={
+            "samples": total_samples,
+            "entities": total_entities,
+            "per_stream": per_stream,
+        },
     )
 
 

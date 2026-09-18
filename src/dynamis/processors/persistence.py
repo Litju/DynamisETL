@@ -134,6 +134,7 @@ def _metric_rows(
             "code_git_sha": code_sha,
             "run_id": run_id,
             "input_checksums": list(input_checksums),
+            "entity_id": metric.entity_id,
             **dict(metric.provenance),
         }
         rows.append(
@@ -149,6 +150,7 @@ def _metric_rows(
                     session_id=metric.session_id,
                     trial_id=metric.trial_id,
                     stream_id=metric.stream_id,
+                    entity_id=metric.entity_id,
                 ),
                 "dataset_id": dataset_id,
                 "metric_id": declaration.metric_id,

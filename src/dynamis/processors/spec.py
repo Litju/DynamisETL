@@ -180,6 +180,9 @@ class ScalarMetric:
     session_id: str | None = None
     trial_id: str | None = None
     stream_id: str | None = None
+    #: Entity discriminator within a multi-object stream (for example a tracking
+    #: object id). ``None`` for single-entity streams.
+    entity_id: str | None = None
     provenance: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -227,6 +230,7 @@ def derived_metric_id(
     session_id: str | None = None,
     trial_id: str | None = None,
     stream_id: str | None = None,
+    entity_id: str | None = None,
 ) -> str:
     """Content-addressed identity of one pipeline-derived metric value.
 
@@ -249,6 +253,7 @@ def derived_metric_id(
             "session_id": session_id,
             "trial_id": trial_id,
             "stream_id": stream_id,
+            "entity_id": entity_id,
         },
         sort_keys=True,
         separators=(",", ":"),

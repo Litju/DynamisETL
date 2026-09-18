@@ -115,6 +115,7 @@ class ProcessorRunResult:
                     "session_id": metric.session_id,
                     "trial_id": metric.trial_id,
                     "stream_id": metric.stream_id,
+                    "entity_id": metric.entity_id,
                 }
                 for metric in self.metrics.metrics
             ],
@@ -248,6 +249,7 @@ def execute_processor(
                     "session_id": metric.session_id,
                     "trial_id": metric.trial_id,
                     "stream_id": metric.stream_id,
+                    "entity_id": metric.entity_id,
                     "provenance": dict(metric.provenance),
                 }
                 for metric in result.metrics
@@ -258,6 +260,7 @@ def execute_processor(
                 item["subject_id"] or "",
                 item["trial_id"] or "",
                 item["stream_id"] or "",
+                item["entity_id"] or "",
             ),
         ),
         "series": [item.to_dict() for item in processed],

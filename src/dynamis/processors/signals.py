@@ -114,6 +114,73 @@ def trapezoid_integral(values: Any, step_s: float) -> float:
     return float(cumulative[-1]) if cumulative.size else 0.0
 
 
+def steps_s(t_rel_ns: Any) -> np.ndarray:
+    """Positive, possibly non-uniform intervals of a strictly increasing time axis."""
+    times = np.asarray(t_rel_ns, dtype=np.int64)
+    if times.ndim != 1 or times.size < 2:
+        raise ValueError("a time axis requires at least two samples")
+    steps = np.diff(times).astype(np.float64) / NS_PER_SECOND
+    if not np.all(steps > 0):
+        raise ValueError("t_rel_ns must be strictly increasing within a stream")
+    return steps
+
+
+def cumulative_trapezoid_variable(values: Any, steps: np.ndarray) -> np.ndarray:
+    """Cumulative trapezoidal integral over explicit per-interval steps."""
+    array = _as_float_array(values)
+    intervals = _as_float_array(steps)
+    if array.size == 0:
+        return array.copy()
+    if intervals.size != max(array.size - 1, 0):
+        raise ValueError("steps must hold exactly one interval per adjacent sample pair")
+    result = np.empty_like(array)
+    result[0] = 0.0
+    if array.size > 1:
+        result[1:] = np.cumsum((array[1:] + array[:-1]) * (0.5 * intervals))
+    return result
+
+
+def sample_durations_s(t_rel_ns: Any) -> np.ndarray:
+    """Trapezoidal time weight of each sample for an integral over the series.
+
+    The first and last samples carry the adjacent interval; interior samples
+    carry half of each neighbour. Constant-rate streams therefore reproduce the
+    uniform step exactly.
+    """
+    times = np.asarray(t_rel_ns, dtype=np.int64)
+    if times.ndim != 1 or times.size == 0:
+        raise ValueError("a time axis requires at least one sample")
+    if times.size == 1:
+        return np.zeros(1, dtype=np.float64)
+    steps = steps_s(times)
+    durations = np.empty(times.size, dtype=np.float64)
+    durations[0] = steps[0]
+    durations[-1] = steps[-1]
+    if times.size > 2:
+        durations[1:-1] = 0.5 * (steps[:-1] + steps[1:])
+    return durations
+
+
+def derivative_variable(values: Any, t_rel_ns: Any, *, edge_policy: str) -> np.ndarray:
+    """Central-difference derivative over an explicit, possibly non-uniform axis."""
+    array = _as_float_array(values)
+    times = np.asarray(t_rel_ns, dtype=np.int64).astype(np.float64) / NS_PER_SECOND
+    if array.size != times.size:
+        raise ValueError("values and time axis must have the same length")
+    if edge_policy not in DERIVATIVE_EDGE_POLICIES:
+        raise ValueError(f"unknown derivative edge policy {edge_policy!r}")
+    result = np.full_like(array, np.nan)
+    if array.size >= 2:
+        spans = times[2:] - times[:-2]
+        if np.any(spans <= 0):
+            raise ValueError("t_rel_ns must be strictly increasing within a stream")
+        result[1:-1] = (array[2:] - array[:-2]) / spans
+        if edge_policy == EDGE_ONE_SIDED_FIRST_ORDER:
+            result[0] = (array[1] - array[0]) / (times[1] - times[0])
+            result[-1] = (array[-1] - array[-2]) / (times[-1] - times[-2])
+    return result
+
+
 def derivative(values: Any, step_s: float, *, edge_policy: str) -> np.ndarray:
     """Central-difference derivative with an explicit edge policy.
 
@@ -258,13 +325,14 @@ def zone_statistics(
     distance_step_m: Any,
     *,
     zones: tuple[SpeedZone, ...],
-    step_s: float,
+    sample_duration_s: Any,
 ) -> dict[str, dict[str, float]]:
     """Distance, duration and peak speed per explicitly supplied zone."""
     speed = _as_float_array(speed_m_s)
     steps = _as_float_array(distance_step_m)
-    if speed.size != steps.size:
-        raise ValueError("speed and distance_step arrays must have the same length")
+    durations = _as_float_array(sample_duration_s)
+    if not (speed.size == steps.size == durations.size):
+        raise ValueError("speed, distance_step and sample_duration arrays must align")
     result: dict[str, dict[str, float]] = {}
     for zone in zones:
         inside = zone.mask(speed)
@@ -273,7 +341,7 @@ def zone_statistics(
         peak = float(np.max(speed[inside])) if count else 0.0
         result[zone.name] = {
             "distance_m": distance,
-            "duration_s": count * step_s,
+            "duration_s": float(np.sum(durations[inside])) if count else 0.0,
             "peak_speed_m_s": peak,
             "samples": float(count),
         }
@@ -327,8 +395,11 @@ class Effort:
 
     start_index: int
     end_index: int
+    start_time_s: float
+    end_time_s: float
     duration_s: float
     peak_speed_m_s: float
+    mean_speed_m_s: float
     distance_m: float
 
 
@@ -364,7 +435,8 @@ def effort_segments(
     speed_m_s: Any,
     distance_step_m: Any,
     *,
-    step_s: float,
+    times_s: Any,
+    sample_duration_s: Any,
     parameters: EffortParameters,
 ) -> tuple[Effort, ...]:
     """Segment efforts with explicit threshold, duration, gap and hysteresis.
@@ -372,18 +444,29 @@ def effort_segments(
     A sample enters an effort at ``speed >= threshold`` and leaves it below
     ``threshold - hysteresis``. Candidate runs separated by no more than
     ``merge_gap_s`` merge; a merged run shorter than ``min_duration_s`` is
-    discarded. Every choice is a supplied parameter, never a sport constant.
+    discarded. Duration is the trapezoidal time weight of the run's samples.
+    Every choice is a supplied parameter, never a sport constant.
     """
     speed = _as_float_array(speed_m_s)
     steps = _as_float_array(distance_step_m)
-    if speed.size != steps.size:
-        raise ValueError("speed and distance_step arrays must have the same length")
+    times = _as_float_array(times_s)
+    durations = _as_float_array(sample_duration_s)
+    if not (speed.size == steps.size == times.size == durations.size):
+        raise ValueError("speed, distance_step, time and duration arrays must align")
     active = parameters.threshold_m_s
     release = max(0.0, parameters.threshold_m_s - parameters.hysteresis_m_s)
     runs: list[list[int]] = []
     state = False
     start = 0
     for index, value in enumerate(speed):
+        if not math.isfinite(value):
+            # A sample with no derivable speed (configured gate, edge policy or a
+            # source gap) cannot sustain an effort: it terminates an open effort
+            # and never starts one.
+            if state:
+                runs.append([start, index - 1])
+                state = False
+            continue
         if not state and value >= active:
             state = True
             start = index
@@ -393,25 +476,28 @@ def effort_segments(
     if state and speed.size:
         runs.append([start, speed.size - 1])
     merged: list[list[int]] = []
-    max_gap_samples = parameters.merge_gap_s / step_s if step_s > 0 else 0.0
     for run in runs:
-        if merged and (run[0] - merged[-1][1] - 1) <= max_gap_samples:
+        if merged and (times[run[0]] - times[merged[-1][1]]) <= parameters.merge_gap_s:
             merged[-1][1] = run[1]
         else:
             merged.append(run)
     efforts: list[Effort] = []
     for begin, end in merged:
-        duration = (end - begin + 1) * step_s
+        duration = float(np.sum(durations[begin : end + 1]))
         if duration + 1e-12 < parameters.min_duration_s:
             continue
         window_speed = speed[begin : end + 1]
         window_steps = steps[begin : end + 1]
+        mean_speed = float(np.sum(window_steps) / duration) if duration > 0 else 0.0
         efforts.append(
             Effort(
                 start_index=begin,
                 end_index=end,
-                duration_s=float(duration),
+                start_time_s=float(times[begin]),
+                end_time_s=float(times[end]),
+                duration_s=duration,
                 peak_speed_m_s=float(np.max(window_speed)) if window_speed.size else 0.0,
+                mean_speed_m_s=mean_speed,
                 distance_m=float(np.sum(window_steps)),
             )
         )
@@ -513,3 +599,12 @@ class DerivativeSpec:
             "filter": self.filter.parameters(),
             "edge_policy": self.edge_policy,
         }
+
+    @staticmethod
+    def from_parameters(parameters: dict[str, Any] | None) -> DerivativeSpec:
+        if parameters is None:
+            return DerivativeSpec()
+        return DerivativeSpec(
+            filter=FilterSpec.from_parameters(parameters.get("filter")),
+            edge_policy=str(parameters.get("edge_policy", EDGE_NAN)),
+        )
