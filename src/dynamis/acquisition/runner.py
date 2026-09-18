@@ -3,14 +3,16 @@
 The runner is the only component allowed to write native payloads, and it
 enforces the immutability rule: an existing final Bronze file is verified
 against the registry expectation and the recorded manifest, never overwritten.
-Re-running a completed acquisition is an idempotent no-op.
+Re-running a completed acquisition is a provenance no-op: the bytes, the local
+SHA-256 and the first-entry ``retrieved_at`` stay unchanged while the run is
+recorded as a new verification event (``verified_at``).
 """
 
 from __future__ import annotations
 
 import json
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -66,6 +68,10 @@ class FileOutcome:
     git_blob_sha1: str | None
     action: str
     attempts: int
+    #: First entry of these bytes into Bronze (immutable once recorded).
+    retrieved_at: datetime | None = None
+    #: This run's re-validation of the bytes.
+    verified_at: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,7 +83,12 @@ class AcquisitionReceipt:
     license_local_only: bool
     attribution_required: bool
     citation: str | None
+    #: Earliest first-acquisition instant of the selected file set: the run time
+    #: when anything was downloaded, otherwise the original Bronze entry time.
     retrieved_at: datetime
+    #: This run's verification instant (advances on every re-run).
+    verified_at: datetime
+    retrieval_performed: bool
     outcomes: tuple[FileOutcome, ...]
     manifest_path: Path
     manifest_relative_path: str
@@ -107,6 +118,8 @@ class AcquisitionReceipt:
             },
             "citation": self.citation,
             "retrieved_at": self.retrieved_at.isoformat(),
+            "verified_at": self.verified_at.isoformat(),
+            "retrieval_performed": self.retrieval_performed,
             "bytes_downloaded": self.bytes_downloaded,
             "files": [
                 {
@@ -118,6 +131,12 @@ class AcquisitionReceipt:
                     "git_blob_sha1": item.git_blob_sha1,
                     "action": item.action,
                     "attempts": item.attempts,
+                    "retrieved_at": (
+                        None if item.retrieved_at is None else item.retrieved_at.isoformat()
+                    ),
+                    "verified_at": (
+                        None if item.verified_at is None else item.verified_at.isoformat()
+                    ),
                 }
                 for item in self.outcomes
             ],
@@ -196,9 +215,12 @@ def acquire(
 
     ``allow_insecure`` exists for loopback test servers only; production
     provider URLs are always required to be HTTPS.
+
+    One deterministic run instant is captured up front and reused for every
+    file, so a run has a single, reproducible acquisition/verification stamp.
     """
     ensure_dataset_layout(settings)
-    retrieved_at = now()
+    run_at = now()
     owns_session = session is None
     http = session if session is not None else requests.Session()
     http.headers.setdefault("User-Agent", USER_AGENT)
@@ -240,7 +262,7 @@ def acquire(
                     expected_sha256=item.upstream_sha256,
                     expected_git_blob_sha1=item.git_blob_sha1,
                     allow_insecure=allow_insecure,
-                    now=now,
+                    now=lambda: run_at,
                 )
                 digest = FileDigest(
                     size_bytes=receipt.size_bytes,
@@ -273,11 +295,13 @@ def acquire(
     stamped = record_retrieval(
         settings,
         manifest,
-        retrieved_at=retrieved_at,
+        retrieved_at=run_at,
+        verified_at=run_at,
         only_keys=tuple(item.key for item in plan.files),
     )
     # The stamp comes from the verified files on disk; assert the digests the
     # runner itself computed so a race or a rewritable path cannot slip through.
+    stamps: dict[str, tuple[datetime | None, datetime | None]] = {}
     for item in stamped.files:
         digest = digests.get(item.key)
         if digest is None:
@@ -290,6 +314,7 @@ def acquire(
             raise ImmutableArtifactError(
                 f"{item.key}: manifest size {item.size_bytes} != verified {digest.size_bytes}"
             )
+        stamps[item.key] = (item.retrieved_at, item.verified_at)
     manifest_path = write_bronze_manifest(settings, stamped)
     verification = verify_manifest(settings, stamped)
     if not verification.ok:
@@ -299,6 +324,14 @@ def acquire(
             f"size_mismatched={list(verification.size_mismatched)}"
         )
 
+    final_outcomes = tuple(
+        replace(
+            item,
+            retrieved_at=stamps.get(item.key, (None, None))[0],
+            verified_at=stamps.get(item.key, (None, None))[1],
+        )
+        for item in outcomes
+    )
     receipt = AcquisitionReceipt(
         dataset_id=plan.dataset_id,
         version=plan.version,
@@ -307,8 +340,10 @@ def acquire(
         license_local_only=plan.license_local_only,
         attribution_required=plan.attribution_required,
         citation=plan.citation,
-        retrieved_at=retrieved_at,
-        outcomes=tuple(outcomes),
+        retrieved_at=stamped.retrieved_at if stamped.retrieved_at is not None else run_at,
+        verified_at=run_at,
+        retrieval_performed=any(item.action == ACTION_DOWNLOADED for item in final_outcomes),
+        outcomes=final_outcomes,
         manifest_path=manifest_path,
         manifest_relative_path=relative_posix(settings.dataset_root, manifest_path),
         manifest_verified=verification.ok,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 
 import pyarrow as pa
@@ -249,19 +250,32 @@ def test_bronze_manifest_roundtrip_and_verification(tmp_settings: Settings) -> N
     )
     assert stamped.files[0].local_sha256 == sha256_bytes(payload)
     assert stamped.retrieved_at is not None
+    assert stamped.verified_at == datetime(2026, 9, 17, tzinfo=UTC)
+    assert stamped.files[0].retrieved_at == datetime(2026, 9, 17, tzinfo=UTC)
+    assert stamped.files[0].verified_at == datetime(2026, 9, 17, tzinfo=UTC)
     assert verify_manifest(tmp_settings, stamped).ok
+
+    # A later verification advances verified_at and never moves retrieved_at.
+    later = datetime(2026, 10, 1, 9, 30, tzinfo=UTC)
+    reverified = record_retrieval(tmp_settings, stamped, retrieved_at=later, verified_at=later)
+    assert reverified.files[0].local_sha256 == sha256_bytes(payload)
+    assert reverified.files[0].retrieved_at == datetime(2026, 9, 17, tzinfo=UTC)
+    assert reverified.files[0].verified_at == later
+    assert reverified.retrieved_at == datetime(2026, 9, 17, tzinfo=UTC)
+    assert reverified.verified_at == later
+    assert verify_manifest(tmp_settings, reverified).ok
 
     # A file whose bytes or size disagree with the manifest is reported, never
     # silently accepted.
     target.write_bytes(payload + b"corrupted")
-    verification = verify_manifest(tmp_settings, stamped)
+    verification = verify_manifest(tmp_settings, reverified)
     assert not verification.ok
     assert first.key in verification.mismatched
     assert first.key in verification.size_mismatched
 
     # A manifest that claims a local checksum for a missing file is also rejected.
     target.unlink()
-    missing = verify_manifest(tmp_settings, stamped)
+    missing = verify_manifest(tmp_settings, reverified)
     assert not missing.ok
     assert first.key in missing.missing
 
@@ -272,6 +286,60 @@ def test_record_retrieval_requires_an_aware_timestamp(tmp_settings: Settings) ->
     manifest = manifest_from_registry(source, source.versions[0])
     with pytest.raises(ValueError, match="timezone-aware"):
         record_retrieval(tmp_settings, manifest, retrieved_at=datetime(2026, 9, 17))
+
+
+def test_record_retrieval_requires_an_aware_verification_timestamp(tmp_settings: Settings) -> None:
+    registry = validate_registry()
+    source = source_by_id(registry, "tackle-workload")
+    manifest = manifest_from_registry(source, source.versions[0])
+    with pytest.raises(ValueError, match="verified_at must be timezone-aware"):
+        record_retrieval(
+            tmp_settings,
+            manifest,
+            retrieved_at=datetime(2026, 9, 17, tzinfo=UTC),
+            verified_at=datetime(2026, 9, 17),
+        )
+
+
+def test_v1_manifest_document_loads_without_verification_field(tmp_settings: Settings) -> None:
+    """Schema-1 documents (RES-97) load deterministically with nothing invented."""
+    registry = validate_registry()
+    source = source_by_id(registry, "womens-soccer-positioning")
+    version = source.version("1.0")
+    path = bronze_manifest_path(tmp_settings, dataset_id=source.dataset_id, version="1.0")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    first = version.retrieval.files[0]
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "1",
+                "dataset_id": source.dataset_id,
+                "version": "1.0",
+                "upstream_url": str(version.upstream_url),
+                "retrieved_at": "2026-09-17T21:29:24.058121Z",
+                "files": [
+                    {
+                        "key": first.key,
+                        "size_bytes": first.size_bytes,
+                        "upstream_md5": None if first.md5 == "unknown" else first.md5,
+                        "upstream_sha1": None,
+                        "upstream_sha256": None,
+                        "local_sha256": "ab" * 32,
+                        "retrieved_at": "2026-09-17T21:29:24.058121Z",
+                        "upstream_url": None,
+                    }
+                ],
+            },
+            indent=2,
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    loaded = read_bronze_manifest(tmp_settings, dataset_id=source.dataset_id, version="1.0")
+    assert loaded.schema_version == "1"
+    assert loaded.retrieved_at == datetime(2026, 9, 17, 21, 29, 24, 58121, tzinfo=UTC)
+    assert loaded.files[0].retrieved_at == datetime(2026, 9, 17, 21, 29, 24, 58121, tzinfo=UTC)
+    assert loaded.files[0].verified_at is None
 
 
 def test_parquet_write_accepts_plain_tables(tmp_settings: Settings) -> None:
