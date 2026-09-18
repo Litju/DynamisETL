@@ -990,6 +990,28 @@ def test_spl_plan_fails_closed_without_acknowledgement() -> None:
         )
 
 
+def test_spl_plan_rejects_superstring_acknowledgements() -> None:
+    from dynamis.registry import (
+        SPL_LICENSE_ACKNOWLEDGEMENT,
+        AcknowledgementRequired,
+        validate_registry,
+    )
+
+    version, key = _spl_selection()
+    registry = validate_registry()
+    superstring = f"invalid-{SPL_LICENSE_ACKNOWLEDGEMENT}-value"
+    assert SPL_LICENSE_ACKNOWLEDGEMENT in superstring
+    for acknowledged in (superstring, [superstring]):
+        with pytest.raises(AcknowledgementRequired, match="fail-closed"):
+            plan_acquisition(
+                "spl-open-data",
+                version=version,
+                keys=[key],
+                registry=registry,
+                acknowledgements=acknowledged,
+            )
+
+
 def test_acquire_also_refuses_spl_without_acknowledgement(
     tmp_settings: Settings,
 ) -> None:
@@ -1003,6 +1025,28 @@ def test_acquire_also_refuses_spl_without_acknowledgement(
     )
     with pytest.raises(AcknowledgementRequired, match="fail-closed"):
         acquire(tmp_settings, plan, registry=validate_registry())
+
+
+def test_acquire_also_rejects_superstring_acknowledgements(tmp_settings: Settings) -> None:
+    from dynamis.registry import (
+        SPL_LICENSE_ACKNOWLEDGEMENT,
+        AcknowledgementRequired,
+        validate_registry,
+    )
+
+    version, key = _spl_selection()
+    plan = _plan(
+        (_planned_file(key, "https://github.com/Sport-Performance-Lab/SPL-Open-Data/raw/pin/x"),),
+        dataset_id="spl-open-data",
+        version=version,
+    )
+    with pytest.raises(AcknowledgementRequired, match="fail-closed"):
+        acquire(
+            tmp_settings,
+            plan,
+            registry=validate_registry(),
+            acknowledgements=f"invalid-{SPL_LICENSE_ACKNOWLEDGEMENT}-value",
+        )
 
 
 def test_cli_refuses_spl_without_the_explicit_flag(capsys: pytest.CaptureFixture[str]) -> None:

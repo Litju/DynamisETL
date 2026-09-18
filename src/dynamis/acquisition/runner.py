@@ -215,15 +215,15 @@ def acquire(
     session: requests.Session | None = None,
     registry: DatasetRegistry | None = None,
     allow_insecure: bool = False,
-    acknowledgements: Collection[str] = (),
+    acknowledgements: Collection[str] | str = (),
     now: Callable[[], datetime] = lambda: datetime.now(UTC),
 ) -> AcquisitionReceipt:
     """Fetch every planned file into immutable Bronze and verify the manifest.
 
-    ``acknowledgements`` re-checks the source-specific eligibility gate so a
-    programmatic caller cannot bypass the planner; ``allow_insecure`` exists for
-    loopback test servers only, and production provider URLs are always required
-    to be HTTPS.
+    ``acknowledgements`` re-checks the source-specific eligibility gate as exact
+    tokens (a bare string is one token) so a programmatic caller cannot bypass
+    the planner; ``allow_insecure`` exists for loopback test servers only, and
+    production provider URLs are always required to be HTTPS.
 
     One deterministic run instant is captured up front and reused for every
     file, so a run has a single, reproducible acquisition/verification stamp.

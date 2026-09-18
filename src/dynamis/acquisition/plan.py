@@ -159,13 +159,14 @@ def plan_acquisition(
     registry: DatasetRegistry | None = None,
     session: requests.Session | None = None,
     timeout: tuple[float, float] = DEFAULT_METADATA_TIMEOUT_S,
-    acknowledgements: Collection[str] = (),
+    acknowledgements: Collection[str] | str = (),
 ) -> AcquisitionPlan:
     """Resolve a registry source into a canonical, revision-pinned fetch plan.
 
-    ``acknowledgements`` carries source-specific eligibility acknowledgements.
-    The gate fails closed before any resolver or metadata request runs, so an
-    unacknowledged restricted source can never be planned, let alone fetched.
+    ``acknowledgements`` carries source-specific eligibility acknowledgements as
+    exact tokens (a bare string is one token). The gate fails closed before any
+    resolver or metadata request runs, so an unacknowledged restricted source can
+    never be planned, let alone fetched.
     """
     document = registry if registry is not None else validate_registry()
     try:
