@@ -141,8 +141,15 @@ def list_silver_streams(
 def load_silver(
     settings: Settings,
     ref: SilverStreamRef,
+    *,
+    columns: list[str] | None = None,
 ) -> tuple[pa.Table, ProcessorInput]:
-    """Read one Silver stream after verifying its registered checksum."""
+    """Read one Silver stream after verifying its registered checksum.
+
+    ``columns`` projects the Parquet read (for example a pose stream whose full
+    table would be tens of millions of rows); the checksum is always computed on
+    the complete file, never on the projection.
+    """
     from dynamis.storage.atomic import sha256_file
 
     path = settings.dataset_root / ref.relative_path
@@ -157,7 +164,7 @@ def load_silver(
             f"{ref.checksum_sha256[:12]}... but disk holds {observed[:12]}...; refusing to "
             "process a mutated canonical input"
         )
-    table = read_parquet_table(path)
+    table = read_parquet_table(path, columns=columns)
     if table.num_rows != ref.row_count:
         raise ValueError(
             f"Silver artifact {ref.relative_path} holds {table.num_rows} rows but the control "

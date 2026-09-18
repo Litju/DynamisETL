@@ -47,6 +47,11 @@ def all_valid(columns: Sequence[Column]) -> pa.Array:
     return cast(pa.Array, result)
 
 
+def equal(column: Column, value: object) -> pa.Array:
+    """Element-wise equality against a scalar (null yields null)."""
+    return cast(pa.Array, _kernels.equal(column, value))
+
+
 def is_finite(column: Column) -> pa.Array:
     """Boolean array: True where the value is finite (null yields null)."""
     return cast(pa.Array, _kernels.is_finite(column))

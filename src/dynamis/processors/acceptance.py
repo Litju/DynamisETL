@@ -280,6 +280,8 @@ def white_force_acceptance(
 
 
 WOMENS_DATASET_ID = "womens-soccer-positioning"
+DFL_DATASET_ID = "dfl-sportec-idsse"
+SKILLCORNER_DATASET_ID = "skillcorner-opendata"
 
 #: Explicit geodetic configuration for the Women's consumer-GNSS release.
 #: The datum is the pipeline's documented WGS 84 inference, not a provider
@@ -361,6 +363,174 @@ SKILLCORNER_ACCEPTANCE_PARAMETERS: dict[str, Any] = {
     **TRACKING_ACCEPTANCE_PARAMETERS,
     "detection_gate": "require_is_detected",
 }
+
+#: Pose geometry for the SkillCorner acceptance run: required landmarks are named
+#: explicitly and every segment/angle is a translation-invariant relative vector.
+#: Z stays the provider's centroid-relative channel; no absolute height or COM
+#: interpretation is made.
+SKILLCORNER_POSE_PARAMETERS: dict[str, Any] = {
+    "required_coordinate_components": ["x_m", "y_m", "z_m"],
+    "segments": [
+        {"name": "left_thigh", "start_landmark": "lHip", "end_landmark": "lKnee"},
+        {"name": "right_thigh", "start_landmark": "rHip", "end_landmark": "rKnee"},
+        {"name": "left_shank", "start_landmark": "lKnee", "end_landmark": "lAnkle"},
+        {"name": "right_shank", "start_landmark": "rKnee", "end_landmark": "rAnkle"},
+        {"name": "shoulder_width", "start_landmark": "lShoulder", "end_landmark": "rShoulder"},
+        {"name": "hip_width", "start_landmark": "lHip", "end_landmark": "rHip"},
+    ],
+    "angles": [
+        {
+            "name": "left_knee",
+            "vertex_landmark": "lKnee",
+            "first_landmark": "lHip",
+            "second_landmark": "lAnkle",
+        },
+        {
+            "name": "right_knee",
+            "vertex_landmark": "rKnee",
+            "first_landmark": "rHip",
+            "second_landmark": "rAnkle",
+        },
+        {
+            "name": "left_hip",
+            "vertex_landmark": "lHip",
+            "first_landmark": "lShoulder",
+            "second_landmark": "lKnee",
+        },
+        {
+            "name": "right_hip",
+            "vertex_landmark": "rHip",
+            "first_landmark": "rShoulder",
+            "second_landmark": "rKnee",
+        },
+    ],
+    "derivative": {
+        "filter": {
+            "family": "none",
+            "order": None,
+            "cutoff_hz": None,
+            "phase": "zero_phase",
+            "padding": "odd",
+            "padlen": None,
+        },
+        "edge_policy": "nan",
+    },
+    "error_policy": "worst_case_additive_radius",
+}
+
+POSE_REQUIRED_COLUMNS = [
+    "subject_id",
+    "t_rel_ns",
+    "sample_index",
+    "joint_id",
+    "joint_name",
+    "is_available",
+    "x_m",
+    "y_m",
+    "z_m",
+    "error_m",
+]
+
+
+def skillcorner_pose_acceptance(
+    settings: Settings,
+    engine: Engine,
+    *,
+    parameters: dict[str, Any] | None = None,
+    progress: Callable[[int, int], None] | None = None,
+) -> dict[str, Any]:
+    """Process the SkillCorner pose streams with translation-invariant geometry."""
+    from dynamis.processors.pose import process_pose
+
+    resolved = dict(parameters or SKILLCORNER_POSE_PARAMETERS)
+    with engine.connect() as connection:
+        refs = list_silver_streams(connection, dataset_id=SKILLCORNER_DATASET_ID, modality="pose")
+    if not refs:
+        raise ValueError(f"{SKILLCORNER_DATASET_ID}: no registered pose streams")
+
+    def execute(ref: SilverStreamRef) -> tuple[ProcessorRunResult, Any, Any]:
+        table, processor_input = load_silver(settings, ref, columns=POSE_REQUIRED_COLUMNS)
+        result = process_pose(table, parameters=resolved)
+        run = execute_processor(
+            settings,
+            result=result,
+            dataset_id=SKILLCORNER_DATASET_ID,
+            inputs=(processor_input,),
+            series_key=ref.stream_id,
+            engine=engine,
+        )
+        return run, result, table
+
+    first_checksums: dict[str, str] = {}
+    run_ids: set[str] = set()
+    per_stream: list[dict[str, Any]] = []
+    metric_values: dict[str, list[float]] = {}
+    for index, ref in enumerate(refs):
+        run, result, table = execute(ref)
+        first_checksums[ref.stream_id] = run.series[0].artifact.checksum_sha256
+        run_ids.add(run.run_id)
+        per_stream.append(
+            {
+                "stream_id": ref.stream_id,
+                "rows": int(table.num_rows),
+                "frames": result.diagnostics["frames"],
+                "entities": result.diagnostics["entities"],
+                "metrics": len(result.metrics),
+            }
+        )
+        for metric in result.metrics:
+            metric_values.setdefault(metric.declaration.metric_id, []).append(metric.value)
+        del table
+        if progress is not None:
+            progress(index + 1, len(refs))
+
+    rerun_matches = 0
+    rerun_run_ids: set[str] = set()
+    for ref in refs:
+        run, _, table = execute(ref)
+        rerun_run_ids.add(run.run_id)
+        if run.series[0].artifact.checksum_sha256 == first_checksums[ref.stream_id]:
+            rerun_matches += 1
+        del table
+    receipt = {
+        "dataset_id": SKILLCORNER_DATASET_ID,
+        "algorithm_id": "pose.translation_invariant_kinematics",
+        "configuration": resolved,
+        "streams": len(refs),
+        "runs": len(run_ids),
+        "rerun_series_matches": rerun_matches,
+        "rerun_run_ids_stable": run_ids == rerun_run_ids,
+        "per_stream": per_stream,
+        "metric_summaries": {
+            metric_id: {
+                "n": len(values),
+                "min": float(min(values)),
+                "max": float(max(values)),
+                "mean": float(sum(values) / len(values)),
+            }
+            for metric_id, values in sorted(metric_values.items())
+        },
+        "conventions": {
+            "translation_invariance": "relative_vectors_only",
+            "parent_tree_created": False,
+            "absolute_height_interpretation": "none",
+            "provider_z_semantics": (
+                "SkillCorner Z is relative to the player centroid and not registered in "
+                "the pitch frame; only within-frame landmark differences are used"
+            ),
+            "error_radius_semantics": (
+                "provider error_m is a 90th-percentile predicted error radius; the "
+                "reported bound is a worst-case additive bound, not a confidence interval"
+            ),
+        },
+    }
+    target = receipt_path(
+        settings, dataset_id=SKILLCORNER_DATASET_ID, kind="acceptance", name="res100-pose"
+    )
+    atomic_write_text(target, json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+    receipt["receipt_path"] = relative_posix(settings.dataset_root, target)
+    return receipt
+
 
 DATUM_INFERENCE_NOTE = (
     "The provider does not declare a geodetic datum for the Women's GNSS release. The "
