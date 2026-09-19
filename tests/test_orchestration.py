@@ -32,6 +32,17 @@ EXPECTED_ASSETS = {
     "gymaware_landmine_discovery",
     "gymaware_landmine_canonical",
     "gymaware_landmine_reconciliation",
+    "synthetic_lpt_known_answer",
+    "white_cmj_force_processing",
+    "white_cmj_imu_processing",
+    "white_cmj_cross_sensor_processing",
+    "womens_gnss_processing",
+    "dfl_tracking_processing",
+    "skillcorner_tracking_processing",
+    "skillcorner_pose_processing",
+    "gold_serving_export",
+    "gold_marts",
+    "gold_publish",
 }
 
 EXPECTED_ASSET_CHECKS = {
@@ -42,6 +53,9 @@ EXPECTED_ASSET_CHECKS = {
     "dfl_tracking_reconciliation_balances",
     "white_cmj_reconciliation_balances",
     "gymaware_landmine_reconciliation_balances",
+    "synthetic_lpt_known_answer_holds",
+    "white_force_processing_complete",
+    "gold_marts_reconcile",
 }
 
 
@@ -181,3 +195,27 @@ def test_dagster_definitions_expose_lineage_edges() -> None:
     assert {key.path[-1] for key in gymaware_reconciliation.parent_keys} == {
         "gymaware_landmine_canonical"
     }
+
+    # Processor assets read canonical Silver through the control-plane registry
+    # and never depend on an acquisition/bronze asset (no downloads on import).
+    force = graph.get(AssetKey("white_cmj_force_processing"))
+    assert not force.parent_keys
+    lpt = graph.get(AssetKey("synthetic_lpt_known_answer"))
+    assert not lpt.parent_keys
+
+    # Gold lineage: every processing family feeds the serving export, which feeds
+    # the dbt marts, which feed the PostgreSQL publication.
+    export = graph.get(AssetKey("gold_serving_export"))
+    assert {key.path[-1] for key in export.parent_keys} == {
+        "white_cmj_force_processing",
+        "white_cmj_imu_processing",
+        "white_cmj_cross_sensor_processing",
+        "womens_gnss_processing",
+        "dfl_tracking_processing",
+        "skillcorner_tracking_processing",
+        "skillcorner_pose_processing",
+    }
+    marts = graph.get(AssetKey("gold_marts"))
+    assert {key.path[-1] for key in marts.parent_keys} == {"gold_serving_export"}
+    publish = graph.get(AssetKey("gold_publish"))
+    assert {key.path[-1] for key in publish.parent_keys} == {"gold_marts"}

@@ -84,6 +84,10 @@ models:
         tests:
           - unique
           - not_null
+      # Source-provided imports (origin = source-provided) carry no algorithm by
+      # definition; every pipeline-computed origin must name its algorithm.
       - name: algorithm_id
         tests:
-          - not_null
+          - not_null:
+              config:
+                where: "origin <> 'source-provided'"
