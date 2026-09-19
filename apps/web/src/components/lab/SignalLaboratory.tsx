@@ -6,19 +6,26 @@ import { MeasurementClassBadge, ModalityBadge } from "@/components/common/Badges
 import { EChart } from "@/components/charts/EChart";
 import {
   buildSignalOption,
-  detectBands,
-  measureColumns,
   rangeLabel,
   reductionNote,
-  toPoints,
   type SignalBand,
   type SignalSeries,
 } from "@/components/charts/signal-options";
+import { useDenseWindow } from "@/components/lab/use-dense-window";
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
 import type { StreamView } from "@/api/types";
 import { useAnalysisContext } from "@/lib/analysis-context";
 import { ApiError } from "@/lib/api/client";
-import { artifactQuery, sessionQuery, windowQuery } from "@/lib/api/queries";
+import { sessionQuery } from "@/lib/api/queries";
+import {
+  bandPairs,
+  bandPointsFor,
+  entityKeys,
+  measureColumns,
+  originNs,
+  pointsFor,
+  type WindowTable,
+} from "@/lib/arrow/window-table";
 import { readPalette } from "@/lib/chart-palette";
 import { useAnalysisStore } from "@/lib/state/analysis";
 import { nsFromRendererTime, rendererTimeMs } from "@/lib/time";
@@ -28,8 +35,9 @@ const RANGE_COMMIT_DEBOUNCE_MS = 250;
 
 /**
  * Signal laboratory: bounded, display-reduced analytical windows over a
- * canonical or processor-derived stream artifact, with a shared playhead,
- * brush-to-range and exact-unit labels. Science stays on the server.
+ * canonical or processor-derived stream artifact. Dense transport prefers Arrow
+ * IPC decoded in a worker; JSON remains the metadata fallback. Playback updates
+ * go straight to the chart instance, never through React state.
  */
 export function SignalLaboratory() {
   const context = useAnalysisContext();
@@ -49,18 +57,11 @@ export function SignalLaboratory() {
     return streams.find((candidate) => candidate.stream_id === streamId) ?? null;
   }, [session.data, streamId]);
   const artifactId = stream?.sample_artifact_ids[0] ?? null;
-  const artifact = useQuery({
-    ...artifactQuery(artifactId ?? ""),
-    enabled: Boolean(artifactId),
-  });
-  const window = useQuery({
-    ...windowQuery({
-      artifactId: artifactId ?? "",
-      ...(fromNs !== null ? { fromNs: Number(fromNs) } : {}),
-      ...(toNs !== null ? { toNs: Number(toNs) } : {}),
-      maxPoints: MAX_WINDOW_POINTS,
-    }),
-    enabled: Boolean(artifactId),
+  const dense = useDenseWindow({
+    artifactId,
+    ...(fromNs !== null ? { fromNs: Number(fromNs) } : {}),
+    ...(toNs !== null ? { toNs: Number(toNs) } : {}),
+    maxPoints: MAX_WINDOW_POINTS,
   });
 
   if (!context) {
@@ -99,8 +100,8 @@ export function SignalLaboratory() {
       />
     );
   }
-  if (artifact.isError || window.isError) {
-    const error = artifact.error ?? window.error;
+  if (dense.isError) {
+    const error = dense.error;
     if (error instanceof ApiError && error.state === "dense_window_too_large") {
       return (
         <StatePanel
@@ -110,151 +111,87 @@ export function SignalLaboratory() {
         />
       );
     }
-    return (
-      <ErrorPanel
-        error={error}
-        onRetry={() => {
-          void artifact.refetch();
-          void window.refetch();
-        }}
-      />
-    );
+    return <ErrorPanel error={error} onRetry={() => void dense.refetch()} />;
   }
-  if (artifact.isPending || window.isPending) {
+  if (dense.isPending || dense.data.table === null) {
     return <LoadingPanel label="Loading dense window" />;
   }
   return (
     <SignalView
-      artifactMeasurementClass={artifact.data.measurement_class}
       stream={stream}
-      unitMap={window.data.meta.units}
-      reductionText={reductionNote(window.data.meta)}
-      rows={window.data.rows}
+      table={dense.data.table}
+      transport={dense.data.transport ?? "json"}
       fromNs={fromNs}
       toNs={toNs}
       subjectFilter={subjectFilter}
-      sourceRows={window.data.meta.source_rows}
-      returnedRows={window.data.meta.returned_rows}
     />
   );
 }
 
 function SignalView({
-  artifactMeasurementClass,
   stream,
-  unitMap,
-  reductionText,
-  rows,
+  table,
+  transport,
   fromNs,
   toNs,
   subjectFilter,
-  sourceRows,
-  returnedRows,
 }: {
-  artifactMeasurementClass: string | null;
   stream: StreamView;
-  unitMap: Record<string, string>;
-  reductionText: string | null;
-  rows: Array<Record<string, unknown>>;
+  table: WindowTable;
+  transport: "arrow" | "json";
   fromNs: bigint | null;
   toNs: bigint | null;
   subjectFilter: string | null;
-  sourceRows: number;
-  returnedRows: number;
 }) {
   const context = useAnalysisContext();
   const chartRef = useRef<ECharts | null>(null);
   const commitTimer = useRef<number | null>(null);
-  const measurementClass = artifactMeasurementClass ?? stream.measurement_class;
-  const first = rows[0];
+  const measurementClass = table.meta.artifact.measurement_class ?? stream.measurement_class;
+  const origin = useMemo(() => originNs(table), [table]);
+  const measures = useMemo(() => measureColumns(table), [table]);
+  const bands = useMemo(() => bandPairs(table), [table]);
+  const groups = useMemo(() => entityKeys(table), [table]);
+  const unitMap = table.meta.units;
+  const reductionText = reductionNote(table.meta);
 
-  const originNs = useMemo(() => {
-    const raw = first?.["t_rel_ns"];
-    if (typeof raw === "number" || typeof raw === "bigint") return BigInt(raw);
-    return fromNs ?? 0n;
-  }, [first, fromNs]);
-
-  const columns = useMemo(
-    () => measureColumns(Object.keys(first ?? {}), unitMap, first),
-    [first, unitMap],
-  );
-  const bands = useMemo(() => detectBands(Object.keys(first ?? {})), [first]);
+  const scopedGroups = useMemo(() => {
+    if (groups.length === 0) return [{ id: null as string | null, rows: allRows(table) }];
+    const filtered =
+      subjectFilter === null ? groups : groups.filter((group) => group.id === subjectFilter);
+    return filtered.length > 0 ? filtered : [];
+  }, [groups, subjectFilter, table]);
 
   const series = useMemo<SignalSeries[]>(() => {
-    if (columns.length === 0) return [];
-    const scopedRows =
-      subjectFilter === null
-        ? rows
-        : rows.filter(
-            (row) => row["subject_id"] === subjectFilter || row["object_id"] === subjectFilter,
-          );
-    const subjects = Array.from(
-      new Set(
-        scopedRows
-          .map((row) =>
-            typeof row["subject_id"] === "string"
-              ? row["subject_id"]
-              : typeof row["object_id"] === "string"
-                ? row["object_id"]
-                : null,
-          )
-          .filter((value): value is string => value !== null),
-      ),
-    );
-    const groups: Array<{ label: string | null; rows: Array<Record<string, unknown>> }> =
-      subjects.length > 1
-        ? subjects.map((subject) => ({
-            label: subject,
-            rows: scopedRows.filter(
-              (row) => row["subject_id"] === subject || row["object_id"] === subject,
-            ),
-          }))
-        : [{ label: null, rows: scopedRows }];
+    if (measures.length === 0) return [];
     const output: SignalSeries[] = [];
-    for (const column of columns) {
-      for (const group of groups) {
+    for (const column of measures) {
+      for (const group of scopedGroups) {
         if (group.rows.length === 0) continue;
         output.push({
-          name: group.label === null ? column : `${group.label} · ${column}`,
+          name: group.id === null ? column : `${group.id} · ${column}`,
           unit: unitMap[column] ?? "1",
           measurementClass,
-          points: toPoints(group.rows, column, originNs),
+          points: pointsFor(table, column, group.rows, origin),
         });
       }
     }
     return output;
-  }, [columns, measurementClass, originNs, rows, subjectFilter, unitMap]);
+  }, [measurementClass, measures, origin, scopedGroups, table, unitMap]);
 
   const bandSeries = useMemo<SignalBand[]>(() => {
     return bands.map((band) => ({
       name: band.base,
       unit: unitMap[band.base] ?? unitMap[band.minKey] ?? "1",
       measurementClass,
-      points: rows
-        .map((row) => {
-          const t = row["t_rel_ns"];
-          if (typeof t !== "number" && typeof t !== "bigint") return null;
-          const min = row[band.minKey];
-          const max = row[band.maxKey];
-          return [
-            rendererTimeMs(originNs, BigInt(t)),
-            typeof min === "number" ? min : null,
-            typeof max === "number" ? max : null,
-          ] as const;
-        })
-        .filter(
-          (point): point is readonly [number, number | null, number | null] => point !== null,
-        ),
+      points: bandPointsFor(table, band.minKey, band.maxKey, origin),
     }));
-  }, [bands, measurementClass, originNs, rows, unitMap]);
+  }, [bands, measurementClass, origin, table, unitMap]);
 
   const committedTimeNs = useAnalysisStore((state) => state.committedTimeNs);
   const rangeNs = useAnalysisStore((state) => state.committedRangeNs);
   const committedPlayheadMs =
-    committedTimeNs === null ? null : rendererTimeMs(originNs, committedTimeNs);
+    committedTimeNs === null ? null : rendererTimeMs(origin, committedTimeNs);
 
-  // The committed playhead is part of the option; live playback is applied
-  // imperatively through the chart instance below.
   const option = useMemo(
     () =>
       buildSignalOption({
@@ -265,26 +202,23 @@ function SignalView({
           rangeNs === null
             ? null
             : {
-                fromMs: rendererTimeMs(originNs, rangeNs.fromNs),
-                toMs: rendererTimeMs(originNs, rangeNs.toNs),
+                fromMs: rendererTimeMs(origin, rangeNs.fromNs),
+                toMs: rendererTimeMs(origin, rangeNs.toNs),
               },
         palette: readPalette(),
       }),
-    [series, bandSeries, rangeNs, originNs, committedPlayheadMs],
+    [series, bandSeries, rangeNs, origin, committedPlayheadMs],
   );
 
   useEffect(() => {
     const applyPlayhead = (tNs: bigint | null) => {
       const chart = chartRef.current;
       if (!chart) return;
-      const ms = tNs === null ? null : rendererTimeMs(originNs, tNs);
+      const ms = tNs === null ? null : rendererTimeMs(origin, tNs);
       chart.setOption(
         {
           series: [
-            {
-              id: "series-0",
-              markLine: { data: ms === null ? [] : [{ xAxis: ms }] },
-            },
+            { id: "series-0", markLine: { data: ms === null ? [] : [{ xAxis: ms }] } },
           ],
         },
         { lazyUpdate: true },
@@ -296,7 +230,7 @@ function SignalView({
       if (next === before) return;
       applyPlayhead(next);
     });
-  }, [originNs]);
+  }, [origin]);
 
   useEffect(() => {
     return () => {
@@ -311,18 +245,18 @@ function SignalView({
   const handlePointClick = useCallback(
     (selection: { xMs: number }) => {
       if (!Number.isFinite(selection.xMs)) return;
-      const tNs = nsFromRendererTime(originNs, selection.xMs);
+      const tNs = nsFromRendererTime(origin, selection.xMs);
       useAnalysisStore.getState().setPlayhead(tNs);
       context?.commitTime(tNs);
     },
-    [context, originNs],
+    [context, origin],
   );
 
   const handleRangeZoom = useCallback(
     (selection: { fromMs: number; toMs: number }) => {
       const range = {
-        fromNs: nsFromRendererTime(originNs, selection.fromMs),
-        toNs: nsFromRendererTime(originNs, selection.toMs),
+        fromNs: nsFromRendererTime(origin, selection.fromMs),
+        toNs: nsFromRendererTime(origin, selection.toMs),
       };
       useAnalysisStore.getState().setBrushRange(range);
       if (commitTimer.current !== null) window.clearTimeout(commitTimer.current);
@@ -330,7 +264,7 @@ function SignalView({
         context?.commitRange(range);
       }, RANGE_COMMIT_DEBOUNCE_MS);
     },
-    [context, originNs],
+    [context, origin],
   );
 
   return (
@@ -342,8 +276,12 @@ function SignalView({
         <span className="mono">sync {stream.synchronization_spec_id}</span>
         <span className="mono">frame {stream.coordinate_frame_id ?? "unavailable"}</span>
         <span className="mono">{stream.nominal_sampling_rate_hz ?? "?"} Hz</span>
+        <span className="mono" title="Dense transport actually used for this window">
+          transport {transport}
+        </span>
         <span className="tabular">
-          {sourceRows} source rows → {returnedRows} returned · {rangeLabel(fromNs, toNs)}
+          {table.meta.source_rows} source rows → {table.meta.returned_rows} returned ·{" "}
+          {rangeLabel(fromNs, toNs)}
         </span>
         {reductionText ? (
           <span className="text-quality-warning">{reductionText}</span>
@@ -370,4 +308,8 @@ function SignalView({
       )}
     </div>
   );
+}
+
+function allRows(table: WindowTable): number[] {
+  return Array.from({ length: table.rowCount }, (_value, index) => index);
 }

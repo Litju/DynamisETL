@@ -30,6 +30,8 @@
     "@tanstack/react-table": "^8.21.3",
     "@tanstack/react-virtual": "^3.14.13",
     "@xyflow/react": "^12.11.6",
+    "apache-arrow": "^21.2.0",
+    "comlink": "^4.4.2",
     "echarts": "^6.1.0",
     "lucide-react": "^1.47.0",
     "motion": "^13.4.0",

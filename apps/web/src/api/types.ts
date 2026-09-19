@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Convenience aliases over the generated OpenAPI schema.
  *
  * The generated `schema.d.ts` remains the single DTO authority; this module only
@@ -20,4 +20,5 @@ export type QualityIssuePage = components["schemas"]["QualityIssuePage"];
 export type RunPage = components["schemas"]["RunPage"];
 export type RightsPage = components["schemas"]["RightsPage"];
 export type DenseWindow = components["schemas"]["DenseWindow"];
+export type DenseWindowMeta = components["schemas"]["DenseWindowMeta"];
 export type ArtifactRef = components["schemas"]["ArtifactRefView"];

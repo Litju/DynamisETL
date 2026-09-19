@@ -1,4 +1,5 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+﻿import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { tableFromArrays, tableToIPC } from "apache-arrow";
 import { render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
@@ -107,7 +108,24 @@ function windowBody(reduced: boolean) {
   };
 }
 
-function installFetch(reduced = false, windowStatus = 200): void {
+function arrowWindowResponse(): Response {
+  const table = tableFromArrays({
+    t_rel_ns: BigInt64Array.from([0n, 10_000_000n, 20_000_000n]),
+    subject_id: ["s1", "s1", "s1"],
+    x_m: Float64Array.from([0, 1, 2]),
+  });
+  const ipc = tableToIPC(table, "stream");
+  const buffer = ipc.buffer.slice(ipc.byteOffset, ipc.byteOffset + ipc.byteLength) as ArrayBuffer;
+  return new Response(buffer, {
+    status: 200,
+    headers: {
+      "Content-Type": "application/vnd.apache.arrow.stream",
+      "X-Dynamis-Window-Meta": JSON.stringify(windowBody(false).meta),
+    },
+  });
+}
+
+function installFetch(reduced = false, windowStatus = 200, arrow = false): void {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: RequestInfo | URL) => {
@@ -120,6 +138,9 @@ function installFetch(reduced = false, windowStatus = 200): void {
         return json(ARTIFACT);
       }
       if (url.pathname === "/api/artifacts/sample-1/window") {
+        if (arrow && url.searchParams.get("format") === "arrow") {
+          return arrowWindowResponse();
+        }
         if (windowStatus !== 200) {
           return json({ detail: "too large", state: "dense_window_too_large" }, windowStatus);
         }
@@ -217,4 +238,12 @@ it("refuses a stream that is not part of the open session", async () => {
   installFetch(false);
   renderLab({ streamId: "other-stream" });
   expect(await screen.findByText("Stream is not part of this session.")).toBeInTheDocument();
+});
+
+it("uses the Arrow dense transport when the API serves it", async () => {
+  installFetch(false, 200, true);
+  renderLab();
+  expect(await screen.findByText("transport arrow")).toBeInTheDocument();
+  expect(await screen.findByTestId("echart")).toBeInTheDocument();
+  expect(screen.getByText("3 source rows → 3 returned · full window")).toBeInTheDocument();
 });
