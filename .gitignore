@@ -41,6 +41,11 @@ build/
 .vite/
 *.tsbuildinfo
 
+# Playwright artifacts (regenerated locally and in CI)
+test-results/
+playwright-report/
+blob-report/
+
 # Scientific data formats (raw, canonical, gold, quarantine)
 *.parquet
 *.arrow

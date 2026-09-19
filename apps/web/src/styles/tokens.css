@@ -1,4 +1,4 @@
-/* DynamisData design tokens — "Dynamis Instrument".
+﻿/* DynamisData design tokens — "Dynamis Instrument".
  *
  * Tailwind v4 theme variables are the canonical frontend design-token source.
  * Semantic variables are defined per theme (`:root` = Instrument Dark,
@@ -18,8 +18,8 @@
   --d-border-strong: oklch(0.42 0.015 255);
 
   --d-text-primary: oklch(0.93 0.005 255);
-  --d-text-secondary: oklch(0.75 0.01 255);
-  --d-text-muted: oklch(0.6 0.012 255);
+  --d-text-secondary: oklch(0.82 0.01 255);
+  --d-text-muted: oklch(0.72 0.012 255);
   --d-text-inverse: oklch(0.16 0.01 255);
 
   /* Focus/selection: cyan/blue instrument accent. */
@@ -70,7 +70,7 @@
 
   --d-text-primary: oklch(0.24 0.012 255);
   --d-text-secondary: oklch(0.4 0.012 255);
-  --d-text-muted: oklch(0.55 0.012 255);
+  --d-text-muted: oklch(0.46 0.012 255);
   --d-text-inverse: oklch(0.98 0.003 255);
 
   --d-accent: oklch(0.55 0.14 215);

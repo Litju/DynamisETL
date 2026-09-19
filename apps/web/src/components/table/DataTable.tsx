@@ -130,45 +130,55 @@ export function DataTable<T>({
   return (
     <div role="table" aria-label={ariaLabel} className="flex h-full min-h-0 flex-col">
       <div
-        role="row"
-        className="sticky top-0 z-10 grid shrink-0 border-b border-border-subtle bg-surface-1"
-        style={{ gridTemplateColumns: template }}
+        role="rowgroup"
+        className="sticky top-0 z-10 shrink-0 border-b border-border-subtle bg-surface-1"
       >
-        {table.getHeaderGroups()[0]?.headers.map((header, index) => {
-          const column = columns[index];
-          const sorted = header.column.getIsSorted();
-          return (
-            <div
-              key={header.id}
-              role="columnheader"
-              aria-sort={
-                sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : "none"
-              }
-              className={cn(
-                "px-2 py-1 text-[11px] font-medium uppercase tracking-wider text-text-muted",
-                column?.align === "right" && "text-right",
-              )}
-            >
-              {header.column.getCanSort() ? (
-                <button
-                  type="button"
-                  onClick={header.column.getToggleSortingHandler()}
-                  className="inline-flex items-center gap-1 hover:text-text-secondary"
-                >
-                  {flexRender(header.column.columnDef.header, header.getContext())}
-                  <span aria-hidden="true" className="text-[9px]">
-                    {sorted === "asc" ? "▲" : sorted === "desc" ? "▼" : "·"}
-                  </span>
-                </button>
-              ) : (
-                flexRender(header.column.columnDef.header, header.getContext())
-              )}
-            </div>
-          );
-        })}
+        <div role="row" className="grid" style={{ gridTemplateColumns: template }}>
+          {table.getHeaderGroups()[0]?.headers.map((header, index) => {
+            const column = columns[index];
+            const sorted = header.column.getIsSorted();
+            return (
+              <div
+                key={header.id}
+                role="columnheader"
+                aria-sort={
+                  sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : "none"
+                }
+                className={cn(
+                  "px-2 py-1 text-[11px] font-medium uppercase tracking-wider text-text-muted",
+                  column?.align === "right" && "text-right",
+                )}
+              >
+                {header.column.getCanSort() ? (
+                  <button
+                    type="button"
+                    onClick={header.column.getToggleSortingHandler()}
+                    className="inline-flex items-center gap-1 hover:text-text-secondary"
+                  >
+                    {flexRender(header.column.columnDef.header, header.getContext())}
+                    <span aria-hidden="true" className="text-[9px]">
+                      {sorted === "asc" ? "▲" : sorted === "desc" ? "▼" : "·"}
+                    </span>
+                  </button>
+                ) : (
+                  flexRender(header.column.columnDef.header, header.getContext())
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
-        <div role="rowgroup" className="relative" style={{ height: bodyHeight }}>
+      <div
+        role="rowgroup"
+        ref={scrollRef}
+        // Scrollable regions must be reachable by keyboard (WCAG 2.2 / axe
+        // scrollable-region-focusable); arrow keys scroll while a cell keeps
+        // focus for row activation.
+        tabIndex={0}
+        aria-label={ariaLabel ? `${ariaLabel} rows` : "Table rows"}
+        className="min-h-0 flex-1 overflow-auto"
+      >
+        <div role="presentation" className="relative" style={{ height: bodyHeight }}>
           {items.map((item) => {
             const row = modelRows[item.index];
             if (!row) return null;

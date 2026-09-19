@@ -286,6 +286,29 @@ export function PoseViewer() {
           </div>
           <div className="mb-2">
             <span className="text-[10px] uppercase tracking-wider text-text-muted">
+              observed landmarks
+            </span>
+            <ul className="mt-1 flex flex-wrap gap-1" aria-label="Observed landmarks">
+              {currentLandmarks.map((landmark) => (
+                <li key={landmark.jointName}>
+                  <button
+                    type="button"
+                    aria-pressed={selectedJoint === landmark.jointName}
+                    onClick={() => useAnalysisStore.getState().selectJoint(landmark.jointName)}
+                    className={
+                      selectedJoint === landmark.jointName
+                        ? "mono rounded-control bg-surface-3 px-1.5 py-0.5 text-text-primary"
+                        : "mono rounded-control border border-border-subtle px-1.5 py-0.5 text-text-muted hover:text-text-secondary"
+                    }
+                  >
+                    {landmark.jointName}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="mb-2">
+            <span className="text-[10px] uppercase tracking-wider text-text-muted">
               frame time
             </span>
             <p className="mono text-text-secondary">

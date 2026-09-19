@@ -2,6 +2,7 @@ import { createRootRoute, Outlet } from "@tanstack/react-router";
 import { useEffect } from "react";
 
 import { AppShell } from "@/components/shell/AppShell";
+import { AnalysisContextProvider } from "@/lib/analysis-context-provider";
 import { applyTheme, useUiStore } from "@/lib/state/ui";
 import { NotFoundPage } from "@/routes/not-found";
 
@@ -11,9 +12,11 @@ function RootLayout() {
     applyTheme(theme);
   }, [theme]);
   return (
-    <AppShell>
-      <Outlet />
-    </AppShell>
+    <AnalysisContextProvider>
+      <AppShell>
+        <Outlet />
+      </AppShell>
+    </AnalysisContextProvider>
   );
 }
 

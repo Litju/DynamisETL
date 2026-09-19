@@ -19,14 +19,12 @@ import type { MetricValue } from "@/api/types";
 import { KeyValueRow, Panel, SectionTitle } from "@/components/common/Panel";
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
 import { metricsQuery, sessionQuery } from "@/lib/api/queries";
-import { AnalysisContext } from "@/lib/analysis-context";
-import type { AnalysisContextValue } from "@/lib/analysis-context";
 import { cn } from "@/lib/cn";
 import { formatMetricValue } from "@/lib/measurement";
 import { labSearchSchema, parseSearch, WORKBENCH_VIEWS } from "@/lib/search";
 import type { LabSearch, WorkbenchView } from "@/lib/search";
 import { useAnalysisStore } from "@/lib/state/analysis";
-import { formatNsDecimal, tryParseNs } from "@/lib/time";
+import { tryParseNs } from "@/lib/time";
 
 
 export function defineLabRoute(parent: AnyRoute) {
@@ -46,16 +44,19 @@ export function LabPage() {
   const setNominalRate = useAnalysisStore((state) => state.setNominalRate);
   const session = useQuery(sessionQuery(datasetId, sessionId));
 
+  const durableTimeNs = tryParseNs(search.t_ns);
+  const durableSubject = search.subject ?? null;
+  const durableView = search.view ?? "overview";
   useEffect(() => {
     hydrate({
-      committedTimeNs: tryParseNs(search.t_ns),
-      selectedEntityId: search.subject ?? null,
-      focusedPanel: search.view ?? "overview",
+      committedTimeNs: durableTimeNs,
+      selectedEntityId: durableSubject,
+      focusedPanel: durableView,
     });
     return () => {
       useAnalysisStore.getState().resetTransient();
     };
-  }, [hydrate, search.subject, search.t_ns, search.view]);
+  }, [hydrate, durableSubject, durableTimeNs, durableView]);
 
   const selectedStream = useMemo(() => {
     const streams = session.data?.streams ?? [];
@@ -78,49 +79,6 @@ export function LabPage() {
     [datasetId, navigate, sessionId],
   );
 
-  const context = useMemo<AnalysisContextValue>(
-    () => ({
-      datasetId,
-      sessionId,
-      trialId: search.trial ?? null,
-      subjectId: search.subject ?? null,
-      streamId: search.stream ?? null,
-      fromNs: tryParseNs(search.from_ns),
-      toNs: tryParseNs(search.to_ns),
-      metricId: search.metric ?? null,
-      derivedMetricId: search.result ?? null,
-      commitTime: (tNs) =>
-        updateSearch({ t_ns: tNs === null ? undefined : formatNsDecimal(tNs) }),
-      commitRange: (range) =>
-        updateSearch(
-          range === null
-            ? { from_ns: undefined, to_ns: undefined }
-            : {
-                from_ns: formatNsDecimal(range.fromNs),
-                to_ns: formatNsDecimal(range.toNs),
-              },
-        ),
-      selectSubject: (subjectId) =>
-        updateSearch({ subject: subjectId === null ? undefined : subjectId }),
-      selectStream: (streamId) =>
-        updateSearch({ stream: streamId === null ? undefined : streamId }),
-      selectResult: (derivedMetricId) =>
-        updateSearch({ result: derivedMetricId === null ? undefined : derivedMetricId }),
-    }),
-    [
-      datasetId,
-      search.metric,
-      search.result,
-      search.subject,
-      search.stream,
-      search.trial,
-      search.from_ns,
-      search.to_ns,
-      sessionId,
-      updateSearch,
-    ],
-  );
-
   if (session.isPending) return <LoadingPanel label="Loading laboratory session" />;
   if (session.isError) {
     return <ErrorPanel error={session.error} onRetry={() => void session.refetch()} />;
@@ -128,8 +86,7 @@ export function LabPage() {
 
   const view: WorkbenchView = search.view ?? "overview";
   return (
-    <AnalysisContext.Provider value={context}>
-      <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full min-h-0 flex-col">
         <div
           role="tablist"
           aria-label="Laboratory views"
@@ -190,7 +147,6 @@ export function LabPage() {
           )}
         </div>
       </div>
-    </AnalysisContext.Provider>
   );
 }
 

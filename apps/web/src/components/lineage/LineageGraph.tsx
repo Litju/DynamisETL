@@ -59,7 +59,7 @@ export default function LineageGraph({ graph }: { graph: ProvenanceGraph }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="min-h-64 flex-1" data-testid="lineage-flow">
+      <div className="h-80 w-full shrink-0" data-testid="lineage-flow">
         <ReactFlow
           nodes={nodes}
           edges={edges}

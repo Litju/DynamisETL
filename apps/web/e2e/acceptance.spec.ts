@@ -1,0 +1,122 @@
+import { expect, test } from "@playwright/test";
+
+import { installApiMocks } from "./fixtures";
+
+const DEEP_LINK =
+  "/lab/skillcorner-opendata/1925299?trial=period-1&subject=SC-P1&view=overview&t_ns=2987480000000";
+
+test.beforeEach(async ({ page }) => {
+  await installApiMocks(page);
+});
+
+test("1. deep link loads deterministic analytical context and survives reload", async ({ page }) => {
+  await page.goto(DEEP_LINK);
+  await expect(page.getByText("skillcorner-opendata").first()).toBeVisible();
+  await expect(page.getByText("period-1").first()).toBeVisible();
+  await expect(page.getByText("SC-P1").first()).toBeVisible();
+  await expect(page.getByText("00:49:47.480").first()).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("00:49:47.480").first()).toBeVisible();
+  await expect(page).toHaveURL(/t_ns=2987480000000/);
+});
+
+test("2. selecting a player on the pitch updates the durable subject context", async ({ page }) => {
+  await page.goto("/lab/skillcorner-opendata/1925299?stream=tracking-1&view=field");
+  const host = page.getByTestId("pitch-canvas");
+  await expect(host).toBeVisible();
+  await expect(page.getByText(/players · .* extrapolated/)).toBeVisible();
+  const canvas = host.locator("canvas");
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  if (!box) return;
+  const scale = Math.min(box.width / 120, box.height / 80);
+  // p1 sits at (-5 m, 2 m) with the pitch origin at the canvas centre.
+  await page.mouse.click(box.x + box.width / 2 - 5 * scale, box.y + box.height / 2 - 2 * scale);
+  await expect(page).toHaveURL(/subject=p1/);
+  await expect(page.getByText(/p1 · player/)).toBeVisible();
+  await expect(page.getByText(/detected$|extrapolated$/).last()).toBeVisible();
+});
+
+test("3/4. committed time propagates from the keyboard to the transport and pose view", async ({
+  page,
+}) => {
+  await page.goto("/lab/skillcorner-opendata/1925299?stream=tracking-1&view=signals&t_ns=50000000");
+  await expect(page.getByText("transport json")).toBeVisible();
+  await expect(page.getByTestId("echart")).toBeVisible();
+  await page.keyboard.press("ArrowRight");
+  await expect(page).toHaveURL(/t_ns=/);
+  const committed = page.getByText(/^committed$/).locator("xpath=following-sibling::span");
+  const committedBefore = await committed.first().textContent();
+  expect(committedBefore).not.toBe("—");
+  // The same committed time governs the 3D view: it loads with the URL state and
+  // the transport reports the identical committed clock.
+  const tNs = new URL(page.url()).searchParams.get("t_ns");
+  await page.goto(
+    `/lab/skillcorner-opendata/1925299?stream=pose-1&view=pose&t_ns=${tNs ?? "50000000"}`,
+  );
+  await expect(page.getByText(/local analytical frame/)).toBeVisible();
+  await expect(committed.first()).toHaveText(committedBefore ?? "");
+});
+
+test("5. selecting a landmark shows coordinates, error radius and declared overlays", async ({
+  page,
+}) => {
+  await page.goto("/lab/skillcorner-opendata/1925299?stream=pose-1&view=pose&t_ns=0");
+  await expect(page.getByText(/local analytical frame · Z is player-centroid-relative/)).toBeVisible();
+  await expect(
+    page.getByText(/1 segment\(s\), 1 angle\(s\) from processor parameters/),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "lKnee" }).click();
+  await expect(page.getByText("selected landmark")).toBeVisible();
+  await expect(page.getByText(/provider p90 predicted error radius 0.0400 m/).first()).toBeVisible();
+  await expect(page.getByText(/z -0.850 m/)).toBeVisible();
+});
+
+test("6. provenance opens the exact algorithm/run/input lineage", async ({ page }) => {
+  await page.goto("/lab/skillcorner-opendata/1925299?view=overview&t_ns=50000000");
+  await page.getByText("pose.angular_rom.left_knee").first().click();
+  const inspector = page.getByRole("region", { name: "Inspector" });
+  await inspector.getByRole("tab", { name: "Provenance" }).click();
+  const flow = page.getByTestId("lineage-flow");
+  await expect(flow.getByText("run-pose")).toBeVisible();
+  await expect(flow.getByText(/Translation-invariant pose kinematics@1\.0\.0/)).toBeVisible();
+  await expect(flow.getByText("gold_row").first()).toBeVisible();
+  // The minimap overlays the pane corner; dispatch the activation on the node
+  // wrapper so the assertion targets the lineage interaction, not pane geometry.
+  await page.locator('.react-flow__node[data-id="run:run-pose"]').dispatchEvent("click");
+  await expect(page.getByText(/processing_run details/)).toBeVisible();
+  await expect(page.getByText(/code_git_sha/)).toBeVisible();
+});
+
+test("7. license and quality context are visible next to results", async ({ page }) => {
+  await page.goto("/quality");
+  await expect(page.getByText("CC BY 4.0").first()).toBeVisible();
+  await expect(page.getByText("CC BY 4.0; attribution required; redistribution: conditional").first()).toBeVisible();
+  await expect(page.getByText("tracking.ball_gap")).toBeVisible();
+  await expect(page.getByText(/gap_frames/)).toBeVisible();
+});
+
+test("8. a stream that is not part of the session is never cross-synchronized", async ({ page }) => {
+  await page.goto("/lab/skillcorner-opendata/1925299?stream=other-stream&view=signals");
+  await expect(page.getByText("Stream is not part of this session.")).toBeVisible();
+});
+
+test("9. compare preserves dataset/subject identity boundaries", async ({ page }) => {
+  await page.goto("/compare?metric=pose.angular_rom.left_knee");
+  await expect(page.getByText(/skillcorner-opendata \/ 1925299 \/ SC-P1/).first()).toBeVisible();
+  await expect(
+    page
+      .getByText(/subject identity is never merged and interchangeability is not established/)
+      .first(),
+  ).toBeVisible();
+  await expect(page.getByText(/pipeline-derived/).first()).toBeVisible();
+});
+
+test("10. methodology page renders the selected result lineage from a deep link", async ({
+  page,
+}) => {
+  await page.goto("/methods?metric=pose.angular_rom.left_knee&result=dm-pose-rom");
+  await expect(page.getByText("Selected result lineage")).toBeVisible();
+  await expect(page.getByText("run-pose")).toBeVisible();
+  await expect(page.getByText("Range of motion for angle left_knee")).toBeVisible();
+});
