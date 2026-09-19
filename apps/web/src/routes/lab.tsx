@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo } from "react";
 import { MeasurementClassBadge, ModalityBadge } from "@/components/common/Badges";
 import { DataTable, type DataTableColumn } from "@/components/table/DataTable";
 import { SignalLaboratory } from "@/components/lab/SignalLaboratory";
+import { PitchReplay } from "@/components/pitch/PitchReplay";
 import type { MetricValue } from "@/api/types";
 import { KeyValueRow, Panel, SectionTitle } from "@/components/common/Panel";
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
@@ -167,6 +168,8 @@ export function LabPage() {
             />
           ) : view === "signals" ? (
             <SignalLaboratory />
+          ) : view === "field" ? (
+            <PitchReplay />
           ) : (
             <StatePanel
               state="empty"
