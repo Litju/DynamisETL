@@ -75,6 +75,8 @@ gold/
 quarantine/
 cache/
 tmp/
+# ...except the source package that happens to be named "gold".
+!src/dynamis/gold/
 
 # Local-only credentials and service state
 infra/docker/data/
