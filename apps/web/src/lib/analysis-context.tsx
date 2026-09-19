@@ -19,6 +19,9 @@ export interface AnalysisContextValue {
   readonly sessionId: string;
   readonly trialId: string | null;
   readonly subjectId: string | null;
+  readonly streamId: string | null;
+  readonly fromNs: bigint | null;
+  readonly toNs: bigint | null;
   readonly metricId: string | null;
   readonly derivedMetricId: string | null;
   /** Commit a playhead selection; serialized as decimal `t_ns` text. */
@@ -27,6 +30,8 @@ export interface AnalysisContextValue {
   readonly commitRange: (range: DurableRange | null) => void;
   /** Select an entity (player/joint subject) durably. */
   readonly selectSubject: (subjectId: string | null) => void;
+  /** Select a stream durably (which renderer the laboratory shows). */
+  readonly selectStream: (streamId: string | null) => void;
   /** Select the result whose methodology/provenance the inspector follows. */
   readonly selectResult: (derivedMetricId: string | null) => void;
 }

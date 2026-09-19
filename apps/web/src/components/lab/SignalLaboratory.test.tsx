@@ -1,0 +1,220 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+
+import { SignalLaboratory } from "@/components/lab/SignalLaboratory";
+import { AnalysisContext, type AnalysisContextValue } from "@/lib/analysis-context";
+
+const setOption = vi.fn();
+const dispose = vi.fn();
+const resize = vi.fn();
+const on = vi.fn();
+const init = vi.fn(() => ({ setOption, dispose, resize, on, getOption: () => ({}) }));
+
+vi.mock("echarts", () => ({
+  init: (...args: unknown[]) => init(...(args as [])),
+}));
+
+const SESSION = {
+  dataset_id: "demo",
+  session: {
+    session_id: "s1",
+    kind: "laboratory",
+    label: null,
+    started_at: null,
+    ended_at: null,
+    participant_count: 1,
+    trial_count: 0,
+    stream_count: 1,
+  },
+  participants: [],
+  trials: [],
+  streams: [
+    {
+      stream_id: "lpt-1",
+      modality: "lpt",
+      measurement_class: "RAW_MEASURED",
+      subject_id: null,
+      trial_id: null,
+      device_id: null,
+      nominal_sampling_rate_hz: 100,
+      si_units: ["m"],
+      source_unit: "m",
+      coordinate_frame_id: "lab-frame",
+      synchronization_spec_id: "source-provided",
+      clock_id: "clock-1",
+      skeleton_id: null,
+      sample_artifact_ids: ["sample-1"],
+      sample_row_count: 3,
+    },
+  ],
+};
+
+const ARTIFACT = {
+  artifact_id: "sample-1",
+  dataset_id: "demo",
+  stream_id: "lpt-1",
+  layer: "silver",
+  relative_path: "silver/demo/lpt/sample-1.parquet",
+  format: "parquet",
+  compression: "zstd",
+  checksum_sha256: "a".repeat(64),
+  row_count: 3,
+  byte_size: 1024,
+  artifact_kind: "sample",
+  modality: "lpt",
+  measurement_class: "RAW_MEASURED",
+  si_units: ["m"],
+  coordinate_frame_id: "lab-frame",
+  synchronization_spec_id: "source-provided",
+};
+
+function windowBody(reduced: boolean) {
+  return {
+    meta: {
+      artifact: ARTIFACT,
+      from_ns: 0,
+      to_ns: 20_000_000,
+      columns: reduced ? ["t_rel_ns", "x_m_min", "x_m_max"] : ["t_rel_ns", "x_m"],
+      source_rows: 3,
+      returned_rows: reduced ? 2 : 3,
+      canonical_time_min_ns: 0,
+      canonical_time_max_ns: 20_000_000,
+      reduction: reduced
+        ? {
+            method: "min_max_envelope_per_time_bucket",
+            parameters: {},
+            source_points: 3,
+            returned_points: 2,
+            note: "display only",
+          }
+        : null,
+      units: { x_m: "m" },
+      coordinate_frame_id: "lab-frame",
+      measurement_class: "RAW_MEASURED",
+      display_note: reduced ? "Display-reduced." : "Exact.",
+    },
+    rows: reduced
+      ? [
+          { t_rel_ns: 0, x_m_min: 0, x_m_max: 1 },
+          { t_rel_ns: 10_000_000, x_m_min: 1, x_m_max: 2 },
+        ]
+      : [
+          { t_rel_ns: 0, x_m: 0 },
+          { t_rel_ns: 10_000_000, x_m: 1 },
+          { t_rel_ns: 20_000_000, x_m: 2 },
+        ],
+  };
+}
+
+function installFetch(reduced = false, windowStatus = 200): void {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL) => {
+      const raw = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const url = new URL(raw, "http://localhost");
+      if (url.pathname === "/api/catalog/datasets/demo/sessions/s1") {
+        return json(SESSION);
+      }
+      if (url.pathname === "/api/artifacts/sample-1") {
+        return json(ARTIFACT);
+      }
+      if (url.pathname === "/api/artifacts/sample-1/window") {
+        if (windowStatus !== 200) {
+          return json({ detail: "too large", state: "dense_window_too_large" }, windowStatus);
+        }
+        return json(windowBody(reduced));
+      }
+      return json({ detail: `unhandled ${url.pathname}` }, 404);
+    }),
+  );
+}
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+function renderLab(overrides: Partial<AnalysisContextValue> = {}) {
+  const context: AnalysisContextValue = {
+    datasetId: "demo",
+    sessionId: "s1",
+    trialId: null,
+    subjectId: null,
+    streamId: "lpt-1",
+    fromNs: null,
+    toNs: null,
+    metricId: null,
+    derivedMetricId: null,
+    commitTime: vi.fn(),
+    commitRange: vi.fn(),
+    selectSubject: vi.fn(),
+    selectStream: vi.fn(),
+    selectResult: vi.fn(),
+    ...overrides,
+  };
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <QueryClientProvider client={client}>
+      <AnalysisContext.Provider value={context}>
+        <SignalLaboratory />
+      </AnalysisContext.Provider>
+    </QueryClientProvider>,
+  );
+  return context;
+}
+
+beforeEach(() => {
+  setOption.mockClear();
+  dispose.mockClear();
+  resize.mockClear();
+  on.mockClear();
+  init.mockClear();
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+it("renders an exact window with unit, synchronization and measurement context", async () => {
+  installFetch(false);
+  renderLab();
+  expect(await screen.findByText("exact samples in this window")).toBeInTheDocument();
+  expect(screen.getByText("3 source rows → 3 returned · full window")).toBeInTheDocument();
+  expect(screen.getByText("sync source-provided")).toBeInTheDocument();
+  expect(screen.getByText("frame lab-frame")).toBeInTheDocument();
+  expect(screen.getByText("raw")).toBeInTheDocument();
+  expect(await screen.findByTestId("echart")).toBeInTheDocument();
+  expect(init).toHaveBeenCalled();
+  expect(setOption).toHaveBeenCalled();
+});
+
+it("states display reduction and never hides it", async () => {
+  installFetch(true);
+  renderLab();
+  expect(
+    await screen.findByText(/Display-reduced: min_max_envelope_per_time_bucket/),
+  ).toBeInTheDocument();
+  expect(screen.getByText(/metrics never derive from this view/)).toBeInTheDocument();
+});
+
+it("asks for a narrower range when the dense window is too large", async () => {
+  installFetch(false, 413);
+  renderLab();
+  expect(await screen.findByText("Dense window too large.")).toBeInTheDocument();
+  expect(screen.getByText(/Narrow the time range/)).toBeInTheDocument();
+});
+
+it("requires an explicit stream and never invents one", async () => {
+  installFetch(false);
+  renderLab({ streamId: null });
+  expect(await screen.findByText("No stream selected.")).toBeInTheDocument();
+});
+
+it("refuses a stream that is not part of the open session", async () => {
+  installFetch(false);
+  renderLab({ streamId: "other-stream" });
+  expect(await screen.findByText("Stream is not part of this session.")).toBeInTheDocument();
+});

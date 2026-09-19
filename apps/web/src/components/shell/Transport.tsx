@@ -1,8 +1,11 @@
+import { useQuery } from "@tanstack/react-query";
 import { Pause, Play, SkipBack, SkipForward } from "lucide-react";
 
 import { useAnalysisContext } from "@/lib/analysis-context";
+import { qualityQuery } from "@/lib/api/queries";
 import { cn } from "@/lib/cn";
 import { effectiveTimeNs, useAnalysisStore } from "@/lib/state/analysis";
+import type { QualityIssuePage } from "@/api/types";
 import {
   formatClockNs,
   formatDurationNs,
@@ -12,6 +15,37 @@ import {
 
 const RATES = [0.25, 0.5, 1, 2, 4] as const;
 const DEFAULT_STEP_RATE_HZ = 25;
+
+export interface QualitySummary {
+  readonly quarantined: number;
+  readonly warnings: number;
+  readonly infos: number;
+}
+
+/** Deterministic quality counts for the transport ribbon. */
+export function summarizeQuality(rows: QualityIssuePage["rows"]): QualitySummary {
+  let quarantined = 0;
+  let warnings = 0;
+  let infos = 0;
+  for (const row of rows) {
+    if (row.state === "QUARANTINED" || row.severity === "ERROR") quarantined += 1;
+    else if (row.severity === "WARNING") warnings += 1;
+    else infos += 1;
+  }
+  return { quarantined, warnings, infos };
+}
+
+export function qualityRibbonText(summary: QualitySummary | null): string {
+  if (summary === null) return "quality context unavailable";
+  if (summary.quarantined === 0 && summary.warnings === 0 && summary.infos === 0) {
+    return "no flagged intervals in the current selection";
+  }
+  const parts: string[] = [];
+  if (summary.quarantined > 0) parts.push(`${summary.quarantined} quarantined`);
+  if (summary.warnings > 0) parts.push(`${summary.warnings} warning`);
+  if (summary.infos > 0) parts.push(`${summary.infos} info`);
+  return parts.join(" · ");
+}
 
 /**
  * Persistent transport: playhead, stepping, playback rate and the committed
@@ -31,6 +65,15 @@ export function Transport({ nominalRateHz }: { nominalRateHz: number | null }) {
   const effective = useAnalysisStore(effectiveTimeNs);
   const disabled = context === null;
   const stepRate = nominalRateHz ?? DEFAULT_STEP_RATE_HZ;
+  const quality = useQuery({
+    ...qualityQuery({
+      datasetId: context?.datasetId,
+      sessionId: context?.sessionId,
+      limit: 200,
+    }),
+    enabled: context !== null,
+  });
+  const qualitySummary = quality.data ? summarizeQuality(quality.data.rows) : null;
 
   const commit = (tNs: bigint) => {
     setPlayhead(tNs);
@@ -151,7 +194,11 @@ export function Transport({ nominalRateHz }: { nominalRateHz: number | null }) {
         <span className="truncate">
           {disabled
             ? "open a laboratory session to see availability"
-            : "no flagged intervals in the current selection"}
+            : quality.isPending
+              ? "loading quality context"
+              : quality.isError
+                ? "quality context unavailable"
+                : qualityRibbonText(qualitySummary)}
         </span>
       </div>
     </footer>

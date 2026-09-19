@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo } from "react";
 
 import { MeasurementClassBadge, ModalityBadge } from "@/components/common/Badges";
 import { DataTable, type DataTableColumn } from "@/components/table/DataTable";
+import { SignalLaboratory } from "@/components/lab/SignalLaboratory";
 import type { MetricValue } from "@/api/types";
 import { KeyValueRow, Panel, SectionTitle } from "@/components/common/Panel";
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
@@ -79,6 +80,9 @@ export function LabPage() {
       sessionId,
       trialId: search.trial ?? null,
       subjectId: search.subject ?? null,
+      streamId: search.stream ?? null,
+      fromNs: tryParseNs(search.from_ns),
+      toNs: tryParseNs(search.to_ns),
       metricId: search.metric ?? null,
       derivedMetricId: search.result ?? null,
       commitTime: (tNs) =>
@@ -94,6 +98,8 @@ export function LabPage() {
         ),
       selectSubject: (subjectId) =>
         updateSearch({ subject: subjectId === null ? undefined : subjectId }),
+      selectStream: (streamId) =>
+        updateSearch({ stream: streamId === null ? undefined : streamId }),
       selectResult: (derivedMetricId) =>
         updateSearch({ result: derivedMetricId === null ? undefined : derivedMetricId }),
     }),
@@ -102,7 +108,10 @@ export function LabPage() {
       search.metric,
       search.result,
       search.subject,
+      search.stream,
       search.trial,
+      search.from_ns,
+      search.to_ns,
       sessionId,
       updateSearch,
     ],
@@ -156,6 +165,8 @@ export function LabPage() {
               }
               onSelectSubject={(subjectId) => updateSearch({ subject: subjectId })}
             />
+          ) : view === "signals" ? (
+            <SignalLaboratory />
           ) : (
             <StatePanel
               state="empty"

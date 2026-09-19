@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 
 import { filterCommands, type Command } from "@/components/command/CommandPalette";
 import { contextSegments } from "@/components/shell/ContextBar";
+import { qualityRibbonText, summarizeQuality } from "@/components/shell/Transport";
 
 const COMMANDS: Command[] = [
   { id: "a", title: "Go to Catalog", group: "Navigate", run: () => undefined },
@@ -37,5 +38,25 @@ describe("context bar segments", () => {
   it("labels non-laboratory surfaces without inventing context", () => {
     expect(contextSegments("/quality", "")).toEqual([{ label: "surface", value: "quality" }]);
     expect(contextSegments("/", "")).toEqual([]);
+  });
+});
+
+describe("quality ribbon", () => {
+  it("counts quarantine and warnings without hiding either", () => {
+    const summary = summarizeQuality([
+      { severity: "ERROR", state: "VALID" },
+      { severity: "WARNING", state: "QUARANTINED" },
+      { severity: "WARNING", state: "VALID" },
+      { severity: "INFO", state: "VALID" },
+    ] as Parameters<typeof summarizeQuality>[0]);
+    expect(summary).toEqual({ quarantined: 2, warnings: 1, infos: 1 });
+    expect(qualityRibbonText(summary)).toBe("2 quarantined · 1 warning · 1 info");
+  });
+
+  it("states absence and unavailability explicitly", () => {
+    expect(qualityRibbonText({ quarantined: 0, warnings: 0, infos: 0 })).toBe(
+      "no flagged intervals in the current selection",
+    );
+    expect(qualityRibbonText(null)).toBe("quality context unavailable");
   });
 });
