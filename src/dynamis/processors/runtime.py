@@ -26,7 +26,11 @@ from typing import Any
 from sqlalchemy import Engine
 
 from dynamis.config import Settings
-from dynamis.processors.persistence import persist_processing_result
+from dynamis.processors.persistence import (
+    assert_persistable_code_sha,
+    dev_allow_unknown_code_sha,
+    persist_processing_result,
+)
 from dynamis.processors.spec import (
     ProcessorResult,
     ProcessorSpec,
@@ -157,11 +161,16 @@ def execute_processor(
     code_sha: str | None = None,
     computed_at: datetime | None = None,
     persist: bool = True,
+    allow_unknown_code_sha: bool | None = None,
 ) -> ProcessorRunResult:
     """Materialize one processor result and (optionally) persist its provenance.
 
     ``series_key`` makes the external artifact path unique per input scope (for
-    example a stream id or trial id) while remaining deterministic.
+    example a stream id or trial id) while remaining deterministic. A persisted
+    run requires a full code Git SHA (see
+    :func:`dynamis.processors.persistence.assert_persistable_code_sha`); the
+    development-only ``DYNAMIS_ALLOW_UNKNOWN_CODE_SHA`` flag is honoured, and the
+    Gold serving publication gate refuses null-SHA processor runs.
     """
     if not inputs:
         raise ValueError("a processor run requires at least one input artifact")
@@ -174,6 +183,12 @@ def execute_processor(
         )
     timestamp = computed_at or datetime.now(UTC)
     resolved_code_sha = code_sha if code_sha is not None else code_git_sha()
+    resolved_allow_unknown = allow_unknown_code_sha
+    if persist:
+        if resolved_allow_unknown is None:
+            resolved_allow_unknown = dev_allow_unknown_code_sha()
+        # Fail before materializing artifacts or touching the control plane.
+        assert_persistable_code_sha(resolved_code_sha, allow_unknown=resolved_allow_unknown)
     parameters_hash = result.spec.parameters_hash
     input_checksums = tuple(item.checksum_sha256 for item in inputs)
     run_id = deterministic_run_id(
@@ -231,6 +246,7 @@ def execute_processor(
                 computed_at=timestamp,
                 code_sha=resolved_code_sha,
                 artifact_rows=artifact_rows,
+                allow_unknown_code_sha=bool(resolved_allow_unknown),
             )
 
     receipt = {

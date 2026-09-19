@@ -13,6 +13,8 @@ identities instead of silently overwriting a scientific value.
 
 from __future__ import annotations
 
+import os
+import re
 from datetime import datetime
 from typing import Any
 
@@ -28,12 +30,49 @@ from dynamis.processors.spec import (
 )
 from dynamis.storage.metadata import build_metadata
 
+#: Development-only escape hatch. Persisted scientific processor runs must carry
+#: a full code Git SHA in production/container execution; a development machine
+#: without Git may opt in explicitly, and the resulting null SHA is visible in
+#: every provenance record. The Gold serving publication gate refuses null-SHA
+#: processor runs so development state cannot reach serving tables silently.
+ENV_ALLOW_UNKNOWN_CODE_SHA = "DYNAMIS_ALLOW_UNKNOWN_CODE_SHA"
+_TRUTHY = frozenset({"1", "true", "yes", "on"})
+_FULL_GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
+
 _TABLES = build_metadata().tables
 ALGORITHM_SPEC_TABLE = _TABLES["algorithm_spec"]
 DERIVED_METRIC_TABLE = _TABLES["derived_metric"]
 METRIC_DEFINITION_TABLE = _TABLES["metric_definition"]
 PROCESSING_ARTIFACT_TABLE = _TABLES["processing_artifact"]
 PROCESSING_RUN_TABLE = _TABLES["processing_run"]
+
+
+def dev_allow_unknown_code_sha() -> bool:
+    """Whether this process explicitly permits development-only unknown code SHA.
+
+    The flag is opt-in, environment-driven and documented as development-only.
+    """
+    return os.environ.get(ENV_ALLOW_UNKNOWN_CODE_SHA, "").strip().lower() in _TRUTHY
+
+
+def assert_persistable_code_sha(code_sha: str | None, *, allow_unknown: bool) -> None:
+    """Refuse to persist a scientific processor run without a full code Git SHA.
+
+    ``allow_unknown`` exists only for development/artifact work; production and
+    container execution must inject ``DYNAMIS_CODE_GIT_SHA``.
+    """
+    if code_sha is not None:
+        if not _FULL_GIT_SHA.match(code_sha):
+            raise ValueError(
+                f"code_git_sha {code_sha!r} is not a full 40-character lower-case Git SHA"
+            )
+        return
+    if not allow_unknown:
+        raise ValueError(
+            "a persisted scientific processor run requires a full 40-character code Git SHA; "
+            "set DYNAMIS_CODE_GIT_SHA in production/container execution or set "
+            f"{ENV_ALLOW_UNKNOWN_CODE_SHA}=1 for development-only artifact work"
+        )
 
 
 def _upsert(
@@ -204,8 +243,14 @@ def persist_processing_result(
     computed_at: datetime,
     code_sha: str | None,
     artifact_rows: tuple[dict[str, Any], ...] = (),
+    allow_unknown_code_sha: bool | None = None,
 ) -> dict[str, int]:
-    """Persist one processor result; call inside a transaction."""
+    """Persist one processor result; call inside a transaction.
+
+    A full code Git SHA is required unless the caller (or the development-only
+    ``DYNAMIS_ALLOW_UNKNOWN_CODE_SHA`` environment flag) explicitly permits an
+    unknown revision.
+    """
     written = {
         "algorithm_spec": 0,
         "metric_definition": 0,
@@ -221,6 +266,9 @@ def persist_processing_result(
         raise ValueError("a processor result must cite at least one verified input checksum")
     if not result.metrics and not result.series:
         raise ValueError("a processor result must produce at least one metric or series")
+    if allow_unknown_code_sha is None:
+        allow_unknown_code_sha = dev_allow_unknown_code_sha()
+    assert_persistable_code_sha(code_sha, allow_unknown=allow_unknown_code_sha)
     written["algorithm_spec"] = _upsert_algorithm(connection, result, code_sha=code_sha)
     parameters_hash = result.spec.parameters_hash
     run_statement = pg_insert(PROCESSING_RUN_TABLE).values(

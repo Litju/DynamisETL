@@ -6,13 +6,15 @@ Compact, reproducible **multimodal human-performance data platform**: heterogene
 sports-science datasets are ingested through source adapters, normalized into
 explicit measurement contracts, validated, and served as interactive 2D/3D analysis.
 
-> **Repository status: RES-99 football/basketball 3D pose.** Contracts, registry,
-> storage conventions, synthetic verification, the PostgreSQL metadata schema,
+> **Repository status: RES-101 V1 product.** Contracts, registry, storage
+> conventions, synthetic verification, the PostgreSQL metadata schema,
 > orchestration and CI exist, plus real provider adapters for Women's Soccer
 > Positioning GNSS, DFL/Sportec IDSSE tracking + events, SkillCorner tracking +
 > body pose, and a prepared (rights-gated, not yet acquired) SPL free-throw
-> adapter. Production metrics, gold marts, ML and the visualization product are
-> later issues.
+> adapter. Deterministic processors, V&V and Gold marts exist (RES-100), and
+> RES-101 ships the analytical API plus the interactive Performance Laboratory
+> (catalog, signal/field/3D laboratories, provenance, quality and rights, dense
+> Arrow transport). ML remains out of scope.
 
 ## V1 product boundary
 
@@ -64,8 +66,9 @@ src/dynamis/
   orchestration/          Dagster assets and Definitions
 infra/migrations/         Alembic environment + bootstrap revision
 sources/registry.json     machine-readable dataset/source registry
-apps/web/                 pnpm workspace placeholder (RES-101 builds the product)
-docker-compose.yml        PostgreSQL 18.6 (+ optional Dagster profile)
+src/dynamis/serving/      FastAPI analytical API (gold/metadata + bounded windows)
+apps/web/                 DynamisData Performance Laboratory (React/Vite product)
+docker-compose.yml        PostgreSQL 18.6 (+ product and orchestration profiles)
 ```
 
 External roots are configured, never hard-coded:
@@ -108,6 +111,12 @@ uv run pytest -m "not postgres"       # synthetic-only, no services required
 uv run dynamis-registry-validate      # registry + rights audit
 uv run dynamis-synthetic-materialize  # Arrow -> Parquet+Zstd, contract-checked
 python scripts/guard_repository.py    # repository boundary
+pnpm install --frozen-lockfile
+pnpm run web:api-check                # FastAPI OpenAPI -> TypeScript drift
+pnpm run web:typecheck && pnpm run web:lint
+pnpm run web:test                     # Vitest unit/component suite
+pnpm run web:build                    # production workbench build
+pnpm run web:e2e                      # Playwright acceptance + axe (Chromium)
 ```
 
 Every V1 modality is proven by synthetic known-answer tests through
@@ -222,6 +231,49 @@ availability stays explicit.
 smoothing, interpolation or RES-100 production metrics; no cross-provider
 fusion and no ball/shot metric canonicalization.
 
+## Performance Laboratory (RES-101)
+
+The validated data plane is exposed as a research product:
+
+- **API** (`src/dynamis/serving/`, `uv run dynamis-serve`): catalog, session/trial/
+  stream explorer, current-revision Gold metrics with exact provenance, metric
+  methodology, selected-result lineage, quality, rights, processing runs and
+  bounded dense windows (JSON or Arrow IPC, `format=arrow`, ETag-cached,
+  display-reduced with explicit metadata). Science is precomputed; the API never
+  triggers a processor run.
+- **Workbench** (`apps/web`, `pnpm --filter @dynamis/web run dev`): the
+  "Dynamis Instrument" shell with URL-owned durable context, linked playhead
+  across ECharts signals, the PixiJS pitch laboratory and the R3F landmark
+  viewer, a selected-lineage provenance inspector, quality/rights visibility and
+  measurement-class semantics. Dense windows prefer Arrow IPC decoded in a
+  worker; heavy renderers are lazy chunks.
+
+```bash
+# Full-stack local workflow (PostgreSQL + API + workbench)
+docker compose --profile product up -d --build
+# workbench on http://localhost:8080, API on http://localhost:8000
+
+# Development split
+uv run dynamis-serve                        # API on 127.0.0.1:8000
+pnpm --filter @dynamis/web run dev          # workbench on 127.0.0.1:5173 (proxies /api)
+```
+
+**Clean-clone reproduction.** From a fresh clone: `uv sync --locked`,
+`pnpm install --frozen-lockfile`, copy `.env.example` to `.env`, then either the
+Compose profile above or (a) `docker compose up -d postgres`, (b)
+`uv run alembic upgrade head`, (c) fetch and ingest the permitted external
+slices documented above, (d) run the processors and `uv run dynamis-gold all`,
+(e) `uv run dynamis-serve` and `pnpm --filter @dynamis/web run dev`. Only
+permitted/externally fetched data is required; nothing is committed.
+
+**V1 acceptance evidence.** Discovery and navigation are real catalog/explorer
+queries; Gold metrics and provenance are typed API responses; dense series are
+windowed and display-reduced with metadata; the signal workflow, pitch replay
+and 3D pose viewer share one playhead spine; deep links reproduce analytical
+context; compare mode preserves dataset/subject boundaries; UI unit/component
+tests, Playwright acceptance with axe scans, and the Python gates all run in
+protected CI; Docker Compose runs the product locally.
+
 ## Data and license boundary
 
 Project code is **Apache-2.0**. External datasets are governed by their own
@@ -240,6 +292,7 @@ outside the code license boundary.
 
 ## Out of scope so far
 
-No production metric or gold mart, no visualization UI, no ML. Dense tracking and
-GNSS samples never enter PostgreSQL; only their artifact metadata and the
-semantic/provenance envelope do.
+No ML. Dense tracking and GNSS samples never enter PostgreSQL; only their
+artifact metadata and the semantic/provenance envelope do. Authentication,
+organizations and collaboration UI are out of scope for V1 (single-user,
+local-first).

@@ -38,6 +38,45 @@ services:
       start_period: 20s
     stop_grace_period: 30s
 
+  # Analytical API + Performance Laboratory shell. Profile-gated so the
+  # foundation gates (PostgreSQL health + Alembic migration) stay lightweight;
+  # the full product workflow is:
+  #   docker compose --profile product up -d --build
+  api:
+    profiles: ["product"]
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+      args:
+        DYNAMIS_CODE_GIT_SHA: ${DYNAMIS_CODE_GIT_SHA:-}
+    container_name: dynamisetl-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_URL: postgresql+psycopg://${POSTGRES_USER:-dynamis}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be provided}@postgres:5432/${POSTGRES_DB:-dynamis}
+      DYNAMIS_DB_SCHEMA: ${DYNAMIS_DB_SCHEMA:-dynamis}
+      DYNAMIS_GOLD_SCHEMA: ${DYNAMIS_GOLD_SCHEMA:-gold}
+      DYNAMIS_DATASET_ROOT: /datasets
+      DYNAMIS_DATABASE_ROOT: /databases
+    volumes:
+      - ${DYNAMIS_DATASET_ROOT:-./data}:/datasets:ro
+    ports:
+      - "${API_PORT:-8000}:8000"
+
+  web:
+    profiles: ["product"]
+    build:
+      context: .
+      dockerfile: infra/docker/web.Dockerfile
+    container_name: dynamisetl-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${WEB_PORT:-8080}:80"
+
   # Optional orchestration UI. Gated behind a profile so the RES-96 foundation
   # gates (PostgreSQL health + Alembic migration) never depend on building a
   # Dagster image.
@@ -58,6 +97,11 @@ services:
       DYNAMIS_DATASET_ROOT: /datasets
       DYNAMIS_DATABASE_ROOT: /databases
       DYNAMIS_DUCKDB_PATH: /databases/duckdb/dynamis.duckdb
+      # Production/container processor provenance: the image build or the
+      # operator injects the exact code revision. Development-only unknown-SHA
+      # behavior stays off unless explicitly enabled (and never serves Gold).
+      DYNAMIS_CODE_GIT_SHA: ${DYNAMIS_CODE_GIT_SHA:-}
+      DYNAMIS_ALLOW_UNKNOWN_CODE_SHA: ${DYNAMIS_ALLOW_UNKNOWN_CODE_SHA:-0}
     volumes:
       - ${DYNAMIS_DATASET_ROOT:-./data}:/datasets
       - ${DYNAMIS_DATABASE_ROOT:-./data}:/databases

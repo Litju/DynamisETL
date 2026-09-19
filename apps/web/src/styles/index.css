@@ -1,0 +1,82 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--d-surface-0);
+    color: var(--d-text-primary);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Numerical content uses tabular numerals for stable comparison. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--d-accent);
+    outline-offset: 1px;
+  }
+
+  ::selection {
+    background: var(--d-accent-muted);
+    color: var(--d-text-primary);
+  }
+
+  /* Compact instrument scrollbars. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--d-border-strong) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: var(--d-border-strong);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 6px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

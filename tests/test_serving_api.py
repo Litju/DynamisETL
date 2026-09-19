@@ -1,0 +1,604 @@
+"""HTTP and dense-window contracts for the analytical API.
+
+Route tests use a deterministic in-process backend, so they exercise the full
+FastAPI surface (status codes, query validation, ETag, Arrow transport, OpenAPI)
+without a live PostgreSQL. The dense tests read real Parquet files under a
+temporary dataset root. A separate PostgreSQL suite (marked ``postgres``) covers
+the SQL repository.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+
+import pyarrow as pa
+import pyarrow.parquet as pq
+import pytest
+from fastapi.testclient import TestClient
+
+from dynamis.config import Settings
+from dynamis.serving.app import ARROW_MEDIA_TYPE, create_app
+from dynamis.serving.dense import (
+    ArtifactPathError,
+    DenseWindowTooLarge,
+    arrow_ipc_stream,
+    load_artifact_window,
+)
+from dynamis.serving.models import (
+    AlgorithmView,
+    ArtifactRefView,
+    DatasetDetail,
+    DatasetSummary,
+    DenseWindowMeta,
+    LicenseView,
+    MetricDefinitionView,
+    MetricMethodology,
+    MetricPage,
+    MetricValue,
+    ProvenanceEdge,
+    ProvenanceGraph,
+    ProvenanceNode,
+    QualityIssuePage,
+    QualityIssueView,
+    RightsPolicyView,
+    RunView,
+    ServingStatus,
+    SessionDetail,
+    SessionParticipantView,
+    SessionSummary,
+    StreamView,
+    TrialView,
+)
+from dynamis.serving.repository import MetricFilters
+
+LICENSE = LicenseView(
+    policy_id="skillcorner-opendata",
+    identifier="CC BY 4.0",
+    status="declared",
+    attribution_required=True,
+    noncommercial_only=False,
+    share_alike=False,
+    redistribution="conditional",
+    local_only=False,
+    restrictions=[],
+    notice="CC BY 4.0; attribution required; redistribution: conditional",
+)
+
+DATASET = DatasetSummary(
+    dataset_id="skillcorner-opendata",
+    name="SkillCorner Open Data",
+    provider="SkillCorner",
+    domain="football",
+    doi=None,
+    upstream_urls=["https://github.com/SkillCorner/opendata"],
+    modalities=["tracking", "pose"],
+    license=LICENSE,
+    version_count=1,
+    session_count=1,
+    subject_count=23,
+    trial_count=2,
+    stream_count=3,
+    metric_count=4,
+    quality_issue_count=1,
+)
+
+METRIC = MetricValue(
+    derived_metric_id="dm-pose-rom",
+    dataset_id="skillcorner-opendata",
+    metric_id="pose.angular_rom.left_knee",
+    metric_name="Range of motion for angle left_knee",
+    metric_description="max - min of the observed angle.",
+    si_unit="rad",
+    measurement_class="PIPELINE_DERIVED",
+    value_kind="scalar",
+    value_num=2.7,
+    value_json=None,
+    subject_id="SC-P1",
+    session_id="1925299",
+    trial_id="period_1",
+    stream_id="pose-period-1",
+    entity_id="SC-P1",
+    algorithm_id="pose.translation_invariant_kinematics",
+    algorithm_version="1.0.0",
+    parameters_hash="e" * 64,
+    code_git_sha="b" * 40,
+    run_id="run-pose",
+    computed_at="2026-09-18T12:00:00+00:00",
+    provenance={"gap_policy": {"strategy": "contiguous_segments"}},
+)
+
+ARTIFACT = ArtifactRefView(
+    artifact_id="sample-1",
+    dataset_id="skillcorner-opendata",
+    stream_id="tracking-period-1",
+    layer="silver",
+    relative_path="silver/dataset_id=skillcorner-opendata/tracking/sample-1.parquet",
+    format="parquet",
+    compression="zstd",
+    checksum_sha256="a" * 64,
+    row_count=100,
+    byte_size=4096,
+    artifact_kind="sample",
+    modality="tracking",
+    measurement_class="MODEL_ESTIMATED",
+    si_units=["m"],
+    coordinate_frame_id="skillcorner-pitch-m",
+    synchronization_spec_id="skillcorner-source-provided-match-clock",
+)
+
+
+def _window_result() -> Any:
+    table = pa.table(
+        {
+            "t_rel_ns": pa.array([0, 40_000_000], type=pa.int64()),
+            "x_m": pa.array([1.0, 2.0], type=pa.float64()),
+        }
+    )
+    meta = DenseWindowMeta(
+        artifact=ARTIFACT,
+        from_ns=0,
+        to_ns=40_000_000,
+        columns=["t_rel_ns", "x_m"],
+        source_rows=2,
+        returned_rows=2,
+        canonical_time_min_ns=0,
+        canonical_time_max_ns=40_000_000,
+        reduction=None,
+        units={"x_m": "m"},
+        coordinate_frame_id=ARTIFACT.coordinate_frame_id,
+        measurement_class=ARTIFACT.measurement_class,
+        display_note="Exact canonical samples.",
+    )
+    from dynamis.serving.dense import DenseWindowResult
+
+    return DenseWindowResult(table=table, meta=meta)
+
+
+class FakeBackend:
+    """Deterministic backend covering both successful and failing states."""
+
+    def __init__(self) -> None:
+        self.window_error: Exception | None = None
+        self.last_filters: MetricFilters | None = None
+
+    def status(self) -> ServingStatus:
+        return ServingStatus(
+            database="ok",
+            db_schema="dynamis",
+            gold_schema="gold",
+            gold_published=True,
+            dataset_count=1,
+            metric_count=1,
+            run_count=1,
+            quality_issue_count=1,
+        )
+
+    def datasets(self) -> list[DatasetSummary]:
+        return [DATASET]
+
+    def dataset(self, dataset_id: str) -> DatasetDetail | None:
+        if dataset_id != DATASET.dataset_id:
+            return None
+        return DatasetDetail(
+            **DATASET.model_dump(),
+            versions=[],
+            v1_role="tracking and pose reference",
+            initial_scope="match 1925299",
+            adapter_id="skillcorner_adapter",
+        )
+
+    def sessions(self, dataset_id: str) -> list[SessionSummary]:
+        return [
+            SessionSummary(
+                session_id="1925299",
+                kind="match",
+                label="Eintracht Frankfurt vs Bayern",
+                started_at=None,
+                ended_at=None,
+                participant_count=23,
+                trial_count=2,
+                stream_count=3,
+            )
+        ]
+
+    def session(self, dataset_id: str, session_id: str) -> SessionDetail | None:
+        if session_id != "1925299":
+            return None
+        return SessionDetail(
+            dataset_id=dataset_id,
+            session=self.sessions(dataset_id)[0],
+            participants=[
+                SessionParticipantView(subject_id="SC-P1", role="player", group_label="home")
+            ],
+            trials=[
+                TrialView(
+                    trial_id="period_1",
+                    subject_id=None,
+                    parent_trial_id=None,
+                    label="first half",
+                    started_at=None,
+                    ended_at=None,
+                )
+            ],
+            streams=[
+                StreamView(
+                    stream_id="tracking-period-1",
+                    modality="tracking",
+                    measurement_class="MODEL_ESTIMATED",
+                    subject_id=None,
+                    trial_id="period_1",
+                    device_id=None,
+                    nominal_sampling_rate_hz=10.0,
+                    si_units=["m"],
+                    source_unit="m",
+                    coordinate_frame_id="skillcorner-pitch-m",
+                    synchronization_spec_id="skillcorner-source-provided-match-clock",
+                    clock_id="skillcorner-match-clock",
+                    skeleton_id=None,
+                    sample_artifact_ids=["sample-1"],
+                    sample_row_count=100,
+                )
+            ],
+        )
+
+    def metrics(self, filters: MetricFilters, limit: int, offset: int) -> MetricPage:
+        self.last_filters = filters
+        return MetricPage(source="gold", total=1, limit=limit, offset=offset, rows=[METRIC])
+
+    def methodology(self, metric_id: str) -> MetricMethodology | None:
+        if metric_id != METRIC.metric_id:
+            return None
+        return MetricMethodology(
+            metric=MetricDefinitionView(
+                metric_id=METRIC.metric_id,
+                name="Range of motion",
+                si_unit="rad",
+                measurement_class="PIPELINE_DERIVED",
+                value_kind="scalar",
+                description="max - min of the observed angle.",
+                algorithm_id=METRIC.algorithm_id,
+            ),
+            algorithm=AlgorithmView(
+                algorithm_id=str(METRIC.algorithm_id),
+                name="Translation-invariant pose kinematics",
+                version="1.0.0",
+                kind="processor",
+                code_git_sha=METRIC.code_git_sha,
+                parameters_hash=METRIC.parameters_hash,
+                parameters={"gap_policy": {"strategy": "contiguous_segments"}},
+                description="Relative vectors and explicit angles.",
+                citation=None,
+            ),
+            measurement_class_semantics="Computed by a versioned processor.",
+            measurement_class_never_means=["PIPELINE_DERIVED is not a measurement."],
+            provenance_fields=["run_id"],
+        )
+
+    def provenance(self, derived_metric_id: str) -> ProvenanceGraph | None:
+        if derived_metric_id != METRIC.derived_metric_id:
+            return None
+        return ProvenanceGraph(
+            derived_metric_id=derived_metric_id,
+            nodes=[
+                ProvenanceNode(
+                    id="run:run-pose",
+                    kind="processing_run",
+                    label="run-pose",
+                    status="completed",
+                    details={},
+                )
+            ],
+            edges=[
+                ProvenanceEdge(
+                    id="a->b", source="run:run-pose", target="derived:x", label="results in"
+                )
+            ],
+            provenance={"code_git_sha": METRIC.code_git_sha},
+            lineage_note="Selected result lineage only.",
+        )
+
+    def quality(
+        self,
+        dataset_id: str | None,
+        session_id: str | None,
+        severity: str | None,
+        limit: int,
+        offset: int,
+    ) -> QualityIssuePage:
+        return QualityIssuePage(
+            total=1,
+            limit=limit,
+            offset=offset,
+            rows=[
+                QualityIssueView(
+                    issue_id="q-1",
+                    dataset_id="skillcorner-opendata",
+                    run_id=None,
+                    session_id="1925299",
+                    stream_id="tracking-period-1",
+                    subject_id=None,
+                    trial_id=None,
+                    sample_index=10,
+                    rule="tracking.ball_gap",
+                    severity="WARNING",
+                    state="VALID",
+                    evidence={"gap_frames": 3},
+                    detected_at="2026-09-18T12:00:00+00:00",
+                )
+            ],
+        )
+
+    def runs(self, dataset_id: str | None, limit: int, offset: int) -> tuple[int, list[RunView]]:
+        return (
+            1,
+            [
+                RunView(
+                    run_id="run-pose",
+                    dataset_id="skillcorner-opendata",
+                    algorithm_id="pose.translation_invariant_kinematics",
+                    algorithm_name="Pose kinematics",
+                    algorithm_version="1.0.0",
+                    kind="processor",
+                    status="completed",
+                    code_git_sha="b" * 40,
+                    parameters_hash="e" * 64,
+                    started_at=None,
+                    completed_at=None,
+                    input_checksums=["c" * 64],
+                    metric_count=4,
+                    artifact_count=1,
+                    notes=None,
+                )
+            ],
+        )
+
+    def licenses(self) -> list[RightsPolicyView]:
+        return [RightsPolicyView(license=LICENSE, dataset_ids=["skillcorner-opendata"])]
+
+    def artifact(self, artifact_id: str) -> ArtifactRefView | None:
+        return ARTIFACT if artifact_id == ARTIFACT.artifact_id else None
+
+    def window(self, artifact_id: str, **kwargs: Any):
+        if self.window_error is not None:
+            raise self.window_error
+        return _window_result()
+
+
+@pytest.fixture
+def client() -> TestClient:
+    backend = FakeBackend()
+    app = create_app(backend=backend)
+    app.state.fake_backend = backend
+    return TestClient(app)
+
+
+def test_health_and_serving_status(client: TestClient) -> None:
+    health = client.get("/api/health")
+    assert health.status_code == 200
+    assert health.json()["status"] == "ok"
+    status = client.get("/api/serving/status")
+    assert status.status_code == 200
+    body = status.json()
+    assert body["gold_published"] is True
+    assert body["db_schema"] == "dynamis"
+
+
+def test_catalog_routes_preserve_rights_and_measurement_context(client: TestClient) -> None:
+    datasets = client.get("/api/catalog/datasets").json()
+    assert datasets[0]["dataset_id"] == "skillcorner-opendata"
+    assert "attribution required" in datasets[0]["license"]["notice"]
+    detail = client.get("/api/catalog/datasets/skillcorner-opendata")
+    assert detail.status_code == 200
+    assert detail.json()["adapter_id"] == "skillcorner_adapter"
+    assert client.get("/api/catalog/datasets/unknown").status_code == 404
+    sessions = client.get("/api/catalog/datasets/skillcorner-opendata/sessions").json()
+    assert sessions[0]["kind"] == "match"
+    session = client.get("/api/catalog/datasets/skillcorner-opendata/sessions/1925299")
+    assert session.status_code == 200
+    stream = session.json()["streams"][0]
+    assert stream["measurement_class"] == "MODEL_ESTIMATED"
+    assert stream["sample_artifact_ids"] == ["sample-1"]
+    assert session.json()["participants"][0]["group_label"] == "home"
+
+
+def test_metrics_route_passes_filters_and_exposes_provenance(client: TestClient) -> None:
+    response = client.get(
+        "/api/metrics",
+        params={"dataset_id": "skillcorner-opendata", "subject_id": "SC-P1", "limit": 10},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["source"] == "gold"
+    row = body["rows"][0]
+    assert row["measurement_class"] == "PIPELINE_DERIVED"
+    assert row["algorithm_id"] == "pose.translation_invariant_kinematics"
+    assert row["code_git_sha"] == "b" * 40
+    backend = client.app.state.fake_backend  # type: ignore[attr-defined]
+    assert backend.last_filters.dataset_id == "skillcorner-opendata"
+    assert backend.last_filters.subject_id == "SC-P1"
+    assert client.get("/api/metrics", params={"limit": 0}).status_code == 422
+    assert client.get("/api/metrics", params={"limit": 5000}).status_code == 422
+
+
+def test_methodology_and_provenance_routes(client: TestClient) -> None:
+    methodology = client.get(f"/api/metrics/methodology/{METRIC.metric_id}")
+    assert methodology.status_code == 200
+    body = methodology.json()
+    assert body["measurement_class_never_means"]
+    assert body["algorithm"]["parameters"]["gap_policy"]["strategy"] == "contiguous_segments"
+    assert client.get("/api/metrics/methodology/unknown.metric").status_code == 404
+    provenance = client.get(f"/api/derived-metrics/{METRIC.derived_metric_id}/provenance")
+    assert provenance.status_code == 200
+    graph = provenance.json()
+    assert any(node["kind"] == "processing_run" for node in graph["nodes"])
+    assert graph["lineage_note"].startswith("Selected result lineage only")
+    assert client.get("/api/derived-metrics/unknown/provenance").status_code == 404
+
+
+def test_quality_runs_and_rights_routes(client: TestClient) -> None:
+    quality = client.get("/api/quality", params={"severity": "WARNING"}).json()
+    assert quality["rows"][0]["evidence"] == {"gap_frames": 3}
+    assert client.get("/api/quality", params={"severity": "BOGUS"}).status_code == 422
+    runs = client.get("/api/runs").json()
+    assert runs["rows"][0]["code_git_sha"] == "b" * 40
+    rights = client.get("/api/rights").json()
+    assert rights["policies"][0]["license"]["identifier"] == "CC BY 4.0"
+
+
+def test_dense_window_json_arrow_and_etag(client: TestClient) -> None:
+    artifact = client.get(f"/api/artifacts/{ARTIFACT.artifact_id}")
+    assert artifact.status_code == 200
+    assert artifact.json()["measurement_class"] == "MODEL_ESTIMATED"
+    window = client.get(f"/api/artifacts/{ARTIFACT.artifact_id}/window")
+    assert window.status_code == 200
+    body = window.json()
+    assert body["meta"]["source_rows"] == 2
+    assert body["rows"][0]["x_m"] == 1.0
+    etag = window.headers["etag"]
+    cached = client.get(
+        f"/api/artifacts/{ARTIFACT.artifact_id}/window",
+        headers={"if-none-match": etag},
+    )
+    assert cached.status_code == 304
+    arrow = client.get(
+        f"/api/artifacts/{ARTIFACT.artifact_id}/window",
+        params={"format": "arrow"},
+    )
+    assert arrow.status_code == 200
+    assert arrow.headers["content-type"].startswith(ARROW_MEDIA_TYPE)
+    assert json.loads(arrow.headers["x-dynamis-window-meta"])["returned_rows"] == 2
+    assert client.get("/api/artifacts/unknown/window").status_code == 404
+
+
+def test_dense_window_errors_map_to_explicit_states(client: TestClient) -> None:
+    backend = client.app.state.fake_backend  # type: ignore[attr-defined]
+    backend.window_error = DenseWindowTooLarge("too large")
+    response = client.get(f"/api/artifacts/{ARTIFACT.artifact_id}/window")
+    assert response.status_code == 413
+    assert response.json()["state"] == "dense_window_too_large"
+    backend.window_error = ArtifactPathError("missing")
+    response = client.get(f"/api/artifacts/{ARTIFACT.artifact_id}/window")
+    assert response.status_code == 404
+    assert response.json()["state"] == "unavailable_for_source"
+
+
+def test_openapi_document_covers_the_locked_surface() -> None:
+    document = create_app(backend=FakeBackend()).openapi()
+    paths = document["paths"]
+    for path in (
+        "/api/health",
+        "/api/serving/status",
+        "/api/catalog/datasets",
+        "/api/catalog/datasets/{dataset_id}",
+        "/api/catalog/datasets/{dataset_id}/sessions",
+        "/api/catalog/datasets/{dataset_id}/sessions/{session_id}",
+        "/api/metrics",
+        "/api/metrics/methodology/{metric_id}",
+        "/api/derived-metrics/{derived_metric_id}/provenance",
+        "/api/quality",
+        "/api/runs",
+        "/api/rights",
+        "/api/artifacts/{artifact_id}",
+        "/api/artifacts/{artifact_id}/window",
+    ):
+        assert path in paths, path
+
+
+def _dense_artifact_ref(settings: Settings, table: pa.Table) -> ArtifactRefView:
+    relative = Path("silver") / "dataset_id=demo" / "tracking" / "window.parquet"
+    target = settings.dataset_root / relative
+    target.parent.mkdir(parents=True, exist_ok=True)
+    pq.write_table(table, target, compression="zstd")
+    return ArtifactRefView(
+        artifact_id="dense-demo",
+        dataset_id="demo",
+        stream_id="tracking-demo",
+        layer="silver",
+        relative_path=relative.as_posix(),
+        format="parquet",
+        compression="zstd",
+        checksum_sha256="d" * 64,
+        row_count=table.num_rows,
+        byte_size=target.stat().st_size,
+        artifact_kind="sample",
+        modality="tracking",
+        measurement_class="MODEL_ESTIMATED",
+        si_units=[],
+        coordinate_frame_id="demo-pitch",
+        synchronization_spec_id="demo-sync",
+    )
+
+
+def test_dense_reduction_preserves_extrema_and_identity(tmp_settings: Settings) -> None:
+    frames = list(range(100))
+    table = pa.table(
+        {
+            "object_id": pa.array(["p1"] * 100, type=pa.string()),
+            "t_rel_ns": pa.array([index * 40_000_000 for index in frames], type=pa.int64()),
+            "x_m": pa.array([float(index) for index in frames], type=pa.float64()),
+            "is_detected": pa.array([True] * 100, type=pa.bool_()),
+        }
+    )
+    ref = _dense_artifact_ref(tmp_settings, table)
+    result = load_artifact_window(tmp_settings, ref, max_points=10)
+    assert result.meta.source_rows == 100
+    assert result.meta.returned_rows <= 10
+    assert result.meta.reduction is not None
+    assert result.meta.reduction.method == "min_max_envelope_per_time_bucket"
+    assert result.meta.reduction.source_points == 100
+    assert set(result.table.column_names) >= {"object_id", "x_m_min", "x_m_max"}
+    assert min(result.table.column("x_m_min").to_pylist()) == 0.0
+    assert max(result.table.column("x_m_max").to_pylist()) == 99.0
+    exact = load_artifact_window(tmp_settings, ref, from_ns=0, to_ns=40_000_000)
+    assert exact.meta.reduction is None
+    assert exact.table.num_rows == 2
+
+
+def test_dense_window_rejects_path_traversal_and_row_overflow(tmp_settings: Settings) -> None:
+    table = pa.table(
+        {
+            "object_id": pa.array(["p1"] * 3, type=pa.string()),
+            "t_rel_ns": pa.array([0, 1, 2], type=pa.int64()),
+            "x_m": pa.array([0.0, 1.0, 2.0], type=pa.float64()),
+        }
+    )
+    ref = _dense_artifact_ref(tmp_settings, table)
+    escaped = ref.model_copy(update={"relative_path": "../escape.parquet"})
+    with pytest.raises(ArtifactPathError, match="outside the dataset root"):
+        load_artifact_window(tmp_settings, escaped)
+    with pytest.raises(DenseWindowTooLarge, match="row cap"):
+        load_artifact_window(tmp_settings, ref, max_source_rows=1)
+    absent = ref.model_copy(update={"relative_path": "silver/missing.parquet"})
+    with pytest.raises(ArtifactPathError, match="missing"):
+        load_artifact_window(tmp_settings, absent)
+
+
+def test_dense_window_reports_contract_units(tmp_settings: Settings) -> None:
+    schema = pa.schema(
+        [
+            pa.field("object_id", pa.string()),
+            pa.field("t_rel_ns", pa.int64(), metadata={b"dynamis.si_unit": b"ns"}),
+            pa.field("x_m", pa.float64(), metadata={b"dynamis.si_unit": b"m"}),
+        ]
+    )
+    table = pa.Table.from_arrays(
+        [
+            pa.array(["p1", "p1"], type=pa.string()),
+            pa.array([0, 1], type=pa.int64()),
+            pa.array([0.0, 1.0], type=pa.float64()),
+        ],
+        schema=schema,
+    )
+    ref = _dense_artifact_ref(tmp_settings, table)
+    result = load_artifact_window(tmp_settings, ref)
+    assert result.meta.units == {"t_rel_ns": "ns", "x_m": "m"}
+    assert result.meta.measurement_class == "MODEL_ESTIMATED"
+
+
+def test_arrow_ipc_stream_round_trip() -> None:
+    table = pa.table({"t_rel_ns": pa.array([0, 1], type=pa.int64())})
+    payload = arrow_ipc_stream(table)
+    reader = pa.ipc.open_stream(pa.BufferReader(payload))
+    assert reader.read_all().equals(table)

@@ -14,6 +14,10 @@
   ],
   "scripts": {
     "web:typecheck": "pnpm --filter @dynamis/web run typecheck",
-    "web:lint": "pnpm --filter @dynamis/web run lint"
+    "web:lint": "pnpm --filter @dynamis/web run lint",
+    "web:test": "pnpm --filter @dynamis/web run test",
+    "web:e2e": "pnpm --filter @dynamis/web run test:e2e",
+    "web:build": "pnpm --filter @dynamis/web run build",
+    "web:api-check": "pnpm --filter @dynamis/web run api:check"
   }
 }
