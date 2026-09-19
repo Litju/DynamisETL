@@ -22,13 +22,16 @@ dependencies = [
     "requests>=2.34.2",
     "scipy>=1.18.1",
     "sqlalchemy>=2.0.54",
+    "uvicorn>=0.53",
 ]
 
 [project.scripts]
 dynamis-fetch = "dynamis.acquisition.cli:main"
 dynamis-gold = "dynamis.gold.cli:main"
 dynamis-ingest = "dynamis.pipeline.cli:main"
+dynamis-openapi = "dynamis.serving.openapi:main"
 dynamis-registry-validate = "dynamis.registry:main"
+dynamis-serve = "dynamis.serving.cli:main"
 dynamis-synthetic-materialize = "dynamis.fixtures.cli:main"
 
 [build-system]
@@ -66,6 +69,7 @@ reportMissingTypeStubs = false
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28.1",
     "hypothesis>=6.168.0",
     # Pinned executable reference client for the independent Sportec
     # event-coordinate oracle (RES-103). CI exercises it on structurally
