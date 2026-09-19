@@ -56,12 +56,12 @@ class DatasetProcessing:
     diagnostics: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
+        """JSON-serializable corpus processing descriptor."""
         return {
             "dataset_id": self.dataset_id,
             "algorithm_id": self.algorithm_id,
             "algorithm_version": self.algorithm_version,
             "parameters_hash": self.parameters_hash,
-            """JSON-serializable corpus processing descriptor."""
             "code_git_sha": self.code_git_sha,
             "streams": self.streams,
             "runs": self.runs,

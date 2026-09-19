@@ -373,9 +373,9 @@ class SpeedZone:
         return inside
 
     def parameters(self) -> dict[str, Any]:
+        """Canonical parameter mapping of this zone."""
         return {
             "name": self.name,
-            """Canonical parameter mapping of this zone."""
             "lower_m_s": self.lower_m_s,
             "upper_m_s": self.upper_m_s,
         }

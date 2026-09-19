@@ -37,8 +37,8 @@ class PairedComparison:
     extra: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
+        """JSON-serializable agreement statistics."""
         payload: dict[str, Any] = {
-            """JSON-serializable agreement statistics."""
             "n": self.n,
             "bias": self.bias,
             "mae": self.mae,

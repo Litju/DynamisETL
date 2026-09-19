@@ -159,6 +159,10 @@ def test_execute_processor_materializes_deterministic_series_and_receipt(
     assert first.series[0].artifact.checksum_sha256 == second.series[0].artifact.checksum_sha256
     assert first.series[0].artifact.relative_path == second.series[0].artifact.relative_path
     assert first.input_checksums == (processor_input.checksum_sha256,)
+    # Serialization descriptors must keep their required keys intact.
+    assert first.inputs[0].to_dict()["relative_path"] == processor_input.relative_path
+    assert first.series[0].to_dict()["relative_path"] == first.series[0].artifact.relative_path
+    assert first.series[0].to_dict()["checksum_sha256"]
 
     receipt = json.loads(
         (tmp_settings.dataset_root / str(first.receipt_path)).read_text(encoding="utf-8")
@@ -169,6 +173,28 @@ def test_execute_processor_materializes_deterministic_series_and_receipt(
     assert receipt["metrics"][0]["value"] == 1.5
     assert receipt["inputs"][0]["checksum_sha256"] == processor_input.checksum_sha256
     assert receipt["series"][0]["checksum_sha256"] == first.series[0].artifact.checksum_sha256
+
+
+def test_serialization_descriptors_keep_their_required_keys() -> None:
+    """Standalone strings inside a dict literal would corrupt these keys."""
+    from dynamis.processors.acceptance import DatasetProcessing
+    from dynamis.processors.statistics import paired_comparison
+
+    comparison = paired_comparison([1.0, 2.0], [1.0, 2.0]).to_dict()
+    assert "n" in comparison
+    assert comparison["n"] == 2
+    corpus = DatasetProcessing(
+        dataset_id="white-cmj-acc-grf",
+        algorithm_id="test",
+        streams=1,
+        runs=1,
+        series_checksums={},
+        metric_values={},
+        metric_units={},
+        code_git_sha="a" * 40,
+    ).to_dict()
+    assert corpus["code_git_sha"] == "a" * 40
+    assert "code_git_sha" in corpus
 
 
 def test_execute_processor_requires_an_engine_when_persisting(tmp_settings: Settings) -> None:

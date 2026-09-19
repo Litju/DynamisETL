@@ -53,9 +53,9 @@ class ProcessorInput:
     row_count: int
 
     def to_dict(self) -> dict[str, Any]:
+        """JSON-serializable descriptor of this input artifact."""
         return {
             "role": self.role,
-            """JSON-serializable descriptor of this input artifact."""
             "relative_path": self.relative_path,
             "checksum_sha256": self.checksum_sha256,
             "row_count": self.row_count,
@@ -70,9 +70,9 @@ class ProcessedSeries:
     artifact: WrittenArtifact
 
     def to_dict(self) -> dict[str, Any]:
+        """JSON-serializable descriptor of this materialized series."""
         return {
             "name": self.name,
-            """JSON-serializable descriptor of this materialized series."""
             "relative_path": self.artifact.relative_path,
             "checksum_sha256": self.artifact.checksum_sha256,
             "row_count": self.artifact.row_count,
