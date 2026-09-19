@@ -451,7 +451,13 @@ def create_app(
             )
         return found
 
-    @app.get("/api/artifacts/{artifact_id}/window", tags=["dense"])
+    @app.get(
+        "/api/artifacts/{artifact_id}/window",
+        tags=["dense"],
+        # The JSON branch is the typed document; the Arrow branch returns a
+        # binary IPC stream with the same metadata in X-Dynamis-Window-Meta.
+        response_model=DenseWindow,
+    )
     def artifact_window(
         artifact_id: str,
         request: Request,

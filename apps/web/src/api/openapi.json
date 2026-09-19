@@ -76,6 +76,7 @@
           "kind",
           "code_git_sha",
           "parameters_hash",
+          "parameters",
           "description",
           "citation"
         ],
@@ -219,6 +220,7 @@
           "artifact_kind",
           "modality",
           "measurement_class",
+          "si_units",
           "coordinate_frame_id",
           "synchronization_spec_id"
         ],
@@ -325,6 +327,8 @@
           "provider",
           "domain",
           "doi",
+          "upstream_urls",
+          "modalities",
           "license",
           "version_count",
           "session_count",
@@ -333,6 +337,7 @@
           "stream_count",
           "metric_count",
           "quality_issue_count",
+          "versions",
           "v1_role",
           "initial_scope",
           "adapter_id"
@@ -421,6 +426,8 @@
           "provider",
           "domain",
           "doi",
+          "upstream_urls",
+          "modalities",
           "license",
           "version_count",
           "session_count",
@@ -490,6 +497,139 @@
           "retrieved_at"
         ],
         "title": "DatasetVersionView",
+        "type": "object"
+      },
+      "DenseWindow": {
+        "properties": {
+          "meta": {
+            "$ref": "#/components/schemas/DenseWindowMeta"
+          },
+          "rows": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "meta",
+          "rows"
+        ],
+        "title": "DenseWindow",
+        "type": "object"
+      },
+      "DenseWindowMeta": {
+        "properties": {
+          "artifact": {
+            "$ref": "#/components/schemas/ArtifactRefView"
+          },
+          "canonical_time_max_ns": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Time Max Ns"
+          },
+          "canonical_time_min_ns": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Time Min Ns"
+          },
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "coordinate_frame_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coordinate Frame Id"
+          },
+          "display_note": {
+            "title": "Display Note",
+            "type": "string"
+          },
+          "from_ns": {
+            "title": "From Ns",
+            "type": "integer"
+          },
+          "measurement_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measurement Class"
+          },
+          "reduction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReductionInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "returned_rows": {
+            "title": "Returned Rows",
+            "type": "integer"
+          },
+          "source_rows": {
+            "title": "Source Rows",
+            "type": "integer"
+          },
+          "to_ns": {
+            "title": "To Ns",
+            "type": "integer"
+          },
+          "units": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Units",
+            "type": "object"
+          }
+        },
+        "required": [
+          "artifact",
+          "from_ns",
+          "to_ns",
+          "columns",
+          "source_rows",
+          "returned_rows",
+          "canonical_time_min_ns",
+          "canonical_time_max_ns",
+          "reduction",
+          "units",
+          "coordinate_frame_id",
+          "measurement_class",
+          "display_note"
+        ],
+        "title": "DenseWindowMeta",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -586,6 +726,7 @@
           "share_alike",
           "redistribution",
           "local_only",
+          "restrictions",
           "notice"
         ],
         "title": "LicenseView",
@@ -726,7 +867,8 @@
           "source",
           "total",
           "limit",
-          "offset"
+          "offset",
+          "rows"
         ],
         "title": "MetricPage",
         "type": "object"
@@ -944,7 +1086,8 @@
           "parameters_hash",
           "code_git_sha",
           "run_id",
-          "computed_at"
+          "computed_at",
+          "provenance"
         ],
         "title": "MetricValue",
         "type": "object"
@@ -1009,6 +1152,9 @@
         },
         "required": [
           "derived_metric_id",
+          "nodes",
+          "edges",
+          "provenance",
           "lineage_note"
         ],
         "title": "ProvenanceGraph",
@@ -1059,7 +1205,8 @@
         "required": [
           "id",
           "kind",
-          "label"
+          "label",
+          "details"
         ],
         "title": "ProvenanceNode",
         "type": "object"
@@ -1089,7 +1236,8 @@
         "required": [
           "total",
           "limit",
-          "offset"
+          "offset",
+          "rows"
         ],
         "title": "QualityIssuePage",
         "type": "object"
@@ -1211,9 +1359,45 @@
           "rule",
           "severity",
           "state",
+          "evidence",
           "detected_at"
         ],
         "title": "QualityIssueView",
+        "type": "object"
+      },
+      "ReductionInfo": {
+        "description": "Explicit display-reduction record; never a scientific transformation.",
+        "properties": {
+          "method": {
+            "title": "Method",
+            "type": "string"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "parameters": {
+            "additionalProperties": true,
+            "title": "Parameters",
+            "type": "object"
+          },
+          "returned_points": {
+            "title": "Returned Points",
+            "type": "integer"
+          },
+          "source_points": {
+            "title": "Source Points",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "method",
+          "parameters",
+          "source_points",
+          "returned_points",
+          "note"
+        ],
+        "title": "ReductionInfo",
         "type": "object"
       },
       "RightsPage": {
@@ -1226,6 +1410,9 @@
             "type": "array"
           }
         },
+        "required": [
+          "policies"
+        ],
         "title": "RightsPage",
         "type": "object"
       },
@@ -1243,7 +1430,8 @@
           }
         },
         "required": [
-          "license"
+          "license",
+          "dataset_ids"
         ],
         "title": "RightsPolicyView",
         "type": "object"
@@ -1273,7 +1461,8 @@
         "required": [
           "total",
           "limit",
-          "offset"
+          "offset",
+          "rows"
         ],
         "title": "RunPage",
         "type": "object"
@@ -1412,6 +1601,7 @@
           "parameters_hash",
           "started_at",
           "completed_at",
+          "input_checksums",
           "metric_count",
           "artifact_count",
           "notes"
@@ -1504,7 +1694,10 @@
         },
         "required": [
           "dataset_id",
-          "session"
+          "session",
+          "participants",
+          "trials",
+          "streams"
         ],
         "title": "SessionDetail",
         "type": "object"
@@ -1734,11 +1927,13 @@
           "trial_id",
           "device_id",
           "nominal_sampling_rate_hz",
+          "si_units",
           "source_unit",
           "coordinate_frame_id",
           "synchronization_spec_id",
           "clock_id",
           "skeleton_id",
+          "sample_artifact_ids",
           "sample_row_count"
         ],
         "title": "StreamView",
@@ -2005,7 +2200,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/DenseWindow"
+                }
               }
             },
             "description": "Successful Response"

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 ServingSource = Literal["gold", "control_plane"]
 
@@ -26,7 +26,7 @@ class LicenseView(BaseModel):
     share_alike: bool
     redistribution: str
     local_only: bool
-    restrictions: list[Any] = Field(default_factory=list)
+    restrictions: list[Any]
     notice: str
 
 
@@ -45,8 +45,8 @@ class DatasetSummary(BaseModel):
     provider: str
     domain: str
     doi: str | None
-    upstream_urls: list[str] = Field(default_factory=list)
-    modalities: list[str] = Field(default_factory=list)
+    upstream_urls: list[str]
+    modalities: list[str]
     license: LicenseView
     version_count: int
     session_count: int
@@ -58,7 +58,7 @@ class DatasetSummary(BaseModel):
 
 
 class DatasetDetail(DatasetSummary):
-    versions: list[DatasetVersionView] = Field(default_factory=list)
+    versions: list[DatasetVersionView]
     v1_role: str
     initial_scope: str
     adapter_id: str
@@ -87,13 +87,13 @@ class StreamView(BaseModel):
     trial_id: str | None
     device_id: str | None
     nominal_sampling_rate_hz: float | None
-    si_units: list[str] = Field(default_factory=list)
+    si_units: list[str]
     source_unit: str | None
     coordinate_frame_id: str | None
     synchronization_spec_id: str
     clock_id: str
     skeleton_id: str | None
-    sample_artifact_ids: list[str] = Field(default_factory=list)
+    sample_artifact_ids: list[str]
     sample_row_count: int
 
 
@@ -117,9 +117,9 @@ class SessionParticipantView(BaseModel):
 class SessionDetail(BaseModel):
     dataset_id: str
     session: SessionSummary
-    participants: list[SessionParticipantView] = Field(default_factory=list)
-    trials: list[TrialView] = Field(default_factory=list)
-    streams: list[StreamView] = Field(default_factory=list)
+    participants: list[SessionParticipantView]
+    trials: list[TrialView]
+    streams: list[StreamView]
 
 
 class MetricValue(BaseModel):
@@ -146,7 +146,7 @@ class MetricValue(BaseModel):
     code_git_sha: str | None
     run_id: str
     computed_at: str | None
-    provenance: dict[str, Any] = Field(default_factory=dict)
+    provenance: dict[str, Any]
 
 
 class MetricPage(BaseModel):
@@ -154,7 +154,7 @@ class MetricPage(BaseModel):
     total: int
     limit: int
     offset: int
-    rows: list[MetricValue] = Field(default_factory=list)
+    rows: list[MetricValue]
 
 
 class MetricDefinitionView(BaseModel):
@@ -174,7 +174,7 @@ class AlgorithmView(BaseModel):
     kind: str
     code_git_sha: str | None
     parameters_hash: str | None
-    parameters: dict[str, Any] = Field(default_factory=dict)
+    parameters: dict[str, Any]
     description: str | None
     citation: str | None
 
@@ -193,7 +193,7 @@ class ProvenanceNode(BaseModel):
     label: str
     status: str | None = None
     measurement_class: str | None = None
-    details: dict[str, Any] = Field(default_factory=dict)
+    details: dict[str, Any]
 
 
 class ProvenanceEdge(BaseModel):
@@ -205,9 +205,9 @@ class ProvenanceEdge(BaseModel):
 
 class ProvenanceGraph(BaseModel):
     derived_metric_id: str
-    nodes: list[ProvenanceNode] = Field(default_factory=list)
-    edges: list[ProvenanceEdge] = Field(default_factory=list)
-    provenance: dict[str, Any] = Field(default_factory=dict)
+    nodes: list[ProvenanceNode]
+    edges: list[ProvenanceEdge]
+    provenance: dict[str, Any]
     lineage_note: str
 
 
@@ -223,7 +223,7 @@ class QualityIssueView(BaseModel):
     rule: str
     severity: str
     state: str
-    evidence: dict[str, Any] = Field(default_factory=dict)
+    evidence: dict[str, Any]
     detected_at: str | None
 
 
@@ -231,7 +231,7 @@ class QualityIssuePage(BaseModel):
     total: int
     limit: int
     offset: int
-    rows: list[QualityIssueView] = Field(default_factory=list)
+    rows: list[QualityIssueView]
 
 
 class RunView(BaseModel):
@@ -246,7 +246,7 @@ class RunView(BaseModel):
     parameters_hash: str | None
     started_at: str | None
     completed_at: str | None
-    input_checksums: list[str] = Field(default_factory=list)
+    input_checksums: list[str]
     metric_count: int
     artifact_count: int
     notes: str | None
@@ -256,23 +256,23 @@ class RunPage(BaseModel):
     total: int
     limit: int
     offset: int
-    rows: list[RunView] = Field(default_factory=list)
+    rows: list[RunView]
 
 
 class RightsPolicyView(BaseModel):
     license: LicenseView
-    dataset_ids: list[str] = Field(default_factory=list)
+    dataset_ids: list[str]
 
 
 class RightsPage(BaseModel):
-    policies: list[RightsPolicyView] = Field(default_factory=list)
+    policies: list[RightsPolicyView]
 
 
 class ReductionInfo(BaseModel):
     """Explicit display-reduction record; never a scientific transformation."""
 
     method: str
-    parameters: dict[str, Any] = Field(default_factory=dict)
+    parameters: dict[str, Any]
     source_points: int
     returned_points: int
     note: str
@@ -292,7 +292,7 @@ class ArtifactRefView(BaseModel):
     artifact_kind: Literal["sample", "processing"]
     modality: str | None
     measurement_class: str | None
-    si_units: list[str] = Field(default_factory=list)
+    si_units: list[str]
     coordinate_frame_id: str | None
     synchronization_spec_id: str | None
 
@@ -301,13 +301,13 @@ class DenseWindowMeta(BaseModel):
     artifact: ArtifactRefView
     from_ns: int
     to_ns: int
-    columns: list[str] = Field(default_factory=list)
+    columns: list[str]
     source_rows: int
     returned_rows: int
     canonical_time_min_ns: int | None
     canonical_time_max_ns: int | None
     reduction: ReductionInfo | None
-    units: dict[str, str] = Field(default_factory=dict)
+    units: dict[str, str]
     coordinate_frame_id: str | None
     measurement_class: str | None
     display_note: str
@@ -315,7 +315,7 @@ class DenseWindowMeta(BaseModel):
 
 class DenseWindow(BaseModel):
     meta: DenseWindowMeta
-    rows: list[dict[str, Any]] = Field(default_factory=list)
+    rows: list[dict[str, Any]]
 
 
 class ServingStatus(BaseModel):

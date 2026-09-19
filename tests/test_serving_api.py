@@ -283,7 +283,11 @@ class FakeBackend:
             derived_metric_id=derived_metric_id,
             nodes=[
                 ProvenanceNode(
-                    id="run:run-pose", kind="processing_run", label="run-pose", status="completed"
+                    id="run:run-pose",
+                    kind="processing_run",
+                    label="run-pose",
+                    status="completed",
+                    details={},
                 )
             ],
             edges=[
