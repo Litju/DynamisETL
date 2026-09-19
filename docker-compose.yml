@@ -58,6 +58,11 @@ services:
       DYNAMIS_DATASET_ROOT: /datasets
       DYNAMIS_DATABASE_ROOT: /databases
       DYNAMIS_DUCKDB_PATH: /databases/duckdb/dynamis.duckdb
+      # Production/container processor provenance: the image build or the
+      # operator injects the exact code revision. Development-only unknown-SHA
+      # behavior stays off unless explicitly enabled (and never serves Gold).
+      DYNAMIS_CODE_GIT_SHA: ${DYNAMIS_CODE_GIT_SHA:-}
+      DYNAMIS_ALLOW_UNKNOWN_CODE_SHA: ${DYNAMIS_ALLOW_UNKNOWN_CODE_SHA:-0}
     volumes:
       - ${DYNAMIS_DATASET_ROOT:-./data}:/datasets
       - ${DYNAMIS_DATABASE_ROOT:-./data}:/databases
