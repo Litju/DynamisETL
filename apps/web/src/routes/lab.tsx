@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+﻿import { useQuery } from "@tanstack/react-query";
 import {
   createRoute,
   type AnyRoute,
@@ -9,6 +9,8 @@ import {
 import { useCallback, useEffect, useMemo } from "react";
 
 import { MeasurementClassBadge, ModalityBadge } from "@/components/common/Badges";
+import { DataTable, type DataTableColumn } from "@/components/table/DataTable";
+import type { MetricValue } from "@/api/types";
 import { KeyValueRow, Panel, SectionTitle } from "@/components/common/Panel";
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
 import { metricsQuery, sessionQuery } from "@/lib/api/queries";
@@ -274,7 +276,7 @@ function LabOverview({
         </p>
       </Panel>
 
-      <Panel title="Derived metrics" className="min-h-64">
+      <Panel title="Derived metrics" className="min-h-64" bodyClassName="overflow-hidden">
         {metrics.isError ? (
           <ErrorPanel error={metrics.error} onRetry={() => void metrics.refetch()} />
         ) : metrics.data.total === 0 ? (
@@ -284,59 +286,70 @@ function LabOverview({
             detail="Metrics appear after the deterministic processor and Gold rebuild path runs."
           />
         ) : (
-          <table className="w-full border-collapse text-[12px]">
-            <thead className="sticky top-0 bg-surface-1 text-left text-[11px] uppercase tracking-wider text-text-muted">
-              <tr className="border-b border-border-subtle">
-                <th scope="col" className="px-2 py-1 font-medium">
-                  Metric
-                </th>
-                <th scope="col" className="px-2 py-1 font-medium">
-                  Entity
-                </th>
-                <th scope="col" className="px-2 py-1 text-right font-medium">
-                  Value
-                </th>
-                <th scope="col" className="px-2 py-1 font-medium">
-                  Class
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {metrics.data.rows.map((metric) => {
-                const display = formatMetricValue(metric.value_num, metric.si_unit);
-                return (
-                  <tr
-                    key={metric.derived_metric_id}
-                    className="cursor-pointer border-b border-border-subtle/60 hover:bg-surface-2"
-                    onClick={() => {
-                      onSelectResult(metric.metric_id, metric.derived_metric_id);
-                      if (metric.subject_id) onSelectSubject(metric.subject_id);
-                    }}
-                    title="Open methodology and exact provenance in the inspector"
-                  >
-                    <td className="px-2 py-1.5">
-                      <div className="mono text-[11px] text-text-secondary">{metric.metric_id}</div>
-                      <div className="text-[10px] text-text-muted">
-                        {metric.metric_name ?? "definition unavailable"}
-                      </div>
-                    </td>
-                    <td className="mono px-2 py-1.5 text-[11px] text-text-muted">
-                      {metric.entity_id ?? metric.subject_id ?? "—"}
-                    </td>
-                    <td className="mono px-2 py-1.5 text-right tabular">{display.text}</td>
-                    <td className="px-2 py-1.5">
-                      <MeasurementClassBadge
-                        measurementClass={metric.measurement_class}
-                        compact
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <DataTable
+            ariaLabel="Derived metrics"
+            rows={metrics.data.rows}
+            columns={METRIC_COLUMNS}
+            getRowId={(metric) => metric.derived_metric_id}
+            onRowClick={(metric) => {
+              onSelectResult(metric.metric_id, metric.derived_metric_id);
+              if (metric.subject_id) onSelectSubject(metric.subject_id);
+            }}
+            emptyState={<StatePanel state="empty" title="No derived metric in this scope." />}
+          />
         )}
       </Panel>
     </div>
   );
 }
+
+const METRIC_COLUMNS: DataTableColumn<MetricValue>[] = [
+  {
+    id: "metric",
+    header: "Metric",
+    size: 2.4,
+    accessor: (metric) => metric.metric_id,
+    cell: (metric) => (
+      <span className="min-w-0">
+        <span className="mono block truncate text-[11px] text-text-secondary">
+          {metric.metric_id}
+        </span>
+        <span className="block truncate text-[10px] text-text-muted">
+          {metric.metric_name ?? "definition unavailable"}
+        </span>
+      </span>
+    ),
+  },
+  {
+    id: "entity",
+    header: "Entity",
+    size: 1,
+    accessor: (metric) => metric.entity_id ?? metric.subject_id ?? "",
+    cell: (metric) => (
+      <span className="mono text-[11px] text-text-muted">
+        {metric.entity_id ?? metric.subject_id ?? "—"}
+      </span>
+    ),
+  },
+  {
+    id: "value",
+    header: "Value",
+    size: 1.2,
+    align: "right",
+    accessor: (metric) => metric.value_num ?? Number.NaN,
+    cell: (metric) => (
+      <span className="mono tabular">
+        {formatMetricValue(metric.value_num, metric.si_unit).text}
+      </span>
+    ),
+  },
+  {
+    id: "class",
+    header: "Class",
+    size: 1.2,
+    accessor: (metric) => metric.measurement_class,
+    cell: (metric) => (
+      <MeasurementClassBadge measurementClass={metric.measurement_class} compact />
+    ),
+  },
+];

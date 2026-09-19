@@ -1,7 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+﻿import { useQuery } from "@tanstack/react-query";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import { StatePanel } from "@/components/common/StatePanel";
 import { sessionQuery } from "@/lib/api/queries";
@@ -54,6 +54,20 @@ function ExplorerForSession({
   const query = useQuery(sessionQuery(datasetId, sessionId));
   const [trialsOpen, setTrialsOpen] = useState(true);
   const [streamsOpen, setStreamsOpen] = useState(true);
+  const [filter, setFilter] = useState("");
+
+  const handleTreeKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    const items = Array.from(
+      event.currentTarget.querySelectorAll<HTMLAnchorElement>("a[data-nav-item]"),
+    );
+    if (items.length === 0) return;
+    event.preventDefault();
+    const activeIndex = items.findIndex((item) => item === document.activeElement);
+    const delta = event.key === "ArrowDown" ? 1 : -1;
+    const nextIndex = activeIndex < 0 ? 0 : Math.min(items.length - 1, Math.max(0, activeIndex + delta));
+    items[nextIndex]?.focus();
+  };
 
   if (query.isPending) {
     return <StatePanel state="loading" title="Loading session structure" />;
@@ -62,14 +76,30 @@ function ExplorerForSession({
     return <StatePanel state="error" title="Session could not be loaded." />;
   }
   const { participants, trials, streams } = query.data;
+  const needle = filter.trim().toLowerCase();
+  const visibleTrials = trials.filter((trial) =>
+    `${trial.label ?? ""} ${trial.trial_id}`.toLowerCase().includes(needle),
+  );
+  const visibleStreams = streams.filter((stream) =>
+    `${stream.stream_id} ${stream.modality} ${stream.measurement_class}`
+      .toLowerCase()
+      .includes(needle),
+  );
   return (
-    <div className="p-2 text-[12px]">
+    <div className="p-2 text-[12px]" onKeyDown={handleTreeKeyDown}>
       <div className="mb-2 border-b border-border-subtle pb-2">
         <div className="mono truncate text-[11px] text-text-muted">{datasetId}</div>
         <div className="truncate text-text-secondary">{sessionId}</div>
         <div className="text-[11px] text-text-muted">
           {participants.length} participants · {trials.length} trials · {streams.length} streams
         </div>
+        <input
+          value={filter}
+          onChange={(event) => setFilter(event.target.value)}
+          placeholder="Filter trials and streams"
+          aria-label="Filter session structure"
+          className="mt-1 h-6 w-full rounded-control border border-border-subtle bg-surface-0 px-2 text-[11px] outline-none focus:border-accent"
+        />
       </div>
 
       <button
@@ -81,11 +111,12 @@ function ExplorerForSession({
       </button>
       {trialsOpen ? (
         <ul className="mb-2">
-          {trials.map((trial) => (
+          {visibleTrials.map((trial) => (
             <li key={trial.trial_id}>
               <Link
                 to="/lab/$datasetId/$sessionId"
                 params={{ datasetId, sessionId }}
+                data-nav-item
                 search={(previous: LabSearch) => ({
                   ...previous,
                   trial: trial.trial_id,
@@ -112,11 +143,12 @@ function ExplorerForSession({
       </button>
       {streamsOpen ? (
         <ul>
-          {streams.map((stream) => (
+          {visibleStreams.map((stream) => (
             <li key={stream.stream_id}>
               <Link
                 to="/lab/$datasetId/$sessionId"
                 params={{ datasetId, sessionId }}
+                data-nav-item
                 search={(previous: LabSearch) => ({
                   ...previous,
                   stream: stream.stream_id,

@@ -79,6 +79,8 @@ export type CompareSearch = z.infer<typeof compareSearchSchema>;
 export const methodsSearchSchema = z.object({
   metric: optionalText,
   dataset: optionalText,
+  /** Exact served result whose selected lineage the page renders. */
+  result: optionalText,
 });
 export type MethodsSearch = z.infer<typeof methodsSearchSchema>;
 

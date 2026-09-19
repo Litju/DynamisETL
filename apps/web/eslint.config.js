@@ -44,4 +44,12 @@ export default tseslint.config(
       },
     },
   },
+  {
+    // TanStack Table intentionally returns a stateful instance from a hook; the
+    // React Compiler memoization rule does not model that library contract.
+    files: ["src/components/table/DataTable.tsx"],
+    rules: {
+      "react-hooks/incompatible-library": "off",
+    },
+  },
 );

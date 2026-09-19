@@ -2,11 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { createRoute, type AnyRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
 
 import { MeasurementClassBadge, ModalityBadge } from "@/components/common/Badges";
+import { DataTable, type DataTableColumn } from "@/components/table/DataTable";
 import { KeyValueRow, Panel, SectionTitle } from "@/components/common/Panel";
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
 import { datasetQuery, datasetsQuery, sessionsQuery } from "@/lib/api/queries";
 import type { DatasetSummary } from "@/api/types";
-import { cn } from "@/lib/cn";
 import { catalogSearchSchema, MODALITIES, parseSearch } from "@/lib/search";
 import type { CatalogSearch } from "@/lib/search";
 
@@ -145,75 +145,84 @@ function CatalogTable({
     const noncommercial = dataset.license.noncommercial_only;
     return rightsFilter === "noncommercial" ? !noncommercial : noncommercial;
   });
-  if (visible.length === 0) {
-    return (
-      <StatePanel state="empty" title="No dataset matches the current filters." />
-    );
-  }
+  const columns: DataTableColumn<DatasetSummary>[] = [
+    {
+      id: "dataset",
+      header: "Dataset",
+      size: 2.2,
+      accessor: (dataset) => dataset.name,
+      cell: (dataset) => (
+        <span className="min-w-0">
+          <span className="block truncate text-text-primary">{dataset.name}</span>
+          <span className="mono block truncate text-[10px] text-text-muted">
+            {dataset.dataset_id}
+          </span>
+        </span>
+      ),
+    },
+    {
+      id: "modalities",
+      header: "Modalities",
+      size: 1.6,
+      accessor: (dataset) => dataset.modalities.join(","),
+      cell: (dataset) => (
+        <span className="flex flex-wrap gap-1">
+          {dataset.modalities.map((modality) => (
+            <ModalityBadge key={modality} modality={modality} />
+          ))}
+        </span>
+      ),
+    },
+    {
+      id: "license",
+      header: "License",
+      size: 1.6,
+      accessor: (dataset) => dataset.license.identifier ?? "unclear",
+      cell: (dataset) => (
+        <span>
+          <span className="block text-text-secondary">
+            {dataset.license.identifier ?? "unclear (local-only)"}
+          </span>
+          {dataset.license.noncommercial_only || dataset.license.local_only ? (
+            <span className="text-[10px] text-quality-warning">
+              {dataset.license.local_only ? "local-only" : "non-commercial"}
+            </span>
+          ) : null}
+        </span>
+      ),
+    },
+    {
+      id: "sessions",
+      header: "Sessions",
+      size: 0.8,
+      align: "right",
+      accessor: (dataset) => dataset.session_count,
+    },
+    {
+      id: "metrics",
+      header: "Metrics",
+      size: 0.8,
+      align: "right",
+      accessor: (dataset) => dataset.metric_count,
+    },
+    {
+      id: "quality",
+      header: "Quarantine",
+      size: 0.9,
+      align: "right",
+      accessor: (dataset) => dataset.quality_issue_count,
+    },
+  ];
   return (
-    <table className="w-full border-collapse text-[12px]">
-      <thead className="sticky top-0 bg-surface-1 text-left text-[11px] uppercase tracking-wider text-text-muted">
-        <tr className="border-b border-border-subtle">
-          <th scope="col" className="px-2 py-1.5 font-medium">
-            Dataset
-          </th>
-          <th scope="col" className="px-2 py-1.5 font-medium">
-            Modalities
-          </th>
-          <th scope="col" className="px-2 py-1.5 font-medium">
-            License
-          </th>
-          <th scope="col" className="px-2 py-1.5 text-right font-medium">
-            Sessions
-          </th>
-          <th scope="col" className="px-2 py-1.5 text-right font-medium">
-            Metrics
-          </th>
-          <th scope="col" className="px-2 py-1.5 text-right font-medium">
-            Quarantine
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {visible.map((dataset) => (
-          <tr
-            key={dataset.dataset_id}
-            className={cn(
-              "cursor-pointer border-b border-border-subtle/60 hover:bg-surface-2",
-              selected === dataset.dataset_id && "bg-surface-3",
-            )}
-            onClick={() => onSelect(dataset.dataset_id)}
-          >
-            <td className="px-2 py-1.5">
-              <div className="text-text-primary">{dataset.name}</div>
-              <div className="mono text-[10px] text-text-muted">{dataset.dataset_id}</div>
-            </td>
-            <td className="px-2 py-1.5">
-              <div className="flex flex-wrap gap-1">
-                {dataset.modalities.map((modality) => (
-                  <ModalityBadge key={modality} modality={modality} />
-                ))}
-              </div>
-            </td>
-            <td className="px-2 py-1.5">
-              <div className="text-text-secondary">
-                {dataset.license.identifier ?? "unclear (local-only)"}
-              </div>
-              {dataset.license.noncommercial_only || dataset.license.local_only ? (
-                <div className="text-[10px] text-quality-warning">
-                  {dataset.license.local_only ? "local-only" : "non-commercial"}
-                </div>
-              ) : null}
-            </td>
-            <td className="mono px-2 py-1.5 text-right tabular">{dataset.session_count}</td>
-            <td className="mono px-2 py-1.5 text-right tabular">{dataset.metric_count}</td>
-            <td className="mono px-2 py-1.5 text-right tabular">
-              {dataset.quality_issue_count}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <DataTable
+      ariaLabel="Registered datasets"
+      rows={visible}
+      columns={columns}
+      getRowId={(dataset) => dataset.dataset_id}
+      selectedRowId={selected}
+      onRowClick={(dataset) => onSelect(dataset.dataset_id)}
+      emptyState={<StatePanel state="empty" title="No dataset matches the current filters." />}
+    />
   );
 }
 

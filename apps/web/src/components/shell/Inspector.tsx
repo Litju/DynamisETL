@@ -1,12 +1,16 @@
 import { Tabs } from "@base-ui/react/tabs";
 import { useQuery } from "@tanstack/react-query";
 import { ShieldAlert } from "lucide-react";
+import { lazy, Suspense } from "react";
 
 import { MeasurementClassBadge, QualityBadge } from "@/components/common/Badges";
 import { KeyValueRow, Panel, SectionTitle } from "@/components/common/Panel";
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
 import { useAnalysisContext } from "@/lib/analysis-context";
 import { methodologyQuery, provenanceQuery, qualityQuery, rightsQuery } from "@/lib/api/queries";
+
+// React Flow stays out of the shell chunk: only the provenance tab pays for it.
+const LineageGraph = lazy(() => import("@/components/lineage/LineageGraph"));
 
 const INSPECTOR_TABS = [
   ["method", "Method"],
@@ -144,28 +148,10 @@ function ProvenanceTab() {
   if (query.isError) return <ErrorPanel error={query.error} onRetry={() => void query.refetch()} />;
   const graph = query.data;
   return (
-    <div className="p-3">
-      <p className="mb-3 text-[11px] text-text-muted">{graph.lineage_note}</p>
-      <ol className="space-y-1">
-        {graph.nodes.map((node) => (
-          <li
-            key={node.id}
-            className="flex items-center justify-between gap-2 rounded-control border border-border-subtle bg-surface-0 px-2 py-1"
-          >
-            <div className="min-w-0">
-              <div className="truncate text-[12px] text-text-secondary">{node.label}</div>
-              <div className="mono truncate text-[10px] text-text-muted">{node.kind}</div>
-            </div>
-            {node.measurement_class ? (
-              <MeasurementClassBadge measurementClass={node.measurement_class} compact />
-            ) : null}
-          </li>
-        ))}
-      </ol>
-      <SectionTitle>Stored provenance</SectionTitle>
-      <pre className="mono overflow-x-auto rounded-control border border-border-subtle bg-surface-0 p-2 text-[11px] text-text-secondary">
-        {JSON.stringify(graph.provenance, null, 2)}
-      </pre>
+    <div className="flex h-full min-h-0 flex-col">
+      <Suspense fallback={<LoadingPanel label="Loading lineage renderer" />}>
+        <LineageGraph graph={graph} />
+      </Suspense>
     </div>
   );
 }
