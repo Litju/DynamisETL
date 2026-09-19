@@ -53,7 +53,7 @@ DEFAULT_PARAMETERS: dict[str, Any] = {
         },
         "edge_policy": EDGE_NAN,
     },
-    "jerk_definition": "second_time_derivative_of_resultant_acceleration_after_configured_filter",
+    "jerk_definition": "first_time_derivative_of_resultant_acceleration_after_configured_filter",
 }
 
 RESULTANT_MEAN = MetricDeclaration(
@@ -97,6 +97,7 @@ SERIES_NAME = "imu_sensor_frame_derived"
 
 
 def imu_spec(parameters: Mapping[str, Any] | None = None) -> ProcessorSpec:
+    """Resolve and validate the IMU processor parameters."""
     resolved = {**DEFAULT_PARAMETERS, **dict(parameters or {})}
     axes = tuple(str(name) for name in resolved["axes"])
     if len(axes) != 3 or len(set(axes)) != 3:

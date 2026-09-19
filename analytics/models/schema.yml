@@ -48,7 +48,7 @@ models:
               values: ["SOURCE_DERIVED", "PIPELINE_DERIVED", "MODEL_ESTIMATED"]
 
   - name: gold_session_player_load
-    description: Aggregated locomotor load per session/subject/entity.
+    description: Aggregated locomotor load per session/subject/entity/run.
     columns:
       - name: dataset_id
         tests:
@@ -56,6 +56,12 @@ models:
       - name: algorithm_id
         tests:
           - not_null
+      - name: run_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_processing_run')
+              field: run_id
 
   - name: gold_cmj_metrics
     description: CMJ trial metrics pivoted from versioned processor output.
@@ -71,11 +77,17 @@ models:
               field: run_id
 
   - name: gold_pose_kinematics_summary
-    description: Pose geometry availability/quality summary.
+    description: Pose geometry availability/quality summary per run.
     columns:
       - name: dataset_id
         tests:
           - not_null
+      - name: run_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_processing_run')
+              field: run_id
 
   - name: gold_processing_provenance
     description: Full provenance chain per currently served processing run.

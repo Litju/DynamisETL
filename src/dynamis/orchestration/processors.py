@@ -59,6 +59,7 @@ def _process(
     *,
     parameters: dict | None = None,
 ) -> dict:
+    """Process one registered corpus and return its descriptor."""
     resolved, engine = _engine()
     try:
         if parameters is None:

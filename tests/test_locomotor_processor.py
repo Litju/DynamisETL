@@ -221,6 +221,25 @@ def test_zones_and_efforts_use_explicit_configuration() -> None:
     assert by_id["locomotor.effort_peak_speed"] == pytest.approx(5.0, rel=1e-12)
 
 
+def test_max_deceleration_measures_the_signed_slowing_rate() -> None:
+    """A known accelerate-then-decelerate trajectory has a real deceleration peak."""
+    rate_hz = 10
+    times = np.arange(0.0, 2.0 + 1e-9, 1.0 / rate_hz)
+    x = np.where(
+        times <= 1.0,
+        2.5 * times**2,
+        10.0 * times - 2.5 * times**2 - 5.0,
+    )
+    y = np.zeros_like(x)
+    result = process_locomotor(
+        _tracking_table({"player-1": (x, y)}, rate_hz=rate_hz),
+        parameters=_planar_parameters(),
+    )
+    by_id = {metric.declaration.metric_id: metric.value for metric in result.metrics}
+    assert by_id["locomotor.max_acceleration"] == pytest.approx(5.0, rel=1e-9)
+    assert by_id["locomotor.max_deceleration"] == pytest.approx(5.0, rel=1e-9)
+
+
 def test_rolling_peak_is_window_limited() -> None:
     rate_hz = 10
     speed = 4.0

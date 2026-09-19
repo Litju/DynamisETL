@@ -155,7 +155,11 @@ MAX_DECELERATION = MetricDeclaration(
     metric_id="locomotor.max_deceleration",
     name="Peak deceleration magnitude",
     si_unit="m/s**2",
-    description="Largest negative acceleration magnitude (floored at zero).",
+    description=(
+        "Largest negative signed tangential acceleration d|v|/dt (floored at zero), i.e. "
+        "the peak slowing rate. This is not the minimum of the non-negative vector "
+        "acceleration magnitude."
+    ),
 )
 EFFORT_COUNT = MetricDeclaration(
     metric_id="locomotor.effort_count",
@@ -197,6 +201,7 @@ def _metric_token(value: str) -> str:
 
 
 def zone_distance_declaration(zone: SpeedZone) -> MetricDeclaration:
+    """Metric declaration for distance covered inside one speed zone."""
     return MetricDeclaration(
         metric_id=f"locomotor.distance_zone.{_metric_token(zone.name)}",
         name=f"Distance in speed zone {zone.name}",
@@ -209,6 +214,7 @@ def zone_distance_declaration(zone: SpeedZone) -> MetricDeclaration:
 
 
 def zone_peak_speed_declaration(zone: SpeedZone) -> MetricDeclaration:
+    """Metric declaration for peak speed inside one speed zone."""
     return MetricDeclaration(
         metric_id=f"locomotor.peak_speed_zone.{_metric_token(zone.name)}",
         name=f"Peak speed in speed zone {zone.name}",
@@ -218,6 +224,7 @@ def zone_peak_speed_declaration(zone: SpeedZone) -> MetricDeclaration:
 
 
 def rolling_distance_declaration(window_s: float) -> MetricDeclaration:
+    """Metric declaration for the peak rolling distance of one window."""
     return MetricDeclaration(
         metric_id=f"locomotor.rolling_peak_distance.{window_s:g}s",
         name=f"Peak rolling distance over {window_s:g} s",
@@ -230,6 +237,7 @@ def rolling_distance_declaration(window_s: float) -> MetricDeclaration:
 
 
 def rolling_mean_speed_declaration(window_s: float) -> MetricDeclaration:
+    """Metric declaration for the peak rolling mean speed of one window."""
     return MetricDeclaration(
         metric_id=f"locomotor.rolling_peak_mean_speed.{window_s:g}s",
         name=f"Peak rolling mean speed over {window_s:g} s",
@@ -542,12 +550,18 @@ def process_locomotor(
         ax = derivative_variable(vx, frame.t_rel_ns, edge_policy=derivative_spec.edge_policy)
         ay = derivative_variable(vy, frame.t_rel_ns, edge_policy=derivative_spec.edge_policy)
         acceleration = np.hypot(ax, ay)
+        # Signed tangential acceleration d|v|/dt: negative while the entity slows,
+        # so the deceleration peak is a real slowing rate and not the minimum of a
+        # non-negative magnitude.
+        tangential_acceleration = derivative_variable(
+            speed, frame.t_rel_ns, edge_policy=derivative_spec.edge_policy
+        )
         cumulative_distance = np.cumsum(distance_step)
         total_distance = float(cumulative_distance[-1]) if cumulative_distance.size else 0.0
         duration_s = float(times_s[-1]) if times_s.size else 0.0
         max_speed = _finite_max(speed)
         max_accel = _finite_max(acceleration)
-        min_accel = _finite_min(acceleration)
+        min_tangential = _finite_min(tangential_acceleration)
         if max_speed is None:
             raise ValueError(
                 f"{ALGORITHM_ID}: speed could not be derived (edge policy "
@@ -576,6 +590,7 @@ def process_locomotor(
             "rate_hz": float(rate_hz),
             "duration_s": duration_s,
             "invalid_samples": int(np.count_nonzero(invalid)),
+            "max_deceleration_definition": "negative_minimum_of_d_speed_dt_floored_at_zero",
         }
 
         def emit(
@@ -603,7 +618,7 @@ def process_locomotor(
         emit(MAX_ACCELERATION, max_accel if max_accel is not None else 0.0)
         emit(
             MAX_DECELERATION,
-            max(0.0, -(min_accel if min_accel is not None else 0.0)),
+            max(0.0, -(min_tangential if min_tangential is not None else 0.0)),
         )
 
         if zones:

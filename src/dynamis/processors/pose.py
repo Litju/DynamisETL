@@ -132,6 +132,7 @@ class AngleDefinition:
 
 
 def _segment_length_declaration(segment: SegmentDefinition) -> MetricDeclaration:
+    """Metric declaration for one segment mean length."""
     return MetricDeclaration(
         metric_id=f"pose.segment_length_mean.{_token(segment.name)}",
         name=f"Mean length of segment {segment.name}",
@@ -144,6 +145,7 @@ def _segment_length_declaration(segment: SegmentDefinition) -> MetricDeclaration
 
 
 def _segment_error_bound_declaration(segment: SegmentDefinition) -> MetricDeclaration:
+    """Metric declaration for one segment worst-case error bound."""
     return MetricDeclaration(
         metric_id=f"pose.segment_length_error_bound.{_token(segment.name)}",
         name=f"Worst-case segment length error bound for {segment.name}",
@@ -157,6 +159,7 @@ def _segment_error_bound_declaration(segment: SegmentDefinition) -> MetricDeclar
 
 
 def _landmark_availability_declaration(landmark: str) -> MetricDeclaration:
+    """Metric declaration for one landmark availability fraction."""
     return MetricDeclaration(
         metric_id=f"pose.availability.{_token(landmark)}",
         name=f"Available-frame fraction for landmark {landmark}",
@@ -166,6 +169,7 @@ def _landmark_availability_declaration(landmark: str) -> MetricDeclaration:
 
 
 def _landmark_error_declaration(landmark: str) -> MetricDeclaration:
+    """Metric declaration for one landmark mean provider error radius."""
     return MetricDeclaration(
         metric_id=f"pose.error_radius_mean.{_token(landmark)}",
         name=f"Mean provider error radius for landmark {landmark}",
@@ -178,6 +182,7 @@ def _landmark_error_declaration(landmark: str) -> MetricDeclaration:
 
 
 def _angle_rom_declaration(angle: AngleDefinition) -> MetricDeclaration:
+    """Metric declaration for one angle range of motion."""
     return MetricDeclaration(
         metric_id=f"pose.angular_rom.{_token(angle.name)}",
         name=f"Range of motion for angle {angle.name}",
@@ -191,6 +196,7 @@ def _angle_rom_declaration(angle: AngleDefinition) -> MetricDeclaration:
 
 
 def _angle_velocity_peak_declaration(angle: AngleDefinition) -> MetricDeclaration:
+    """Metric declaration for one angle peak angular velocity."""
     return MetricDeclaration(
         metric_id=f"pose.angular_velocity_peak.{_token(angle.name)}",
         name=f"Peak angular velocity for angle {angle.name}",
@@ -200,6 +206,7 @@ def _angle_velocity_peak_declaration(angle: AngleDefinition) -> MetricDeclaratio
 
 
 def _angle_velocity_rms_declaration(angle: AngleDefinition) -> MetricDeclaration:
+    """Metric declaration for one angle RMS angular velocity."""
     return MetricDeclaration(
         metric_id=f"pose.angular_velocity_rms.{_token(angle.name)}",
         name=f"RMS angular velocity for angle {angle.name}",
@@ -209,6 +216,7 @@ def _angle_velocity_rms_declaration(angle: AngleDefinition) -> MetricDeclaration
 
 
 def pose_spec(parameters: Mapping[str, Any] | None = None) -> ProcessorSpec:
+    """Resolve and validate the pose processor parameters."""
     resolved = {**DEFAULT_PARAMETERS, **dict(parameters or {})}
     components = tuple(str(item) for item in resolved["required_coordinate_components"])
     if components != ("x_m", "y_m", "z_m"):

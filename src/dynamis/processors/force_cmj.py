@@ -169,6 +169,8 @@ def force_cmj_spec(parameters: Mapping[str, Any] | None = None) -> ProcessorSpec
 
 
 def _identity(table: pa.Table) -> dict[str, str | None]:
+    """First-row identity scope of a single-entity canonical stream."""
+
     def single(name: str) -> str | None:
         if name not in table.column_names:
             return None

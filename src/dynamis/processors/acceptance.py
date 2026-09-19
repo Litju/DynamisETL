@@ -61,6 +61,7 @@ class DatasetProcessing:
             "algorithm_id": self.algorithm_id,
             "algorithm_version": self.algorithm_version,
             "parameters_hash": self.parameters_hash,
+            """JSON-serializable corpus processing descriptor."""
             "code_git_sha": self.code_git_sha,
             "streams": self.streams,
             "runs": self.runs,
@@ -77,6 +78,7 @@ def _reference_values(
     dataset_id: str,
     metric_ids: tuple[str, ...],
 ) -> dict[str, dict[str, float]]:
+    """Reference metric values from the control plane, keyed by trial/stream."""
     rows = connection.execute(
         sa.select(
             DERIVED_METRIC_TABLE.c.metric_id,
@@ -124,6 +126,7 @@ def _paired(
     *,
     tolerance: float,
 ) -> dict[str, Any]:
+    """Descriptive paired comparison payload with no automated verdict."""
     keys = sorted(set(pipeline) & set(reference))
     if not keys:
         return {"n": 0, "paired_keys": []}
@@ -543,6 +546,7 @@ DATUM_INFERENCE_NOTE = (
 
 
 def _optional_float_array(column: Any) -> Any:
+    """Column values as float64 with missing values mapped to NaN."""
     import numpy as np
 
     return np.asarray(

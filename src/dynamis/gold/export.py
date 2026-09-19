@@ -62,6 +62,7 @@ class ServingExport:
 
 
 def serving_root(settings: Settings) -> Path:
+    """Root directory of the deterministic serving Parquet export."""
     return settings.dataset_root / "gold" / "serving"
 
 

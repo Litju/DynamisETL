@@ -48,7 +48,7 @@ def _series() -> SeriesOutput:
     )
 
 
-def _result() -> ProcessorResult:
+def _result(*, value: float = 2.5) -> ProcessorResult:
     return ProcessorResult(
         spec=_spec(),
         metrics=(
@@ -59,7 +59,7 @@ def _result() -> ProcessorResult:
                     si_unit="m",
                     description="Persistence test scalar.",
                 ),
-                value=2.5,
+                value=value,
                 session_id="session-1",
                 stream_id="stream-1",
                 provenance={"window_s": 5.0},
@@ -193,6 +193,33 @@ def test_pipeline_metric_provenance_is_complete_and_idempotent(
         assert run_row.code_git_sha == "f" * 40
         assert run_row.parameters_hash == _spec().parameters_hash
         assert run_row.input_checksums == ["e" * 64]
+
+        # A corrected input changes the run but not the metric identity; the
+        # stored row must converge to the corrected value instead of being
+        # silently discarded by DO NOTHING.
+        with control.begin() as connection:
+            corrected = persist_processing_result(
+                connection,
+                dataset_id="white-cmj-acc-grf",
+                run_id="run-test-corrected",
+                result=_result(value=3.5),
+                input_checksums=("g" * 64,),
+                computed_at=checked_at,
+                code_sha="f" * 40,
+            )
+        assert corrected["derived_metric"] == 1
+        with control.connect() as connection:
+            row = connection.execute(
+                text(
+                    "SELECT count(*), max(value_num), max(run_id), max(input_checksums::text) "
+                    "FROM derived_metric"
+                )
+            ).fetchone()
+        assert row is not None
+        assert row[0] == 1
+        assert row[1] == pytest.approx(3.5)
+        assert row[2] == "run-test-corrected"
+        assert '"' + "g" * 64 + '"' in row[3]
     finally:
         control.dispose()
         with admin.begin() as connection:

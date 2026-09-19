@@ -171,6 +171,34 @@ def test_execute_processor_materializes_deterministic_series_and_receipt(
     assert receipt["series"][0]["checksum_sha256"] == first.series[0].artifact.checksum_sha256
 
 
+def test_execute_processor_requires_an_engine_when_persisting(tmp_settings: Settings) -> None:
+    with pytest.raises(ValueError, match="persist=True requires a control-plane engine"):
+        execute_processor(
+            tmp_settings,
+            result=_result(_spec()),
+            dataset_id="white-cmj-acc-grf",
+            inputs=(_input(tmp_settings),),
+            series_key="stream-1",
+        )
+
+
+def test_malformed_input_checksums_are_rejected_before_any_write() -> None:
+    from datetime import UTC, datetime
+
+    from dynamis.processors.persistence import persist_processing_result
+
+    with pytest.raises(ValueError, match="sha256 hex digests"):
+        persist_processing_result(
+            None,
+            dataset_id="white-cmj-acc-grf",
+            run_id="run-test",
+            result=_result(_spec()),
+            input_checksums=("short",),
+            computed_at=datetime.now(UTC),
+            code_sha=None,
+        )
+
+
 def test_execute_processor_requires_inputs_and_series_key(tmp_settings: Settings) -> None:
     spec = _spec()
     with pytest.raises(ValueError, match="at least one input"):

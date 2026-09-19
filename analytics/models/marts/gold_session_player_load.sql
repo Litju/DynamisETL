@@ -8,6 +8,7 @@ select
     subject_id,
     entity_id,
     algorithm_id,
+    run_id,
     count(*) as locomotor_metric_count,
     max(value_num) filter (where metric_id = 'locomotor.distance_total') as distance_total_m,
     max(value_num) filter (where metric_id = 'locomotor.mean_speed') as mean_speed_m_s,
@@ -20,5 +21,5 @@ select
     max(value_num) filter (where metric_id = 'locomotor.effort_peak_speed') as effort_peak_speed_m_s
 from {{ ref('gold_trial_metrics') }}
 where metric_id like 'locomotor.%'
-group by dataset_id, session_id, subject_id, entity_id, algorithm_id
-order by dataset_id, session_id, subject_id, entity_id, algorithm_id
+group by dataset_id, session_id, subject_id, entity_id, algorithm_id, run_id
+order by dataset_id, session_id, subject_id, entity_id, algorithm_id, run_id

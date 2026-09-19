@@ -7,8 +7,8 @@ Usage::
     dynamis-gold all       # build then publish
 
 No step downloads anything: the export reads the configured PostgreSQL control
-plane, dbt reads the local serving Parquet export, and publication writes the
-local Gold DuckDB marts.
+plane, dbt reads the local serving Parquet export, and publication reads the
+local Gold DuckDB marts and writes the PostgreSQL Gold serving schema.
 """
 
 from __future__ import annotations
@@ -31,6 +31,7 @@ def _engine():
 
 
 def build() -> dict[str, Any]:
+    """Export the control plane and run the dbt build."""
     resolved, engine = _engine()
     try:
         export = export_serving(resolved, engine)
@@ -41,6 +42,7 @@ def build() -> dict[str, Any]:
 
 
 def publish() -> dict[str, Any]:
+    """Publish the built marts into the PostgreSQL gold schema."""
     resolved, engine = _engine()
     try:
         return publish_gold(resolved, engine)
@@ -49,6 +51,7 @@ def publish() -> dict[str, Any]:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """CLI entry point for the Gold build/publish pipeline."""
     parser = argparse.ArgumentParser(prog="dynamis-gold", description=__doc__)
     parser.add_argument("command", choices=("build", "publish", "all"))
     args = parser.parse_args(argv)

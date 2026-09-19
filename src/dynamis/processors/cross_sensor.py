@@ -80,6 +80,7 @@ PEARSON_R = MetricDeclaration(
 
 
 def cross_sensor_spec(parameters: Mapping[str, Any] | None = None) -> ProcessorSpec:
+    """Resolve and validate the cross-sensor association parameters."""
     resolved = {**DEFAULT_PARAMETERS, **dict(parameters or {})}
     for name in ("pairing", "interpolation", "resampling", "statistic"):
         if resolved[name] != DEFAULT_PARAMETERS[name]:

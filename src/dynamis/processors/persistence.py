@@ -36,20 +36,41 @@ PROCESSING_ARTIFACT_TABLE = _TABLES["processing_artifact"]
 PROCESSING_RUN_TABLE = _TABLES["processing_run"]
 
 
-def _upsert(connection, table: Table, rows: list[dict[str, Any]]) -> int:
+def _upsert(
+    connection,
+    table: Table,
+    rows: list[dict[str, Any]],
+    *,
+    update: bool = False,
+) -> int:
+    """Insert rows, optionally making the incoming row authoritative on conflict.
+
+    ``update=True`` is used for derived metrics: when a corrected input changes
+    only the input checksums, the derived-metric identity is unchanged but the
+    run changes, and the stored value must converge to the corrected one instead
+    of being silently discarded by ``DO NOTHING``.
+    """
     if not rows:
         return 0
     primary_keys = [column.name for column in table.primary_key.columns]
-    statement = (
-        pg_insert(table)
-        .values(rows)
-        .on_conflict_do_nothing(index_elements=primary_keys)
-        .returning(*table.primary_key.columns)
-    )
+    statement = pg_insert(table).values(rows)
+    if update:
+        statement = statement.on_conflict_do_update(
+            index_elements=primary_keys,
+            set_={
+                column.name: statement.excluded[column.name]
+                for column in table.columns
+                if column.name not in primary_keys
+            },
+        )
+    else:
+        statement = statement.on_conflict_do_nothing(index_elements=primary_keys)
+    statement = statement.returning(*table.primary_key.columns)
     return len(connection.execute(statement).fetchall())
 
 
 def _upsert_algorithm(connection, result: ProcessorResult, *, code_sha: str | None) -> int:
+    """Converge the global algorithm spec to the executed revision."""
     contract = result.spec.contract(code_sha=code_sha)
     statement = pg_insert(ALGORITHM_SPEC_TABLE).values(
         [
@@ -84,6 +105,7 @@ def _upsert_algorithm(connection, result: ProcessorResult, *, code_sha: str | No
 
 
 def _assert_existing_definitions_match(connection, definitions: dict[str, dict[str, Any]]) -> None:
+    """Refuse to reuse an existing metric id with a different definition."""
     if not definitions:
         return
     existing_rows = connection.execute(
@@ -123,6 +145,7 @@ def _metric_rows(
     code_sha: str | None,
     input_checksums: tuple[str, ...],
 ) -> list[dict[str, Any]]:
+    """Build one derived-metric row per scalar with its full provenance."""
     rows: list[dict[str, Any]] = []
     for metric in result.metrics:
         declaration = metric.declaration
@@ -190,7 +213,10 @@ def persist_processing_result(
         "processing_run": 0,
         "processing_artifact": 0,
     }
-    usable_checksums = [checksum for checksum in input_checksums if len(checksum) == 64]
+    malformed = [checksum for checksum in input_checksums if len(checksum) != 64]
+    if malformed:
+        raise ValueError(f"input checksums must be full sha256 hex digests; found {malformed!r}")
+    usable_checksums = list(input_checksums)
     if not usable_checksums:
         raise ValueError("a processor result must cite at least one verified input checksum")
     if not result.metrics and not result.series:
@@ -272,7 +298,7 @@ def persist_processing_result(
     )
     for row in metric_rows:
         row["computed_at"] = computed_at
-    written["derived_metric"] = _upsert(connection, DERIVED_METRIC_TABLE, metric_rows)
+    written["derived_metric"] = _upsert(connection, DERIVED_METRIC_TABLE, metric_rows, update=True)
 
     if artifact_rows:
         paths = sorted({str(row["relative_path"]) for row in artifact_rows})

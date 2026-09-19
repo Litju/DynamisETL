@@ -46,6 +46,7 @@ class StreamingValidator:
     """Validates a bounded batch stream against one canonical schema."""
 
     def __init__(self, schema: pa.Schema, *, require_zero_based: bool = True) -> None:
+        """Bind the validator to the frozen canonical schema of one stream."""
         self._schema = schema
         self._require_zero_based = require_zero_based
         self._violations: list[Violation] = []
@@ -81,9 +82,11 @@ class StreamingValidator:
 
     @property
     def row_count(self) -> int:
+        """Number of non-empty rows observed so far."""
         return self._row_count
 
     def observe(self, batch: pa.RecordBatch) -> None:
+        """Validate one non-empty batch and accumulate its evidence."""
         if batch.num_rows == 0:
             # An empty batch carries no evidence; treating it as a stream prefix
             # would report "no identity/authority observed" against a stream that
@@ -111,6 +114,7 @@ class StreamingValidator:
         self._observe_time(batch)
 
     def _observe_identity(self, batch: pa.RecordBatch) -> None:
+        """Accumulate dataset/session/stream identity and subject presence."""
         for name, collected in self._identity.items():
             if name not in batch.schema.names:
                 continue
@@ -123,6 +127,7 @@ class StreamingValidator:
             self._subject_nulls += batch.column("subject_id").null_count
 
     def _observe_authorities(self, batch: pa.RecordBatch) -> None:
+        """Accumulate clock/synchronization/coordinate-frame declarations."""
         for name in ("clock_id", "synchronization_spec_id", "coordinate_frame_id"):
             if name not in batch.schema.names:
                 continue
@@ -140,6 +145,7 @@ class StreamingValidator:
                 self._frame_values.update(values)
 
     def _observe_measurement_class(self, batch: pa.RecordBatch) -> None:
+        """Accumulate the closed measurement-class vocabulary."""
         if "measurement_class" not in batch.schema.names:
             return
         column = batch.column("measurement_class")
@@ -298,6 +304,7 @@ class StreamingValidator:
                 )
 
     def _observe_time(self, batch: pa.RecordBatch) -> None:
+        """Accumulate timing evidence for structurally conforming batches."""
         if batch.num_rows == 0:
             return
         # Timing kernels are only defined for the canonical integer timebase; a

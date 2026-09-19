@@ -38,6 +38,7 @@ class PairedComparison:
 
     def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
+            """JSON-serializable agreement statistics."""
             "n": self.n,
             "bias": self.bias,
             "mae": self.mae,
@@ -65,8 +66,8 @@ def paired_comparison(
 
     ``bias`` is ``mean(pipeline - reference)``, so a positive bias means the
     pipeline overestimates the reference. ``ccc`` is Lin's concordance
-    correlation coefficient; it is ``None`` when either vector is constant,
-    where it is undefined rather than zero.
+    correlation coefficient; it is ``None`` only when both vectors are constant
+    and equal (a zero denominator), where it is undefined rather than zero.
     """
     a = np.asarray(pipeline, dtype=np.float64)
     b = np.asarray(reference, dtype=np.float64)

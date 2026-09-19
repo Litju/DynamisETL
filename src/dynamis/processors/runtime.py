@@ -55,6 +55,7 @@ class ProcessorInput:
     def to_dict(self) -> dict[str, Any]:
         return {
             "role": self.role,
+            """JSON-serializable descriptor of this input artifact."""
             "relative_path": self.relative_path,
             "checksum_sha256": self.checksum_sha256,
             "row_count": self.row_count,
@@ -71,6 +72,7 @@ class ProcessedSeries:
     def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
+            """JSON-serializable descriptor of this materialized series."""
             "relative_path": self.artifact.relative_path,
             "checksum_sha256": self.artifact.checksum_sha256,
             "row_count": self.artifact.row_count,
@@ -165,6 +167,11 @@ def execute_processor(
         raise ValueError("a processor run requires at least one input artifact")
     if not series_key.strip():
         raise ValueError("a processor run requires a deterministic series key")
+    if persist and engine is None:
+        raise ValueError(
+            "persist=True requires a control-plane engine; use persist=False for an "
+            "artifact-only execution"
+        )
     timestamp = computed_at or datetime.now(UTC)
     resolved_code_sha = code_sha if code_sha is not None else code_git_sha()
     parameters_hash = result.spec.parameters_hash

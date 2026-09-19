@@ -118,8 +118,15 @@ def main() -> int:
                     "WHERE metric_id LIKE 'gymaware_%' GROUP BY measurement_class"
                 )
             ).fetchall()
+        gymaware_classes = {row[0]: row[1] for row in gymaware}
+        unexpected_classes = sorted(set(gymaware_classes) - {"SOURCE_DERIVED"})
+        if unexpected_classes:
+            raise ValueError(
+                "GymAware metrics must remain SOURCE_DERIVED; "
+                f"found unexpected measurement classes {unexpected_classes}"
+            )
         summary["gymaware_source_only"] = {
-            "classes": {row[0]: row[1] for row in gymaware},
+            "classes": gymaware_classes,
             "dense_lpt_processing": False,
             "gymaware_validation_claimed": False,
             "note": (

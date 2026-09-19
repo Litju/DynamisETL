@@ -49,6 +49,7 @@ class GoldBuild:
 
 
 def gold_duckdb_path(settings: Settings) -> Path:
+    """Gold DuckDB database path beside the configured control-plane DuckDB."""
     return settings.duckdb_path.with_name("dynamis_gold.duckdb")
 
 

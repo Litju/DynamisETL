@@ -113,6 +113,7 @@ SERIES_NAME = "lpt_reps"
 
 
 def lpt_spec(parameters: Mapping[str, Any] | None = None) -> ProcessorSpec:
+    """Resolve and validate the LPT processor parameters."""
     resolved = {**DEFAULT_PARAMETERS, **dict(parameters or {})}
     if resolved["segmentation"] != DEFAULT_PARAMETERS["segmentation"]:
         raise ValueError("unsupported segmentation algorithm")

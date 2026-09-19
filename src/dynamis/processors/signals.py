@@ -366,6 +366,7 @@ class SpeedZone:
                 raise ValueError("zone upper bound must be finite and above the lower bound")
 
     def mask(self, speed_m_s: np.ndarray) -> np.ndarray:
+        """Boolean mask of samples whose speed falls inside this zone."""
         inside = speed_m_s >= self.lower_m_s
         if self.upper_m_s is not None:
             inside = inside & (speed_m_s < self.upper_m_s)
@@ -374,6 +375,7 @@ class SpeedZone:
     def parameters(self) -> dict[str, Any]:
         return {
             "name": self.name,
+            """Canonical parameter mapping of this zone."""
             "lower_m_s": self.lower_m_s,
             "upper_m_s": self.upper_m_s,
         }
