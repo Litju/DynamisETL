@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Transient analysis state spine.
  *
  * Zustand owns only small high-frequency client state: hover, live playback,
@@ -33,6 +33,7 @@ export interface AnalysisState {
   selectedEntityId: string | null;
   hoveredEntityId: string | null;
   hoveredJoint: string | null;
+  selectedJoint: string | null;
   focusedPanel: WorkbenchPanel;
   /** Renderer interaction flags (camera drag, pitch pan, chart drag). */
   interacting: boolean;
@@ -48,6 +49,7 @@ export interface AnalysisState {
   selectEntity: (entityId: string | null) => void;
   hoverEntity: (entityId: string | null) => void;
   hoverJoint: (jointId: string | null) => void;
+  selectJoint: (jointId: string | null) => void;
   focusPanel: (panel: WorkbenchPanel) => void;
   setInteracting: (interacting: boolean) => void;
   hydrate: (state: {
@@ -76,6 +78,7 @@ export const useAnalysisStore = create<AnalysisState>()((set) => ({
   selectedEntityId: null,
   hoveredEntityId: null,
   hoveredJoint: null,
+  selectedJoint: null,
   focusedPanel: "overview",
 
   setPlayhead: (tNs) => set({ playheadNs: tNs }),
@@ -91,6 +94,7 @@ export const useAnalysisStore = create<AnalysisState>()((set) => ({
   selectEntity: (entityId) => set({ selectedEntityId: entityId }),
   hoverEntity: (entityId) => set({ hoveredEntityId: entityId }),
   hoverJoint: (jointId) => set({ hoveredJoint: jointId }),
+  selectJoint: (jointId) => set({ selectedJoint: jointId }),
   focusPanel: (panel) => set({ focusedPanel: panel }),
   setInteracting: (interacting) => set({ interacting }),
 

@@ -12,6 +12,9 @@ import { MeasurementClassBadge, ModalityBadge } from "@/components/common/Badges
 import { DataTable, type DataTableColumn } from "@/components/table/DataTable";
 import { SignalLaboratory } from "@/components/lab/SignalLaboratory";
 import { PitchReplay } from "@/components/pitch/PitchReplay";
+import { lazy, Suspense } from "react";
+
+const PoseViewer = lazy(() => import("@/components/pose/PoseViewer"));
 import type { MetricValue } from "@/api/types";
 import { KeyValueRow, Panel, SectionTitle } from "@/components/common/Panel";
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
@@ -170,6 +173,10 @@ export function LabPage() {
             <SignalLaboratory />
           ) : view === "field" ? (
             <PitchReplay />
+          ) : view === "pose" ? (
+            <Suspense fallback={<LoadingPanel label="Loading 3D laboratory" />}>
+              <PoseViewer />
+            </Suspense>
           ) : (
             <StatePanel
               state="empty"

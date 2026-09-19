@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+﻿import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
 import { render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -203,7 +203,11 @@ describe("workbench shell", () => {
 
   it("opens a non-overview view from the deep link without inventing results", async () => {
     renderAt("/lab/skillcorner-opendata/1925299?stream=pose-period-1&view=pose");
-    expect(await screen.findByText(/Preparing pose stream pose-period-1/)).toBeInTheDocument();
+    // The stub session declares no canonical pose artifact, so the pose viewer
+    // must say so explicitly instead of rendering an empty scene.
+    expect(
+      await screen.findByText("No canonical pose artifact is registered."),
+    ).toBeInTheDocument();
     expect(screen.queryByText("pose.angular_rom.left_knee")).not.toBeInTheDocument();
   });
 

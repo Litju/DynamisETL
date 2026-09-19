@@ -52,4 +52,13 @@ export default tseslint.config(
       "react-hooks/incompatible-library": "off",
     },
   },
+  {
+    // R3F mutates scene objects imperatively in useFrame by design; the React
+    // Compiler immutability rule does not model three.js objects (mesh.visible,
+    // mesh.position) and must not force per-frame React state instead.
+    files: ["src/components/pose/PoseScene.tsx"],
+    rules: {
+      "react-hooks/immutability": "off",
+    },
+  },
 );
