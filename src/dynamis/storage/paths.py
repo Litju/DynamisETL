@@ -190,6 +190,32 @@ def gold_parquet_path(
     return directory / f"{sanitize_component(name, field='name')}.parquet"
 
 
+def processing_series_path(
+    settings: Settings,
+    *,
+    dataset_id: str,
+    algorithm_id: str,
+    parameters_hash: str,
+    name: str,
+) -> Path:
+    """Deterministic external path for one dense processed series artifact.
+
+    The algorithm and parameter hash are part of the path, so two parameter
+    revisions can never overwrite each other's scientific output; reruns of the
+    same revision converge on the same bytes.
+    """
+    if len(parameters_hash) != 64:
+        raise PathConventionError("parameters_hash must be a full sha256 hex digest")
+    directory = (
+        layer_dir(settings, ArtifactLayer.GOLD)
+        / sanitize_component(dataset_id, field="dataset_id")
+        / "processing"
+        / sanitize_component(algorithm_id, field="algorithm_id")
+        / parameters_hash[:12]
+    )
+    return directory / f"{sanitize_component(name, field='name')}.parquet"
+
+
 def quarantine_parquet_path(
     settings: Settings,
     *,

@@ -1,0 +1,10 @@
+# Local DuckDB target for the Gold project. The database path is machine-local
+# configuration supplied through the environment (never committed).
+dynamis_gold:
+  target: local
+  outputs:
+    local:
+      type: duckdb
+      path: "{{ env_var('DYNAMIS_GOLD_DUCKDB_PATH') }}"
+      threads: 4
+      extensions: []

@@ -123,6 +123,25 @@ def test_schema_drift_aborts_and_leaves_no_artifact(tmp_settings: Settings) -> N
     assert not list(target.parent.glob(".*tmp*"))
 
 
+def test_same_names_type_drift_aborts_the_streaming_write(tmp_settings: Settings) -> None:
+    """The writer's exact-schema check is independent defense, not name equality."""
+    table = _canonical_table()
+    batches = list(_batches(table, 32))
+    drifted = batches[0].set_column(
+        batches[0].schema.get_field_index("t_rel_ns"),
+        pa.field("t_rel_ns", pa.string()),
+        pa.array(["not-a-timestamp"] * batches[0].num_rows, type=pa.string()),
+    )
+    assert drifted.schema.names == table.schema.names
+    target = tmp_settings.dataset_root / "type-drift.parquet"
+    with pytest.raises(ValueError, match="does not match the declared canonical schema"):
+        write_parquet_streaming_atomic(
+            [drifted], target, schema=table.schema, row_group_size=ROW_GROUP
+        )
+    assert not target.exists()
+    assert not list(target.parent.glob(".*tmp*"))
+
+
 def test_midstream_failure_leaves_no_artifact(tmp_settings: Settings) -> None:
     table = _canonical_table()
     target = tmp_settings.dataset_root / "failure.parquet"

@@ -26,6 +26,8 @@ SI_UNITS: Final[tuple[str, ...]] = (
     "ms",
     "m/s",
     "m/s**2",
+    #: Jerk: the first derivative of acceleration, used by IMU derivative features.
+    "m/s**3",
     "rad",
     "rad/s",
     "N",

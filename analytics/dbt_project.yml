@@ -1,0 +1,31 @@
+# DynamisData Gold analytics project.
+#
+# dbt-duckdb performs relational serving transformations only, over Parquet
+# exports of the control plane and processor outputs. No scientific algorithm
+# (filtering, derivative, integration, segmentation, biomechanics) is defined
+# here: metrics arrive already computed and versioned by dynamic
+# processors, and marts only select/join/aggregate them.
+name: dynamis_gold
+version: "1.0.0"
+profile: dynamis_gold
+config-version: 2
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+
+vars:
+  # Absolute POSIX path of the serving Parquet export directory; the runner
+  # always overrides it explicitly so a stale default can never be served.
+  serving_root: "gold/serving"
+
+models:
+  dynamis_gold:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table
+
+flags:
+  send_anonymous_usage_stats: false
+  partial_parse: false
