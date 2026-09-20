@@ -18,7 +18,7 @@ from sqlalchemy.engine import Engine
 from dynamis.config import ENV_DB_SCHEMA, ENV_POSTGRES_URL, repository_root
 from dynamis.storage.tables import EXPECTED_TABLE_NAMES
 
-HEAD_REVISION = "0004_skeleton_topology"
+HEAD_REVISION = "0005_serving_read_indexes"
 
 
 def _alembic_config(url: str) -> Config:
@@ -91,7 +91,10 @@ def test_offline_downgrade_of_0004_refuses_before_destructive_sql(
 
     emitted = capsys.readouterr().out
     assert "DROP COLUMN" not in emitted
-    assert "alembic_version SET" not in emitted
+    # Revisions above 0004 are lossless (index-only) and may stamp down to
+    # 0004 before the refusal. What must never happen offline is stamping
+    # past 0004, because that would claim the topology column was dropped.
+    assert "version_num='0003_sync_alignment'" not in emitted
 
 
 @pytest.mark.postgres
