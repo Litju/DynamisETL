@@ -1,6 +1,6 @@
 import { Tabs } from "@base-ui/react/tabs";
 import { useQuery } from "@tanstack/react-query";
-import { ShieldAlert } from "lucide-react";
+import { PanelRightClose, ShieldAlert } from "lucide-react";
 import { lazy, Suspense } from "react";
 
 import { MeasurementClassBadge, QualityBadge } from "@/components/common/Badges";
@@ -24,12 +24,25 @@ const INSPECTOR_TABS = [
  * metric, the exact selected-result lineage, quality issues in scope and the
  * governing rights policy. Text is the primary detail surface.
  */
-export function Inspector() {
+export function Inspector({ onCollapse }: { onCollapse?: () => void } = {}) {
   return (
     <Panel
       title="Inspector"
       className="border-l border-border-subtle"
       bodyClassName="overflow-y-auto"
+      actions={
+        onCollapse ? (
+          <button
+            type="button"
+            onClick={onCollapse}
+            aria-label="Collapse the inspector"
+            title="Collapse the inspector"
+            className="flex size-5 items-center justify-center rounded-[3px] text-text-muted transition-colors duration-quick hover:bg-surface-2 hover:text-text-secondary"
+          >
+            <PanelRightClose size={13} aria-hidden="true" />
+          </button>
+        ) : null
+      }
     >
       <Tabs.Root defaultValue="method" className="flex min-h-full flex-col">
         <Tabs.List className="sticky top-0 z-10 flex shrink-0 border-b border-border-subtle bg-surface-1">

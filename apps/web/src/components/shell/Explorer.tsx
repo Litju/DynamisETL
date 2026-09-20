@@ -31,12 +31,21 @@ export function Explorer() {
     );
   }
   return (
-    <ExplorerForSession
-      datasetId={datasetId}
-      sessionId={sessionId}
-      selectedStream={selectedStream}
-      selectedTrial={selectedTrial}
-    />
+    <div className="flex h-full min-h-0 flex-col">
+      <header className="flex h-8 shrink-0 items-center border-b border-border-subtle px-3">
+        <h2 className="text-[11px] font-medium uppercase tracking-wider text-text-muted">
+          Session explorer
+        </h2>
+      </header>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <ExplorerForSession
+          datasetId={datasetId}
+          sessionId={sessionId}
+          selectedStream={selectedStream}
+          selectedTrial={selectedTrial}
+        />
+      </div>
+    </div>
   );
 }
 

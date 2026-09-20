@@ -1,6 +1,7 @@
 ﻿import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createAppRouter } from "@/router";
@@ -177,9 +178,21 @@ describe("workbench shell", () => {
     renderAt("/catalog");
     expect(await screen.findByRole("navigation", { name: "Product surfaces" })).toBeInTheDocument();
     expect(screen.getByText(/Performance Laboratory/)).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Inspector" })).toBeInTheDocument();
     expect(await screen.findByText("SkillCorner Open Data")).toBeInTheDocument();
     expect(screen.getByText("CC BY 4.0")).toBeInTheDocument();
+  });
+
+  it("compacts the inspector to a rail where nothing is inspectable", async () => {
+    const user = userEvent.setup();
+    renderAt("/catalog");
+    // The catalog owns its own dataset evidence, so the inspector must not
+    // reserve flagship width with an empty pane.
+    await screen.findByRole("navigation", { name: "Product surfaces" });
+    expect(screen.queryByRole("region", { name: "Inspector" })).not.toBeInTheDocument();
+
+    // It stays one click away.
+    await user.click(screen.getByRole("button", { name: "Open the inspector" }));
+    expect(await screen.findByRole("region", { name: "Inspector" })).toBeInTheDocument();
   });
 
   it("restores the full durable context from a deep link", async () => {

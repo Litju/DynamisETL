@@ -31,17 +31,31 @@ export interface UiState {
   paletteOpen: boolean;
   focusMode: boolean;
   theme: Theme;
+  /**
+   * Explicit inspector override. `null` follows the route's own rule: the
+   * evidence pane expands where a selection can be inspected and compacts to a
+   * rail elsewhere, so an empty inspector never reserves flagship width.
+   */
+  inspectorOpen: boolean | null;
   setPaletteOpen: (open: boolean) => void;
   toggleFocusMode: () => void;
   setTheme: (theme: Theme) => void;
+  setInspectorOpen: (open: boolean | null) => void;
+}
+
+/** Resolve inspector visibility from the route default and any user override. */
+export function inspectorVisible(override: boolean | null, routeDefault: boolean): boolean {
+  return override ?? routeDefault;
 }
 
 export const useUiStore = create<UiState>()((set) => ({
   paletteOpen: false,
   focusMode: false,
   theme: readStoredTheme(),
+  inspectorOpen: null,
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
   toggleFocusMode: () => set((state) => ({ focusMode: !state.focusMode })),
+  setInspectorOpen: (inspectorOpen) => set({ inspectorOpen }),
   setTheme: (theme) => {
     try {
       globalThis.localStorage?.setItem(THEME_KEY, theme);

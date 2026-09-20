@@ -1,33 +1,98 @@
 import { useQuery } from "@tanstack/react-query";
-import { useRouterState } from "@tanstack/react-router";
-import { Command, Moon, Sun } from "lucide-react";
+import { Link, useRouterState } from "@tanstack/react-router";
+import { ChevronRight, Command, Moon, Sun } from "lucide-react";
 
-import { servingStatusQuery } from "@/lib/api/queries";
+import { CopyableId } from "@/components/common/CopyableId";
+import { datasetsQuery, servingStatusQuery, sessionQuery } from "@/lib/api/queries";
 import { cn } from "@/lib/cn";
 import { useUiStore } from "@/lib/state/ui";
 
-interface ContextSegment {
+/** One readable step of the context spine. */
+export interface ContextCrumb {
+  readonly key: string;
+  /** Human-readable label shown to the reader. */
   readonly label: string;
-  readonly value: string;
-  readonly mono?: boolean;
+  /** Exact machine identity, revealed as secondary evidence. */
+  readonly id?: string | undefined;
+  readonly idLabel?: string | undefined;
+  readonly to?: string | undefined;
 }
 
-/** Parse the durable context out of the current location for the context bar. */
-export function contextSegments(pathname: string, search: string): ContextSegment[] {
-  const segments: ContextSegment[] = [];
+const SURFACE_LABELS: Record<string, string> = {
+  catalog: "Catalog",
+  lab: "Laboratory",
+  compare: "Compare",
+  methods: "Methodology",
+  runs: "Processing runs",
+  quality: "Quality & rights",
+};
+
+/**
+ * Resolve the readable context spine for the current location.
+ *
+ * Human-readable names lead; the exact dataset/session/trial/subject ids stay
+ * available as secondary evidence. Resolved names are passed in by the caller
+ * (they come from Query), so this stays a pure function over the location.
+ */
+export function contextCrumbs(
+  pathname: string,
+  search: string,
+  names: {
+    readonly dataset?: string | undefined;
+    readonly session?: string | undefined;
+    readonly trial?: string | undefined;
+  } = {},
+): ContextCrumb[] {
   const parts = pathname.split("/").filter(Boolean);
-  if (parts[0] === "lab" && parts[1]) {
-    segments.push({ label: "dataset", value: parts[1], mono: true });
-    if (parts[2]) segments.push({ label: "session", value: parts[2], mono: true });
-  } else if (parts[0]) {
-    segments.push({ label: "surface", value: parts[0] });
-  }
+  const surface = parts[0];
+  if (surface === undefined) return [];
+  const crumbs: ContextCrumb[] = [
+    { key: "surface", label: SURFACE_LABELS[surface] ?? surface, to: `/${surface}` },
+  ];
+  if (surface !== "lab") return crumbs;
+
+  const datasetId = parts[1];
+  const sessionId = parts[2];
+  if (datasetId === undefined) return crumbs;
+  crumbs.push({
+    key: "dataset",
+    label: names.dataset ?? datasetId,
+    id: datasetId,
+    idLabel: "dataset id",
+  });
+  if (sessionId === undefined) return crumbs;
+  crumbs.push({
+    key: "session",
+    label: names.session ?? sessionId,
+    id: sessionId,
+    idLabel: "session id",
+  });
+
   const params = new URLSearchParams(search);
-  for (const key of ["trial", "subject", "metric"] as const) {
-    const value = params.get(key);
-    if (value) segments.push({ label: key, value, mono: key !== "subject" });
+  const trial = params.get("trial");
+  if (trial) {
+    crumbs.push({ key: "trial", label: names.trial ?? trial, id: trial, idLabel: "trial id" });
   }
-  return segments;
+  const subject = params.get("subject");
+  if (subject) {
+    crumbs.push({ key: "subject", label: `Subject ${subject}`, id: subject, idLabel: "subject id" });
+  }
+  return crumbs;
+}
+
+/** Look up readable names for the ids currently in the location. */
+function useContextNames(datasetId: string | null, sessionId: string | null) {
+  const datasets = useQuery({ ...datasetsQuery(), enabled: datasetId !== null });
+  const session = useQuery({
+    ...sessionQuery(datasetId ?? "", sessionId ?? ""),
+    enabled: Boolean(datasetId && sessionId),
+  });
+  const dataset = datasets.data?.find((candidate) => candidate.dataset_id === datasetId);
+  return {
+    dataset: dataset?.name,
+    session: session.data?.session.label ?? undefined,
+    trials: session.data?.trials ?? [],
+  };
 }
 
 export function ContextBar() {
@@ -36,36 +101,85 @@ export function ContextBar() {
   const setTheme = useUiStore((state) => state.setTheme);
   const setPaletteOpen = useUiStore((state) => state.setPaletteOpen);
   const { data: status, isError } = useQuery(servingStatusQuery());
-  const segments = contextSegments(location.pathname, location.searchStr ?? "");
+
+  const parts = location.pathname.split("/").filter(Boolean);
+  const datasetId = parts[0] === "lab" ? (parts[1] ?? null) : null;
+  const sessionId = parts[0] === "lab" ? (parts[2] ?? null) : null;
+  const names = useContextNames(datasetId, sessionId);
+
+  const searchStr = location.searchStr ?? "";
+  const trialId = new URLSearchParams(searchStr).get("trial");
+  const trialLabel = names.trials.find((trial) => trial.trial_id === trialId)?.label ?? undefined;
+  const crumbs = contextCrumbs(location.pathname, searchStr, {
+    dataset: names.dataset,
+    session: names.session,
+    // Trial labels carry the provider's condition/index detail, which is long;
+    // the readable trial id is the better spine label.
+    trial: trialLabel ? trialId ?? undefined : undefined,
+  });
 
   const databaseOk = Boolean(status) && !isError;
   const goldPublished = status?.gold_published === true;
 
   return (
-    <header className="flex h-10 shrink-0 items-center gap-3 border-b border-border-subtle bg-surface-0 px-3">
-      <div className="flex min-w-0 items-center gap-3">
-        <span className="whitespace-nowrap text-[13px] font-semibold tracking-tight">
-          DynamisData <span className="text-text-muted">Performance Laboratory</span>
+    <header className="flex h-11 shrink-0 items-center gap-3 border-b border-border-subtle bg-surface-0 px-3">
+      <Link
+        to="/catalog"
+        className="flex shrink-0 items-baseline gap-1.5 rounded-control text-[14px] font-semibold tracking-tight"
+        title="DynamisData Performance Laboratory"
+      >
+        <span>DynamisData</span>
+        <span className="hidden text-[11px] font-normal text-text-muted lg:inline">
+          Performance Laboratory
         </span>
-        <div className="flex min-w-0 items-center gap-2 overflow-hidden">
-          {segments.map((segment) => (
-            <span
-              key={segment.label}
-              className="flex min-w-0 items-center gap-1 text-[12px] text-text-secondary"
-            >
-              <span className="text-[10px] uppercase tracking-wider text-text-muted">
-                {segment.label}
-              </span>
-              <span className={cn("truncate", segment.mono && "mono")}>{segment.value}</span>
+      </Link>
+
+      <nav
+        aria-label="Analysis context"
+        className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden"
+      >
+        {crumbs.map((crumb, index) => (
+          <span key={crumb.key} className="flex min-w-0 items-center gap-1">
+            <ChevronRight
+              size={12}
+              aria-hidden="true"
+              className="shrink-0 text-border-strong"
+            />
+            <span className="flex min-w-0 flex-col justify-center leading-tight">
+              {crumb.to && index === 0 ? (
+                <Link
+                  to={crumb.to}
+                  className="truncate text-[12px] text-text-secondary hover:text-text-primary"
+                >
+                  {crumb.label}
+                </Link>
+              ) : (
+                <span
+                  className={cn(
+                    "truncate text-[12px]",
+                    index === crumbs.length - 1 ? "text-text-primary" : "text-text-secondary",
+                  )}
+                  title={crumb.label}
+                >
+                  {crumb.label}
+                </span>
+              )}
+              {crumb.id && crumb.id !== crumb.label ? (
+                <CopyableId
+                  value={crumb.id}
+                  label={crumb.idLabel ?? "identifier"}
+                  className="-mt-0.5 max-w-48"
+                />
+              ) : null}
             </span>
-          ))}
-        </div>
-      </div>
+          </span>
+        ))}
+      </nav>
 
       <button
         type="button"
         onClick={() => setPaletteOpen(true)}
-        className="ml-auto flex h-6 w-64 items-center gap-2 rounded-control border border-border-subtle bg-surface-1 px-2 text-left text-[12px] text-text-muted hover:border-border-strong"
+        className="flex h-7 w-56 shrink-0 items-center gap-2 rounded-control border border-border-subtle bg-surface-1 px-2 text-left text-[12px] text-text-muted transition-colors duration-quick hover:border-border-strong hover:text-text-secondary"
       >
         <Command size={12} aria-hidden="true" />
         <span className="flex-1 truncate">Search or run a command</span>
@@ -73,11 +187,11 @@ export function ContextBar() {
       </button>
 
       <div
-        className="flex items-center gap-1.5 text-[11px] text-text-muted"
+        className="flex shrink-0 items-center gap-1.5 text-[11px] text-text-muted"
         title={
           databaseOk
-            ? `serving database ready (${status?.db_schema}); gold schema ${goldPublished ? "published" : "not published"}`
-            : "serving database unavailable"
+            ? `Serving database ready (${status?.db_schema}); Gold schema ${goldPublished ? "published" : "not published"}`
+            : "Serving database unavailable"
         }
       >
         <span
@@ -89,7 +203,7 @@ export function ContextBar() {
               : "var(--d-quality-unavailable)",
           }}
         />
-        <span>{databaseOk ? (goldPublished ? "gold" : "control") : "offline"}</span>
+        <span>{databaseOk ? (goldPublished ? "Gold" : "Control") : "Offline"}</span>
       </div>
 
       <button
@@ -97,12 +211,12 @@ export function ContextBar() {
         aria-label={theme === "dark" ? "Switch to Report Light" : "Switch to Instrument Dark"}
         title={theme === "dark" ? "Switch to Report Light" : "Switch to Instrument Dark"}
         onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-        className="flex size-6 items-center justify-center rounded-control text-text-muted hover:bg-surface-2 hover:text-text-secondary"
+        className="flex size-7 shrink-0 items-center justify-center rounded-control text-text-muted transition-colors duration-quick hover:bg-surface-2 hover:text-text-secondary"
       >
         {theme === "dark" ? (
-          <Sun size={13} aria-hidden="true" />
+          <Sun size={14} aria-hidden="true" />
         ) : (
-          <Moon size={13} aria-hidden="true" />
+          <Moon size={14} aria-hidden="true" />
         )}
       </button>
     </header>
