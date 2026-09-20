@@ -264,6 +264,60 @@ export interface components {
             /** Version */
             version: string;
         };
+        /**
+         * ArtifactDetail
+         * @description One artifact plus the canonical time bounds of its samples.
+         *
+         *     The bounds require reading the Parquet footer/column statistics, so they are
+         *     served only for a single requested artifact and never inside a list
+         *     response. A laboratory uses them to choose a deterministic first window
+         *     instead of asking the reader to guess a time range.
+         */
+        ArtifactDetail: {
+            /** Artifact Id */
+            artifact_id: string;
+            /**
+             * Artifact Kind
+             * @enum {string}
+             */
+            artifact_kind: "sample" | "processing";
+            /** Byte Size */
+            byte_size: number | null;
+            /** Canonical Time Max Ns */
+            canonical_time_max_ns?: number | null;
+            /** Canonical Time Min Ns */
+            canonical_time_min_ns?: number | null;
+            /** Checksum Sha256 */
+            checksum_sha256: string;
+            /** Compression */
+            compression: string | null;
+            /** Coordinate Frame Id */
+            coordinate_frame_id: string | null;
+            /** Dataset Id */
+            dataset_id: string;
+            /** Entity Column */
+            entity_column?: string | null;
+            /** Entity Count */
+            entity_count?: number | null;
+            /** Format */
+            format: string;
+            /** Layer */
+            layer: string;
+            /** Measurement Class */
+            measurement_class: string | null;
+            /** Modality */
+            modality: string | null;
+            /** Relative Path */
+            relative_path: string;
+            /** Row Count */
+            row_count: number;
+            /** Si Units */
+            si_units: string[];
+            /** Stream Id */
+            stream_id: string | null;
+            /** Synchronization Spec Id */
+            synchronization_spec_id: string | null;
+        };
         /** ArtifactRefView */
         ArtifactRefView: {
             /** Artifact Id */
@@ -872,7 +926,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ArtifactRefView"];
+                    "application/json": components["schemas"]["ArtifactDetail"];
                 };
             };
             /** @description Validation Error */
@@ -893,6 +947,7 @@ export interface operations {
                 to_ns?: number | null;
                 columns?: string | null;
                 max_points?: number | null;
+                entity_id?: string | null;
                 format?: string;
             };
             header?: never;

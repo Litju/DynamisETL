@@ -16,11 +16,21 @@ import {
 describe("canonical nanosecond time", () => {
   it("parses exact decimal text and rejects non-integer forms", () => {
     expect(parseNs("2987480000000")).toBe(2_987_480_000_000n);
-    for (const value of ["", "-1", "1.5", "1e3", "abc", " 1"]) {
+    for (const value of ["", "1.5", "1e3", "abc", " 1", "--1", "+1"]) {
       expect(() => parseNs(value)).toThrow(InvalidNanosecondsError);
       expect(tryParseNs(value)).toBeNull();
     }
     expect(tryParseNs(1234)).toBeNull();
+  });
+
+  it("carries signed canonical time, because trials are event-aligned", () => {
+    // A White CMJ trial is aligned on the source-provided takeoff, so its
+    // canonical time runs from a negative value up to zero. Rejecting the sign
+    // would make that trial's playhead and range impossible to deep-link.
+    expect(parseNs("-1345000000")).toBe(-1_345_000_000n);
+    expect(tryParseNs("-1345000000")).toBe(-1_345_000_000n);
+    expect(formatNsDecimal(-1_345_000_000n)).toBe("-1345000000");
+    expect(parseNs(formatNsDecimal(-1_345_000_000n))).toBe(-1_345_000_000n);
   });
 
   it("round-trips through decimal URL text", () => {

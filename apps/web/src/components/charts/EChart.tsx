@@ -65,7 +65,10 @@ export function EChart({
         });
       });
       // ECharts types model zrender events; dataZoom is an action event.
-      const onAction = chart.on as (event: string, handler: () => void) => void;
+      // The handle must stay bound: ECharts guards `on` against a disposed
+      // instance through `this`, so a detached reference throws before any
+      // series is ever drawn.
+      const onAction = chart.on.bind(chart) as (event: string, handler: () => void) => void;
       onAction("dataZoom", () => {
         const option = chart?.getOption();
         const zoom = option?.dataZoom as

@@ -28,6 +28,12 @@ export interface WindowQuery {
   readonly toNs?: number | undefined;
   readonly columns?: readonly string[] | undefined;
   readonly maxPoints?: number | undefined;
+  /**
+   * Scope the window to one tracked entity. A dense artifact interleaves every
+   * entity on the same time axis, so a viewer that renders one player or one
+   * subject must say so or pay for every other entity's rows.
+   */
+  readonly entityId?: string | undefined;
 }
 
 function compact(params: Record<string, string | number | undefined>): Record<string, string> {
@@ -235,6 +241,7 @@ export const windowQuery = (query: WindowQuery) =>
               to_ns: query.toNs,
               columns: query.columns?.join(","),
               max_points: query.maxPoints,
+              entity_id: query.entityId,
             }),
           },
         }),

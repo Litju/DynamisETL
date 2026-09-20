@@ -13,7 +13,13 @@ export const NS_PER_MILLISECOND = 1_000_000n;
 export const NS_PER_SECOND = 1_000_000_000n;
 export const NS_PER_MINUTE = 60n * NS_PER_SECOND;
 
-const DECIMAL_NS = /^\d+$/;
+/**
+ * Canonical `t_rel_ns` is signed. A trial aligned on a source event — the White
+ * CMJ records are takeoff-aligned — runs from a negative time up to zero, so a
+ * durable playhead or range bound must be able to carry a leading minus sign.
+ * Everything else stays strict: no decimals, no exponents, no whitespace.
+ */
+const DECIMAL_NS = /^-?\d+$/;
 
 export class InvalidNanosecondsError extends Error {
   constructor(readonly value: string) {
@@ -22,7 +28,7 @@ export class InvalidNanosecondsError extends Error {
   }
 }
 
-/** Parse exact decimal-nanosecond text; rejects signs, decimals and exponents. */
+/** Parse exact decimal-nanosecond text; rejects decimals and exponents. */
 export function parseNs(text: string): bigint {
   if (!DECIMAL_NS.test(text)) {
     throw new InvalidNanosecondsError(text);

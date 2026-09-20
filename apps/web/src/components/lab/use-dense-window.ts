@@ -15,6 +15,8 @@ export interface DenseWindowRequest {
   readonly toNs?: number | undefined;
   readonly columns?: readonly string[] | undefined;
   readonly maxPoints?: number | undefined;
+  /** Scope to one tracked entity so the window stays inside the point budget. */
+  readonly entityId?: string | undefined;
 }
 
 export interface DenseWindowState {
@@ -37,6 +39,7 @@ export function useDenseWindow(request: DenseWindowRequest) {
       request.toNs ?? null,
       request.columns?.join(",") ?? null,
       request.maxPoints ?? null,
+      request.entityId ?? null,
     ],
     enabled: Boolean(request.artifactId),
     queryFn: async (): Promise<DenseWindowState> => {
@@ -47,6 +50,7 @@ export function useDenseWindow(request: DenseWindowRequest) {
           ...(request.toNs !== undefined ? { toNs: request.toNs } : {}),
           ...(request.columns !== undefined ? { columns: request.columns } : {}),
           ...(request.maxPoints !== undefined ? { maxPoints: request.maxPoints } : {}),
+          ...(request.entityId !== undefined ? { entityId: request.entityId } : {}),
         });
         return {
           table: tableFromDecoded(arrow.decoded, arrow.meta),
@@ -63,6 +67,7 @@ export function useDenseWindow(request: DenseWindowRequest) {
                 ...(request.toNs !== undefined ? { to_ns: request.toNs } : {}),
                 ...(request.columns !== undefined ? { columns: request.columns.join(",") } : {}),
                 ...(request.maxPoints !== undefined ? { max_points: request.maxPoints } : {}),
+                ...(request.entityId !== undefined ? { entity_id: request.entityId } : {}),
               },
             },
           }),

@@ -19,6 +19,8 @@ import type { MetricValue } from "@/api/types";
 import { KeyValueRow, Panel, SectionTitle } from "@/components/common/Panel";
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
 import { metricsQuery, sessionQuery } from "@/lib/api/queries";
+import { patchChangesSearch, resolveLabDefaults } from "@/lib/defaults";
+import { sessionSurfaces } from "@/lib/capabilities";
 import { cn } from "@/lib/cn";
 import { formatMetricValue } from "@/lib/measurement";
 import { labSearchSchema, parseSearch, WORKBENCH_VIEWS } from "@/lib/search";
@@ -79,20 +81,43 @@ export function LabPage() {
     [datasetId, navigate, sessionId],
   );
 
+  // Deterministic real-data defaults. Only keys the URL leaves open are filled,
+  // so an explicit deep link and back/forward navigation keep exactly the state
+  // they encoded; `replace` keeps the resolution out of the history stack.
+  const detail = session.data;
+  useEffect(() => {
+    if (!detail) return;
+    const { patch } = resolveLabDefaults(detail, search);
+    if (!patchChangesSearch(patch, search)) return;
+    updateSearch(patch);
+  }, [detail, search, updateSearch]);
+
   if (session.isPending) return <LoadingPanel label="Loading laboratory session" />;
   if (session.isError) {
     return <ErrorPanel error={session.error} onRetry={() => void session.refetch()} />;
   }
 
   const view: WorkbenchView = search.view ?? "overview";
+  // A laboratory tab is offered only when this session has a stream that can
+  // open it, so the workbench never advertises an analysis the data cannot
+  // render. Provenance follows the selected result and is always reachable.
+  const surfaces = sessionSurfaces(session.data.streams);
+  const availableViews: WorkbenchView[] = [
+    "overview",
+    ...WORKBENCH_VIEWS.filter(
+      (candidate): candidate is WorkbenchView =>
+        candidate !== "overview" &&
+        (candidate === "provenance" || surfaces.includes(candidate as never)),
+    ),
+  ];
   return (
     <div className="flex h-full min-h-0 flex-col">
         <div
           role="tablist"
           aria-label="Laboratory views"
-          className="flex h-8 shrink-0 items-center gap-1 border-b border-border-subtle bg-surface-1 px-2"
+          className="flex h-9 shrink-0 items-center gap-0.5 border-b border-border-subtle bg-surface-1 px-2"
         >
-          {WORKBENCH_VIEWS.map((candidate) => (
+          {availableViews.map((candidate) => (
             <button
               key={candidate}
               type="button"
@@ -100,18 +125,32 @@ export function LabPage() {
               aria-selected={view === candidate}
               onClick={() => updateSearch({ view: candidate })}
               className={cn(
-                "rounded-control px-2 py-1 text-[12px] capitalize",
+                "relative rounded-control px-2.5 py-1 text-[12px] capitalize transition-colors duration-quick",
                 view === candidate
-                  ? "bg-surface-3 text-text-primary"
+                  ? "bg-surface-3 font-medium text-text-primary"
                   : "text-text-muted hover:bg-surface-2 hover:text-text-secondary",
               )}
             >
               {candidate}
+              {view === candidate ? (
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-x-2 -bottom-[5px] h-0.5 rounded-full bg-accent"
+                />
+              ) : null}
             </button>
           ))}
-          <span className="mono ml-auto text-[10px] text-text-muted">
-            {search.trial ? `trial ${search.trial}` : "no trial selected"}
-            {search.subject ? ` · subject ${search.subject}` : ""}
+          <span className="ml-auto flex items-center gap-2 text-[11px] text-text-muted">
+            {search.trial ? (
+              <span title={`Selected trial ${search.trial}`}>
+                Trial <span className="mono text-text-secondary">{search.trial}</span>
+              </span>
+            ) : null}
+            {search.subject ? (
+              <span title={`Selected subject ${search.subject}`}>
+                Subject <span className="mono text-text-secondary">{search.subject}</span>
+              </span>
+            ) : null}
           </span>
         </div>
         <div className="min-h-0 flex-1">

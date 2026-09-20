@@ -62,6 +62,12 @@ const ARTIFACT = {
   si_units: ["m"],
   coordinate_frame_id: "skillcorner-pose-hybrid-m",
   synchronization_spec_id: "skillcorner-provided",
+  // The viewer sizes its window from the artifact's own canonical bounds and
+  // scopes it to one subject, so the fixture must serve both.
+  canonical_time_min_ns: 0,
+  canonical_time_max_ns: 100_000_000,
+  entity_column: "subject_id",
+  entity_count: 1,
 };
 
 const POSE_ROWS = [

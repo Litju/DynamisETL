@@ -297,6 +297,24 @@ class ArtifactRefView(BaseModel):
     synchronization_spec_id: str | None
 
 
+class ArtifactDetail(ArtifactRefView):
+    """One artifact plus the canonical time bounds of its samples.
+
+    The bounds require reading the Parquet footer/column statistics, so they are
+    served only for a single requested artifact and never inside a list
+    response. A laboratory uses them to choose a deterministic first window
+    instead of asking the reader to guess a time range.
+    """
+
+    canonical_time_min_ns: int | None = None
+    canonical_time_max_ns: int | None = None
+    #: The column that identifies one tracked entity, when the artifact has one.
+    entity_column: str | None = None
+    #: Distinct entities interleaved on this artifact's time axis. A viewer
+    #: divides by it to size a window that fits its point budget.
+    entity_count: int | None = None
+
+
 class DenseWindowMeta(BaseModel):
     artifact: ArtifactRefView
     from_ns: int

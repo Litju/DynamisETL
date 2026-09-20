@@ -24,10 +24,15 @@ from dynamis.serving.dense import (
     ArtifactPathError,
     DenseWindowTooLarge,
     arrow_ipc_stream,
+    canonical_timespan,
+    entity_cardinality,
+    entity_column,
     load_artifact_window,
+    resolve_artifact_path,
 )
 from dynamis.serving.models import (
     AlgorithmView,
+    ArtifactDetail,
     ArtifactRefView,
     DatasetDetail,
     DatasetSummary,
@@ -162,6 +167,7 @@ class FakeBackend:
     def __init__(self) -> None:
         self.window_error: Exception | None = None
         self.last_filters: MetricFilters | None = None
+        self.last_window_kwargs: dict[str, Any] = {}
 
     def status(self) -> ServingStatus:
         return ServingStatus(
@@ -360,9 +366,21 @@ class FakeBackend:
     def artifact(self, artifact_id: str) -> ArtifactRefView | None:
         return ARTIFACT if artifact_id == ARTIFACT.artifact_id else None
 
+    def artifact_detail(self, artifact_id: str) -> ArtifactDetail | None:
+        if artifact_id != ARTIFACT.artifact_id:
+            return None
+        return ArtifactDetail(
+            **ARTIFACT.model_dump(),
+            canonical_time_min_ns=0,
+            canonical_time_max_ns=100_000_000,
+            entity_column="object_id",
+            entity_count=3,
+        )
+
     def window(self, artifact_id: str, **kwargs: Any):
         if self.window_error is not None:
             raise self.window_error
+        self.last_window_kwargs = dict(kwargs)
         return _window_result()
 
 
@@ -554,6 +572,94 @@ def test_dense_reduction_preserves_extrema_and_identity(tmp_settings: Settings) 
     exact = load_artifact_window(tmp_settings, ref, from_ns=0, to_ns=40_000_000)
     assert exact.meta.reduction is None
     assert exact.table.num_rows == 2
+
+
+def test_dense_window_scopes_to_one_entity(tmp_settings: Settings) -> None:
+    """A viewer that renders one entity must not pay for every other entity.
+
+    A dense artifact interleaves entities on one time axis, so without scoping
+    a pose or tracking window overruns the point budget and comes back
+    display-reduced — which a replay cannot use, because a per-bucket extremum
+    is not an observed position.
+    """
+    frames = list(range(50))
+    table = pa.table(
+        {
+            "object_id": pa.array(
+                [entity for _ in frames for entity in ("p1", "p2", "p3")], type=pa.string()
+            ),
+            "t_rel_ns": pa.array(
+                [index * 40_000_000 for index in frames for _ in range(3)], type=pa.int64()
+            ),
+            "x_m": pa.array(
+                [float(index) for index in frames for _ in range(3)], type=pa.float64()
+            ),
+        }
+    )
+    ref = _dense_artifact_ref(tmp_settings, table)
+
+    everyone = load_artifact_window(tmp_settings, ref, max_points=60)
+    assert everyone.meta.source_rows == 150
+    assert everyone.meta.reduction is not None
+
+    # The same budget serves exact frames once the window names one entity.
+    scoped = load_artifact_window(tmp_settings, ref, max_points=60, entity_id="p2")
+    assert scoped.meta.source_rows == 50
+    assert scoped.meta.reduction is None
+    assert set(scoped.table.column("object_id").to_pylist()) == {"p2"}
+
+    # Cardinality is what a viewer divides by to size its window.
+    assert entity_cardinality(tmp_settings, ref) == 3
+    assert entity_column(pq.read_schema(resolve_artifact_path(tmp_settings, ref))) == "object_id"
+
+
+def test_dense_window_carries_signed_canonical_time(tmp_settings: Settings) -> None:
+    """Event-aligned trials run up to zero from a negative canonical time.
+
+    White CMJ records are aligned on the source-provided takeoff, so refusing a
+    negative bound would make the flagship force trial unreachable.
+    """
+    table = pa.table(
+        {
+            "subject_id": pa.array(["white-s000"] * 4, type=pa.string()),
+            "t_rel_ns": pa.array(
+                [-1_345_000_000, -1_000_000_000, -500_000_000, 0], type=pa.int64()
+            ),
+            "force_z_body_weight_ratio": pa.array([1.0, 0.6, 2.7, 0.1], type=pa.float64()),
+        }
+    )
+    ref = _dense_artifact_ref(tmp_settings, table)
+
+    assert canonical_timespan(tmp_settings, ref) == (-1_345_000_000, 0)
+    window = load_artifact_window(tmp_settings, ref, from_ns=-1_345_000_000, to_ns=-500_000_000)
+    assert window.meta.returned_rows == 3
+    assert window.meta.from_ns == -1_345_000_000
+    assert window.table.column("t_rel_ns").to_pylist() == [
+        -1_345_000_000,
+        -1_000_000_000,
+        -500_000_000,
+    ]
+
+
+def test_artifact_detail_serves_bounds_for_a_first_window(client: TestClient) -> None:
+    response = client.get("/api/artifacts/sample-1")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["canonical_time_min_ns"] == 0
+    assert body["canonical_time_max_ns"] == 100_000_000
+    assert body["entity_column"] == "object_id"
+    assert body["entity_count"] == 3
+
+
+def test_window_endpoint_accepts_negative_bounds_and_entity_scope(client: TestClient) -> None:
+    backend: FakeBackend = client.app.state.fake_backend
+    response = client.get(
+        "/api/artifacts/sample-1/window",
+        params={"from_ns": -1_345_000_000, "to_ns": 0, "entity_id": "white-s000"},
+    )
+    assert response.status_code == 200
+    assert backend.last_window_kwargs["from_ns"] == -1_345_000_000
+    assert backend.last_window_kwargs["entity_id"] == "white-s000"
 
 
 def test_dense_window_rejects_path_traversal_and_row_overflow(tmp_settings: Settings) -> None:

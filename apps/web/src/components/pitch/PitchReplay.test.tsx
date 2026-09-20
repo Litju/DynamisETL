@@ -67,6 +67,12 @@ const ARTIFACT = {
   si_units: ["m"],
   coordinate_frame_id: "skillcorner-pitch-m",
   synchronization_spec_id: "skillcorner-provided",
+  // The renderer sizes its window from the artifact's own canonical bounds
+  // and entity cardinality, so the fixture must serve them.
+  canonical_time_min_ns: 0,
+  canonical_time_max_ns: 100_000_000,
+  entity_column: "object_id",
+  entity_count: 3,
 };
 
 const ROWS = [

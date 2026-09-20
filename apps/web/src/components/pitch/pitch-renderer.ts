@@ -111,13 +111,25 @@ export async function createPitchRenderer(
     trail: toPixiColor(palette.trail, FALLBACK_HEX.trail!),
   };
 
+  // Two coordinate spaces, deliberately separated.
+  //
+  // `world` carries the metres -> pixels transform and holds pitch geometry
+  // drawn in metres, so the lines stay true to the surveyed pitch at any zoom.
+  // `overlay` is untransformed and holds entities and trails, which are placed
+  // through `pitchToScreen` and therefore keep a constant on-screen size: an
+  // analyst reads a player marker, not a marker that grows with the zoom.
+  //
+  // Drawing entities in pixel coordinates *inside* the scaled world would apply
+  // the transform twice and put every entity far outside the viewport.
   const world: Container = new pixi.Container();
-  app.stage.addChild(world);
+  const overlay: Container = new pixi.Container();
+  app.stage.addChild(world, overlay);
   const trailLayer: Graphics = new pixi.Graphics();
   const entityLayer: Graphics = new pixi.Graphics();
   trailLayer.eventMode = "none";
   entityLayer.eventMode = "none";
-  world.addChild(trailLayer, entityLayer);
+  overlay.eventMode = "none";
+  overlay.addChild(trailLayer, entityLayer);
 
   const viewport: { current: Viewport } = {
     current: fitViewport(host.clientWidth, host.clientHeight),
@@ -270,12 +282,18 @@ export async function createPitchRenderer(
   };
 }
 
+/** Pixel margin kept around the pitch so touchline play stays visible. */
+const PITCH_MARGIN_M = 4;
+
 export function fitViewport(
   widthPx: number,
   heightPx: number,
   previous?: Viewport,
 ): Viewport {
-  const scale = previous?.scale ?? Math.min(widthPx / 120, heightPx / 80);
+  const lengthM = DEFAULT_PITCH.lengthM + PITCH_MARGIN_M * 2;
+  const widthM = DEFAULT_PITCH.widthM + PITCH_MARGIN_M * 2;
+  const fitted = Math.min(widthPx / lengthM, heightPx / widthM);
+  const scale = previous?.scale ?? fitted;
   return {
     scale: Number.isFinite(scale) && scale > 0 ? scale : 5,
     offsetX: widthPx / 2,
@@ -284,7 +302,8 @@ export function fitViewport(
 }
 
 function applyViewport(world: Container, viewport: Viewport) {
-  world.scale.set(viewport.scale);
+  // The pitch Y axis points up the screen, matching `pitchToScreen`.
+  world.scale.set(viewport.scale, -viewport.scale);
   world.position.set(viewport.offsetX, viewport.offsetY);
 }
 

@@ -8,7 +8,8 @@
 
 import { z } from "zod";
 
-export const DECIMAL_NS = /^\d+$/;
+/** Canonical time is signed; see `lib/time.ts` for why. */
+export const DECIMAL_NS = /^-?\d+$/;
 
 export const WORKBENCH_VIEWS = ["overview", "signals", "field", "pose", "provenance"] as const;
 export type WorkbenchView = (typeof WORKBENCH_VIEWS)[number];
@@ -29,7 +30,7 @@ export type Modality = (typeof MODALITIES)[number];
 // normalized back to canonical decimal text; an unsafe integer fails closed.
 const nsText = z.preprocess((value) => {
   if (typeof value === "number") {
-    return Number.isSafeInteger(value) && value >= 0 ? String(value) : undefined;
+    return Number.isSafeInteger(value) ? String(value) : undefined;
   }
   if (typeof value === "string") {
     return DECIMAL_NS.test(value) ? value : undefined;

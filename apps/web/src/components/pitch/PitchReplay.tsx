@@ -22,11 +22,11 @@ import { useAnalysisContext } from "@/lib/analysis-context";
 import { ApiError } from "@/lib/api/client";
 import { artifactQuery, sessionQuery, windowQuery } from "@/lib/api/queries";
 import { readPalette } from "@/lib/chart-palette";
+import { windowAround } from "@/lib/dense-window";
 import { useAnalysisStore } from "@/lib/state/analysis";
-import { formatClockNs, NS_PER_SECOND } from "@/lib/time";
+import { formatClockNs, formatDurationNs } from "@/lib/time";
 
 const MAX_REPLAY_POINTS = 20_000;
-const DEFAULT_WINDOW_NS = 30n * NS_PER_SECOND;
 
 /**
  * Field laboratory: PixiJS pitch replay over canonical tracking windows.
@@ -53,25 +53,26 @@ export function PitchReplay() {
   const effective = playheadNs ?? committedTimeNs;
   const fromNs = context?.fromNs ?? null;
   const toNs = context?.toNs ?? null;
-  const windowBounds = useMemo(() => {
-    if (fromNs !== null && toNs !== null) {
-      return { fromNs: Number(fromNs), toNs: Number(toNs), explicit: true };
-    }
-    if (effective !== null) {
-      return {
-        fromNs: Number(effective - DEFAULT_WINDOW_NS),
-        toNs: Number(effective + DEFAULT_WINDOW_NS),
-        explicit: false,
-      };
-    }
-    return null;
-  }, [effective, fromNs, toNs]);
 
   const artifactId = stream?.sample_artifact_ids[0] ?? null;
   const artifact = useQuery({
     ...artifactQuery(artifactId ?? ""),
     enabled: Boolean(artifactId),
   });
+
+  // Replay needs exact entity frames, so the window is sized from the
+  // artifact's own measured density rather than a fixed duration that happens
+  // to suit one source: SkillCorner runs 182 rows/s and DFL 575 rows/s over
+  // the same nominal match.
+  const windowBounds = useMemo(
+    () =>
+      windowAround(artifact.data, {
+        anchorNs: effective,
+        explicit: fromNs !== null && toNs !== null ? { fromNs, toNs } : null,
+        maxPoints: MAX_REPLAY_POINTS,
+      }),
+    [artifact.data, effective, fromNs, toNs],
+  );
   const handleSelectEntity = useCallback(
     (objectId: string) => {
       useAnalysisStore.getState().selectEntity(objectId);
@@ -82,7 +83,9 @@ export function PitchReplay() {
   const window = useQuery({
     ...windowQuery({
       artifactId: artifactId ?? "",
-      ...(windowBounds ? { fromNs: windowBounds.fromNs, toNs: windowBounds.toNs } : {}),
+      ...(windowBounds
+        ? { fromNs: Number(windowBounds.fromNs), toNs: Number(windowBounds.toNs) }
+        : {}),
       columns: [
         "t_rel_ns",
         "object_id",
@@ -94,7 +97,9 @@ export function PitchReplay() {
       ],
       maxPoints: MAX_REPLAY_POINTS,
     }),
-    enabled: Boolean(artifactId),
+    // The bounds come from the artifact, so the window waits for it rather
+    // than firing an unbounded request for the whole recording first.
+    enabled: Boolean(artifactId) && windowBounds !== null,
   });
 
   if (!context) {
@@ -161,7 +166,9 @@ export function PitchReplay() {
       />
     );
   }
-  if (artifact.isPending || window.isPending) return <LoadingPanel label="Loading tracking window" />;
+  if (artifact.isPending || windowBounds === null || window.isPending) {
+    return <LoadingPanel label="Loading tracking window" />;
+  }
   if (window.data.meta.reduction !== null) {
     return (
       <StatePanel
@@ -175,7 +182,8 @@ export function PitchReplay() {
     <PitchView
       stream={stream}
       rows={window.data.rows}
-      explicitRange={windowBounds?.explicit ?? false}
+      explicitRange={windowBounds.explicit}
+      windowLabel={`${formatDurationNs(windowBounds.toNs - windowBounds.fromNs)} window`}
       onSelectEntity={handleSelectEntity}
     />
   );
@@ -185,11 +193,13 @@ function PitchView({
   stream,
   rows,
   explicitRange,
+  windowLabel,
   onSelectEntity,
 }: {
   stream: StreamView;
   rows: Array<Record<string, unknown>>;
   explicitRange: boolean;
+  windowLabel: string;
   onSelectEntity: (objectId: string) => void;
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -326,7 +336,7 @@ function PitchView({
             ? "—"
             : `ball ${summary.ballDetected === null ? "detection unknown" : summary.ballDetected ? "detected" : "extrapolated"}`}
         </span>
-        <span>{explicitRange ? "selected range" : "±30 s around playhead"}</span>
+        <span>{explicitRange ? "selected range" : windowLabel}</span>
       </header>
       <div className="relative min-h-0 flex-1">
         <div

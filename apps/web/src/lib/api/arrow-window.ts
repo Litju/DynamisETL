@@ -31,6 +31,7 @@ export async function fetchWindowArrow(
     toNs?: number;
     columns?: readonly string[];
     maxPoints?: number;
+    entityId?: string;
   },
   signal?: AbortSignal,
 ): Promise<ArrowWindow> {
@@ -39,6 +40,7 @@ export async function fetchWindowArrow(
     to_ns: params.toNs,
     columns: params.columns?.join(","),
     max_points: params.maxPoints,
+    entity_id: params.entityId,
     format: "arrow",
   });
   const base = apiBaseUrl().replace(/\/+$/, "");

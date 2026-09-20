@@ -22,3 +22,6 @@ export type RightsPage = components["schemas"]["RightsPage"];
 export type DenseWindow = components["schemas"]["DenseWindow"];
 export type DenseWindowMeta = components["schemas"]["DenseWindowMeta"];
 export type ArtifactRef = components["schemas"]["ArtifactRefView"];
+export type ArtifactDetail = components["schemas"]["ArtifactDetail"];
+export type TrialView = components["schemas"]["TrialView"];
+export type SessionParticipantView = components["schemas"]["SessionParticipantView"];

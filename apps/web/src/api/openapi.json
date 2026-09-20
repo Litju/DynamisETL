@@ -83,6 +83,195 @@
         "title": "AlgorithmView",
         "type": "object"
       },
+      "ArtifactDetail": {
+        "description": "One artifact plus the canonical time bounds of its samples.\n\nThe bounds require reading the Parquet footer/column statistics, so they are\nserved only for a single requested artifact and never inside a list\nresponse. A laboratory uses them to choose a deterministic first window\ninstead of asking the reader to guess a time range.",
+        "properties": {
+          "artifact_id": {
+            "title": "Artifact Id",
+            "type": "string"
+          },
+          "artifact_kind": {
+            "enum": [
+              "sample",
+              "processing"
+            ],
+            "title": "Artifact Kind",
+            "type": "string"
+          },
+          "byte_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Byte Size"
+          },
+          "canonical_time_max_ns": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Time Max Ns"
+          },
+          "canonical_time_min_ns": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Time Min Ns"
+          },
+          "checksum_sha256": {
+            "title": "Checksum Sha256",
+            "type": "string"
+          },
+          "compression": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compression"
+          },
+          "coordinate_frame_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coordinate Frame Id"
+          },
+          "dataset_id": {
+            "title": "Dataset Id",
+            "type": "string"
+          },
+          "entity_column": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Column"
+          },
+          "entity_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Count"
+          },
+          "format": {
+            "title": "Format",
+            "type": "string"
+          },
+          "layer": {
+            "title": "Layer",
+            "type": "string"
+          },
+          "measurement_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measurement Class"
+          },
+          "modality": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modality"
+          },
+          "relative_path": {
+            "title": "Relative Path",
+            "type": "string"
+          },
+          "row_count": {
+            "title": "Row Count",
+            "type": "integer"
+          },
+          "si_units": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Si Units",
+            "type": "array"
+          },
+          "stream_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stream Id"
+          },
+          "synchronization_spec_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synchronization Spec Id"
+          }
+        },
+        "required": [
+          "artifact_id",
+          "dataset_id",
+          "stream_id",
+          "layer",
+          "relative_path",
+          "format",
+          "compression",
+          "checksum_sha256",
+          "row_count",
+          "byte_size",
+          "artifact_kind",
+          "modality",
+          "measurement_class",
+          "si_units",
+          "coordinate_frame_id",
+          "synchronization_spec_id"
+        ],
+        "title": "ArtifactDetail",
+        "type": "object"
+      },
       "ArtifactRefView": {
         "properties": {
           "artifact_id": {
@@ -2080,7 +2269,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ArtifactRefView"
+                  "$ref": "#/components/schemas/ArtifactDetail"
                 }
               }
             },
@@ -2123,7 +2312,6 @@
             "schema": {
               "anyOf": [
                 {
-                  "minimum": 0,
                   "type": "integer"
                 },
                 {
@@ -2140,7 +2328,6 @@
             "schema": {
               "anyOf": [
                 {
-                  "minimum": 0,
                   "type": "integer"
                 },
                 {
@@ -2182,6 +2369,23 @@
                 }
               ],
               "title": "Max Points"
+            }
+          },
+          {
+            "in": "query",
+            "name": "entity_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Entity Id"
             }
           },
           {

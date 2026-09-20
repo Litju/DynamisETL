@@ -1,5 +1,5 @@
 ﻿import { useQuery } from "@tanstack/react-query";
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 
 import { MeasurementClassBadge, ModalityBadge } from "@/components/common/Badges";
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
@@ -18,14 +18,15 @@ import type { StreamView } from "@/api/types";
 import { useAnalysisContext } from "@/lib/analysis-context";
 import { ApiError } from "@/lib/api/client";
 import { artifactQuery, methodologyQuery, metricsQuery, sessionQuery, windowQuery } from "@/lib/api/queries";
+import { usePoseSubjects } from "@/components/pose/use-pose-subjects";
+import { windowAround } from "@/lib/dense-window";
 import { formatMetricValue } from "@/lib/measurement";
 import { useAnalysisStore } from "@/lib/state/analysis";
-import { formatClockNs, NS_PER_SECOND } from "@/lib/time";
+import { formatClockNs } from "@/lib/time";
 
 const PoseCanvas = lazy(() => import("@/components/pose/PoseScene"));
 
 const MAX_POSE_POINTS = 20_000;
-const DEFAULT_WINDOW_NS = 10n * NS_PER_SECOND;
 
 /**
  * 3D biomechanics laboratory: source landmarks in a local analytical frame.
@@ -54,22 +55,52 @@ export function PoseViewer() {
   }, [session.data, streamId]);
 
   const effective = playheadNs ?? committedTimeNs;
-  const windowBounds = useMemo(() => {
-    if (context?.fromNs != null && context.toNs != null) {
-      return { fromNs: Number(context.fromNs), toNs: Number(context.toNs) };
-    }
-    if (effective !== null) {
-      return { fromNs: Number(effective - DEFAULT_WINDOW_NS), toNs: Number(effective + DEFAULT_WINDOW_NS) };
-    }
-    return null;
-  }, [context?.fromNs, context?.toNs, effective]);
-
   const artifactId = stream?.sample_artifact_ids[0] ?? null;
   const artifact = useQuery({ ...artifactQuery(artifactId ?? ""), enabled: Boolean(artifactId) });
+
+  // A pose artifact interleaves every observed subject on one time axis: the
+  // SkillCorner period holds 21.4M rows across 23 subjects. Landmark viewing
+  // needs exact frames, so the window is both scoped to one subject and sized
+  // from the artifact's measured per-subject density.
+  //
+  // A pose stream that declares no subject of its own needs one resolved from
+  // the data before it can render: the probe reports who is actually observed,
+  // and the first of them becomes the deterministic default.
+  const observed = usePoseSubjects(artifactId, artifact.data, effective);
+  const observedSubjectList = observed.subjects;
+  const selectedSubject = context?.subjectId ?? null;
+  const streamSubject = stream?.subject_id ?? null;
+  const subjectId = useMemo(() => {
+    if (selectedSubject !== null && observedSubjectList.includes(selectedSubject)) {
+      return selectedSubject;
+    }
+    return observedSubjectList[0] ?? streamSubject;
+  }, [observedSubjectList, selectedSubject, streamSubject]);
+
+  const explicitFromNs = context?.fromNs ?? null;
+  const explicitToNs = context?.toNs ?? null;
+  const artifactData = artifact.data;
+  const windowBounds = useMemo(
+    () =>
+      windowAround(artifactData, {
+        anchorNs: effective,
+        explicit:
+          explicitFromNs !== null && explicitToNs !== null
+            ? { fromNs: explicitFromNs, toNs: explicitToNs }
+            : null,
+        maxPoints: MAX_POSE_POINTS,
+        entityScoped: subjectId !== null,
+      }),
+    [artifactData, effective, explicitFromNs, explicitToNs, subjectId],
+  );
+
   const window = useQuery({
     ...windowQuery({
       artifactId: artifactId ?? "",
-      ...(windowBounds ? { fromNs: windowBounds.fromNs, toNs: windowBounds.toNs } : {}),
+      ...(windowBounds
+        ? { fromNs: Number(windowBounds.fromNs), toNs: Number(windowBounds.toNs) }
+        : {}),
+      ...(subjectId !== null ? { entityId: subjectId } : {}),
       columns: [
         "t_rel_ns",
         "subject_id",
@@ -82,7 +113,7 @@ export function PoseViewer() {
       ],
       maxPoints: MAX_POSE_POINTS,
     }),
-    enabled: Boolean(artifactId),
+    enabled: Boolean(artifactId) && windowBounds !== null,
   });
   const metrics = useQuery({
     ...metricsQuery({ streamId: streamId ?? undefined, limit: 50 }),
@@ -124,6 +155,13 @@ export function PoseViewer() {
 
   const [preset, setPreset] = useState<CameraPreset>("reset");
   const [showErrorRadii, setShowErrorRadii] = useState(false);
+
+  // Publish the resolved subject so the pitch, metric tables and inspector
+  // follow the same entity. Committing it durably keeps the view shareable.
+  const selectSubject = context?.selectSubject;
+  useEffect(() => {
+    if (subjectId !== null && subjectId !== selectedSubject) selectSubject?.(subjectId);
+  }, [selectSubject, selectedSubject, subjectId]);
 
   if (!context) return <StatePanel state="empty" title="Open a laboratory session first." />;
   if (session.isPending) return <LoadingPanel label="Loading session streams" />;
@@ -183,7 +221,9 @@ export function PoseViewer() {
       />
     );
   }
-  if (artifact.isPending || window.isPending) return <LoadingPanel label="Loading pose window" />;
+  if (artifact.isPending || windowBounds === null || window.isPending) {
+    return <LoadingPanel label="Loading pose window" />;
+  }
   if (window.data.meta.reduction !== null) {
     return (
       <StatePanel
@@ -246,6 +286,32 @@ export function PoseViewer() {
           </Suspense>
         </div>
         <aside className="w-60 shrink-0 overflow-y-auto border-l border-border-subtle bg-surface-1 p-2 text-[11px]">
+          {observed.subjects.length > 0 ? (
+            <div className="mb-3">
+              <label
+                htmlFor="pose-subject"
+                className="text-[10px] uppercase tracking-wider text-text-muted"
+              >
+                subject
+              </label>
+              <select
+                id="pose-subject"
+                value={subjectId ?? ""}
+                onChange={(event) => context?.selectSubject(event.target.value)}
+                className="mono mt-1 h-7 w-full rounded-control border border-border-subtle bg-surface-0 px-1.5 text-[12px] text-text-secondary outline-none focus:border-accent"
+              >
+                {observed.subjects.map((candidate) => (
+                  <option key={candidate} value={candidate}>
+                    {candidate}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-[10px] text-text-muted">
+                {observed.subjects.length} observed in this window; landmarks are never
+                merged across subjects.
+              </p>
+            </div>
+          ) : null}
           <div className="mb-2">
             <span className="text-[10px] uppercase tracking-wider text-text-muted">camera</span>
             <div className="mt-1 flex flex-wrap gap-1">
