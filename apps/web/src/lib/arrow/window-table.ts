@@ -20,6 +20,12 @@ export interface WindowTable {
 }
 
 const IDENTITY_COLUMNS = new Set([
+  // Reduction bookkeeping: the bucket index, its bounds and its row count are
+  // structure, not measurements.
+  "__bucket",
+  "t_start_ns",
+  "t_end_ns",
+  "bucket_rows",
   "dataset_id",
   "session_id",
   "trial_id",
@@ -41,7 +47,22 @@ const IDENTITY_COLUMNS = new Set([
   "skeleton_id",
 ]);
 
-const TIME_COLUMN = "t_rel_ns";
+/**
+ * Candidate time columns, most exact first.
+ *
+ * A display-reduced window is grouped into time buckets and carries
+ * `t_start_ns` rather than `t_rel_ns`; the bucket start is then the canonical
+ * time of the envelope point. Without this fallback a reduced window has no
+ * time axis and every point collapses onto the same x.
+ */
+const TIME_COLUMNS: readonly string[] = ["t_rel_ns", "t_start_ns"];
+const TIME_COLUMN = TIME_COLUMNS[0]!;
+
+/** The column that carries canonical time in this window's column set. */
+export function timeColumnOf(columns: readonly string[]): string {
+  const names = new Set(columns);
+  return TIME_COLUMNS.find((candidate) => names.has(candidate)) ?? TIME_COLUMN;
+}
 
 export function tableFromDecoded(decoded: DecodedWindow, meta: DenseWindowMeta): WindowTable {
   const numeric = new Map<string, Float64Array>();
@@ -56,13 +77,20 @@ export function tableFromDecoded(decoded: DecodedWindow, meta: DenseWindowMeta):
     timeNs: decoded.timeNs,
     numeric,
     strings,
-    columnOrder: [TIME_COLUMN, ...decoded.columns.map((column) => column.name)],
+    columnOrder: [
+      timeColumnOf([...decoded.columns.map((column) => column.name), ...meta.columns]),
+      ...decoded.columns.map((column) => column.name),
+    ],
   };
 }
 
 export function tableFromJson(window: DenseWindow): WindowTable {
   const rows = window.rows;
-  const columnOrder = [TIME_COLUMN, ...window.meta.columns.filter((name) => name !== TIME_COLUMN)];
+  const timeColumn = timeColumnOf(window.meta.columns);
+  const columnOrder = [
+    timeColumn,
+    ...window.meta.columns.filter((name) => name !== timeColumn),
+  ];
   const timeNs = new BigInt64Array(rows.length);
   const numeric = new Map<string, Float64Array>();
   const strings = new Map<string, string[]>();
@@ -71,7 +99,7 @@ export function tableFromJson(window: DenseWindow): WindowTable {
 
   for (const name of columnOrder) {
     const sample = rows.find((row) => row[name] !== undefined)?.[name];
-    if (name === TIME_COLUMN) continue;
+    if (name === timeColumn) continue;
     if (typeof sample === "number" || typeof sample === "bigint") {
       numericBuffers.set(name, new Float64Array(rows.length));
     } else {
@@ -79,7 +107,7 @@ export function tableFromJson(window: DenseWindow): WindowTable {
     }
   }
   rows.forEach((row, index) => {
-    const time = row[TIME_COLUMN];
+    const time = row[timeColumn];
     if (typeof time === "number") timeNs[index] = BigInt(Math.trunc(time));
     else if (typeof time === "bigint") timeNs[index] = time;
     for (const [name, buffer] of numericBuffers) {
@@ -122,6 +150,42 @@ export function measureColumns(table: WindowTable): string[] {
   return Array.from(table.numeric.keys()).filter((name) => {
     if (IDENTITY_COLUMNS.has(name) || bandMembers.has(name)) return false;
     return name !== "timestamp_utc_ns";
+  });
+}
+
+/**
+ * Measure columns with at least one observed value.
+ *
+ * A source publishes the full canonical schema even where it records nothing:
+ * the White CMJ force artifact carries `force_x_n` through `cop_z_m` as all
+ * null and distributes only the body-weight-normalised vertical trace. A
+ * laboratory that offered those quantities would present an empty axis as
+ * though the measurement existed, so they are filtered out here.
+ */
+export function populatedMeasures(table: WindowTable): string[] {
+  return measureColumns(table).filter((name) => {
+    const values = table.numeric.get(name);
+    if (!values) return false;
+    for (let index = 0; index < values.length; index += 1) {
+      if (Number.isFinite(values[index])) return true;
+    }
+    return false;
+  });
+}
+
+/** Envelope pairs whose base measure has at least one observed extremum. */
+export function populatedBandPairs(
+  table: WindowTable,
+): Array<{ base: string; minKey: string; maxKey: string }> {
+  return bandPairs(table).filter((pair) => {
+    const mins = table.numeric.get(pair.minKey);
+    const maxes = table.numeric.get(pair.maxKey);
+    if (!mins || !maxes) return false;
+    const count = Math.min(mins.length, maxes.length);
+    for (let index = 0; index < count; index += 1) {
+      if (Number.isFinite(mins[index]) || Number.isFinite(maxes[index])) return true;
+    }
+    return false;
   });
 }
 

@@ -22,16 +22,27 @@ export interface DecodedWindow {
   readonly timeNs: BigInt64Array<ArrayBufferLike>;
 }
 
-const TIME_COLUMN = "t_rel_ns";
+/**
+ * Candidate time columns, most exact first.
+ *
+ * An exact window carries `t_rel_ns`. A display-reduced window is grouped into
+ * time buckets, so it carries `t_start_ns` and `t_end_ns` instead: the bucket
+ * start is then the canonical time of the envelope point. Without this
+ * fallback a reduced window has no time axis at all and every point collapses
+ * onto the same x.
+ */
+export const TIME_COLUMNS: readonly string[] = ["t_rel_ns", "t_start_ns"];
 
 export function decodeWindow(buffer: ArrayBuffer | Uint8Array): DecodedWindow {
   const table: Table = tableFromIPC(buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer));
   const columns: ArrowColumn[] = [];
   let timeNs: BigInt64Array<ArrayBufferLike> = new BigInt64Array(0);
+  const names = new Set(table.schema.fields.map((field) => field.name));
+  const timeColumn = TIME_COLUMNS.find((candidate) => names.has(candidate)) ?? TIME_COLUMNS[0]!;
   table.schema.fields.forEach((field, index) => {
     const vector = table.getChildAt(index);
     if (vector === null) return;
-    if (field.name === TIME_COLUMN) {
+    if (field.name === timeColumn) {
       timeNs = toBigInt64(vector);
       return;
     }

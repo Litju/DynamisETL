@@ -202,10 +202,10 @@ afterEach(() => {
 it("renders an exact window with unit, synchronization and measurement context", async () => {
   installFetch(false);
   renderLab();
-  expect(await screen.findByText("exact samples in this window")).toBeInTheDocument();
-  expect(screen.getByText("3 source rows → 3 returned · full window")).toBeInTheDocument();
-  expect(screen.getByText("sync source-provided")).toBeInTheDocument();
-  expect(screen.getByText("frame lab-frame")).toBeInTheDocument();
+  expect(await screen.findByText("Exact samples")).toBeInTheDocument();
+  expect(screen.getByText("3 source rows → 3 plotted")).toBeInTheDocument();
+  expect(screen.getByText("source-provided")).toBeInTheDocument();
+  expect(screen.getByText("lab-frame")).toBeInTheDocument();
   expect(screen.getByText("raw")).toBeInTheDocument();
   expect(await screen.findByTestId("echart")).toBeInTheDocument();
   expect(init).toHaveBeenCalled();
@@ -215,10 +215,14 @@ it("renders an exact window with unit, synchronization and measurement context",
 it("states display reduction and never hides it", async () => {
   installFetch(true);
   renderLab();
+  // The state is a badge; the full reduction record stays available on it,
+  // and the envelope is named as display reduction rather than uncertainty.
+  expect(await screen.findByText("Display-reduced")).toBeInTheDocument();
   expect(
-    await screen.findByText(/Display-reduced: min_max_envelope_per_time_bucket/),
+    screen.getByTitle(/Display-reduced: min_max_envelope_per_time_bucket/),
   ).toBeInTheDocument();
-  expect(screen.getByText(/metrics never derive from this view/)).toBeInTheDocument();
+  expect(screen.getByText(/not measured uncertainty/)).toBeInTheDocument();
+  expect(screen.getByText(/never derive from it/)).toBeInTheDocument();
 });
 
 it("asks for a narrower range when the dense window is too large", async () => {
@@ -243,7 +247,7 @@ it("refuses a stream that is not part of the open session", async () => {
 it("uses the Arrow dense transport when the API serves it", async () => {
   installFetch(false, 200, true);
   renderLab();
-  expect(await screen.findByText("transport arrow")).toBeInTheDocument();
+  expect(await screen.findByText("arrow transport")).toBeInTheDocument();
   expect(await screen.findByTestId("echart")).toBeInTheDocument();
-  expect(screen.getByText("3 source rows → 3 returned · full window")).toBeInTheDocument();
+  expect(screen.getByText("3 source rows → 3 plotted")).toBeInTheDocument();
 });
