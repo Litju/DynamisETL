@@ -562,6 +562,9 @@ class SkeletonDefinition(Base):
     #: an ordered landmark list with no parent graph at all).
     topology: Mapped[str] = mapped_column(String(16), nullable=False, server_default=text("'tree'"))
     joint_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    display_connections: Mapped[list[Any]] = mapped_column(
+        JSONB, nullable=False, server_default=JSON_EMPTY_ARRAY
+    )
     description: Mapped[str | None] = mapped_column(Text)
 
     __table_args__ = (

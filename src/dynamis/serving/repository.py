@@ -39,6 +39,7 @@ from dynamis.serving.models import (
     SessionDetail,
     SessionParticipantView,
     SessionSummary,
+    SkeletonDisplayConnectionView,
     StreamView,
     SubjectView,
     TrialView,
@@ -299,6 +300,63 @@ def list_sessions(connection: Connection, dataset_id: str) -> list[SessionSummar
     ]
 
 
+def _skeleton_authorities(
+    connection: Connection, skeleton_ids: set[str]
+) -> dict[str, tuple[str, list[str], list[SkeletonDisplayConnectionView]]]:
+    """Read persisted skeleton display topology separately from parentage."""
+    authorities: dict[str, tuple[str, list[str], list[SkeletonDisplayConnectionView]]] = {}
+    for skeleton_id in sorted(skeleton_ids):
+        if not skeleton_id:
+            continue
+        definition = (
+            connection.execute(
+                sa.text(
+                    "SELECT topology, display_connections FROM skeleton_definition "
+                    "WHERE skeleton_id = :skeleton_id"
+                ),
+                {"skeleton_id": skeleton_id},
+            )
+            .mappings()
+            .first()
+        )
+        if definition is None:
+            continue
+        joints = (
+            connection.execute(
+                sa.text(
+                    "SELECT joint_id, joint_name FROM skeleton_joint "
+                    "WHERE skeleton_id = :skeleton_id ORDER BY joint_id"
+                ),
+                {"skeleton_id": skeleton_id},
+            )
+            .mappings()
+            .all()
+        )
+        names_by_id = {int(row["joint_id"]): str(row["joint_name"]) for row in joints}
+        connections: list[SkeletonDisplayConnectionView] = []
+        for item in _list(definition["display_connections"]):
+            if not isinstance(item, dict):
+                continue
+            start = item.get("start_joint_name")
+            end = item.get("end_joint_name")
+            if not isinstance(start, str) or not isinstance(end, str):
+                start = names_by_id.get(item.get("start_joint_id"))
+                end = names_by_id.get(item.get("end_joint_id"))
+            if isinstance(start, str) and isinstance(end, str):
+                connections.append(
+                    SkeletonDisplayConnectionView(
+                        start_joint_name=start,
+                        end_joint_name=end,
+                    )
+                )
+        authorities[skeleton_id] = (
+            str(definition["topology"]),
+            [str(row["joint_name"]) for row in joints],
+            connections,
+        )
+    return authorities
+
+
 def session_detail(
     connection: Connection, dataset_id: str, session_id: str
 ) -> SessionDetail | None:
@@ -367,6 +425,10 @@ def session_detail(
         .mappings()
         .all()
     )
+    skeletons = _skeleton_authorities(
+        connection,
+        {str(row["skeleton_id"]) for row in streams if row["skeleton_id"] is not None},
+    )
     return SessionDetail(
         dataset_id=dataset_id,
         session=SessionSummary(
@@ -413,6 +475,21 @@ def session_detail(
                 synchronization_spec_id=row["synchronization_spec_id"],
                 clock_id=row["clock_id"],
                 skeleton_id=row["skeleton_id"],
+                skeleton_topology=(
+                    skeletons.get(str(row["skeleton_id"]), (None, [], []))[0]
+                    if row["skeleton_id"] is not None
+                    else None
+                ),
+                skeleton_joint_names=(
+                    skeletons.get(str(row["skeleton_id"]), (None, [], []))[1]
+                    if row["skeleton_id"] is not None
+                    else []
+                ),
+                skeleton_display_connections=(
+                    skeletons.get(str(row["skeleton_id"]), (None, [], []))[2]
+                    if row["skeleton_id"] is not None
+                    else []
+                ),
                 sample_artifact_ids=[str(item) for item in _list(row["artifact_ids"])],
                 sample_row_count=int(row["sample_row_count"]),
             )

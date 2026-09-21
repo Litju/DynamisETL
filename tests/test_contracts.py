@@ -511,7 +511,12 @@ def test_skeleton_topology_is_validated() -> None:
 
 
 def test_landmark_set_skeleton_declares_no_parent_graph() -> None:
-    from dynamis.contracts import JointDefinition, SkeletonDefinition, SkeletonTopology
+    from dynamis.contracts import (
+        JointDefinition,
+        SkeletonDefinition,
+        SkeletonDisplayConnection,
+        SkeletonTopology,
+    )
 
     landmarks = (
         JointDefinition(joint_id=0, joint_name="left_ankle", parent_joint_id=None),
@@ -527,6 +532,30 @@ def test_landmark_set_skeleton_declares_no_parent_graph() -> None:
     )
     assert skeleton.topology is SkeletonTopology.LANDMARK_SET
     assert all(joint.parent_joint_id is None for joint in skeleton.joints)
+
+    display = SkeletonDisplayConnection(start_joint_name="left_ankle", end_joint_name="right_ankle")
+    with_display = SkeletonDefinition(
+        skeleton_id="syn-skeleton-landmarks-with-display",
+        name="landmark set with display edges",
+        topology=SkeletonTopology.LANDMARK_SET,
+        joint_count=2,
+        joints=landmarks,
+        display_connections=(display,),
+        description="Source publishes drawable pairs without a parent graph.",
+    )
+    assert with_display.display_connections == (display,)
+    with pytest.raises(ValidationError, match="unknown landmark"):
+        SkeletonDefinition(
+            skeleton_id="s",
+            name="bad display edge",
+            topology=SkeletonTopology.LANDMARK_SET,
+            joint_count=2,
+            joints=landmarks,
+            display_connections=(
+                SkeletonDisplayConnection(start_joint_name="left_ankle", end_joint_name="nose"),
+            ),
+            description="documented",
+        )
 
     # Parent ids must not be fabricated for a landmark set.
     with pytest.raises(ValidationError, match="landmark_set"):

@@ -156,6 +156,9 @@ def _sync_skeletons(connection, skeletons: tuple[SkeletonDefinition, ...]) -> tu
             "name": skeleton.name,
             "topology": skeleton.topology.value,
             "joint_count": skeleton.joint_count,
+            "display_connections": [
+                connection.model_dump() for connection in skeleton.display_connections
+            ],
             "description": skeleton.description,
         }
         for skeleton in skeletons
@@ -167,6 +170,7 @@ def _sync_skeletons(connection, skeletons: tuple[SkeletonDefinition, ...]) -> tu
             "name": statement.excluded.name,
             "topology": statement.excluded.topology,
             "joint_count": statement.excluded.joint_count,
+            "display_connections": statement.excluded.display_connections,
             "description": statement.excluded.description,
         },
     )

@@ -8,10 +8,12 @@ import {
   angleAt,
   boundsOf,
   cameraFor,
+  drawableDisplayConnections,
   landmarksAt,
   planarCentre,
   toViewerPoint,
   type CameraPreset,
+  type DisplayConnectionDefinition,
   type PoseFrame,
   type PoseLandmark,
   type ProcessorOverlays,
@@ -21,6 +23,7 @@ import { useAnalysisStore } from "@/lib/state/analysis";
 
 export const JOINT_COLOR = "#7fd1e8";
 export const SELECTED_JOINT_COLOR = "#ffd166";
+export const PROVIDER_SKELETON_COLOR = "#6d9eb4";
 export const SEGMENT_COLOR = "#b48ef0";
 export const ANGLE_COLOR = "#e884b4";
 export const ERROR_RADIUS_COLOR = "#e8a13f";
@@ -34,12 +37,20 @@ export const ERROR_RADIUS_COLOR = "#e8a13f";
 export function PoseScene({
   frames,
   overlays,
+  providerConnections,
   preset,
+  showProviderSkeleton,
+  showSegments,
+  showAngles,
   showErrorRadii,
 }: {
   frames: readonly PoseFrame[];
   overlays: ProcessorOverlays;
+  providerConnections: readonly DisplayConnectionDefinition[];
   preset: CameraPreset;
+  showProviderSkeleton: boolean;
+  showSegments: boolean;
+  showAngles: boolean;
   showErrorRadii: boolean;
 }) {
   const framesRef = useRef(frames);
@@ -129,6 +140,7 @@ export function PoseScene({
     useAnalysisStore.getState().playheadNs ?? useAnalysisStore.getState().committedTimeNs;
   const landmarks = landmarksAt(frames, currentTime);
   const byName = new Map(landmarks.map((landmark) => [landmark.jointName, landmark]));
+  const drawableProviderConnections = drawableDisplayConnections(landmarks, providerConnections);
 
   return (
     <>
@@ -207,30 +219,44 @@ export function PoseScene({
               </mesh>
             ))
         : null}
-      {overlays.segments.map((segment) => {
-        const start = byName.get(segment.startLandmark);
-        const end = byName.get(segment.endLandmark);
-        if (!start || !end) return null;
-        return (
-          <Line
-            key={segment.name}
-            points={[toViewerPoint(start, centre), toViewerPoint(end, centre)]}
-            color={SEGMENT_COLOR}
-            lineWidth={2.5}
-          />
-        );
-      })}
-      {overlays.angles.map((angle) => {
-        const vertex = byName.get(angle.vertexLandmark);
-        const first = byName.get(angle.firstLandmark);
-        const second = byName.get(angle.secondLandmark);
-        if (!vertex || !first || !second) return null;
-        const radians = angleAt(vertex, first, second);
-        if (radians === null) return null;
-        const arc = arcPoints(vertex, first, second, radians, centre);
-        if (arc.length < 2) return null;
-        return <Line key={angle.name} points={arc} color={ANGLE_COLOR} lineWidth={2} />;
-      })}
+      {showProviderSkeleton
+        ? drawableProviderConnections.map(([start, end]) => (
+            <Line
+              key={`provider-${start.jointName}-${end.jointName}`}
+              points={[toViewerPoint(start, centre), toViewerPoint(end, centre)]}
+              color={PROVIDER_SKELETON_COLOR}
+              lineWidth={1.8}
+            />
+          ))
+        : null}
+      {showSegments
+        ? overlays.segments.map((segment) => {
+            const start = byName.get(segment.startLandmark);
+            const end = byName.get(segment.endLandmark);
+            if (!start || !end) return null;
+            return (
+              <Line
+                key={segment.name}
+                points={[toViewerPoint(start, centre), toViewerPoint(end, centre)]}
+                color={SEGMENT_COLOR}
+                lineWidth={2.5}
+              />
+            );
+          })
+        : null}
+      {showAngles
+        ? overlays.angles.map((angle) => {
+            const vertex = byName.get(angle.vertexLandmark);
+            const first = byName.get(angle.firstLandmark);
+            const second = byName.get(angle.secondLandmark);
+            if (!vertex || !first || !second) return null;
+            const radians = angleAt(vertex, first, second);
+            if (radians === null) return null;
+            const arc = arcPoints(vertex, first, second, radians, centre);
+            if (arc.length < 2) return null;
+            return <Line key={angle.name} points={arc} color={ANGLE_COLOR} lineWidth={2} />;
+          })
+        : null}
     </>
   );
 }
@@ -286,15 +312,23 @@ export function arcPoints(
 export function PoseCanvas({
   frames,
   overlays,
+  providerConnections,
   preset,
   playing,
+  showProviderSkeleton,
+  showSegments,
+  showAngles,
   showErrorRadii,
   onReady,
 }: {
   frames: readonly PoseFrame[];
   overlays: ProcessorOverlays;
+  providerConnections: readonly DisplayConnectionDefinition[];
   preset: CameraPreset;
   playing: boolean;
+  showProviderSkeleton: boolean;
+  showSegments: boolean;
+  showAngles: boolean;
   showErrorRadii: boolean;
   onReady?: () => void;
 }) {
@@ -309,7 +343,11 @@ export function PoseCanvas({
       <PoseScene
         frames={frames}
         overlays={overlays}
+        providerConnections={providerConnections}
         preset={preset}
+        showProviderSkeleton={showProviderSkeleton}
+        showSegments={showSegments}
+        showAngles={showAngles}
         showErrorRadii={showErrorRadii}
       />
     </Canvas>

@@ -14,6 +14,7 @@ import pytest
 import synthetic_skillcorner as synthetic
 from dynamis.adapters.skillcorner.adapter import SkillCornerMatchAdapter
 from dynamis.adapters.skillcorner.authorities import (
+    POSE_DISPLAY_CONNECTIONS,
     POSE_LANDMARKS,
     POSE_SKELETON_ID,
     SKILLCORNER_DATASET_ID,
@@ -51,6 +52,14 @@ def test_landmark_authority_is_the_documented_readme_order() -> None:
     assert skeleton.joint_count == 29
     assert tuple(joint.joint_name for joint in skeleton.joints) == POSE_LANDMARKS
     assert all(joint.parent_joint_id is None for joint in skeleton.joints)
+    assert skeleton.display_connections == tuple(
+        {
+            "start_joint_name": start,
+            "end_joint_name": end,
+        }
+        for start, end in POSE_DISPLAY_CONNECTIONS
+    )
+    assert len(skeleton.display_connections) == 28
     # The provider JSON mapping order is alphabetical; it must not leak in.
     assert POSE_LANDMARKS[:4] == ("nose", "neck", "lEye", "rEye")
 

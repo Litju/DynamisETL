@@ -183,6 +183,20 @@
             ],
             "title": "Entity Count"
           },
+          "entity_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Ids"
+          },
           "format": {
             "title": "Format",
             "type": "string"
@@ -2061,6 +2075,24 @@
         "title": "SessionSummary",
         "type": "object"
       },
+      "SkeletonDisplayConnectionView": {
+        "properties": {
+          "end_joint_name": {
+            "title": "End Joint Name",
+            "type": "string"
+          },
+          "start_joint_name": {
+            "title": "Start Joint Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start_joint_name",
+          "end_joint_name"
+        ],
+        "title": "SkeletonDisplayConnectionView",
+        "type": "object"
+      },
       "StreamView": {
         "properties": {
           "clock_id": {
@@ -2126,6 +2158,13 @@
             "title": "Si Units",
             "type": "array"
           },
+          "skeleton_display_connections": {
+            "items": {
+              "$ref": "#/components/schemas/SkeletonDisplayConnectionView"
+            },
+            "title": "Skeleton Display Connections",
+            "type": "array"
+          },
           "skeleton_id": {
             "anyOf": [
               {
@@ -2136,6 +2175,24 @@
               }
             ],
             "title": "Skeleton Id"
+          },
+          "skeleton_joint_names": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Skeleton Joint Names",
+            "type": "array"
+          },
+          "skeleton_topology": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skeleton Topology"
           },
           "source_unit": {
             "anyOf": [

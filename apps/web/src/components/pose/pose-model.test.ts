@@ -4,6 +4,7 @@ import {
   angleAt,
   boundsOf,
   cameraFor,
+  drawableDisplayConnections,
   extractFrames,
   frameIndexAt,
   landmarksAt,
@@ -31,6 +32,34 @@ describe("pose landmark extraction", () => {
     expect(frames[0]?.landmarks.map((landmark) => landmark.jointName)).toEqual(["lHip", "nose"]);
     expect(frames[2]?.landmarks).toEqual([]);
     expect(frames[2]?.observed).toBe(false);
+  });
+
+  it("keeps pose subjects separate and draws provider edges only for available endpoints", () => {
+    const mixed = [
+      ...ROWS,
+      {
+        t_rel_ns: 0,
+        subject_id: "s2",
+        joint_name: "nose",
+        is_available: true,
+        x_m: 10,
+        y_m: 0,
+        z_m: 0,
+      },
+    ] satisfies PoseRow[];
+    expect(extractFrames(mixed, "s1")[0]?.landmarks.map((landmark) => landmark.jointName)).toEqual([
+      "lHip",
+      "nose",
+    ]);
+    expect(extractFrames(mixed)).toHaveLength(4);
+
+    const landmarks = extractFrames(ROWS, "s1")[0]!.landmarks;
+    expect(
+      drawableDisplayConnections(landmarks, [
+        { startLandmark: "nose", endLandmark: "lHip" },
+        { startLandmark: "nose", endLandmark: "lKnee" },
+      ]),
+    ).toHaveLength(1);
   });
 
   it("finds the frame at or before a canonical time", () => {

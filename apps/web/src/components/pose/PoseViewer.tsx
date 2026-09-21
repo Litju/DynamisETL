@@ -12,6 +12,7 @@ import {
   overlaysFromParameters,
   summarizeFrame,
   type CameraPreset,
+  type DisplayConnectionDefinition,
   type PoseLandmark,
 } from "@/components/pose/pose-model";
 import type { StreamView } from "@/api/types";
@@ -67,14 +68,16 @@ export function PoseViewer() {
   // A pose stream that declares no subject of its own needs one resolved from
   // the data before it can render: the probe reports who is actually observed,
   // and the first of them becomes the deterministic default.
-  const observed = usePoseSubjects(artifactId, artifact.data, effective);
+  const observed = usePoseSubjects(
+    artifact.data,
+    session.data?.participants ?? [],
+    stream?.subject_id ?? null,
+  );
   const observedSubjectList = observed.subjects;
   const selectedSubject = context?.subjectId ?? null;
   const streamSubject = stream?.subject_id ?? null;
   const subjectId = useMemo(() => {
-    if (selectedSubject !== null && observedSubjectList.includes(selectedSubject)) {
-      return selectedSubject;
-    }
+    if (selectedSubject !== null) return selectedSubject;
     return observedSubjectList[0] ?? streamSubject;
   }, [observedSubjectList, selectedSubject, streamSubject]);
 
@@ -147,8 +150,9 @@ export function PoseViewer() {
           z_m?: unknown;
           error_m?: unknown;
         }>,
+        subjectId,
       ),
-    [window.data],
+    [subjectId, window.data],
   );
   const overlays = useMemo(
     () =>
@@ -159,13 +163,25 @@ export function PoseViewer() {
   );
 
   const [preset, setPreset] = useState<CameraPreset>("reset");
+  const [showProviderSkeleton, setShowProviderSkeleton] = useState(true);
+  const [showSegments, setShowSegments] = useState(true);
+  const [showAngles, setShowAngles] = useState(true);
   const [showErrorRadii, setShowErrorRadii] = useState(false);
+
+  const providerConnections = useMemo<DisplayConnectionDefinition[]>(
+    () =>
+      (stream?.skeleton_display_connections ?? []).map((connection) => ({
+        startLandmark: connection.start_joint_name,
+        endLandmark: connection.end_joint_name,
+      })),
+    [stream?.skeleton_display_connections],
+  );
 
   // Publish the resolved subject so the pitch, metric tables and inspector
   // follow the same entity. Committing it durably keeps the view shareable.
   const selectSubject = context?.selectSubject;
   useEffect(() => {
-    if (subjectId !== null && subjectId !== selectedSubject) selectSubject?.(subjectId);
+    if (selectedSubject === null && subjectId !== null) selectSubject?.(subjectId);
   }, [selectSubject, selectedSubject, subjectId]);
 
   if (!context) return <StatePanel state="empty" title="Open a laboratory session first." />;
@@ -242,8 +258,12 @@ export function PoseViewer() {
     return (
       <StatePanel
         state="unavailable"
-        title="No observed landmark is available in this window."
-        detail="Unavailable joints are never imputed or replaced."
+        title={
+          subjectId === null
+            ? "No observed landmark is available in this window."
+            : `Individual ${subjectId} is not observed at this time/window.`
+        }
+        detail="The selected identity remains unchanged; unavailable joints are never imputed or replaced."
       />
     );
   }
@@ -265,6 +285,9 @@ export function PoseViewer() {
         <span className="mono">{stream.stream_id}</span>
         <MeasurementClassBadge measurementClass={stream.measurement_class} compact />
         <span className="mono">skeleton {stream.skeleton_id ?? "unregistered"}</span>
+        <span>
+          individual <span className="mono text-text-secondary">{subjectId ?? "not scoped"}</span>
+        </span>
         <span className="text-quality-warning">
           local analytical frame · Z is player-centroid-relative, not absolute height
         </span>
@@ -289,8 +312,12 @@ export function PoseViewer() {
             <PoseCanvas
               frames={frames}
               overlays={overlays}
+              providerConnections={providerConnections}
               preset={preset}
               playing={playing}
+              showProviderSkeleton={showProviderSkeleton}
+              showSegments={showSegments}
+              showAngles={showAngles}
               showErrorRadii={showErrorRadii}
               onReady={() => setRendererReady(true)}
             />
@@ -311,15 +338,15 @@ export function PoseViewer() {
                 onChange={(event) => context?.selectSubject(event.target.value)}
                 className="mono mt-1 h-7 w-full rounded-control border border-border-subtle bg-surface-0 px-1.5 text-[12px] text-text-secondary outline-none focus:border-accent"
               >
-                {observed.subjects.map((candidate) => (
+                {[...new Set(subjectId ? [...observed.subjects, subjectId] : observed.subjects)].map((candidate) => (
                   <option key={candidate} value={candidate}>
                     {candidate}
                   </option>
                 ))}
               </select>
               <p className="mt-1 text-[10px] text-text-muted">
-                {observed.subjects.length} observed in this window; landmarks are never
-                merged across subjects.
+                {observed.subjects.length} individuals in the artifact/session authority;
+                landmarks are never merged across subjects.
               </p>
             </div>
           ) : null}
@@ -351,6 +378,33 @@ export function PoseViewer() {
             />
             provider p90 predicted error radius
           </label>
+          <div className="mb-3 space-y-1">
+            <span className="t-section text-text-muted">layers</span>
+            <label className="flex items-center gap-1 text-text-muted">
+              <input
+                type="checkbox"
+                checked={showProviderSkeleton}
+                onChange={(event) => setShowProviderSkeleton(event.target.checked)}
+              />
+              provider skeleton / landmark connections
+            </label>
+            <label className="flex items-center gap-1 text-text-muted">
+              <input
+                type="checkbox"
+                checked={showSegments}
+                onChange={(event) => setShowSegments(event.target.checked)}
+              />
+              analytical segments
+            </label>
+            <label className="flex items-center gap-1 text-text-muted">
+              <input
+                type="checkbox"
+                checked={showAngles}
+                onChange={(event) => setShowAngles(event.target.checked)}
+              />
+              joint angles
+            </label>
+          </div>
           <div className="mb-3">
             <span className="t-section text-text-muted">
               viewer frame
@@ -371,6 +425,14 @@ export function PoseViewer() {
             <p className="mt-1 text-[10px] leading-relaxed text-text-muted">
               Display orientation only. Every served pose metric is computed from relative
               vectors, so the view carries no absolute height or pitch position.
+            </p>
+          </div>
+          <div className="mb-2">
+            <span className="t-section text-text-muted">
+              provider structure
+            </span>
+            <p className="text-text-muted">
+              {providerConnections.length} provider display connection(s) · landmark_set · no parent tree
             </p>
           </div>
           <div className="mb-2">

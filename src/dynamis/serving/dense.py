@@ -294,6 +294,25 @@ def entity_cardinality(settings: Settings, ref: ArtifactRefView) -> int | None:
     return int(row[0]) if row and row[0] is not None else None
 
 
+def entity_ids(settings: Settings, ref: ArtifactRefView) -> list[str] | None:
+    """Return the stable distinct entity identities present in an artifact."""
+    path = resolve_artifact_path(settings, ref)
+    column = entity_column(pq.read_schema(path))
+    if column is None:
+        return None
+    connection = _connect()
+    try:
+        rows = connection.execute(
+            f'SELECT DISTINCT CAST("{column}" AS VARCHAR) AS entity_id '
+            "FROM read_parquet(?) WHERE "
+            f'"{column}" IS NOT NULL ORDER BY entity_id',
+            [path.as_posix()],
+        ).fetchall()
+    finally:
+        connection.close()
+    return [str(row[0]) for row in rows if row[0] is not None]
+
+
 def canonical_timespan(settings: Settings, ref: ArtifactRefView) -> tuple[int | None, int | None]:
     """Canonical ``t_rel_ns`` bounds of one artifact.
 
@@ -481,6 +500,7 @@ __all__ = [
     "default_max_source_rows",
     "entity_cardinality",
     "entity_column",
+    "entity_ids",
     "load_artifact_window",
     "resolve_artifact_path",
     "table_records",

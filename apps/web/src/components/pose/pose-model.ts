@@ -39,6 +39,11 @@ export interface PoseRow {
   readonly error_m?: unknown;
 }
 
+export interface DisplayConnectionDefinition {
+  readonly startLandmark: string;
+  readonly endLandmark: string;
+}
+
 export interface SegmentDefinition {
   readonly name: string;
   readonly startLandmark: string;
@@ -66,22 +71,33 @@ function finite(value: unknown): number | null {
 }
 
 /** Group pose rows into observed frames, dropping unavailable/non-finite joints. */
-export function extractFrames(rows: readonly PoseRow[]): PoseFrame[] {
+export function extractFrames(
+  rows: readonly PoseRow[],
+  subjectId: string | null = null,
+): PoseFrame[] {
   const byTime = new Map<
-    number,
+    string,
     { subjectId: string | null; landmarks: PoseLandmark[]; unavailable: Set<string> }
   >();
   for (const row of rows) {
     const t = row.t_rel_ns;
     if (typeof t !== "number") continue;
+    const rowSubject =
+      typeof row.subject_id === "string"
+        ? row.subject_id
+        : typeof row.subject_id === "number"
+          ? String(row.subject_id)
+          : null;
+    if (subjectId !== null && rowSubject !== subjectId) continue;
     const jointName = row.joint_name;
     if (typeof jointName !== "string" || jointName.length === 0) continue;
     const available = row.is_available === true;
     const x = finite(row.x_m);
     const y = finite(row.y_m);
     const z = finite(row.z_m);
-    const entry = byTime.get(t) ?? {
-      subjectId: typeof row.subject_id === "string" ? row.subject_id : null,
+    const key = `${t}\u0000${rowSubject ?? ""}`;
+    const entry = byTime.get(key) ?? {
+      subjectId: rowSubject,
       landmarks: [],
       unavailable: new Set<string>(),
     };
@@ -96,12 +112,16 @@ export function extractFrames(rows: readonly PoseRow[]): PoseFrame[] {
     } else {
       entry.unavailable.add(jointName);
     }
-    byTime.set(t, entry);
+    byTime.set(key, entry);
   }
   return Array.from(byTime.entries())
-    .sort(([left], [right]) => left - right)
-    .map(([tRelNs, entry]) => ({
-      tRelNs,
+    .sort(([left], [right]) => {
+      const leftTime = Number(left.slice(0, left.indexOf("\u0000")));
+      const rightTime = Number(right.slice(0, right.indexOf("\u0000")));
+      return leftTime - rightTime || left.localeCompare(right);
+    })
+    .map(([key, entry]) => ({
+      tRelNs: Number(key.slice(0, key.indexOf("\u0000"))),
       subjectId: entry.subjectId,
       landmarks: entry.landmarks.sort((left, right) =>
         left.jointName < right.jointName ? -1 : 1,
@@ -113,6 +133,21 @@ export function extractFrames(rows: readonly PoseRow[]): PoseFrame[] {
         .sort(),
       observed: entry.landmarks.length > 0,
     }));
+}
+
+/** Provider display edges whose two endpoints are observed in the frame. */
+export function drawableDisplayConnections(
+  landmarks: readonly PoseLandmark[],
+  connections: readonly DisplayConnectionDefinition[],
+): Array<readonly [PoseLandmark, PoseLandmark]> {
+  const byName = new Map(landmarks.map((landmark) => [landmark.jointName, landmark]));
+  const drawable: Array<readonly [PoseLandmark, PoseLandmark]> = [];
+  for (const connection of connections) {
+    const start = byName.get(connection.startLandmark);
+    const end = byName.get(connection.endLandmark);
+    if (start !== undefined && end !== undefined) drawable.push([start, end]);
+  }
+  return drawable;
 }
 
 export function frameIndexAt(frames: readonly PoseFrame[], tRelNs: bigint): number {

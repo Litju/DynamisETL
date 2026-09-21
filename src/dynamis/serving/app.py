@@ -29,6 +29,7 @@ from dynamis.serving.dense import (
     canonical_timespan,
     entity_cardinality,
     entity_column,
+    entity_ids,
     load_artifact_window,
     resolve_artifact_path,
     table_records,
@@ -222,6 +223,7 @@ class PostgresServingBackend:
             canonical_time_max_ns=maximum,
             entity_column=entity_column(pq.read_schema(path)),
             entity_count=entity_cardinality(self.settings, ref),
+            entity_ids=entity_ids(self.settings, ref),
         )
 
     def window(

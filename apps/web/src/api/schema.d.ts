@@ -316,6 +316,8 @@ export interface components {
             entity_column?: string | null;
             /** Entity Count */
             entity_count?: number | null;
+            /** Entity Ids */
+            entity_ids?: string[] | null;
             /** Format */
             format: string;
             /** Layer */
@@ -885,6 +887,13 @@ export interface components {
             /** Trial Count */
             trial_count: number;
         };
+        /** SkeletonDisplayConnectionView */
+        SkeletonDisplayConnectionView: {
+            /** End Joint Name */
+            end_joint_name: string;
+            /** Start Joint Name */
+            start_joint_name: string;
+        };
         /** StreamView */
         StreamView: {
             /** Clock Id */
@@ -905,8 +914,14 @@ export interface components {
             sample_row_count: number;
             /** Si Units */
             si_units: string[];
+            /** Skeleton Display Connections */
+            skeleton_display_connections?: components["schemas"]["SkeletonDisplayConnectionView"][];
             /** Skeleton Id */
             skeleton_id: string | null;
+            /** Skeleton Joint Names */
+            skeleton_joint_names?: string[];
+            /** Skeleton Topology */
+            skeleton_topology?: string | null;
             /** Source Unit */
             source_unit: string | null;
             /** Stream Id */
