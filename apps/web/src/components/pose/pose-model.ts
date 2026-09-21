@@ -143,6 +143,48 @@ export function landmarksAt(
   return index < 0 ? [] : (frames[index]?.landmarks ?? []);
 }
 
+/** A point in the viewer's own frame: [right, up, depth], in metres. */
+export type ViewerPoint = readonly [number, number, number];
+
+/**
+ * Place a source landmark in the viewer's frame.
+ *
+ * The SkillCorner hybrid frame carries X and Y as pitch-plane metres and Z as
+ * a player-centroid-relative vertical. Mapping those axes straight onto the
+ * renderer would put the pitch's lateral axis on screen-up and lay the subject
+ * on its side, so the viewer maps the centroid-relative vertical to screen-up
+ * and the two pitch-plane axes to the horizontal plane.
+ *
+ * Landmarks are also expressed relative to `centre`, the observed cloud's own
+ * centre. Both operations are display-only and change nothing scientific: the
+ * processor that produces every served pose metric declares
+ * `translation_invariance: relative_vectors_only` and
+ * `absolute_height_interpretation: none`, so its angles are computed from
+ * relative vectors and carry no absolute position or height to preserve. The
+ * viewer states the active frame on screen rather than implying the subject
+ * stands on a global pitch plane.
+ */
+export function toViewerPoint(
+  landmark: { readonly xM: number; readonly yM: number; readonly zM: number },
+  centre: { readonly xM: number; readonly yM: number },
+): ViewerPoint {
+  return [landmark.xM - centre.xM, landmark.zM, landmark.yM - centre.yM];
+}
+
+/** Pitch-plane centre of the observed landmarks; the viewer's local origin. */
+export function planarCentre(
+  landmarks: readonly PoseLandmark[],
+): { readonly xM: number; readonly yM: number } {
+  if (landmarks.length === 0) return { xM: 0, yM: 0 };
+  let sumX = 0;
+  let sumY = 0;
+  for (const landmark of landmarks) {
+    sumX += landmark.xM;
+    sumY += landmark.yM;
+  }
+  return { xM: sumX / landmarks.length, yM: sumY / landmarks.length };
+}
+
 export interface Bounds {
   readonly min: readonly [number, number, number];
   readonly max: readonly [number, number, number];
@@ -150,11 +192,18 @@ export interface Bounds {
   readonly radius: number;
 }
 
-/** Bounds of the observed landmarks in the local analytical frame. */
+/**
+ * Bounds of observed landmarks, in the viewer's frame.
+ *
+ * The radius is the half-diagonal of the observed cloud with a small floor, so
+ * a single-landmark frame still yields a usable camera distance rather than a
+ * degenerate one.
+ */
 export function boundsOf(landmarks: readonly PoseLandmark[]): Bounds {
   if (landmarks.length === 0) {
     return { min: [0, 0, 0], max: [0, 0, 0], center: [0, 0, 0], radius: 1 };
   }
+  const centre = planarCentre(landmarks);
   let minX = Number.POSITIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
   let minZ = Number.POSITIVE_INFINITY;
@@ -162,12 +211,13 @@ export function boundsOf(landmarks: readonly PoseLandmark[]): Bounds {
   let maxY = Number.NEGATIVE_INFINITY;
   let maxZ = Number.NEGATIVE_INFINITY;
   for (const landmark of landmarks) {
-    minX = Math.min(minX, landmark.xM);
-    minY = Math.min(minY, landmark.yM);
-    minZ = Math.min(minZ, landmark.zM);
-    maxX = Math.max(maxX, landmark.xM);
-    maxY = Math.max(maxY, landmark.yM);
-    maxZ = Math.max(maxZ, landmark.zM);
+    const [x, y, z] = toViewerPoint(landmark, centre);
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    minZ = Math.min(minZ, z);
+    maxX = Math.max(maxX, x);
+    maxY = Math.max(maxY, y);
+    maxZ = Math.max(maxZ, z);
   }
   const center: [number, number, number] = [
     (minX + maxX) / 2,
@@ -175,7 +225,7 @@ export function boundsOf(landmarks: readonly PoseLandmark[]): Bounds {
     (minZ + maxZ) / 2,
   ];
   const radius = Math.max(
-    1,
+    0.4,
     Math.hypot(maxX - minX, maxY - minY, maxZ - minZ) / 2,
   );
   return { min: [minX, minY, minZ], max: [maxX, maxY, maxZ], center, radius };
@@ -210,7 +260,9 @@ export function cameraFor(
   preset: CameraPreset,
   bounds: Bounds,
 ): { position: [number, number, number]; target: [number, number, number] } {
-  const distance = bounds.radius * 3.2;
+  // Close enough that the observed cloud fills the viewport, far enough that a
+  // limb swinging outside the first frame's bounds does not leave the view.
+  const distance = bounds.radius * 2.6;
   const [cx, cy, cz] = bounds.center;
   const offsets: Record<Exclude<CameraPreset, "free" | "reset">, [number, number, number]> = {
     front: [0, 0, distance],
@@ -221,7 +273,12 @@ export function cameraFor(
     body_local: [distance * 0.3, distance * 0.25, distance * 0.9],
   };
   if (preset === "free" || preset === "reset") {
-    return { position: [cx, cy + bounds.radius * 0.4, cz + distance], target: [cx, cy, cz] };
+    // A three-quarter view: a straight-on camera flattens the depth axis, and
+    // depth is where a markerless estimate is least certain.
+    return {
+      position: [cx + distance * 0.5, cy + distance * 0.22, cz + distance * 0.82],
+      target: [cx, cy, cz],
+    };
   }
   const [dx, dy, dz] = offsets[preset];
   return { position: [cx + dx, cy + dy, cz + dz], target: [cx, cy, cz] };

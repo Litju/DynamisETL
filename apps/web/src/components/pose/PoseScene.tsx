@@ -9,9 +9,13 @@ import {
   boundsOf,
   cameraFor,
   landmarksAt,
+  planarCentre,
+  toViewerPoint,
   type CameraPreset,
   type PoseFrame,
+  type PoseLandmark,
   type ProcessorOverlays,
+  type ViewerPoint,
 } from "@/components/pose/pose-model";
 import { useAnalysisStore } from "@/lib/state/analysis";
 
@@ -54,15 +58,32 @@ export function PoseScene({
     return Array.from(names).sort();
   }, [frames]);
 
+  // Framing follows one observed frame, not the union of many. Pooling 500
+  // landmarks across a moving subject inflates the bounding radius with the
+  // path they travelled, and the camera then backs off far enough to make the
+  // body a speck.
+  // The viewer's local origin is fixed to the first observed frame, not
+  // recomputed per frame: re-centring every frame would hold the subject still
+  // and slide the reference geometry underneath them, which reads as the world
+  // moving rather than the athlete.
+  const centre = useMemo(() => {
+    const firstObserved = frames.find((frame) => frame.observed);
+    return planarCentre(firstObserved?.landmarks ?? []);
+  }, [frames]);
+
   const bounds = useMemo(() => {
-    const observed = frames.flatMap((frame) => frame.landmarks);
-    return boundsOf(observed.slice(0, 500));
+    const firstObserved = frames.find((frame) => frame.observed);
+    return boundsOf(firstObserved?.landmarks ?? []);
   }, [frames]);
 
   useEffect(() => {
     const controls = controlsRef.current;
     if (!controls) return;
     const { position, target } = cameraFor(preset, bounds);
+    // Applied without a transition. A paused scene renders on demand, so an
+    // animated move would draw one frame and stop part-way through, leaving
+    // the camera short of the preset it was asked for. RES-101 also wants
+    // camera changes functional rather than cinematic.
     void controls.setLookAt(
       position[0],
       position[1],
@@ -70,12 +91,17 @@ export function PoseScene({
       target[0],
       target[1],
       target[2],
-      true,
+      false,
     );
     invalidate();
   }, [preset, bounds, invalidate]);
 
   const jointRefs = useRef<Map<string, Mesh>>(new Map());
+  // `useFrame` runs outside React's render, so the origin is carried by a ref.
+  const centreRef = useRef(centre);
+  useEffect(() => {
+    centreRef.current = centre;
+  }, [centre]);
 
   const setJointRef = useCallback((name: string, mesh: Mesh | null) => {
     if (mesh) jointRefs.current.set(name, mesh);
@@ -94,7 +120,8 @@ export function PoseScene({
         continue;
       }
       mesh.visible = true;
-      mesh.position.set(landmark.xM, landmark.yM, landmark.zM);
+      const [x, y, z] = toViewerPoint(landmark, centreRef.current);
+      mesh.position.set(x, y, z);
     }
   });
 
@@ -106,16 +133,28 @@ export function PoseScene({
   return (
     <>
       <color attach="background" args={["#12161c"]} />
+      <fog attach="fog" args={["#12161c", bounds.radius * 3, bounds.radius * 9]} />
       <ambientLight intensity={0.9} />
       <directionalLight position={[2, 4, 3]} intensity={1.1} />
+      {/*
+        Reference geometry for a *local analytical frame*.
+
+        An infinite ground grid would read as a floor and invite the viewer to
+        measure height against it, but this stream's Z is player-centroid
+        relative and its axes are the provider's own. The reference is
+        therefore a bounded plane sized to the observed landmark cloud and
+        placed at the bottom of its bounds — orientation and depth, with no
+        claim about absolute height or global position.
+      */}
       <Grid
-        args={[4, 4]}
-        cellSize={0.25}
-        cellColor="#2a3340"
-        sectionSize={1}
-        sectionColor="#3d4b5c"
-        infiniteGrid
-        fadeDistance={12}
+        args={[bounds.radius * 2.6, bounds.radius * 2.6]}
+        position={[bounds.center[0], bounds.min[1], bounds.center[2]]}
+        cellSize={bounds.radius / 8}
+        cellColor="#242c37"
+        sectionSize={bounds.radius / 2}
+        sectionColor="#33404f"
+        fadeDistance={bounds.radius * 14}
+        fadeStrength={1.5}
       />
       <CameraControls ref={controlsRef} makeDefault />
       {allNames.map((name) => (
@@ -132,18 +171,37 @@ export function PoseScene({
           }}
           onPointerOut={() => useAnalysisStore.getState().hoverJoint(null)}
         >
-          <sphereGeometry args={[0.022, 12, 12]} />
+          <sphereGeometry args={[selectedJoint === name ? 0.042 : 0.026, 16, 16]} />
           <meshStandardMaterial
             color={selectedJoint === name ? SELECTED_JOINT_COLOR : JOINT_COLOR}
-            roughness={0.4}
+            emissive={selectedJoint === name ? SELECTED_JOINT_COLOR : "#000000"}
+            emissiveIntensity={selectedJoint === name ? 0.45 : 0}
+            roughness={0.35}
+            metalness={0.05}
           />
         </mesh>
       ))}
+      {/*
+        The selected landmark carries a wireframe shell as well as a larger
+        radius and a different hue, so the selection survives a colour-vision
+        difference and a greyscale screenshot alike.
+      */}
+      {selectedJoint !== null && byName.has(selectedJoint) ? (
+        <mesh position={toViewerPoint(byName.get(selectedJoint)!, centre)}>
+          <sphereGeometry args={[0.07, 16, 16]} />
+          <meshBasicMaterial
+            color={SELECTED_JOINT_COLOR}
+            wireframe
+            transparent
+            opacity={0.55}
+          />
+        </mesh>
+      ) : null}
       {showErrorRadii
         ? landmarks
             .filter((landmark) => landmark.errorM !== null && landmark.errorM > 0)
             .map((landmark) => (
-              <mesh key={`error-${landmark.jointName}`} position={[landmark.xM, landmark.yM, landmark.zM]}>
+              <mesh key={`error-${landmark.jointName}`} position={toViewerPoint(landmark, centre)}>
                 <sphereGeometry args={[landmark.errorM ?? 0, 10, 10]} />
                 <meshBasicMaterial color={ERROR_RADIUS_COLOR} transparent opacity={0.12} depthWrite={false} />
               </mesh>
@@ -156,12 +214,9 @@ export function PoseScene({
         return (
           <Line
             key={segment.name}
-            points={[
-              [start.xM, start.yM, start.zM],
-              [end.xM, end.yM, end.zM],
-            ]}
+            points={[toViewerPoint(start, centre), toViewerPoint(end, centre)]}
             color={SEGMENT_COLOR}
-            lineWidth={2}
+            lineWidth={2.5}
           />
         );
       })}
@@ -172,7 +227,7 @@ export function PoseScene({
         if (!vertex || !first || !second) return null;
         const radians = angleAt(vertex, first, second);
         if (radians === null) return null;
-        const arc = arcPoints(vertex, first, second, radians);
+        const arc = arcPoints(vertex, first, second, radians, centre);
         if (arc.length < 2) return null;
         return <Line key={angle.name} points={arc} color={ANGLE_COLOR} lineWidth={2} />;
       })}
@@ -180,14 +235,20 @@ export function PoseScene({
   );
 }
 
-/** Arc polyline between the two segment directions at the vertex (SLERP). */
+/**
+ * Arc polyline between the two segment directions at the vertex (SLERP).
+ *
+ * The arc is built in the source frame, where the angle is defined, and each
+ * point is mapped into the viewer's frame only for drawing.
+ */
 export function arcPoints(
-  vertex: { xM: number; yM: number; zM: number },
-  first: { xM: number; yM: number; zM: number },
-  second: { xM: number; yM: number; zM: number },
+  vertex: PoseLandmark,
+  first: PoseLandmark,
+  second: PoseLandmark,
   radians: number,
-  radius = 0.08,
-): Array<[number, number, number]> {
+  centre: { readonly xM: number; readonly yM: number } = { xM: 0, yM: 0 },
+  radius = 0.1,
+): ViewerPoint[] {
   const toVector = (point: { xM: number; yM: number; zM: number }) => {
     const x = point.xM - vertex.xM;
     const y = point.yM - vertex.yM;
@@ -199,8 +260,8 @@ export function arcPoints(
   const v = toVector(second);
   const angle = Math.min(Math.PI - 1e-6, Math.max(1e-6, radians));
   const sinAngle = Math.sin(angle);
-  const points: Array<[number, number, number]> = [];
-  const steps = 16;
+  const points: ViewerPoint[] = [];
+  const steps = 20;
   for (let step = 0; step <= steps; step += 1) {
     const t = step / steps;
     const weightU = Math.sin((1 - t) * angle) / sinAngle;
@@ -208,11 +269,16 @@ export function arcPoints(
     const mixed = u.map((value, index) => value * weightU + (v[index] ?? 0) * weightV);
     const norm = Math.hypot(...mixed);
     const normalized = norm === 0 ? [0, 0, 0] : mixed.map((value) => value / norm);
-    points.push([
-      vertex.xM + normalized[0]! * radius,
-      vertex.yM + normalized[1]! * radius,
-      vertex.zM + normalized[2]! * radius,
-    ]);
+    points.push(
+      toViewerPoint(
+        {
+          xM: vertex.xM + normalized[0]! * radius,
+          yM: vertex.yM + normalized[1]! * radius,
+          zM: vertex.zM + normalized[2]! * radius,
+        },
+        centre,
+      ),
+    );
   }
   return points;
 }

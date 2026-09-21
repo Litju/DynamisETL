@@ -119,14 +119,18 @@ export function PoseViewer() {
     ...metricsQuery({ streamId: streamId ?? undefined, limit: 50 }),
     enabled: Boolean(streamId),
   });
-  const processorAlgorithmId = useMemo(() => {
+  // Analytical overlays come from the processor revision that produced this
+  // stream's metrics, and the methodology endpoint is keyed by metric id: an
+  // algorithm id resolves to nothing there, which silently emptied every
+  // overlay. The first pose metric of the stream names the revision to read.
+  const poseMetricId = useMemo(() => {
     const rows = metrics.data?.rows ?? [];
     const poseMetric = rows.find((row) => (row.algorithm_id ?? "").startsWith("pose."));
-    return poseMetric?.algorithm_id ?? null;
+    return poseMetric?.metric_id ?? null;
   }, [metrics.data]);
   const methodology = useQuery({
-    ...methodologyQuery(processorAlgorithmId ?? ""),
-    enabled: Boolean(processorAlgorithmId),
+    ...methodologyQuery(poseMetricId ?? ""),
+    enabled: Boolean(poseMetricId),
   });
 
   const frames = useMemo(
@@ -340,6 +344,25 @@ export function PoseViewer() {
             />
             provider p90 predicted error radius
           </label>
+          <div className="mb-3">
+            <span className="text-[10px] uppercase tracking-wider text-text-muted">
+              viewer frame
+            </span>
+            <dl className="mt-1 space-y-0.5 text-[10px] leading-snug text-text-muted">
+              <div className="flex justify-between gap-2">
+                <dt>screen up</dt>
+                <dd className="mono text-text-secondary">source z (centroid-relative)</dd>
+              </div>
+              <div className="flex justify-between gap-2">
+                <dt>horizontal plane</dt>
+                <dd className="mono text-text-secondary">source x, y (pitch plane)</dd>
+              </div>
+            </dl>
+            <p className="mt-1 text-[10px] leading-relaxed text-text-muted">
+              Display orientation only. Every served pose metric is computed from relative
+              vectors, so the view carries no absolute height or pitch position.
+            </p>
+          </div>
           <div className="mb-2">
             <span className="text-[10px] uppercase tracking-wider text-text-muted">
               processor overlays

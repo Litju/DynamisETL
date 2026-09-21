@@ -8,7 +8,9 @@ import {
   frameIndexAt,
   landmarksAt,
   overlaysFromParameters,
+  planarCentre,
   summarizeFrame,
+  toViewerPoint,
   type PoseRow,
 } from "@/components/pose/pose-model";
 
@@ -42,15 +44,33 @@ describe("pose landmark extraction", () => {
     ]);
   });
 
-  it("computes local-frame bounds and a stable camera preset", () => {
+  it("puts the centroid-relative vertical on the viewer's up axis", () => {
+    // Source x/y are pitch-plane metres and source z is centroid-relative
+    // height. Mapping them straight onto the renderer would lay the subject on
+    // its side, so the viewer's up axis carries source z.
+    const centre = planarCentre(frames[0]!.landmarks);
+    expect(toViewerPoint({ xM: 1, yM: 2, zM: 3 }, { xM: 1, yM: 2 })).toEqual([0, 3, 0]);
+
     const bounds = boundsOf(frames[0]!.landmarks);
-    expect(bounds.center[2]).toBeCloseTo(-0.15, 9);
+    // nose z = 0.1, hip z = -0.4, so the vertical midpoint is -0.15.
+    expect(bounds.center[1]).toBeCloseTo(-0.15, 9);
+    // Both landmarks sit at the same pitch-plane point, so the horizontal
+    // extent is zero once the cloud is re-centred on its own origin.
+    expect(centre).toEqual({ xM: 0, yM: 0 });
+    expect(bounds.center[0]).toBeCloseTo(0, 9);
+    expect(bounds.center[2]).toBeCloseTo(0, 9);
     expect(bounds.radius).toBeGreaterThan(0);
+  });
+
+  it("frames the observed cloud from every camera preset", () => {
+    const bounds = boundsOf(frames[0]!.landmarks);
     const front = cameraFor("front", bounds);
     expect(front.target).toEqual(bounds.center);
     expect(front.position[2]).toBeGreaterThan(bounds.center[2]!);
     const left = cameraFor("left", bounds);
     expect(left.position[0]).toBeLessThan(bounds.center[0]!);
+    const top = cameraFor("top", bounds);
+    expect(top.position[1]).toBeGreaterThan(bounds.center[1]!);
     expect(cameraFor("reset", bounds).position).toEqual(cameraFor("free", bounds).position);
   });
 
