@@ -34,6 +34,8 @@ export interface WindowQuery {
    * subject must say so or pay for every other entity's rows.
    */
   readonly entityId?: string | undefined;
+  readonly cacheScope?: "dense-window" | "dense-chunk" | undefined;
+  readonly chunkId?: string | undefined;
 }
 
 function compact(params: Record<string, string | number | undefined>): Record<string, string> {
@@ -62,7 +64,17 @@ export const queryKeys = {
   runs: (query: Record<string, string | undefined>) => ["runs", query] as const,
   rights: ["rights"] as const,
   artifact: (artifactId: string) => ["artifacts", artifactId] as const,
-  window: (query: WindowQuery) => ["artifacts", query.artifactId, "window", query] as const,
+  window: (query: WindowQuery) => [
+    query.cacheScope ?? "dense-window",
+    query.artifactId,
+    "window",
+    query.chunkId ?? "single",
+    query.fromNs ?? null,
+    query.toNs ?? null,
+    query.columns?.join(",") ?? null,
+    query.maxPoints ?? null,
+    query.entityId ?? null,
+  ] as const,
 };
 
 export const servingStatusQuery = () =>
@@ -246,7 +258,7 @@ export const artifactQuery = (artifactId: string) =>
 export const windowQuery = (query: WindowQuery) =>
   queryOptions({
     queryKey: queryKeys.window(query),
-    queryFn: async () =>
+    queryFn: async ({ signal }) =>
       unwrap(
         await api.GET("/api/artifacts/{artifact_id}/window", {
           params: {
@@ -259,6 +271,7 @@ export const windowQuery = (query: WindowQuery) =>
               entity_id: query.entityId,
             }),
           },
+          signal,
         }),
       ),
     staleTime: 30_000,

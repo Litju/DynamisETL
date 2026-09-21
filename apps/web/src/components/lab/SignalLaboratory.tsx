@@ -31,6 +31,7 @@ import {
   type WindowTable,
 } from "@/lib/arrow/window-table";
 import { formatMetricValue } from "@/lib/measurement";
+import { affordableSpanNs, canonicalSpan } from "@/lib/dense-window";
 import {
   resolveSignalStream,
   stableIndividualIds,
@@ -96,6 +97,22 @@ export function SignalLaboratory() {
   const entityId = artifact.data?.entity_column
     ? subjectId ?? undefined
     : undefined;
+  const committedTimeNs = useAnalysisStore((state) => state.committedTimeNs);
+  const chunk = useMemo(() => {
+    if (fromNs !== null || toNs !== null || !artifact.data) return undefined;
+    const span = canonicalSpan(artifact.data);
+    const chunkSpanNs = affordableSpanNs(artifact.data, {
+      maxPoints: MAX_WINDOW_POINTS,
+      entityScoped: entityId !== undefined,
+    });
+    if (!span || chunkSpanNs === null) return undefined;
+    return {
+      canonicalMinNs: span.minNs,
+      canonicalMaxNs: span.maxNs,
+      anchorNs: committedTimeNs,
+      chunkSpanNs,
+    } as const;
+  }, [artifact.data, committedTimeNs, entityId, fromNs, toNs]);
 
   // Selecting a subject on a per-subject stream resolves to the compatible
   // real stream/trial and makes that resolution durable for reloads.
@@ -118,6 +135,7 @@ export function SignalLaboratory() {
     ...(toNs !== null ? { toNs: Number(toNs) } : {}),
     ...(entityId !== undefined ? { entityId } : {}),
     maxPoints: MAX_WINDOW_POINTS,
+    ...(chunk ? { chunk } : {}),
   });
 
   if (!context) {

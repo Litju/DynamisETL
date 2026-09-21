@@ -22,7 +22,9 @@ import { useAnalysisContext } from "@/lib/analysis-context";
 import { ApiError } from "@/lib/api/client";
 import { artifactQuery, methodologyQuery, metricsQuery, sessionQuery, windowQuery } from "@/lib/api/queries";
 import { usePoseSubjects } from "@/components/pose/use-pose-subjects";
-import { windowAround } from "@/lib/dense-window";
+import { canonicalSpan, windowAround } from "@/lib/dense-window";
+import { planDenseChunks } from "@/lib/dense-chunks";
+import { useDenseChunkPrefetch } from "@/components/lab/use-dense-window";
 import { formatMetricValue } from "@/lib/measurement";
 import { useAnalysisStore } from "@/lib/state/analysis";
 import { formatClockNs } from "@/lib/time";
@@ -101,26 +103,44 @@ export function PoseViewer() {
     [artifactData, committedTimeNs, explicitFromNs, explicitToNs, sceneSubjectId],
   );
 
+  const chunkPlan = useMemo(() => {
+    if (explicitFromNs !== null || explicitToNs !== null || !artifactData || !windowBounds) return null;
+    const span = canonicalSpan(artifactData);
+    if (!span) return null;
+    return planDenseChunks({
+      canonicalMinNs: span.minNs,
+      canonicalMaxNs: span.maxNs,
+      anchorNs: committedTimeNs,
+      chunkSpanNs: windowBounds.toNs - windowBounds.fromNs + 1n,
+    });
+  }, [artifactData, committedTimeNs, explicitFromNs, explicitToNs, windowBounds]);
+  const poseWindowRequest = useMemo(() => ({
+    artifactId: artifactId ?? "",
+    ...(sceneSubjectId !== null ? { entityId: sceneSubjectId } : {}),
+    columns: [
+      "t_rel_ns",
+      "subject_id",
+      "joint_name",
+      "is_available",
+      "x_m",
+      "y_m",
+      "z_m",
+      "error_m",
+    ],
+    maxPoints: MAX_POSE_POINTS,
+  }), [artifactId, sceneSubjectId]);
+  useDenseChunkPrefetch(poseWindowRequest, chunkPlan);
+  const activeWindowBounds = chunkPlan?.active ?? windowBounds;
+
   const window = useQuery({
     ...windowQuery({
-      artifactId: artifactId ?? "",
-      ...(windowBounds
-        ? { fromNs: Number(windowBounds.fromNs), toNs: Number(windowBounds.toNs) }
+      ...poseWindowRequest,
+      ...(activeWindowBounds
+        ? { fromNs: Number(activeWindowBounds.fromNs), toNs: Number(activeWindowBounds.toNs) }
         : {}),
-      ...(sceneSubjectId !== null ? { entityId: sceneSubjectId } : {}),
-      columns: [
-        "t_rel_ns",
-        "subject_id",
-        "joint_name",
-        "is_available",
-        "x_m",
-        "y_m",
-        "z_m",
-        "error_m",
-      ],
-      maxPoints: MAX_POSE_POINTS,
+      ...(chunkPlan ? { cacheScope: "dense-chunk", chunkId: chunkPlan.active.id } : {}),
     }),
-    enabled: Boolean(artifactId) && windowBounds !== null,
+    enabled: Boolean(artifactId) && activeWindowBounds !== null,
   });
   const metrics = useQuery({
     ...metricsQuery({
