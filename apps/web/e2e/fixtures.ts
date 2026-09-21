@@ -237,6 +237,12 @@ const POSE_ROWS = POSE_LANDMARKS.map((joint_name) => {
     error_m: joint_name === "lKnee" ? 0.04 : joint_name === "lAnkle" ? 0.05 : 0.03,
   };
 });
+const POSE_ROWS_LATER = POSE_ROWS.map((row) => ({
+  ...row,
+  t_rel_ns: 40_000_000,
+  x_m: row.x_m + 0.12,
+}));
+const POSE_WINDOW_ROWS = [...POSE_ROWS, ...POSE_ROWS_LATER];
 
 const POSE_WINDOW = {
   meta: {
@@ -253,8 +259,8 @@ const POSE_WINDOW = {
       "z_m",
       "error_m",
     ],
-    source_rows: POSE_ROWS.length,
-    returned_rows: POSE_ROWS.length,
+    source_rows: POSE_WINDOW_ROWS.length,
+    returned_rows: POSE_WINDOW_ROWS.length,
     canonical_time_min_ns: 0,
     canonical_time_max_ns: 100_000_000,
     reduction: null,
@@ -263,7 +269,7 @@ const POSE_WINDOW = {
     measurement_class: "MODEL_ESTIMATED",
     display_note: "Exact.",
   },
-  rows: POSE_ROWS,
+  rows: POSE_WINDOW_ROWS,
 };
 
 export const METRIC = {

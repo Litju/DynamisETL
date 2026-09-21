@@ -12,6 +12,7 @@ import {
   planarCentre,
   summarizeFrame,
   toViewerPoint,
+  withoutDuplicateAngles,
   type PoseRow,
 } from "@/components/pose/pose-model";
 
@@ -114,6 +115,14 @@ describe("pose landmark extraction", () => {
 });
 
 describe("processor overlays", () => {
+  it("does not draw a duplicate display angle when the processor owns it", () => {
+    const display = [
+      { name: "left_knee", vertexLandmark: "lKnee", firstLandmark: "lHip", secondLandmark: "lAnkle" },
+      { name: "left_elbow", vertexLandmark: "lElbow", firstLandmark: "lShoulder", secondLandmark: "lWrist" },
+    ];
+    expect(withoutDuplicateAngles(display, [display[0]!])).toEqual([display[1]]);
+  });
+
   it("reads segments and angles only from processor parameters", () => {
     const overlays = overlaysFromParameters({
       segments: [

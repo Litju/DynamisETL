@@ -18,6 +18,7 @@ import {
   type PoseLandmark,
   type ProcessorOverlays,
   type ViewerPoint,
+  withoutDuplicateAngles,
 } from "@/components/pose/pose-model";
 import { useAnalysisStore } from "@/lib/state/analysis";
 
@@ -111,9 +112,35 @@ export function PoseScene({
   useEffect(() => {
     framesRef.current = frames;
   }, [frames]);
-  const { invalidate } = useThree();
+  const { invalidate, setFrameloop } = useThree();
   const selectedJoint = useAnalysisStore((state) => state.selectedJoint);
+  const playing = useAnalysisStore((state) => state.playing);
   const controlsRef = useRef<ComponentRef<typeof CameraControls> | null>(null);
+  const articulationAngles = useMemo(
+    () => withoutDuplicateAngles(ARTICULATION_ANGLE_CUES, overlays.angles),
+    [overlays.angles],
+  );
+
+  // R3F's demand loop does not automatically wake when Zustand changes.
+  // Invalidate on playback transitions and live playhead updates so Pose moves
+  // with the shared transport while remaining on-demand when paused.
+  useEffect(
+    () =>
+      useAnalysisStore.subscribe((state, previous) => {
+        if (
+          state.playheadNs !== previous.playheadNs ||
+          state.playing !== previous.playing
+        ) {
+          invalidate();
+        }
+      }),
+    [invalidate],
+  );
+
+  useEffect(() => {
+    setFrameloop(playing ? "always" : "demand");
+    invalidate();
+  }, [invalidate, playing, setFrameloop]);
 
   const allNames = useMemo(() => {
     const names = new Set<string>();
@@ -395,7 +422,7 @@ export function PoseScene({
           })
         : null}
       {showArticulationAngles
-        ? ARTICULATION_ANGLE_CUES.map((angle) => {
+        ? articulationAngles.map((angle) => {
             const initial = anglePointsAt(landmarks, angle, centre, 0.075);
             if (initial === null) return null;
             return (

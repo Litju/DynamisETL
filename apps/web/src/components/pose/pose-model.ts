@@ -135,6 +135,17 @@ export function extractFrames(
     }));
 }
 
+/** Remove display cues that duplicate processor-declared angle geometry. */
+export function withoutDuplicateAngles(
+  displayAngles: readonly AngleDefinition[],
+  processorAngles: readonly AngleDefinition[],
+): AngleDefinition[] {
+  const key = (angle: AngleDefinition) =>
+    `${angle.vertexLandmark}|${[angle.firstLandmark, angle.secondLandmark].sort().join("|")}`;
+  const processorKeys = new Set(processorAngles.map(key));
+  return displayAngles.filter((angle) => !processorKeys.has(key(angle)));
+}
+
 /** Provider display edges whose two endpoints are observed in the frame. */
 export function drawableDisplayConnections(
   landmarks: readonly PoseLandmark[],

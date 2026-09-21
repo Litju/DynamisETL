@@ -36,6 +36,23 @@ test("1b. individual selection is URL-owned across reload, scrub and history", a
   await expect(page).toHaveURL(/subject=SC-P2/);
 });
 
+test("1c. Pose playback advances both the playhead and rendered scene", async ({ page }) => {
+  await page.goto(
+    "/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P1&view=pose&t_ns=0",
+  );
+  const canvas = page.getByTestId("pose-canvas").locator("canvas");
+  await expect(canvas).toBeVisible();
+  const playhead = page.getByLabel("Transport and timeline").locator(".t-value").first();
+  const beforeTime = await playhead.innerText();
+  const before = await canvas.screenshot();
+  await page.getByRole("button", { name: "Play" }).click();
+  await page.waitForTimeout(1000);
+  const afterTime = await playhead.innerText();
+  const after = await canvas.screenshot();
+  expect(afterTime).not.toBe(beforeTime);
+  expect(after.equals(before)).toBe(false);
+});
+
 test("2. selecting a player on the pitch updates the durable subject context", async ({ page }) => {
   await page.goto("/lab/skillcorner-opendata/1925299?stream=tracking-1&view=field");
   const host = page.getByTestId("pitch-canvas");
