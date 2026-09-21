@@ -7,6 +7,7 @@ import { CommandPalette } from "@/components/command/CommandPalette";
 import { ContextBar } from "@/components/shell/ContextBar";
 import { Explorer } from "@/components/shell/Explorer";
 import { Inspector } from "@/components/shell/Inspector";
+import { PoseTelemetry } from "@/components/pose/PoseTelemetry";
 import { NavRail } from "@/components/shell/NavRail";
 import { Transport } from "@/components/shell/Transport";
 import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
@@ -50,7 +51,8 @@ export function shellLayoutFor(pathname: string): ShellLayout {
 export function AppShell({ children }: { children: ReactNode }) {
   usePlaybackClock();
   useGlobalShortcuts();
-  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const location = useRouterState({ select: (state) => state.location });
+  const pathname = location.pathname;
   const focusMode = useUiStore((state) => state.focusMode);
   const inspectorOverride = useUiStore((state) => state.inspectorOpen);
   const setInspectorOpen = useUiStore((state) => state.setInspectorOpen);
@@ -58,7 +60,10 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const layout = shellLayoutFor(pathname);
   const showExplorer = !focusMode && layout.explorer;
-  const showInspector = !focusMode && inspectorVisible(inspectorOverride, layout.inspector);
+  const poseRoute = new URLSearchParams(location.searchStr ?? "").get("view") === "pose";
+  const showPoseTelemetry = !focusMode && layout.inspector && poseRoute;
+  const showInspector =
+    showPoseTelemetry || (!focusMode && inspectorVisible(inspectorOverride, layout.inspector));
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-surface-0 text-text-primary">
@@ -98,7 +103,11 @@ export function AppShell({ children }: { children: ReactNode }) {
                 maxSize="40%"
                 className="min-w-0"
               >
-                <Inspector onCollapse={() => setInspectorOpen(false)} />
+                {showPoseTelemetry ? (
+                  <PoseTelemetry />
+                ) : (
+                  <Inspector onCollapse={() => setInspectorOpen(false)} />
+                )}
               </Panel>
             </>
           ) : null}

@@ -1,17 +1,10 @@
 ﻿import { useQuery } from "@tanstack/react-query";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import { StatePanel } from "@/components/common/StatePanel";
-import { extractFrames, frameIndexAt, landmarksAt, summarizeFrame } from "@/components/pose/pose-model";
-import type { SessionDetail, StreamView } from "@/api/types";
-import { artifactQuery, sessionQuery, windowQuery } from "@/lib/api/queries";
-import { useAnalysisContext } from "@/lib/analysis-context";
-import { useAnalysisStore } from "@/lib/state/analysis";
-import { stablePoseSubjects } from "@/components/pose/use-pose-subjects";
-import { windowAround } from "@/lib/dense-window";
-import { formatMetricValue } from "@/lib/measurement";
+import { sessionQuery } from "@/lib/api/queries";
 import type { LabSearch } from "@/lib/search";
 import { cn } from "@/lib/cn";
 
@@ -27,7 +20,6 @@ export function Explorer() {
   const search = new URLSearchParams(location.searchStr ?? "");
   const selectedStream = search.get("stream");
   const selectedTrial = search.get("trial");
-  const selectedView = search.get("view");
 
   if (!datasetId || !sessionId) {
     return (
@@ -51,7 +43,6 @@ export function Explorer() {
           sessionId={sessionId}
           selectedStream={selectedStream}
           selectedTrial={selectedTrial}
-          selectedView={selectedView}
         />
       </div>
     </div>
@@ -63,13 +54,11 @@ function ExplorerForSession({
   sessionId,
   selectedStream,
   selectedTrial,
-  selectedView,
 }: {
   datasetId: string;
   sessionId: string;
   selectedStream: string | null;
   selectedTrial: string | null;
-  selectedView: string | null;
 }) {
   const query = useQuery(sessionQuery(datasetId, sessionId));
   const [trialsOpen, setTrialsOpen] = useState(true);
@@ -166,14 +155,6 @@ function ExplorerForSession({
         </ul>
       ) : null}
 
-      {selectedView === "pose" ? (
-        <PoseTelemetry
-          participants={participants}
-          streams={streams}
-          selectedStream={selectedStream}
-        />
-      ) : null}
-
       <button
         type="button"
         onClick={() => setStreamsOpen((open) => !open)}
@@ -211,124 +192,5 @@ function ExplorerForSession({
         </ul>
       ) : null}
     </div>
-  );
-}
-
-function PoseTelemetry({
-  participants,
-  streams,
-  selectedStream,
-}: {
-  participants: SessionDetail["participants"];
-  streams: readonly StreamView[];
-  selectedStream: string | null;
-}) {
-  const context = useAnalysisContext();
-  const playheadNs = useAnalysisStore((state) => state.playheadNs);
-  const committedTimeNs = useAnalysisStore((state) => state.committedTimeNs);
-  const stream = useMemo(
-    () =>
-      streams.find(
-        (candidate) =>
-          candidate.stream_id === selectedStream && candidate.modality === "pose",
-      ) ?? streams.find((candidate) => candidate.modality === "pose") ?? null,
-    [selectedStream, streams],
-  );
-  const artifactId = stream?.sample_artifact_ids[0] ?? null;
-  const artifact = useQuery({
-    ...artifactQuery(artifactId ?? ""),
-    enabled: Boolean(artifactId),
-  });
-  const subjects = useMemo(
-    () => stablePoseSubjects(artifact.data, participants, stream?.subject_id ?? null),
-    [artifact.data, participants, stream?.subject_id],
-  );
-  const subjectId = context?.subjectId ?? subjects[0] ?? stream?.subject_id ?? null;
-  const effective = playheadNs ?? committedTimeNs;
-  const bounds = useMemo(
-    () =>
-      windowAround(artifact.data, {
-        anchorNs: effective,
-        explicit: null,
-        maxPoints: 20_000,
-        entityScoped: subjectId !== null,
-      }),
-    [artifact.data, effective, subjectId],
-  );
-  const window = useQuery({
-    ...windowQuery({
-      artifactId: artifactId ?? "",
-      ...(bounds ? { fromNs: Number(bounds.fromNs), toNs: Number(bounds.toNs) } : {}),
-      ...(subjectId !== null ? { entityId: subjectId } : {}),
-      columns: [
-        "t_rel_ns",
-        "subject_id",
-        "joint_name",
-        "is_available",
-        "x_m",
-        "y_m",
-        "z_m",
-        "error_m",
-      ],
-      maxPoints: 20_000,
-    }),
-    enabled: Boolean(artifactId) && bounds !== null,
-  });
-  const frames = useMemo(
-    () =>
-      extractFrames(
-        (window.data?.rows ?? []) as Array<{ [key: string]: unknown }>,
-        subjectId,
-      ),
-    [subjectId, window.data],
-  );
-  const landmarks = landmarksAt(frames, effective);
-  const byName = new Map(landmarks.map((landmark) => [landmark.jointName, landmark]));
-  const jointNames = stream?.skeleton_joint_names ?? landmarks.map((landmark) => landmark.jointName);
-  const frameIndex = effective === null ? 0 : frameIndexAt(frames, effective);
-  const summary = summarizeFrame(
-    frames.length > 0 && frameIndex >= 0 ? frames[frameIndex] ?? null : null,
-  );
-
-  if (stream === null || artifactId === null || artifact.isPending || window.isPending) {
-    return null;
-  }
-  return (
-    <section
-      aria-label="Live pose telemetry"
-      data-testid="pose-telemetry"
-      className="mb-2 border-b border-border-subtle pb-2"
-    >
-      <div className="flex items-center justify-between gap-2 py-1">
-        <span className="t-section text-text-muted">Live pose telemetry</span>
-        <span className="mono text-[10px] text-text-secondary">{subjectId ?? "—"}</span>
-      </div>
-      <div className="mb-1 text-[10px] text-text-muted">
-        {summary.observedLandmarks} observed · {summary.unavailableLandmarks} unavailable
-      </div>
-      <div className="max-h-80 overflow-y-auto rounded-control border border-border-subtle">
-        {jointNames.map((jointName) => {
-          const landmark = byName.get(jointName);
-          return (
-            <div
-              key={jointName}
-              className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-1 border-b border-border-subtle px-1.5 py-1 last:border-b-0"
-            >
-              <span className="mono truncate text-[10px] text-text-secondary">{jointName}</span>
-              {landmark ? (
-                <span className="mono text-right text-[9px] tabular text-text-muted">
-                  {landmark.xM.toFixed(2)}, {landmark.yM.toFixed(2)}, {landmark.zM.toFixed(2)}
-                  {landmark.errorM !== null
-                    ? ` · ${formatMetricValue(landmark.errorM, "m").text}`
-                    : ""}
-                </span>
-              ) : (
-                <span className="text-[9px] text-quality-warning">unavailable</span>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </section>
   );
 }

@@ -53,14 +53,16 @@ test("1c. Pose playback advances both the playhead and rendered scene", async ({
   expect(after.equals(before)).toBe(false);
 });
 
-test("1d. Pose telemetry lists every provider landmark in the explorer", async ({ page }) => {
+test("1d. Pose telemetry lists every provider landmark in the inspector", async ({ page }) => {
   await page.goto(
     "/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P1&view=pose&t_ns=0",
   );
   const telemetry = page.getByTestId("pose-telemetry");
   await expect(telemetry).toBeVisible();
+  await expect(page.locator("#inspector").getByTestId("pose-telemetry")).toBeVisible();
+  expect(await page.locator("#explorer [data-testid=pose-telemetry]").count()).toBe(0);
   await expect(telemetry.getByText("29 observed · 0 unavailable")).toBeVisible();
-  expect(await telemetry.locator(".grid").count()).toBe(29);
+  expect(await telemetry.locator(".grid").count()).toBe(30); // column header + 29 landmarks
   await expect(telemetry.getByText("nose")).toBeVisible();
   await expect(telemetry.getByText("lSmallToe")).toBeVisible();
   await expect(telemetry.getByText("rPinky")).toBeVisible();
