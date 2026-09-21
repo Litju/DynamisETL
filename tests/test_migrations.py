@@ -18,7 +18,7 @@ from sqlalchemy.engine import Engine
 from dynamis.config import ENV_DB_SCHEMA, ENV_POSTGRES_URL, repository_root
 from dynamis.storage.tables import EXPECTED_TABLE_NAMES
 
-HEAD_REVISION = "0007_skeleton_display"
+HEAD_REVISION = "0008_skeleton_edges_seed"
 
 
 def _alembic_config(url: str) -> Config:

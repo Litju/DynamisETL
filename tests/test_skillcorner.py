@@ -366,6 +366,10 @@ def test_skillcorner_skeleton_and_alignment_provenance_is_idempotent(
                 text("SELECT topology FROM skeleton_definition WHERE skeleton_id = :id"),
                 {"id": POSE_SKELETON_ID},
             ).scalar_one()
+            display_connections = connection.execute(
+                text("SELECT display_connections FROM skeleton_definition WHERE skeleton_id = :id"),
+                {"id": POSE_SKELETON_ID},
+            ).scalar_one()
             joint_count = connection.execute(
                 text("SELECT count(*) FROM skeleton_joint WHERE skeleton_id = :id"),
                 {"id": POSE_SKELETON_ID},
@@ -392,6 +396,7 @@ def test_skillcorner_skeleton_and_alignment_provenance_is_idempotent(
                 {"dataset": SKILLCORNER_DATASET_ID, "id": POSE_SKELETON_ID},
             ).scalar_one()
         assert topology == "landmark_set"
+        assert len(display_connections) == 28
         assert int(joint_count) == 29
         assert int(nullable_parents) == 29
         assert int(pose_streams) == 2
