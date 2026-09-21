@@ -170,6 +170,7 @@ export function PoseViewer() {
   const [showProviderSkeleton, setShowProviderSkeleton] = useState(true);
   const [showTorsoCue, setShowTorsoCue] = useState(true);
   const [showFootContact, setShowFootContact] = useState(true);
+  const [showHandContact, setShowHandContact] = useState(true);
   const [showHeadNeck, setShowHeadNeck] = useState(true);
   const [showArticulationAngles, setShowArticulationAngles] = useState(true);
   const [showSegments, setShowSegments] = useState(true);
@@ -328,6 +329,7 @@ export function PoseViewer() {
               showProviderSkeleton={showProviderSkeleton}
               showTorsoCue={showTorsoCue}
               showFootContact={showFootContact}
+              showHandContact={showHandContact}
               showHeadNeck={showHeadNeck}
               showArticulationAngles={showArticulationAngles}
               showSegments={showSegments}
@@ -430,6 +432,15 @@ export function PoseViewer() {
                 onChange={(event) => setShowFootContact(event.target.checked)}
               />
               foot contact triangles
+            </label>
+            <label className="flex items-center gap-1 text-text-muted">
+              <input
+                type="checkbox"
+                className="size-6 shrink-0"
+                checked={showHandContact}
+                onChange={(event) => setShowHandContact(event.target.checked)}
+              />
+              hand thumb / pinky closures
             </label>
             <label className="flex items-center gap-1 text-text-muted">
               <input

@@ -247,11 +247,14 @@ export interface Bounds {
  * a single-landmark frame still yields a usable camera distance rather than a
  * degenerate one.
  */
-export function boundsOf(landmarks: readonly PoseLandmark[]): Bounds {
+export function boundsOf(
+  landmarks: readonly PoseLandmark[],
+  origin?: { readonly xM: number; readonly yM: number },
+): Bounds {
   if (landmarks.length === 0) {
     return { min: [0, 0, 0], max: [0, 0, 0], center: [0, 0, 0], radius: 1 };
   }
-  const centre = planarCentre(landmarks);
+  const centre = origin ?? planarCentre(landmarks);
   let minX = Number.POSITIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
   let minZ = Number.POSITIVE_INFINITY;

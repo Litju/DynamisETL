@@ -53,6 +53,19 @@ test("1c. Pose playback advances both the playhead and rendered scene", async ({
   expect(after.equals(before)).toBe(false);
 });
 
+test("1d. Pose telemetry lists every provider landmark in the explorer", async ({ page }) => {
+  await page.goto(
+    "/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P1&view=pose&t_ns=0",
+  );
+  const telemetry = page.getByTestId("pose-telemetry");
+  await expect(telemetry).toBeVisible();
+  await expect(telemetry.getByText("29 observed · 0 unavailable")).toBeVisible();
+  expect(await telemetry.locator(".grid").count()).toBe(29);
+  await expect(telemetry.getByText("nose")).toBeVisible();
+  await expect(telemetry.getByText("lSmallToe")).toBeVisible();
+  await expect(telemetry.getByText("rPinky")).toBeVisible();
+});
+
 test("2. selecting a player on the pitch updates the durable subject context", async ({ page }) => {
   await page.goto("/lab/skillcorner-opendata/1925299?stream=tracking-1&view=field");
   const host = page.getByTestId("pitch-canvas");

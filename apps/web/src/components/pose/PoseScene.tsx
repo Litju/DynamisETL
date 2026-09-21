@@ -46,8 +46,15 @@ const TORSO_CUE_CONNECTIONS: readonly DisplayConnectionDefinition[] = [
 const FOOT_CONTACT_CUE_CONNECTIONS: readonly DisplayConnectionDefinition[] = [
   { startLandmark: "lHeel", endLandmark: "lBigToe" },
   { startLandmark: "lHeel", endLandmark: "lSmallToe" },
+  { startLandmark: "lAnkle", endLandmark: "lSmallToe" },
   { startLandmark: "rHeel", endLandmark: "rBigToe" },
   { startLandmark: "rHeel", endLandmark: "rSmallToe" },
+  { startLandmark: "rAnkle", endLandmark: "rSmallToe" },
+];
+
+const HAND_CONTACT_CUE_CONNECTIONS: readonly DisplayConnectionDefinition[] = [
+  { startLandmark: "lThumb", endLandmark: "lPinky" },
+  { startLandmark: "rThumb", endLandmark: "rPinky" },
 ];
 
 // View-only head/neck closure. Source edges remain the provider authority.
@@ -89,6 +96,7 @@ export function PoseScene({
   showProviderSkeleton,
   showTorsoCue,
   showFootContact,
+  showHandContact,
   showHeadNeck,
   showArticulationAngles,
   showSegments,
@@ -102,6 +110,7 @@ export function PoseScene({
   showProviderSkeleton: boolean;
   showTorsoCue: boolean;
   showFootContact: boolean;
+  showHandContact: boolean;
   showHeadNeck: boolean;
   showArticulationAngles: boolean;
   showSegments: boolean;
@@ -201,7 +210,8 @@ export function PoseScene({
   }, []);
 
   useFrame(() => {
-    const time = useAnalysisStore.getState().playheadNs ?? useAnalysisStore.getState().committedTimeNs;
+    const state = useAnalysisStore.getState();
+    const time = state.playheadNs ?? state.committedTimeNs;
     const currentLandmarks = landmarksAt(framesRef.current, time);
     landmarksRef.current = currentLandmarks;
     const currentByName = new Map(
@@ -216,6 +226,19 @@ export function PoseScene({
       mesh.visible = true;
       const [x, y, z] = toViewerPoint(landmark, centreRef.current);
       mesh.position.set(x, y, z);
+    }
+    if (state.playing && currentLandmarks.length > 0 && controlsRef.current) {
+      const followBounds = boundsOf(currentLandmarks, centreRef.current);
+      const { position, target } = cameraFor(preset, followBounds);
+      void controlsRef.current.setLookAt(
+        position[0],
+        position[1],
+        position[2],
+        target[0],
+        target[1],
+        target[2],
+        false,
+      );
     }
   });
 
@@ -339,6 +362,22 @@ export function PoseScene({
             return (
               <DynamicPoseLine
                 key={`foot-contact-${connection.startLandmark}-${connection.endLandmark}`}
+                initialPoints={[toViewerPoint(start, centre), toViewerPoint(end, centre)]}
+                getPoints={() => connectionPoints(landmarksRef.current, connection, centre)}
+                color={FOOT_CONTACT_CUE_COLOR}
+                lineWidth={1.5}
+              />
+            );
+          })
+        : null}
+      {showHandContact
+        ? HAND_CONTACT_CUE_CONNECTIONS.map((connection) => {
+            const start = byName.get(connection.startLandmark);
+            const end = byName.get(connection.endLandmark);
+            if (!start || !end) return null;
+            return (
+              <DynamicPoseLine
+                key={`hand-contact-${connection.startLandmark}-${connection.endLandmark}`}
                 initialPoints={[toViewerPoint(start, centre), toViewerPoint(end, centre)]}
                 getPoints={() => connectionPoints(landmarksRef.current, connection, centre)}
                 color={FOOT_CONTACT_CUE_COLOR}
@@ -565,6 +604,7 @@ export function PoseCanvas({
   showProviderSkeleton,
   showTorsoCue,
   showFootContact,
+  showHandContact,
   showHeadNeck,
   showArticulationAngles,
   showSegments,
@@ -580,6 +620,7 @@ export function PoseCanvas({
   showProviderSkeleton: boolean;
   showTorsoCue: boolean;
   showFootContact: boolean;
+  showHandContact: boolean;
   showHeadNeck: boolean;
   showArticulationAngles: boolean;
   showSegments: boolean;
@@ -603,6 +644,7 @@ export function PoseCanvas({
         showProviderSkeleton={showProviderSkeleton}
         showTorsoCue={showTorsoCue}
         showFootContact={showFootContact}
+        showHandContact={showHandContact}
         showHeadNeck={showHeadNeck}
         showArticulationAngles={showArticulationAngles}
         showSegments={showSegments}
