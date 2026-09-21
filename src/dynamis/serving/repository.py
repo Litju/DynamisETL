@@ -24,6 +24,7 @@ from dynamis.serving.models import (
     DatasetSummary,
     DatasetVersionView,
     LicenseView,
+    MetricCatalogEntry,
     MetricDefinitionView,
     MetricMethodology,
     MetricPage,
@@ -579,6 +580,56 @@ def query_metrics(
             for row in rows
         ],
     )
+
+
+def list_metric_definitions(connection: Connection) -> list[MetricCatalogEntry]:
+    """Registered metric definitions with the datasets that actually serve them.
+
+    Discovery needs the vocabulary, not the values: a reader choosing what to
+    compare or inspect should not have to page through 77k derived rows to find
+    out which metric ids exist. The served-dataset list comes from the derived
+    rows so the catalog never offers a metric nothing has computed.
+    """
+    rows = (
+        connection.execute(
+            sa.text(
+                """SELECT d.metric_id, d.name, d.si_unit, d.measurement_class, d.value_kind,
+                    d.description, d.algorithm_id,
+                    coalesce(s.dataset_ids, '[]'::json) AS dataset_ids,
+                    coalesce(c.value_count, 0) AS value_count
+                FROM metric_definition d
+                LEFT JOIN (
+                    -- Distinct pairs first, then aggregate. A DISTINCT inside
+                    -- the aggregate sorts every row of each group; this form is
+                    -- an index-only scan of (metric_id, dataset_id).
+                    SELECT metric_id, json_agg(dataset_id ORDER BY dataset_id) AS dataset_ids
+                    FROM (SELECT DISTINCT metric_id, dataset_id FROM derived_metric) pairs
+                    GROUP BY metric_id
+                ) s ON s.metric_id = d.metric_id
+                LEFT JOIN (
+                    SELECT metric_id, count(*) AS value_count
+                    FROM derived_metric GROUP BY metric_id
+                ) c ON c.metric_id = d.metric_id
+                ORDER BY d.metric_id"""
+            )
+        )
+        .mappings()
+        .all()
+    )
+    return [
+        MetricCatalogEntry(
+            metric_id=row["metric_id"],
+            name=row["name"],
+            si_unit=row["si_unit"],
+            measurement_class=row["measurement_class"],
+            value_kind=row["value_kind"],
+            description=row["description"],
+            algorithm_id=row["algorithm_id"],
+            dataset_ids=[str(item) for item in _list(row["dataset_ids"])],
+            value_count=int(row["value_count"]),
+        )
+        for row in rows
+    ]
 
 
 def metric_methodology(connection: Connection, metric_id: str) -> MetricMethodology | None:

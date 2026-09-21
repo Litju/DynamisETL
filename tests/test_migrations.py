@@ -18,7 +18,7 @@ from sqlalchemy.engine import Engine
 from dynamis.config import ENV_DB_SCHEMA, ENV_POSTGRES_URL, repository_root
 from dynamis.storage.tables import EXPECTED_TABLE_NAMES
 
-HEAD_REVISION = "0005_serving_read_indexes"
+HEAD_REVISION = "0006_metric_catalog_index"
 
 
 def _alembic_config(url: str) -> Config:

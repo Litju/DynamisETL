@@ -921,6 +921,77 @@
         "title": "LicenseView",
         "type": "object"
       },
+      "MetricCatalogEntry": {
+        "description": "One registered metric plus where it is actually served.\n\n`dataset_ids` and `value_count` come from the derived rows, so the catalog\ncan distinguish a metric the registry defines from one the pipeline has\ngenuinely computed; discovery should not offer the former as if it were\nanalysable.",
+        "properties": {
+          "algorithm_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Algorithm Id"
+          },
+          "dataset_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Dataset Ids",
+            "type": "array"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "measurement_class": {
+            "title": "Measurement Class",
+            "type": "string"
+          },
+          "metric_id": {
+            "title": "Metric Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "si_unit": {
+            "title": "Si Unit",
+            "type": "string"
+          },
+          "value_count": {
+            "title": "Value Count",
+            "type": "integer"
+          },
+          "value_kind": {
+            "title": "Value Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "metric_id",
+          "name",
+          "si_unit",
+          "measurement_class",
+          "value_kind",
+          "description",
+          "algorithm_id",
+          "dataset_ids",
+          "value_count"
+        ],
+        "title": "MetricCatalogEntry",
+        "type": "object"
+      },
       "MetricDefinitionView": {
         "properties": {
           "algorithm_id": {
@@ -2818,6 +2889,31 @@
           }
         },
         "summary": "Metrics",
+        "tags": [
+          "metrics"
+        ]
+      }
+    },
+    "/api/metrics/definitions": {
+      "get": {
+        "operationId": "metric_definitions_api_metrics_definitions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MetricCatalogEntry"
+                  },
+                  "title": "Response Metric Definitions Api Metrics Definitions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Metric Definitions",
         "tags": [
           "metrics"
         ]

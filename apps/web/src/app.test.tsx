@@ -161,6 +161,21 @@ function installFetchStub(): void {
       if (path === "/api/metrics") {
         return jsonResponse(METRICS);
       }
+      if (path === "/api/metrics/definitions") {
+        return jsonResponse([
+          {
+            metric_id: "pose.angular_rom.left_knee",
+            name: "Range of motion for angle left_knee",
+            si_unit: "rad",
+            measurement_class: "PIPELINE_DERIVED",
+            value_kind: "scalar",
+            description: null,
+            algorithm_id: "pose.translation_invariant_kinematics",
+            dataset_ids: ["skillcorner-opendata"],
+            value_count: 4,
+          },
+        ]);
+      }
       return jsonResponse({ detail: `unhandled ${path}` }, 404);
     }),
   );
@@ -245,7 +260,10 @@ describe("workbench shell", () => {
 
   it("keeps compare mode on an explicit empty state until configured", async () => {
     renderAt("/compare");
-    expect(await screen.findByText("No comparison configured.")).toBeInTheDocument();
+    // Discovery comes first: the metric vocabulary is offered rather than an
+    // internal id being demanded.
+    expect(await screen.findByText("Choose a metric to compare.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Metric")).toBeInTheDocument();
   });
 });
 

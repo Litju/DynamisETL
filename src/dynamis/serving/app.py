@@ -42,6 +42,7 @@ from dynamis.serving.models import (
     DatasetSummary,
     DenseWindow,
     HealthStatus,
+    MetricCatalogEntry,
     MetricMethodology,
     MetricPage,
     ProvenanceGraph,
@@ -79,6 +80,8 @@ class ServingBackend(Protocol):
     def metrics(self, filters: repository.MetricFilters, limit: int, offset: int) -> MetricPage: ...
 
     def methodology(self, metric_id: str) -> MetricMethodology | None: ...
+
+    def metric_definitions(self) -> list[MetricCatalogEntry]: ...
 
     def provenance(self, derived_metric_id: str) -> ProvenanceGraph | None: ...
 
@@ -194,6 +197,10 @@ class PostgresServingBackend:
             return repository.list_runs(
                 connection, dataset_id=dataset_id, limit=limit, offset=offset
             )
+
+    def metric_definitions(self) -> list[MetricCatalogEntry]:
+        with self._connect() as connection:
+            return repository.list_metric_definitions(connection)
 
     def licenses(self) -> list[RightsPolicyView]:
         with self._connect() as connection:
@@ -410,6 +417,16 @@ def create_app(
             limit=limit,
             offset=offset,
         )
+
+    # Declared before the `{metric_id:path}` route so the literal path is not
+    # captured as a metric id.
+    @app.get(
+        "/api/metrics/definitions",
+        response_model=list[MetricCatalogEntry],
+        tags=["metrics"],
+    )
+    def metric_definitions(service: BackendDependency) -> list[MetricCatalogEntry]:
+        return service.metric_definitions()
 
     @app.get(
         "/api/metrics/methodology/{metric_id:path}",

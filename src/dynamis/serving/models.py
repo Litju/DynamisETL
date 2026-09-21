@@ -167,6 +167,19 @@ class MetricDefinitionView(BaseModel):
     algorithm_id: str | None
 
 
+class MetricCatalogEntry(MetricDefinitionView):
+    """One registered metric plus where it is actually served.
+
+    `dataset_ids` and `value_count` come from the derived rows, so the catalog
+    can distinguish a metric the registry defines from one the pipeline has
+    genuinely computed; discovery should not offer the former as if it were
+    analysable.
+    """
+
+    dataset_ids: list[str]
+    value_count: int
+
+
 class AlgorithmView(BaseModel):
     algorithm_id: str
     name: str

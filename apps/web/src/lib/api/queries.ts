@@ -54,6 +54,7 @@ export const queryKeys = {
   session: (datasetId: string, sessionId: string) =>
     ["catalog", "datasets", datasetId, "sessions", sessionId] as const,
   metrics: (query: MetricQuery) => ["metrics", query] as const,
+  metricDefinitions: ["metrics", "definitions"] as const,
   methodology: (metricId: string) => ["metrics", "methodology", metricId] as const,
   provenance: (derivedMetricId: string) =>
     ["derived-metrics", derivedMetricId, "provenance"] as const,
@@ -136,6 +137,14 @@ export const metricsQuery = (query: MetricQuery) =>
         }),
       ),
     staleTime: 15_000,
+  });
+
+/** The registered metric vocabulary, for discovery and comparison selection. */
+export const metricDefinitionsQuery = () =>
+  queryOptions({
+    queryKey: queryKeys.metricDefinitions,
+    queryFn: async () => unwrap(await api.GET("/api/metrics/definitions")),
+    staleTime: 5 * 60_000,
   });
 
 export const methodologyQuery = (metricId: string) =>

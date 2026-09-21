@@ -1008,7 +1008,9 @@ class DerivedMetric(Base):
         # key is the opaque result id alone.
         _serving_index("ix_derived_metric_dataset_session", "dataset_id", "session_id"),
         _serving_index("ix_derived_metric_run", "run_id"),
-        _serving_index("ix_derived_metric_metric", "metric_id"),
+        # Leading metric_id serves point lookups; the dataset column makes
+        # catalog discovery ("which datasets serve this metric") index-only.
+        _serving_index("ix_derived_metric_metric_dataset", "metric_id", "dataset_id"),
         _serving_index("ix_derived_metric_stream", "stream_id"),
     )
 

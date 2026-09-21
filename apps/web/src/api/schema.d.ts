@@ -152,6 +152,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/metrics/definitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Metric Definitions */
+        get: operations["metric_definitions_api_metrics_definitions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/metrics/methodology/{metric_id}": {
         parameters: {
             query?: never;
@@ -520,6 +537,35 @@ export interface components {
             share_alike: boolean;
             /** Status */
             status: string;
+        };
+        /**
+         * MetricCatalogEntry
+         * @description One registered metric plus where it is actually served.
+         *
+         *     `dataset_ids` and `value_count` come from the derived rows, so the catalog
+         *     can distinguish a metric the registry defines from one the pipeline has
+         *     genuinely computed; discovery should not offer the former as if it were
+         *     analysable.
+         */
+        MetricCatalogEntry: {
+            /** Algorithm Id */
+            algorithm_id: string | null;
+            /** Dataset Ids */
+            dataset_ids: string[];
+            /** Description */
+            description: string | null;
+            /** Measurement Class */
+            measurement_class: string;
+            /** Metric Id */
+            metric_id: string;
+            /** Name */
+            name: string;
+            /** Si Unit */
+            si_unit: string;
+            /** Value Count */
+            value_count: number;
+            /** Value Kind */
+            value_kind: string;
         };
         /** MetricDefinitionView */
         MetricDefinitionView: {
@@ -1178,6 +1224,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    metric_definitions_api_metrics_definitions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetricCatalogEntry"][];
                 };
             };
         };
