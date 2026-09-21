@@ -169,6 +169,9 @@ export function PoseViewer() {
   const [preset, setPreset] = useState<CameraPreset>("reset");
   const [showProviderSkeleton, setShowProviderSkeleton] = useState(true);
   const [showTorsoCue, setShowTorsoCue] = useState(true);
+  const [showFootContact, setShowFootContact] = useState(true);
+  const [showHeadNeck, setShowHeadNeck] = useState(true);
+  const [showArticulationAngles, setShowArticulationAngles] = useState(true);
   const [showSegments, setShowSegments] = useState(true);
   const [showAngles, setShowAngles] = useState(true);
   const [showErrorRadii, setShowErrorRadii] = useState(false);
@@ -324,6 +327,9 @@ export function PoseViewer() {
               playing={playing}
               showProviderSkeleton={showProviderSkeleton}
               showTorsoCue={showTorsoCue}
+              showFootContact={showFootContact}
+              showHeadNeck={showHeadNeck}
+              showArticulationAngles={showArticulationAngles}
               showSegments={showSegments}
               showAngles={showAngles}
               showErrorRadii={showErrorRadii}
@@ -420,6 +426,33 @@ export function PoseViewer() {
               <input
                 type="checkbox"
                 className="size-6 shrink-0"
+                checked={showFootContact}
+                onChange={(event) => setShowFootContact(event.target.checked)}
+              />
+              foot contact triangles
+            </label>
+            <label className="flex items-center gap-1 text-text-muted">
+              <input
+                type="checkbox"
+                className="size-6 shrink-0"
+                checked={showHeadNeck}
+                onChange={(event) => setShowHeadNeck(event.target.checked)}
+              />
+              head / neck completeness
+            </label>
+            <label className="flex items-center gap-1 text-text-muted">
+              <input
+                type="checkbox"
+                className="size-6 shrink-0"
+                checked={showArticulationAngles}
+                onChange={(event) => setShowArticulationAngles(event.target.checked)}
+              />
+              view-only articulation angles
+            </label>
+            <label className="flex items-center gap-1 text-text-muted">
+              <input
+                type="checkbox"
+                className="size-6 shrink-0"
                 checked={showAngles}
                 onChange={(event) => setShowAngles(event.target.checked)}
               />
@@ -457,6 +490,9 @@ export function PoseViewer() {
             </p>
             <p className="text-[10px] text-text-muted">
               Shoulder-to-hip torso cue is display-only and not provider topology or processor anatomy.
+            </p>
+            <p className="text-[10px] text-text-muted">
+              Foot/head/neck closures and articulation angle cues are display-only; processor angles remain separate.
             </p>
           </div>
           <div className="mb-2">

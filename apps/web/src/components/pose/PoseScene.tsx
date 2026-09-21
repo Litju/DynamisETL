@@ -11,6 +11,7 @@ import {
   landmarksAt,
   planarCentre,
   toViewerPoint,
+  type AngleDefinition,
   type CameraPreset,
   type DisplayConnectionDefinition,
   type PoseFrame,
@@ -24,6 +25,9 @@ export const JOINT_COLOR = "#7fd1e8";
 export const SELECTED_JOINT_COLOR = "#ffd166";
 export const PROVIDER_SKELETON_COLOR = "#6d9eb4";
 export const TORSO_CUE_COLOR = "#9dc6d4";
+export const FOOT_CONTACT_CUE_COLOR = "#b9dbe5";
+export const HEAD_NECK_CUE_COLOR = "#b9dbe5";
+export const ARTICULATION_ANGLE_CUE_COLOR = "#d9b7e8";
 export const SEGMENT_COLOR = "#b48ef0";
 export const ANGLE_COLOR = "#e884b4";
 export const ERROR_RADIUS_COLOR = "#e8a13f";
@@ -34,6 +38,40 @@ export const ERROR_RADIUS_COLOR = "#e8a13f";
 const TORSO_CUE_CONNECTIONS: readonly DisplayConnectionDefinition[] = [
   { startLandmark: "lShoulder", endLandmark: "lHip" },
   { startLandmark: "rShoulder", endLandmark: "rHip" },
+];
+
+// View-only closures for source landmarks that describe foot contact points;
+// they do not change the provider topology.
+const FOOT_CONTACT_CUE_CONNECTIONS: readonly DisplayConnectionDefinition[] = [
+  { startLandmark: "lHeel", endLandmark: "lBigToe" },
+  { startLandmark: "lHeel", endLandmark: "lSmallToe" },
+  { startLandmark: "rHeel", endLandmark: "rBigToe" },
+  { startLandmark: "rHeel", endLandmark: "rSmallToe" },
+];
+
+// View-only head/neck closure. Source edges remain the provider authority.
+const HEAD_NECK_CUE_CONNECTIONS: readonly DisplayConnectionDefinition[] = [
+  { startLandmark: "lEar", endLandmark: "neck" },
+  { startLandmark: "rEar", endLandmark: "neck" },
+  { startLandmark: "lEar", endLandmark: "rEar" },
+];
+
+// Descriptive display angles only; processor-declared angles remain separate.
+const ARTICULATION_ANGLE_CUES: readonly AngleDefinition[] = [
+  { name: "head_orientation", vertexLandmark: "nose", firstLandmark: "lEar", secondLandmark: "rEar" },
+  { name: "neck_orientation", vertexLandmark: "neck", firstLandmark: "nose", secondLandmark: "midHip" },
+  { name: "left_shoulder", vertexLandmark: "lShoulder", firstLandmark: "neck", secondLandmark: "lElbow" },
+  { name: "right_shoulder", vertexLandmark: "rShoulder", firstLandmark: "neck", secondLandmark: "rElbow" },
+  { name: "left_elbow", vertexLandmark: "lElbow", firstLandmark: "lShoulder", secondLandmark: "lWrist" },
+  { name: "right_elbow", vertexLandmark: "rElbow", firstLandmark: "rShoulder", secondLandmark: "rWrist" },
+  { name: "left_wrist", vertexLandmark: "lWrist", firstLandmark: "lElbow", secondLandmark: "lPinky" },
+  { name: "right_wrist", vertexLandmark: "rWrist", firstLandmark: "rElbow", secondLandmark: "rPinky" },
+  { name: "left_hip", vertexLandmark: "lHip", firstLandmark: "lShoulder", secondLandmark: "lKnee" },
+  { name: "right_hip", vertexLandmark: "rHip", firstLandmark: "rShoulder", secondLandmark: "rKnee" },
+  { name: "left_knee", vertexLandmark: "lKnee", firstLandmark: "lHip", secondLandmark: "lAnkle" },
+  { name: "right_knee", vertexLandmark: "rKnee", firstLandmark: "rHip", secondLandmark: "rAnkle" },
+  { name: "left_ankle", vertexLandmark: "lAnkle", firstLandmark: "lKnee", secondLandmark: "lBigToe" },
+  { name: "right_ankle", vertexLandmark: "rAnkle", firstLandmark: "rKnee", secondLandmark: "rBigToe" },
 ];
 
 /**
@@ -49,6 +87,9 @@ export function PoseScene({
   preset,
   showProviderSkeleton,
   showTorsoCue,
+  showFootContact,
+  showHeadNeck,
+  showArticulationAngles,
   showSegments,
   showAngles,
   showErrorRadii,
@@ -59,6 +100,9 @@ export function PoseScene({
   preset: CameraPreset;
   showProviderSkeleton: boolean;
   showTorsoCue: boolean;
+  showFootContact: boolean;
+  showHeadNeck: boolean;
+  showArticulationAngles: boolean;
   showSegments: boolean;
   showAngles: boolean;
   showErrorRadii: boolean;
@@ -260,6 +304,38 @@ export function PoseScene({
             );
           })
         : null}
+      {showFootContact
+        ? FOOT_CONTACT_CUE_CONNECTIONS.map((connection) => {
+            const start = byName.get(connection.startLandmark);
+            const end = byName.get(connection.endLandmark);
+            if (!start || !end) return null;
+            return (
+              <DynamicPoseLine
+                key={`foot-contact-${connection.startLandmark}-${connection.endLandmark}`}
+                initialPoints={[toViewerPoint(start, centre), toViewerPoint(end, centre)]}
+                getPoints={() => connectionPoints(landmarksRef.current, connection, centre)}
+                color={FOOT_CONTACT_CUE_COLOR}
+                lineWidth={1.5}
+              />
+            );
+          })
+        : null}
+      {showHeadNeck
+        ? HEAD_NECK_CUE_CONNECTIONS.map((connection) => {
+            const start = byName.get(connection.startLandmark);
+            const end = byName.get(connection.endLandmark);
+            if (!start || !end) return null;
+            return (
+              <DynamicPoseLine
+                key={`head-neck-${connection.startLandmark}-${connection.endLandmark}`}
+                initialPoints={[toViewerPoint(start, centre), toViewerPoint(end, centre)]}
+                getPoints={() => connectionPoints(landmarksRef.current, connection, centre)}
+                color={HEAD_NECK_CUE_COLOR}
+                lineWidth={1.5}
+              />
+            );
+          })
+        : null}
       {showSegments
         ? overlays.segments.map((segment) => {
             const start = byName.get(segment.startLandmark);
@@ -318,6 +394,21 @@ export function PoseScene({
             );
           })
         : null}
+      {showArticulationAngles
+        ? ARTICULATION_ANGLE_CUES.map((angle) => {
+            const initial = anglePointsAt(landmarks, angle, centre, 0.075);
+            if (initial === null) return null;
+            return (
+              <DynamicPoseLine
+                key={`articulation-angle-${angle.name}`}
+                initialPoints={initial}
+                getPoints={() => anglePointsAt(landmarksRef.current, angle, centre, 0.075)}
+                color={ARTICULATION_ANGLE_CUE_COLOR}
+                lineWidth={1.3}
+              />
+            );
+          })
+        : null}
     </>
   );
 }
@@ -333,6 +424,21 @@ function connectionPoints(
   return start && end
     ? [toViewerPoint(start, centre), toViewerPoint(end, centre)]
     : null;
+}
+
+function anglePointsAt(
+  landmarks: readonly PoseLandmark[],
+  angle: AngleDefinition,
+  centre: { readonly xM: number; readonly yM: number },
+  radius: number,
+): ViewerPoint[] | null {
+  const byName = new Map(landmarks.map((landmark) => [landmark.jointName, landmark]));
+  const vertex = byName.get(angle.vertexLandmark);
+  const first = byName.get(angle.firstLandmark);
+  const second = byName.get(angle.secondLandmark);
+  if (!vertex || !first || !second) return null;
+  const radians = angleAt(vertex, first, second);
+  return radians === null ? null : arcPoints(vertex, first, second, radians, centre, radius);
 }
 
 interface DynamicLineHandle {
@@ -431,6 +537,9 @@ export function PoseCanvas({
   playing,
   showProviderSkeleton,
   showTorsoCue,
+  showFootContact,
+  showHeadNeck,
+  showArticulationAngles,
   showSegments,
   showAngles,
   showErrorRadii,
@@ -443,6 +552,9 @@ export function PoseCanvas({
   playing: boolean;
   showProviderSkeleton: boolean;
   showTorsoCue: boolean;
+  showFootContact: boolean;
+  showHeadNeck: boolean;
+  showArticulationAngles: boolean;
   showSegments: boolean;
   showAngles: boolean;
   showErrorRadii: boolean;
@@ -463,6 +575,9 @@ export function PoseCanvas({
         preset={preset}
         showProviderSkeleton={showProviderSkeleton}
         showTorsoCue={showTorsoCue}
+        showFootContact={showFootContact}
+        showHeadNeck={showHeadNeck}
+        showArticulationAngles={showArticulationAngles}
         showSegments={showSegments}
         showAngles={showAngles}
         showErrorRadii={showErrorRadii}
