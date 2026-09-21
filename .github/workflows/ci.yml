@@ -204,6 +204,88 @@ jobs:
       - name: Workspace lint hook
         run: pnpm run web:lint
 
+  # Validates the product workspace: generated API typing drift, TypeScript,
+  # lint, unit/component tests and the production build.
+  web:
+    name: Web workbench
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm (version from package.json `packageManager`)
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }} with the pnpm store cache
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install from the frozen lockfile
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify there is no API schema drift
+        run: pnpm run web:api-check
+
+      - name: Typecheck
+        run: pnpm run web:typecheck
+
+      - name: Lint
+        run: pnpm run web:lint
+
+      - name: Unit and component tests
+        run: pnpm run web:test
+
+      - name: Production build
+        run: pnpm run web:build
+
+  # End-to-end acceptance and automated accessibility against Chromium with
+  # deterministic contract-shaped API fixtures: no PostgreSQL, no dataset
+  # download. The Docker Compose profile remains the full-stack reproduction
+  # path documented in README.
+  e2e:
+    name: Web e2e and accessibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm (version from package.json `packageManager`)
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }} with the pnpm store cache
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install from the frozen lockfile
+        run: pnpm install --frozen-lockfile
+
+      - name: Install the Chromium browser for Playwright
+        run: pnpm --filter @dynamis/web exec playwright install --with-deps chromium
+
+      - name: Acceptance, accessibility and visual smoke
+        run: pnpm run web:e2e
+
+      - name: Upload the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report
+          retention-days: 7
+          if-no-files-found: ignore
+
   # Rejects scientific data, database state, secrets, machine-specific absolute
   # paths and static-analysis suppression from the repository. The guard script
   # is dependency-free so it runs before any installation.

@@ -19,6 +19,11 @@ imputed. The provider ``error_m`` field is its 90th-percentile predicted error
 radius, not a probability, standard deviation or confidence weight. Error
 propagation, when enabled, is a named worst-case additive bound on segment
 length (``e_start + e_end``) and is never labelled a confidence interval.
+
+Observed pose may disappear and later resume. Every subject's observed frames
+are therefore split into contiguous temporal segments at explicit gaps, and
+filter/derivative state restarts at each boundary: no interpolated sample is
+invented and no derivative is taken across a gap.
 """
 
 from __future__ import annotations
@@ -56,6 +61,21 @@ TRANSLATION_INVARIANCE = "relative_vectors_only"
 ABSOLUTE_HEIGHT_INTERPRETATION = "none"
 PARENT_TREE_CREATED = False
 
+#: Locked V1 temporal-gap policy. Provider pose is observation-limited: a subject
+#: may disappear and later resume. Every subject's observed frames are split into
+#: contiguous temporal segments at gaps larger than ``max_gap_factor`` times the
+#: expected sample step; filtering and differentiation restart at every segment
+#: boundary and never cross a gap. There is no interpolation and no imputation.
+GAP_POLICY_CONTIGUOUS_SEGMENTS = "contiguous_segments"
+GAP_POLICIES = (GAP_POLICY_CONTIGUOUS_SEGMENTS,)
+DEFAULT_MAX_GAP_FACTOR = 1.5
+GAP_POLICY_SEMANTICS = (
+    "Observed pose frames are split into contiguous temporal segments at an observed "
+    "step above max_gap_factor * expected step; filter and derivative state restart at "
+    "every segment boundary, no value is interpolated and no derivative is taken across "
+    "a gap. ROM is the range of observed values and is not a differentiated quantity."
+)
+
 DEFAULT_PARAMETERS: dict[str, Any] = {
     "required_coordinate_components": ["x_m", "y_m", "z_m"],
     "segments": [],
@@ -72,6 +92,10 @@ DEFAULT_PARAMETERS: dict[str, Any] = {
         "edge_policy": EDGE_NAN,
     },
     "error_policy": ERROR_POLICY_NONE,
+    "gap_policy": {
+        "strategy": GAP_POLICY_CONTIGUOUS_SEGMENTS,
+        "max_gap_factor": DEFAULT_MAX_GAP_FACTOR,
+    },
     "translation_invariance": TRANSLATION_INVARIANCE,
     "absolute_height_interpretation": ABSOLUTE_HEIGHT_INTERPRETATION,
     "parent_tree_created": PARENT_TREE_CREATED,
@@ -232,6 +256,20 @@ def pose_spec(parameters: Mapping[str, Any] | None = None) -> ProcessorSpec:
         raise ValueError("parent_tree_created must remain False")
     if resolved["error_policy"] not in ERROR_POLICIES:
         raise ValueError(f"unknown error_policy {resolved['error_policy']!r}")
+    gap_policy = dict(resolved["gap_policy"])
+    strategy = str(gap_policy.get("strategy", ""))
+    if strategy != GAP_POLICY_CONTIGUOUS_SEGMENTS:
+        raise ValueError(
+            f"gap_policy.strategy must remain {GAP_POLICY_CONTIGUOUS_SEGMENTS!r}; "
+            "differentiating across an observation gap would fabricate motion"
+        )
+    max_gap_factor = float(gap_policy.get("max_gap_factor", DEFAULT_MAX_GAP_FACTOR))
+    if not math.isfinite(max_gap_factor) or max_gap_factor < 1.0:
+        raise ValueError("gap_policy.max_gap_factor must be a finite factor of at least 1.0")
+    resolved["gap_policy"] = {
+        "strategy": strategy,
+        "max_gap_factor": max_gap_factor,
+    }
     segments = tuple(SegmentDefinition.from_parameters(item) for item in resolved["segments"])
     angles = tuple(AngleDefinition.from_parameters(item) for item in resolved["angles"])
     if not segments and not angles:
@@ -267,7 +305,8 @@ def pose_spec(parameters: Mapping[str, Any] | None = None) -> ProcessorSpec:
             "Relative segment vectors/lengths and explicitly defined three-point angles "
             "with ROM and explicitly specified angular velocity. Required landmarks are "
             "named in parameters, unavailable landmarks produce no result, no parent tree "
-            "is created and provider Z is never interpreted as absolute height."
+            "is created, provider Z is never interpreted as absolute height, and "
+            "filter/derivative state restarts at every contiguous temporal segment."
         ),
         parameters=resolved,
     )
@@ -338,6 +377,8 @@ def process_pose(
     required = tuple(str(item) for item in spec.parameters["required_landmarks"])
     derivative_spec = DerivativeSpec.from_parameters(dict(spec.parameters["derivative"]))
     error_policy = str(spec.parameters["error_policy"])
+    gap_policy = dict(spec.parameters["gap_policy"])
+    max_gap_factor = float(gap_policy["max_gap_factor"])
     for name in ("t_rel_ns", "joint_name", "is_available", "x_m", "y_m", "z_m"):
         if name not in table.column_names:
             raise ValueError(f"{ALGORITHM_ID}: required column {name!r} is absent")
@@ -362,6 +403,18 @@ def process_pose(
     for subject in subjects:
         frames, per_landmark = _entity_arrays(table, subject=subject, required_landmarks=required)
         total_frames += frames.size
+        rate_hz = _rate_hz(table, frames)
+        temporal_segments = _contiguous_segments(
+            frames,
+            rate_hz=rate_hz,
+            max_gap_factor=max_gap_factor,
+        )
+        gap_policy_provenance = {
+            "strategy": GAP_POLICY_CONTIGUOUS_SEGMENTS,
+            "max_gap_factor": max_gap_factor,
+            "pose_segments": len(temporal_segments),
+            "semantics": GAP_POLICY_SEMANTICS,
+        }
         scope = {
             "session_id": table.column("session_id")[0].as_py(),
             "subject_id": subject,
@@ -377,6 +430,7 @@ def process_pose(
             "absolute_height_interpretation": ABSOLUTE_HEIGHT_INTERPRETATION,
             "parent_tree_created": PARENT_TREE_CREATED,
             "translation_invariance": TRANSLATION_INVARIANCE,
+            "gap_policy": gap_policy_provenance,
             "derivative": derivative_spec.parameters(),
         }
         for name in required:
@@ -407,6 +461,7 @@ def process_pose(
         columns: dict[str, pa.Array] = {
             "entity_id": pa.array([subject] * frames.size, type=pa.string()),
             "t_rel_ns": pa.array(frames, type=pa.int64()),
+            "segment_index": _segment_index_column(frames, temporal_segments),
         }
         for segment in segments:
             start = per_landmark[segment.start_landmark]
@@ -445,7 +500,6 @@ def process_pose(
                             **scope,
                         )
                     )
-        rate_hz = _rate_hz(table, frames)
         for angle in angles:
             vertex = per_landmark[angle.vertex_landmark]
             first = per_landmark[angle.first_landmark]
@@ -469,13 +523,23 @@ def process_pose(
             token = _token(angle.name)
             columns[f"angle_{token}_rad"] = pa.array(angle_series, type=pa.float64())
             finite = angle_series[np.isfinite(angle_series)]
-            filtered_angle = derivative_spec.filter.apply(angle_series, rate_hz=rate_hz)
-            try:
-                velocity = derivative_variable(
-                    filtered_angle, frames, edge_policy=derivative_spec.edge_policy
-                )
-            except ValueError:
-                velocity = np.full(frames.size, np.nan)
+            # Filter and derivative state restart at every contiguous segment
+            # boundary: no sample is interpolated and no difference spans a gap.
+            velocity = np.full(frames.size, np.nan)
+            for start, stop in temporal_segments:
+                if stop - start < 2:
+                    continue
+                try:
+                    filtered_angle = derivative_spec.filter.apply(
+                        angle_series[start:stop], rate_hz=rate_hz
+                    )
+                    velocity[start:stop] = derivative_variable(
+                        filtered_angle,
+                        frames[start:stop],
+                        edge_policy=derivative_spec.edge_policy,
+                    )
+                except ValueError:
+                    continue
             columns[f"angular_velocity_{token}_rad_s"] = pa.array(velocity, type=pa.float64())
             if finite.size >= 2:
                 metrics.append(
@@ -534,10 +598,48 @@ def process_pose(
             "frames": total_frames,
             "required_landmarks": list(required),
             "error_policy": error_policy,
+            "gap_policy": {
+                "strategy": GAP_POLICY_CONTIGUOUS_SEGMENTS,
+                "max_gap_factor": max_gap_factor,
+                "semantics": GAP_POLICY_SEMANTICS,
+            },
             "parent_tree_created": PARENT_TREE_CREATED,
             "absolute_height_interpretation": ABSOLUTE_HEIGHT_INTERPRETATION,
         },
     )
+
+
+def _contiguous_segments(
+    frames: np.ndarray,
+    *,
+    rate_hz: float,
+    max_gap_factor: float,
+) -> tuple[tuple[int, int], ...]:
+    """Split observed frames into contiguous temporal segments.
+
+    A boundary exists where the observed step exceeds ``max_gap_factor`` times
+    the expected step. The expected step is the declared/measured sampling period
+    when one is resolvable; a series with fewer than two frames is one segment.
+    """
+    if frames.size <= 1:
+        return ((0, int(frames.size)),)
+    if rate_hz > 0:
+        expected_step_ns = 1e9 / rate_hz
+    else:
+        expected_step_ns = float(np.median(np.diff(frames)))
+    if not math.isfinite(expected_step_ns) or expected_step_ns <= 0:
+        return ((0, int(frames.size)),)
+    breaks = np.flatnonzero(np.diff(frames) > max_gap_factor * expected_step_ns) + 1
+    bounds = (0, *breaks.tolist(), int(frames.size))
+    return tuple((int(bounds[index]), int(bounds[index + 1])) for index in range(len(bounds) - 1))
+
+
+def _segment_index_column(frames: np.ndarray, segments: tuple[tuple[int, int], ...]) -> pa.Array:
+    """Per-frame contiguous-segment index, so consumers can see the gaps."""
+    values = np.zeros(frames.size, dtype=np.int32)
+    for index, (start, stop) in enumerate(segments):
+        values[start:stop] = index
+    return pa.array(values, type=pa.int32())
 
 
 def _rate_hz(table: pa.Table, frames: np.ndarray) -> float:
@@ -558,8 +660,12 @@ __all__ = [
     "ABSOLUTE_HEIGHT_INTERPRETATION",
     "ALGORITHM_ID",
     "ALGORITHM_VERSION",
+    "DEFAULT_MAX_GAP_FACTOR",
     "ERROR_POLICY_NONE",
     "ERROR_POLICY_WORST_CASE",
+    "GAP_POLICIES",
+    "GAP_POLICY_CONTIGUOUS_SEGMENTS",
+    "GAP_POLICY_SEMANTICS",
     "PARENT_TREE_CREATED",
     "TRANSLATION_INVARIANCE",
     "AngleDefinition",
