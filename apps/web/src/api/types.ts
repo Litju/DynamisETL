@@ -17,6 +17,7 @@ export type MetricPage = components["schemas"]["MetricPage"];
 export type MetricMethodology = components["schemas"]["MetricMethodology"];
 export type ProvenanceGraph = components["schemas"]["ProvenanceGraph"];
 export type QualityIssuePage = components["schemas"]["QualityIssuePage"];
+export type QualityIssueView = components["schemas"]["QualityIssueView"];
 export type RunPage = components["schemas"]["RunPage"];
 export type RightsPage = components["schemas"]["RightsPage"];
 export type DenseWindow = components["schemas"]["DenseWindow"];
