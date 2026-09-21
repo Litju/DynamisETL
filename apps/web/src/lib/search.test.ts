@@ -5,6 +5,7 @@ import {
   compareSearchSchema,
   labSearchSchema,
   labSearchToParams,
+  normalizeLabSearch,
   parseSearch,
 } from "@/lib/search";
 
@@ -39,6 +40,12 @@ describe("durable search parameter validation", () => {
     expect(parsed.t_ns).toBe("2987480000000");
     expect(parsed.subject).toBe("809166");
     expect(typeof parsed.t_ns).toBe("string");
+  });
+
+  it("normalizes every numeric subject identity at the root context seam", () => {
+    for (const subject of [11897, 287934, 809166, 965697]) {
+      expect(normalizeLabSearch({ subject }).subject).toBe(String(subject));
+    }
   });
 
   it("drops invalid values instead of entering the state spine unchecked", () => {

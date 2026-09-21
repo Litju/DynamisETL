@@ -2,7 +2,7 @@ import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useMemo, type ReactNode } from "react";
 
 import { AnalysisContext, type AnalysisContextValue } from "@/lib/analysis-context";
-import type { LabSearch } from "@/lib/search";
+import { normalizeLabSearch, type LabSearch } from "@/lib/search";
 import { formatNsDecimal, tryParseNs } from "@/lib/time";
 
 /**
@@ -19,7 +19,7 @@ export function AnalysisContextProvider({ children }: { children: ReactNode }) {
   const parts = location.pathname.split("/").filter(Boolean);
   const datasetId = parts[0] === "lab" ? (parts[1] ?? null) : null;
   const sessionId = parts[0] === "lab" ? (parts[2] ?? null) : null;
-  const search = (location.search ?? {}) as Partial<LabSearch>;
+  const search = normalizeLabSearch(location.search);
 
   const value = useMemo<AnalysisContextValue | null>(() => {
     if (datasetId === null || sessionId === null) return null;

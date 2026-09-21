@@ -113,6 +113,15 @@ export function parseSearch<Schema extends z.ZodType>(
   return schema.parse({});
 }
 
+/** Normalize raw router search values before they enter the shared context. */
+export function normalizeLabSearch(input: unknown): LabSearch {
+  const record =
+    typeof input === "object" && input !== null
+      ? (input as Record<string, unknown>)
+      : {};
+  return parseSearch(labSearchSchema, record);
+}
+
 /** Build lab search from a partial durable context without undefined keys. */
 export function labSearchToParams(search: LabSearch): Record<string, string> {
   const params: Record<string, string> = {};
