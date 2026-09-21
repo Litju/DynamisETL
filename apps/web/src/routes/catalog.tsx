@@ -132,8 +132,8 @@ export function CatalogPage() {
               onChange={(value) => updateSearch({ rights: value as CatalogSearch["rights"] })}
               options={[
                 { value: "all", label: "Any rights" },
-                { value: "noncommercial", label: "Commercial use allowed" },
-                { value: "commercial", label: "Non-commercial only" },
+                { value: "noncommercial", label: "Non-commercial only" },
+                { value: "commercial", label: "Commercial use allowed" },
               ]}
             />
             <span className="ml-auto text-[11px] tabular text-text-muted">

@@ -109,7 +109,18 @@ describe("signal option builder", () => {
   it("renders a reduced window as an extrema envelope, not as uncertainty", () => {
     const reduced = buildSignalOption({
       panes: [{ id: "position", label: "Position", unit: "m" }],
-      series: [],
+      series: [
+        {
+          name: "Velocity X",
+          unit: "m/s",
+          measurementClass: "MODEL_ESTIMATED",
+          paneIndex: 0,
+          points: [
+            [0, 0],
+            [10, 1],
+          ],
+        },
+      ],
       bands: [
         {
           name: "Position X",

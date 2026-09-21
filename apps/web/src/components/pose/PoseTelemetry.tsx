@@ -85,10 +85,13 @@ export function PoseTelemetry() {
     frames.length > 0 && frameIndex >= 0 ? frames[frameIndex] ?? null : null,
   );
 
-  if (session.isPending || artifact.isPending || window.isPending || stream === null) {
+  if (session.isSuccess && (stream === null || artifactId === null)) {
+    return <div className="p-3 text-[11px] text-quality-warning">Pose telemetry unavailable.</div>;
+  }
+  if (session.isPending || artifact.isPending || window.isPending) {
     return <div className="p-3 text-[11px] text-text-muted">Loading pose telemetry…</div>;
   }
-  if (session.isError || artifact.isError || window.isError || artifactId === null) {
+  if (session.isError || artifact.isError || window.isError) {
     return <div className="p-3 text-[11px] text-quality-warning">Pose telemetry unavailable.</div>;
   }
 

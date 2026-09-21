@@ -6,7 +6,7 @@
 The RES-108 screenshot audit concluded that *"analytical capability exists in code, but the
 product does not visibly present analysis as the primary experience."* That is accurate but
 understates the position. Running the product against the real local data showed that the
-capability largely **did not execute**. Nine defects are recorded below. Six of them
+capability largely **did not execute**. Ten defects are recorded below. Six of them
 independently prevented a flagship renderer from drawing anything.
 
 Each entry gives the observed symptom, the actual cause, the evidence, and what was done.

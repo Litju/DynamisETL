@@ -49,11 +49,12 @@ test("1e. all-subject Pose mode uses one fixed world without entity scoping", as
   );
   const toggle = page.getByTestId("pose-all-subjects-toggle");
   await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  const requestsBeforeToggle = poseWindowRequests.length;
   await toggle.click();
   await expect(toggle).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByText("all subjects · fixed camera (2)")).toBeVisible();
   await expect(page.getByText(/2 subjects share one source-coordinate world/)).toBeVisible();
-  expect(poseWindowRequests.some((url) => !url.includes("entity_id="))).toBe(true);
+  expect(poseWindowRequests.slice(requestsBeforeToggle).some((url) => !url.includes("entity_id="))).toBe(true);
 });
 
 test("1c. Pose playback advances both the playhead and rendered scene", async ({ page }) => {

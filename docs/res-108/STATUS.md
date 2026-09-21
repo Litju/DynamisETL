@@ -198,7 +198,7 @@ changed. Tables whose primary key already leads with the filtered column were le
 |---|---|
 | TypeScript typecheck | **Pass** |
 | ESLint | **Pass** — 0 errors, 2 hook-dependency warnings |
-| Vitest | **Pass** — 141 tests, 20 files |
+| Vitest | **Pass** — 152 tests, 21 files |
 | Python serving + migrations + schema | **Pass** — 35 tests |
 | ruff check / format | **Pass** |
 | pyright (serving) | **Pass** — 0 errors |

@@ -622,9 +622,9 @@ function drawPitch(graphics: Graphics, line: number, surface: number) {
 
     for (const corner of [-1, 1]) {
       const start =
-        side > 0 ? (corner > 0 ? Math.PI / 2 : Math.PI) : corner > 0 ? 0 : -Math.PI / 2;
+        side > 0 ? (corner > 0 ? Math.PI : Math.PI / 2) : corner > 0 ? -Math.PI / 2 : 0;
       const end =
-        side > 0 ? (corner > 0 ? Math.PI : (3 * Math.PI) / 2) : corner > 0 ? Math.PI / 2 : 0;
+        side > 0 ? (corner > 0 ? (3 * Math.PI) / 2 : Math.PI) : corner > 0 ? 0 : Math.PI / 2;
       strokeArc(graphics, goalLine, corner * half.y, 1, start, end, lineWidth, line, 0.7);
     }
   }

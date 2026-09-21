@@ -95,26 +95,30 @@ export function EChart({
         const start = Number(eventState?.start ?? first?.start ?? 0);
         const end = Number(eventState?.end ?? first?.end ?? 100);
         const xAxis = (option?.xAxis as Array<{ min?: number; max?: number }> | undefined)?.[0];
-        let dataMin = Number.POSITIVE_INFINITY;
-        let dataMax = Number.NEGATIVE_INFINITY;
-        for (const series of (option?.series as Array<{ data?: unknown }> | undefined) ?? []) {
-          for (const point of Array.isArray(series.data) ? series.data : []) {
-            const x = Array.isArray(point) ? Number(point[0]) : Number.NaN;
-            if (!Number.isFinite(x)) continue;
-            dataMin = Math.min(dataMin, x);
-            dataMax = Math.max(dataMax, x);
-          }
-        }
-        const min = Number.isFinite(eventState?.startValue)
+        let min = Number.isFinite(eventState?.startValue)
           ? Number(eventState.startValue)
           : typeof xAxis?.min === "number"
             ? xAxis.min
-            : dataMin;
-        const max = Number.isFinite(eventState?.endValue)
+            : null;
+        let max = Number.isFinite(eventState?.endValue)
           ? Number(eventState.endValue)
           : typeof xAxis?.max === "number"
             ? xAxis.max
-            : dataMax;
+            : null;
+        if (min === null || max === null) {
+          let dataMin = Number.POSITIVE_INFINITY;
+          let dataMax = Number.NEGATIVE_INFINITY;
+          for (const series of (option?.series as Array<{ data?: unknown }> | undefined) ?? []) {
+            for (const point of Array.isArray(series.data) ? series.data : []) {
+              const x = Array.isArray(point) ? Number(point[0]) : Number.NaN;
+              if (!Number.isFinite(x)) continue;
+              dataMin = Math.min(dataMin, x);
+              dataMax = Math.max(dataMax, x);
+            }
+          }
+          min ??= dataMin;
+          max ??= dataMax;
+        }
         if (!Number.isFinite(min) || !Number.isFinite(max) || max < min) return;
         const span = max - min;
         callbacksRef.current.onRangeZoom?.({

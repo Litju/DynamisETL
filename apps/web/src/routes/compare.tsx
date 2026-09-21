@@ -74,7 +74,10 @@ export function ComparePage() {
   );
   const metricA = search.metric ?? null;
   const metricB = search.b ?? null;
-  const groupBy = (search.a as GroupBy | undefined) ?? "dataset_id";
+  const groupBy =
+    typeof search.a === "string" && GROUP_OPTIONS.includes(search.a as GroupBy)
+      ? (search.a as GroupBy)
+      : "dataset_id";
 
   return (
     <div className="flex h-full min-h-0 flex-col">
