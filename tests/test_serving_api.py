@@ -39,6 +39,7 @@ from dynamis.serving.models import (
     DatasetSummary,
     DenseWindowMeta,
     LicenseView,
+    MetricCatalogEntry,
     MetricDefinitionView,
     MetricMethodology,
     MetricPage,
@@ -253,6 +254,9 @@ class FakeBackend:
     def metrics(self, filters: MetricFilters, limit: int, offset: int) -> MetricPage:
         self.last_filters = filters
         return MetricPage(source="gold", total=1, limit=limit, offset=offset, rows=[METRIC])
+
+    def metric_definitions(self) -> list[MetricCatalogEntry]:
+        return []
 
     def methodology(self, metric_id: str) -> MetricMethodology | None:
         if metric_id != METRIC.metric_id:
@@ -665,7 +669,7 @@ def test_artifact_detail_serves_bounds_for_a_first_window(client: TestClient) ->
 
 
 def test_window_endpoint_accepts_negative_bounds_and_entity_scope(client: TestClient) -> None:
-    backend: FakeBackend = client.app.state.fake_backend
+    backend: FakeBackend = client.app.state.fake_backend  # type: ignore[attr-defined]
     response = client.get(
         "/api/artifacts/sample-1/window",
         params={"from_ns": -1_345_000_000, "to_ns": 0, "entity_id": "white-s000"},
