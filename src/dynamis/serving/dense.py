@@ -239,8 +239,6 @@ def load_artifact_window(
                 "from_ns": lower,
                 "to_ns": upper,
                 "max_points": int(max_points),
-                "identity_count": identity_count,
-                "points_per_identity": points_per_identity,
                 "bucket_count": table.num_rows,
             },
             source_points=source_rows,
