@@ -68,6 +68,7 @@ const ARTIFACT = {
   canonical_time_max_ns: 100_000_000,
   entity_column: "subject_id",
   entity_count: 1,
+  entity_ids: ["s1", "s2"],
 };
 
 const POSE_ROWS = [
@@ -284,4 +285,13 @@ it("requires a pose stream and never renders another modality", async () => {
   installFetch();
   renderViewer({ streamId: null });
   expect(await screen.findByText("No stream selected.")).toBeInTheDocument();
+});
+
+it("keeps a durable subject selected when the current window only returns another subject", async () => {
+  installFetch();
+  renderViewer({ subjectId: "s2" });
+  expect(
+    await screen.findByText("Individual s2 is not observed at this time/window."),
+  ).toBeInTheDocument();
+  expect(screen.queryByTestId("pose-scene-stub")).not.toBeInTheDocument();
 });

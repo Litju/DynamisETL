@@ -8,7 +8,6 @@ import {
   angleAt,
   boundsOf,
   cameraFor,
-  drawableDisplayConnections,
   landmarksAt,
   planarCentre,
   toViewerPoint,
@@ -121,11 +120,13 @@ export function PoseScene({
 
   useFrame(() => {
     const time = useAnalysisStore.getState().playheadNs ?? useAnalysisStore.getState().committedTimeNs;
-    const landmarks = new Map(
-      landmarksAt(framesRef.current, time).map((landmark) => [landmark.jointName, landmark]),
+    const currentLandmarks = landmarksAt(framesRef.current, time);
+    landmarksRef.current = currentLandmarks;
+    const currentByName = new Map(
+      currentLandmarks.map((landmark) => [landmark.jointName, landmark]),
     );
     for (const [name, mesh] of jointRefs.current) {
-      const landmark = landmarks.get(name);
+      const landmark = currentByName.get(name);
       if (!landmark) {
         mesh.visible = false;
         continue;
@@ -139,8 +140,8 @@ export function PoseScene({
   const currentTime =
     useAnalysisStore.getState().playheadNs ?? useAnalysisStore.getState().committedTimeNs;
   const landmarks = landmarksAt(frames, currentTime);
+  const landmarksRef = useRef<readonly PoseLandmark[]>(landmarks);
   const byName = new Map(landmarks.map((landmark) => [landmark.jointName, landmark]));
-  const drawableProviderConnections = drawableDisplayConnections(landmarks, providerConnections);
 
   return (
     <>
@@ -220,10 +221,13 @@ export function PoseScene({
             ))
         : null}
       {showProviderSkeleton
-        ? drawableProviderConnections.map(([start, end]) => (
-            <Line
-              key={`provider-${start.jointName}-${end.jointName}`}
-              points={[toViewerPoint(start, centre), toViewerPoint(end, centre)]}
+        ? providerConnections.map((connection) => (
+            <DynamicPoseLine
+              key={`provider-${connection.startLandmark}-${connection.endLandmark}`}
+              initialPoints={connectionPoints(landmarks, connection, centre)}
+              getPoints={() =>
+                connectionPoints(landmarksRef.current, connection, centre)
+              }
               color={PROVIDER_SKELETON_COLOR}
               lineWidth={1.8}
             />
@@ -235,9 +239,19 @@ export function PoseScene({
             const end = byName.get(segment.endLandmark);
             if (!start || !end) return null;
             return (
-              <Line
+              <DynamicPoseLine
                 key={segment.name}
-                points={[toViewerPoint(start, centre), toViewerPoint(end, centre)]}
+                initialPoints={[toViewerPoint(start, centre), toViewerPoint(end, centre)]}
+                getPoints={() => {
+                  const current = new Map(
+                    landmarksRef.current.map((landmark) => [landmark.jointName, landmark]),
+                  );
+                  const currentStart = current.get(segment.startLandmark);
+                  const currentEnd = current.get(segment.endLandmark);
+                  return currentStart && currentEnd
+                    ? [toViewerPoint(currentStart, centre), toViewerPoint(currentEnd, centre)]
+                    : null;
+                }}
                 color={SEGMENT_COLOR}
                 lineWidth={2.5}
               />
@@ -254,10 +268,83 @@ export function PoseScene({
             if (radians === null) return null;
             const arc = arcPoints(vertex, first, second, radians, centre);
             if (arc.length < 2) return null;
-            return <Line key={angle.name} points={arc} color={ANGLE_COLOR} lineWidth={2} />;
+            return (
+              <DynamicPoseLine
+                key={angle.name}
+                initialPoints={arc}
+                getPoints={() => {
+                  const current = new Map(
+                    landmarksRef.current.map((landmark) => [landmark.jointName, landmark]),
+                  );
+                  const currentVertex = current.get(angle.vertexLandmark);
+                  const currentFirst = current.get(angle.firstLandmark);
+                  const currentSecond = current.get(angle.secondLandmark);
+                  if (!currentVertex || !currentFirst || !currentSecond) return null;
+                  const currentRadians = angleAt(currentVertex, currentFirst, currentSecond);
+                  return currentRadians === null
+                    ? null
+                    : arcPoints(currentVertex, currentFirst, currentSecond, currentRadians, centre);
+                }}
+                color={ANGLE_COLOR}
+                lineWidth={2}
+              />
+            );
           })
         : null}
     </>
+  );
+}
+
+function connectionPoints(
+  landmarks: readonly PoseLandmark[],
+  connection: DisplayConnectionDefinition,
+  centre: { readonly xM: number; readonly yM: number },
+): ViewerPoint[] | null {
+  const byName = new Map(landmarks.map((landmark) => [landmark.jointName, landmark]));
+  const start = byName.get(connection.startLandmark);
+  const end = byName.get(connection.endLandmark);
+  return start && end
+    ? [toViewerPoint(start, centre), toViewerPoint(end, centre)]
+    : null;
+}
+
+interface DynamicLineHandle {
+  visible: boolean;
+  geometry: { setPositions: (positions: number[]) => void };
+  computeLineDistances?: () => void;
+}
+
+function DynamicPoseLine({
+  initialPoints,
+  getPoints,
+  color,
+  lineWidth,
+}: {
+  initialPoints: readonly ViewerPoint[] | null;
+  getPoints: () => readonly ViewerPoint[] | null;
+  color: string;
+  lineWidth: number;
+}) {
+  const lineRef = useRef<DynamicLineHandle | null>(null);
+  const setLineRef = useCallback((value: unknown) => {
+    lineRef.current = value as DynamicLineHandle | null;
+  }, []);
+  useFrame(() => {
+    const line = lineRef.current;
+    if (!line) return;
+    const points = getPoints();
+    line.visible = points !== null;
+    if (points === null) return;
+    line.geometry.setPositions(points.flatMap((point) => [...point]));
+    line.computeLineDistances?.();
+  });
+  return (
+    <Line
+      ref={setLineRef}
+      points={initialPoints ?? [[0, 0, 0], [0, 0, 0]]}
+      color={color}
+      lineWidth={lineWidth}
+    />
   );
 }
 

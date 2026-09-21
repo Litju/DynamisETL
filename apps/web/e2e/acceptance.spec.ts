@@ -20,6 +20,22 @@ test("1. deep link loads deterministic analytical context and survives reload", 
   await expect(page).toHaveURL(/t_ns=2987480000000/);
 });
 
+test("1b. individual selection is URL-owned across reload, scrub and history", async ({ page }) => {
+  await page.goto("/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P1&view=pose&t_ns=0");
+  const picker = page.locator("#pose-subject");
+  await expect(picker).toHaveValue("SC-P1");
+  await picker.selectOption("SC-P2");
+  await expect(page).toHaveURL(/subject=SC-P2/);
+  await page.keyboard.press("ArrowRight");
+  await expect(page).toHaveURL(/subject=SC-P2/);
+  await page.reload();
+  await expect(page).toHaveURL(/subject=SC-P2/);
+  await page.goBack();
+  await expect(page).toHaveURL(/subject=SC-P1/);
+  await page.goForward();
+  await expect(page).toHaveURL(/subject=SC-P2/);
+});
+
 test("2. selecting a player on the pitch updates the durable subject context", async ({ page }) => {
   await page.goto("/lab/skillcorner-opendata/1925299?stream=tracking-1&view=field");
   const host = page.getByTestId("pitch-canvas");

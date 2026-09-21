@@ -49,8 +49,16 @@ export function AnalysisContextProvider({ children }: { children: ReactNode }) {
             ? { from_ns: undefined, to_ns: undefined }
             : { from_ns: formatNsDecimal(range.fromNs), to_ns: formatNsDecimal(range.toNs) },
         ),
-      selectSubject: (subjectIdValue) =>
-        update({ subject: subjectIdValue === null ? undefined : subjectIdValue }),
+      selectSubject: (subjectIdValue, options) =>
+        void navigate({
+          to: "/lab/$datasetId/$sessionId",
+          params: { datasetId, sessionId },
+          search: (previous: LabSearch) => ({
+            ...previous,
+            subject: subjectIdValue === null ? undefined : subjectIdValue,
+          }),
+          replace: options?.replace ?? false,
+        }),
       selectStream: (streamIdValue) =>
         update({ stream: streamIdValue === null ? undefined : streamIdValue }),
       selectResult: (derivedMetricId) =>

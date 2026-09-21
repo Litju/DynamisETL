@@ -34,6 +34,10 @@ import {
 } from "@/lib/arrow/window-table";
 import { readPalette } from "@/lib/chart-palette";
 import { formatMetricValue } from "@/lib/measurement";
+import {
+  resolveSignalStream,
+  stableIndividualIds,
+} from "@/lib/individual-selection";
 import { useAnalysisStore } from "@/lib/state/analysis";
 import { formatDurationNs, nsFromRendererTime, rendererTimeMs } from "@/lib/time";
 
@@ -68,15 +72,54 @@ export function SignalLaboratory() {
     ...sessionQuery(datasetId ?? "", sessionId ?? ""),
     enabled: Boolean(datasetId && sessionId),
   });
-  const stream: StreamView | null = useMemo(() => {
+  const currentStream: StreamView | null = useMemo(() => {
     const streams = session.data?.streams ?? [];
     return streams.find((candidate) => candidate.stream_id === streamId) ?? null;
   }, [session.data, streamId]);
+  const selectedSubject = context?.subjectId ?? null;
+  const stream = useMemo(
+    () =>
+      resolveSignalStream(
+        session.data?.streams ?? [],
+        currentStream,
+        selectedSubject,
+      ),
+    [currentStream, selectedSubject, session.data?.streams],
+  );
   const artifactId = stream?.sample_artifact_ids[0] ?? null;
+  const artifact = useQuery({
+    ...artifactQuery(artifactId ?? ""),
+    enabled: Boolean(artifactId),
+  });
+  const individuals = useMemo(
+    () => stableIndividualIds(artifact.data, session.data?.streams ?? []),
+    [artifact.data, session.data?.streams],
+  );
+  const subjectId = selectedSubject ?? stream?.subject_id ?? individuals[0] ?? null;
+  const entityId = artifact.data?.entity_column
+    ? subjectId ?? undefined
+    : undefined;
+
+  // Selecting a subject on a per-subject stream resolves to the compatible
+  // real stream/trial and makes that resolution durable for reloads.
+  useEffect(() => {
+    if (selectedSubject === null && subjectId !== null) {
+      context?.selectSubject(subjectId, { replace: true });
+    }
+    if (
+      selectedSubject !== null &&
+      currentStream !== null &&
+      stream !== null &&
+      stream.stream_id !== currentStream.stream_id
+    ) {
+      context?.selectStream(stream.stream_id);
+    }
+  }, [context, currentStream, selectedSubject, stream, subjectId]);
   const dense = useDenseWindow({
     artifactId,
     ...(fromNs !== null ? { fromNs: Number(fromNs) } : {}),
     ...(toNs !== null ? { toNs: Number(toNs) } : {}),
+    ...(entityId !== undefined ? { entityId } : {}),
     maxPoints: MAX_WINDOW_POINTS,
   });
 
@@ -102,8 +145,12 @@ export function SignalLaboratory() {
     return (
       <StatePanel
         state="unavailable"
-        title="Stream is not part of this session."
-        detail="The selected stream does not belong to the open session; cross-session synchronization is never inferred."
+        title={
+          selectedSubject === null
+            ? "Stream is not part of this session."
+            : `No signal stream is available for individual ${selectedSubject}.`
+        }
+        detail="The selected identity remains unchanged; another subject's stream is never substituted."
       />
     );
   }
@@ -133,9 +180,11 @@ export function SignalLaboratory() {
     return <LoadingPanel label="Loading dense window" />;
   }
   return (
-    <SignalView
-      stream={stream}
-      artifactId={artifactId}
+      <SignalView
+        stream={stream}
+        individuals={individuals}
+        subjectId={subjectId}
+        artifactId={artifactId}
       table={dense.data.table}
       transport={dense.data.transport ?? "json"}
       fromNs={fromNs}
@@ -146,6 +195,8 @@ export function SignalLaboratory() {
 
 function SignalView({
   stream,
+  individuals,
+  subjectId,
   artifactId,
   table,
   transport,
@@ -153,6 +204,8 @@ function SignalView({
   toNs,
 }: {
   stream: StreamView;
+  individuals: readonly string[];
+  subjectId: string | null;
   artifactId: string;
   table: WindowTable;
   transport: "arrow" | "json";
@@ -318,6 +371,8 @@ function SignalView({
       <div className="flex min-w-0 flex-1 flex-col">
         <AnalysisHeader
           stream={stream}
+          individuals={individuals}
+          subjectId={subjectId}
           group={activeGroup}
           groups={groups}
           onSelectGroup={setSelectedGroupId}
@@ -349,7 +404,7 @@ function SignalView({
           reductionText={reductionText}
         />
       </div>
-      <TrialEvidence stream={stream} />
+      <TrialEvidence stream={stream} subjectId={subjectId} />
     </div>
   );
 }
@@ -360,15 +415,20 @@ function SignalView({
  */
 function AnalysisHeader({
   stream,
+  individuals,
+  subjectId,
   group,
   groups,
   onSelectGroup,
 }: {
   stream: StreamView;
+  individuals: readonly string[];
+  subjectId: string | null;
   group: ChannelGroup | null;
   groups: readonly ChannelGroup[];
   onSelectGroup: (groupId: string) => void;
 }) {
+  const context = useAnalysisContext();
   return (
     <header className="shrink-0 border-b border-border-subtle bg-surface-1 px-4 py-2">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -388,6 +448,32 @@ function AnalysisHeader({
           </span>
         </div>
       </div>
+      {individuals.length > 0 ? (
+        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+          <label htmlFor="signal-individual" className="text-[11px] text-text-muted">
+            individual
+          </label>
+          <select
+            id="signal-individual"
+            value={subjectId ?? ""}
+            onChange={(event) => context?.selectSubject(event.target.value)}
+            className="mono h-7 rounded-control border border-border-subtle bg-surface-0 px-1.5 text-[11px] text-text-secondary outline-none focus:border-accent"
+          >
+            {[...new Set(subjectId ? [...individuals, subjectId] : individuals)].map((individual) => (
+              <option key={individual} value={individual}>
+                {individual}
+              </option>
+            ))}
+          </select>
+          <span className="text-[10px] text-text-muted">
+            selected identity scopes the dense request and evidence
+          </span>
+        </div>
+      ) : subjectId !== null ? (
+        <p className="mt-1 text-[10px] text-text-muted">
+          individual <span className="mono text-text-secondary">{subjectId}</span>
+        </p>
+      ) : null}
       {groups.length > 1 ? (
         <div
           role="group"
@@ -491,12 +577,19 @@ function ProvenanceStrip({
  * Real derived metrics for the plotted trial, beside the trace they describe.
  * Selecting one drives the inspector, so the value and its method stay linked.
  */
-function TrialEvidence({ stream }: { stream: StreamView }) {
+function TrialEvidence({
+  stream,
+  subjectId,
+}: {
+  stream: StreamView;
+  subjectId: string | null;
+}) {
   const context = useAnalysisContext();
   const metrics = useQuery({
     ...metricsQuery({
       datasetId: context?.datasetId ?? undefined,
       sessionId: context?.sessionId ?? undefined,
+      ...(subjectId ? { subjectId } : {}),
       ...(stream.trial_id ? { trialId: stream.trial_id } : {}),
       limit: 60,
     }),
@@ -524,7 +617,7 @@ function TrialEvidence({ stream }: { stream: StreamView }) {
           {stream.trial_id ?? stream.stream_id}
         </p>
         <dl className="mt-2 space-y-1 text-[11px]">
-          <EvidenceRow label="Subject" value={stream.subject_id ?? "not subject-scoped"} />
+          <EvidenceRow label="Individual" value={subjectId ?? stream.subject_id ?? "not subject-scoped"} />
           <EvidenceRow
             label="Samples"
             value={stream.sample_row_count.toLocaleString("en-US")}

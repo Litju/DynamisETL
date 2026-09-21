@@ -65,9 +65,9 @@ export function PoseViewer() {
   // needs exact frames, so the window is both scoped to one subject and sized
   // from the artifact's measured per-subject density.
   //
-  // A pose stream that declares no subject of its own needs one resolved from
-  // the data before it can render: the probe reports who is actually observed,
-  // and the first of them becomes the deterministic default.
+  // A pose stream that declares no subject of its own resolves identities from
+  // the stable artifact/session authority; the current playhead never changes
+  // the selected individual.
   const observed = usePoseSubjects(
     artifact.data,
     session.data?.participants ?? [],
@@ -120,7 +120,11 @@ export function PoseViewer() {
     enabled: Boolean(artifactId) && windowBounds !== null,
   });
   const metrics = useQuery({
-    ...metricsQuery({ streamId: streamId ?? undefined, limit: 50 }),
+    ...metricsQuery({
+      streamId: streamId ?? undefined,
+      ...(subjectId !== null ? { subjectId } : {}),
+      limit: 50,
+    }),
     enabled: Boolean(streamId),
   });
   // Analytical overlays come from the processor revision that produced this
@@ -181,7 +185,9 @@ export function PoseViewer() {
   // follow the same entity. Committing it durably keeps the view shareable.
   const selectSubject = context?.selectSubject;
   useEffect(() => {
-    if (selectedSubject === null && subjectId !== null) selectSubject?.(subjectId);
+    if (selectedSubject === null && subjectId !== null) {
+      selectSubject?.(subjectId, { replace: true });
+    }
   }, [selectSubject, selectedSubject, subjectId]);
 
   if (!context) return <StatePanel state="empty" title="Open a laboratory session first." />;

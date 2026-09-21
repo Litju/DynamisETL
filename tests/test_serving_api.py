@@ -27,6 +27,7 @@ from dynamis.serving.dense import (
     canonical_timespan,
     entity_cardinality,
     entity_column,
+    entity_ids,
     load_artifact_window,
     resolve_artifact_path,
 )
@@ -375,6 +376,7 @@ class FakeBackend:
             canonical_time_max_ns=100_000_000,
             entity_column="object_id",
             entity_count=3,
+            entity_ids=["p1", "p2", "p3"],
         )
 
     def window(self, artifact_id: str, **kwargs: Any):
@@ -610,6 +612,7 @@ def test_dense_window_scopes_to_one_entity(tmp_settings: Settings) -> None:
 
     # Cardinality is what a viewer divides by to size its window.
     assert entity_cardinality(tmp_settings, ref) == 3
+    assert entity_ids(tmp_settings, ref) == ["p1", "p2", "p3"]
     assert entity_column(pq.read_schema(resolve_artifact_path(tmp_settings, ref))) == "object_id"
 
 

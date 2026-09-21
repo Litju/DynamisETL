@@ -56,11 +56,24 @@ const TRACKING_STREAM = {
   sample_row_count: 3,
 };
 
+const POSE_DISPLAY_CONNECTIONS = [
+  ["nose", "neck"], ["nose", "lEye"], ["nose", "rEye"],
+  ["lEye", "lEar"], ["rEye", "rEar"], ["neck", "lShoulder"],
+  ["neck", "rShoulder"], ["neck", "midHip"], ["lShoulder", "lElbow"],
+  ["lElbow", "lWrist"], ["rShoulder", "rElbow"], ["rElbow", "rWrist"],
+  ["lWrist", "lThumb"], ["lWrist", "lPinky"], ["rWrist", "rThumb"],
+  ["rWrist", "rPinky"], ["midHip", "lHip"], ["midHip", "rHip"],
+  ["lHip", "lKnee"], ["lKnee", "lAnkle"], ["rHip", "rKnee"],
+  ["rKnee", "rAnkle"], ["lAnkle", "lHeel"], ["lAnkle", "lBigToe"],
+  ["lBigToe", "lSmallToe"], ["rAnkle", "rHeel"], ["rAnkle", "rBigToe"],
+  ["rBigToe", "rSmallToe"],
+].map(([start_joint_name, end_joint_name]) => ({ start_joint_name, end_joint_name }));
+
 const POSE_STREAM = {
   stream_id: "pose-1",
   modality: "pose",
   measurement_class: "MODEL_ESTIMATED",
-  subject_id: "SC-P1",
+  subject_id: null,
   trial_id: "period-1",
   device_id: null,
   nominal_sampling_rate_hz: 25,
@@ -70,6 +83,14 @@ const POSE_STREAM = {
   synchronization_spec_id: "skillcorner-source-provided-match-clock",
   clock_id: "skillcorner-match-clock",
   skeleton_id: "skillcorner-bodypose-29-landmarks",
+  skeleton_topology: "landmark_set",
+  skeleton_joint_names: [
+    "nose", "neck", "lEye", "rEye", "lEar", "rEar", "lShoulder", "rShoulder",
+    "lElbow", "rElbow", "lWrist", "rWrist", "lThumb", "rThumb", "lPinky", "rPinky",
+    "midHip", "lHip", "rHip", "lKnee", "rKnee", "lAnkle", "rAnkle", "lHeel",
+    "rHeel", "lBigToe", "rBigToe", "lSmallToe", "rSmallToe",
+  ],
+  skeleton_display_connections: POSE_DISPLAY_CONNECTIONS,
   sample_artifact_ids: ["pose-sample"],
   sample_row_count: 3,
 };
@@ -132,6 +153,9 @@ const POSE_ARTIFACT = {
   coordinate_frame_id: "skillcorner-pose-hybrid-m",
   artifact_kind: "sample",
   modality: "pose",
+  entity_column: "subject_id",
+  entity_count: 2,
+  entity_ids: ["SC-P1", "SC-P2"],
 };
 
 const TRACKING_WINDOW = {
