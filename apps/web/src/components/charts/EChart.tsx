@@ -114,6 +114,8 @@ export function EChart({
       role="img"
       aria-label={ariaLabel}
       data-testid="echart"
+      data-renderer="echarts"
+      data-renderer-ready={ready ? "true" : "false"}
       className={cn("h-full min-h-48 w-full", className)}
     />
   );

@@ -71,7 +71,6 @@ export default function LineageGraph({ graph }: { graph: ProvenanceGraph }) {
           nodesDraggable={false}
           nodesConnectable={false}
           elementsSelectable
-          proOptions={{ hideAttribution: true }}
           onNodeClick={(_event, node) => setSelectedId(node.id)}
           onPaneClick={() => setSelectedId(null)}
         >

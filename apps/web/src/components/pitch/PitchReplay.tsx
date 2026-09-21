@@ -289,6 +289,7 @@ function PitchView({
   const rendererRef = useRef<PitchRendererHandle | null>(null);
   const selectedEntityId = useAnalysisStore((state) => state.selectedEntityId);
   const committedRangeNs = useAnalysisStore((state) => state.committedRangeNs);
+  const [rendererReady, setRendererReady] = useState(false);
   // The scene is rebuilt when the window changes; these refs carry the current
   // presentation state into the newly created renderer.
   const layersRef = useRef<PitchLayers>(DEFAULT_PITCH_LAYERS);
@@ -336,6 +337,7 @@ function PitchView({
     if (!host) return;
     let disposed = false;
     let renderer: PitchRendererHandle | null = null;
+    setRendererReady(false);
     void createPitchRenderer(host, palette, (objectId) => {
       useAnalysisStore.getState().selectEntity(objectId);
       onSelectEntity(objectId);
@@ -346,6 +348,7 @@ function PitchView({
       }
       renderer = created;
       rendererRef.current = created;
+      setRendererReady(true);
       created.setLayers(layersRef.current);
       created.setEvents(eventsRef.current);
       created.setFrame(
@@ -356,6 +359,7 @@ function PitchView({
     });
     return () => {
       disposed = true;
+      setRendererReady(false);
       renderer?.destroy();
       rendererRef.current = null;
     };
@@ -493,6 +497,8 @@ function PitchView({
           role="img"
           aria-label={`Pitch replay for ${stream.stream_id}`}
           data-testid="pitch-canvas"
+          data-renderer="pixi"
+          data-renderer-ready={rendererReady ? "true" : "false"}
           className="h-full w-full"
         />
         <div className="pointer-events-none absolute left-2 top-2 max-w-64 rounded-control border border-border-subtle bg-surface-1/90 px-2 py-1 text-[11px]">

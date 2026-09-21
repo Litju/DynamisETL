@@ -289,12 +289,14 @@ export function PoseCanvas({
   preset,
   playing,
   showErrorRadii,
+  onReady,
 }: {
   frames: readonly PoseFrame[];
   overlays: ProcessorOverlays;
   preset: CameraPreset;
   playing: boolean;
   showErrorRadii: boolean;
+  onReady?: () => void;
 }) {
   return (
     <Canvas
@@ -302,6 +304,7 @@ export function PoseCanvas({
       camera={{ fov: 40, near: 0.01, far: 100 }}
       dpr={[1, 2]}
       gl={{ antialias: true }}
+      onCreated={() => onReady?.()}
     >
       <PoseScene
         frames={frames}

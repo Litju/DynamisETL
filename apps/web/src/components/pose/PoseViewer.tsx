@@ -44,6 +44,7 @@ export function PoseViewer() {
   const playing = useAnalysisStore((state) => state.playing);
   const selectedJoint = useAnalysisStore((state) => state.selectedJoint);
   const hoveredJoint = useAnalysisStore((state) => state.hoveredJoint);
+  const [rendererReady, setRendererReady] = useState(false);
 
   const session = useQuery({
     ...sessionQuery(datasetId ?? "", sessionId ?? ""),
@@ -278,7 +279,12 @@ export function PoseViewer() {
         ) : null}
       </header>
       <div className="flex min-h-0 flex-1">
-        <div className="relative min-h-0 flex-1" data-testid="pose-canvas">
+        <div
+          className="relative min-h-0 flex-1"
+          data-testid="pose-canvas"
+          data-renderer="r3f"
+          data-renderer-ready={rendererReady ? "true" : "false"}
+        >
           <Suspense fallback={<LoadingPanel label="Loading 3D renderer" />}>
             <PoseCanvas
               frames={frames}
@@ -286,6 +292,7 @@ export function PoseViewer() {
               preset={preset}
               playing={playing}
               showErrorRadii={showErrorRadii}
+              onReady={() => setRendererReady(true)}
             />
           </Suspense>
         </div>
@@ -354,10 +361,13 @@ export function PoseViewer() {
                 <dd className="mono text-text-secondary">source z (centroid-relative)</dd>
               </div>
               <div className="flex justify-between gap-2">
-                <dt>horizontal plane</dt>
-                <dd className="mono text-text-secondary">source x, y (pitch plane)</dd>
+                <dt>screen depth</dt>
+                <dd className="mono text-text-secondary">−source y (right-handed)</dd>
               </div>
             </dl>
+            <p className="t-evidence mt-1">
+              display R<sub>x</sub>(+90°): [x, y, z] → [x, z, −y]
+            </p>
             <p className="mt-1 text-[10px] leading-relaxed text-text-muted">
               Display orientation only. Every served pose metric is computed from relative
               vectors, so the view carries no absolute height or pitch position.
