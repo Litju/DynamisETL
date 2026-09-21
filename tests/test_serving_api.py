@@ -402,6 +402,9 @@ def test_health_and_serving_status(client: TestClient) -> None:
     health = client.get("/api/health")
     assert health.status_code == 200
     assert health.json()["status"] == "ok"
+    ready = client.get("/api/ready")
+    assert ready.status_code == 200
+    assert ready.json()["status"] == "ok"
     status = client.get("/api/serving/status")
     assert status.status_code == 200
     body = status.json()

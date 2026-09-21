@@ -8,6 +8,10 @@ never recomputes a scientific value.
 
 from __future__ import annotations
 
+import json
+import logging
+import os
+import time
 from typing import Annotated, Any, Protocol
 
 import pyarrow.parquet as pq
@@ -59,6 +63,7 @@ from dynamis.serving.models import (
 from dynamis.storage.control_plane import control_plane_engine
 
 API_VERSION = "0.1.0"
+ACCESS_LOG = logging.getLogger("dynamis.access")
 DEFAULT_PAGE_LIMIT = 100
 MAX_PAGE_LIMIT = 1000
 
@@ -317,6 +322,25 @@ def create_app(
 
         app.state.backend = _LazyBackend()
 
+    @app.middleware("http")
+    async def bounded_access_log(request: Request, call_next):
+        started = time.perf_counter()
+        response = await call_next(request)
+        if os.environ.get("DYNAMIS_ACCESS_LOG", "0") == "1":
+            ACCESS_LOG.info(
+                json.dumps(
+                    {
+                        "event": "http_request",
+                        "method": request.method,
+                        "path": request.url.path,
+                        "status": response.status_code,
+                        "duration_ms": round((time.perf_counter() - started) * 1000, 3),
+                    },
+                    separators=(",", ":"),
+                )
+            )
+        return response
+
     @app.exception_handler(SQLAlchemyError)
     async def _database_error(_request, exc: SQLAlchemyError) -> JSONResponse:
         return JSONResponse(
@@ -353,6 +377,11 @@ def create_app(
 
     @app.get("/api/health", response_model=HealthStatus, tags=["system"])
     def health() -> HealthStatus:
+        return HealthStatus(status="ok", version=API_VERSION)
+
+    @app.get("/api/ready", response_model=HealthStatus, tags=["system"])
+    def ready(service: BackendDependency) -> HealthStatus:
+        service.status()
         return HealthStatus(status="ok", version=API_VERSION)
 
     @app.get("/api/serving/status", response_model=ServingStatus, tags=["system"])

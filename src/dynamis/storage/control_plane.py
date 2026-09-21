@@ -7,6 +7,8 @@ address the same unqualified tables.
 
 from __future__ import annotations
 
+import os
+
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.engine import URL, make_url
 
@@ -27,5 +29,18 @@ def control_plane_engine(settings: Settings, url: str | None = None) -> Engine:
         parsed,
         connect_args={"options": f"-c search_path={settings.db_schema},public"},
         pool_pre_ping=True,
+        pool_size=_positive_int("DYNAMIS_DB_POOL_SIZE", 4),
+        max_overflow=_positive_int("DYNAMIS_DB_MAX_OVERFLOW", 4),
+        pool_timeout=_positive_int("DYNAMIS_DB_POOL_TIMEOUT", 30),
         future=True,
     )
+
+
+def _positive_int(name: str, default: int) -> int:
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return default
+    value = int(raw)
+    if value <= 0:
+        raise ConfigurationError(f"{name} must be positive")
+    return value

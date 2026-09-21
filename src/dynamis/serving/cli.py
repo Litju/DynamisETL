@@ -8,6 +8,7 @@ or downloads data.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
 import uvicorn
@@ -16,7 +17,7 @@ import uvicorn
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="dynamis-serve", description=__doc__)
     parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--port", type=int, default=None)
     parser.add_argument(
         "--reload",
         action="store_true",
@@ -28,7 +29,7 @@ def main(argv: list[str] | None = None) -> int:
         "dynamis.serving.app:app",
         factory=True,
         host=args.host,
-        port=args.port,
+        port=args.port or int(os.environ.get("PORT", "8000")),
         reload=args.reload,
         log_level=args.log_level,
     )
