@@ -372,7 +372,7 @@ function AnalysisHeader({
   return (
     <header className="shrink-0 border-b border-border-subtle bg-surface-1 px-4 py-2">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 className="text-[15px] font-medium leading-tight text-text-primary">
+        <h2 className="t-analysis-title">
           {group?.label ?? "Signal window"}
           {group && group.unit !== "1" ? (
             <span className="ml-2 text-[12px] font-normal text-text-muted">[{group.unit}]</span>
@@ -517,7 +517,7 @@ function TrialEvidence({ stream }: { stream: StreamView }) {
       className="flex w-72 shrink-0 flex-col border-l border-border-subtle bg-surface-1"
     >
       <div className="shrink-0 border-b border-border-subtle px-3 py-2">
-        <h3 className="text-[12px] font-medium text-text-secondary">
+        <h3 className="t-analysis-title text-text-secondary">
           {stream.trial_id ? "Trial" : "Stream"}
         </h3>
         <p className="mono mt-0.5 truncate text-[11px] text-text-muted" title={stream.trial_id ?? stream.stream_id}>
@@ -545,7 +545,7 @@ function TrialEvidence({ stream }: { stream: StreamView }) {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <h3 className="sticky top-0 z-10 bg-surface-1 px-3 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">
+        <h3 className="t-section sticky top-0 z-10 bg-surface-1 px-3 pb-1 pt-2 text-text-muted">
           Derived metrics
         </h3>
         {metrics.isPending ? (

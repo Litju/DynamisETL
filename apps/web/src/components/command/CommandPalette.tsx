@@ -176,7 +176,7 @@ export function CommandPalette() {
                   )}
                 >
                   <span>{command.title}</span>
-                  <span className="text-[10px] uppercase tracking-wider text-text-muted">
+                  <span className="t-section text-text-muted">
                     {command.group}
                   </span>
                 </button>

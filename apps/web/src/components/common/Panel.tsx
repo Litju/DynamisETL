@@ -32,7 +32,7 @@ export function Panel({
     >
       {title ? (
         <header className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-border-subtle px-3">
-          <h2 className="truncate text-[11px] font-medium uppercase tracking-wider text-text-muted">
+          <h2 className="t-section truncate text-text-muted">
             {title}
           </h2>
           {actions ? <div className="flex items-center gap-1">{actions}</div> : null}
@@ -54,7 +54,7 @@ export function KeyValueRow({
 }) {
   return (
     <div className="grid grid-cols-[7.5rem_1fr] items-baseline gap-2 border-b border-border-subtle/60 px-3 py-1.5 last:border-b-0">
-      <dt className="text-[11px] uppercase tracking-wide text-text-muted">{label}</dt>
+          <dt className="t-section text-text-muted">{label}</dt>
       <dd className={cn("min-w-0 break-words text-[12px] text-text-secondary", mono && "mono")}>
         {children}
       </dd>
@@ -64,7 +64,7 @@ export function KeyValueRow({
 
 export function SectionTitle({ children }: { children: ReactNode }) {
   return (
-    <h3 className="mb-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">
+    <h3 className="t-section mb-2 text-text-muted">
       {children}
     </h3>
   );

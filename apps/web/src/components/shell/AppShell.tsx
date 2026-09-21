@@ -132,7 +132,7 @@ function InspectorRail({ onExpand }: { onExpand: () => void }) {
       </button>
       <span
         aria-hidden="true"
-        className="mt-3 select-none text-[10px] uppercase tracking-[0.18em] text-text-muted"
+        className="t-section mt-3 select-none text-text-muted tracking-[0.18em]"
         style={{ writingMode: "vertical-rl" }}
       >
         Inspector

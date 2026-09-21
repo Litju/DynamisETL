@@ -428,7 +428,7 @@ function PitchView({
     <div className="flex h-full min-h-0 flex-col">
       <header className="shrink-0 border-b border-border-subtle bg-surface-1 px-4 py-2">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <h2 className="text-[15px] font-medium leading-tight text-text-primary">
+          <h2 className="t-analysis-title">
             Pitch tracking
             <span className="ml-2 text-[12px] font-normal text-text-muted">
               {explicitRange ? "selected range" : windowLabel}

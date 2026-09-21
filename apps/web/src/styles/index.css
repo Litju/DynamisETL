@@ -13,7 +13,7 @@
     background-color: var(--d-surface-0);
     color: var(--d-text-primary);
     font-family: var(--font-sans);
-    font-size: 13px;
+    font-size: var(--d-type-body);
     line-height: 1.45;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
@@ -37,9 +37,11 @@
     color: inherit;
   }
 
+  /* One focus treatment for every control, visible on all surfaces. */
   :focus-visible {
     outline: 2px solid var(--d-accent);
     outline-offset: 1px;
+    border-radius: var(--radius-control);
   }
 
   ::selection {
@@ -67,6 +69,98 @@
 
   *::-webkit-scrollbar-track {
     background: transparent;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Typography scale.
+ *
+ * Nine levels, in the order RES-108 defines them: product title, surface
+ * title, analysis title, selected context, primary value, section heading,
+ * body/control, metadata label, technical evidence. Sizes are declared
+ * once here instead of being repeated as literals, so the hierarchy is a
+ * system a reader can feel rather than a per-component accident.
+ *
+ * Monospace is reserved for machine identity — ids, hashes, code revisions,
+ * timestamps and exact scientific values — never for ordinary prose.
+ * ------------------------------------------------------------------------ */
+@layer components {
+  .t-product-title {
+    font-size: var(--d-type-product);
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: -0.025em;
+    color: var(--d-text-primary);
+  }
+
+  .t-surface-title {
+    font-size: var(--d-type-surface);
+    font-weight: 500;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+    color: var(--d-text-primary);
+  }
+
+  .t-analysis-title {
+    font-size: var(--d-type-analysis);
+    font-weight: 500;
+    line-height: 1.3;
+    color: var(--d-text-primary);
+  }
+
+  .t-context {
+    font-size: var(--d-type-context);
+    line-height: 1.35;
+  }
+
+  .t-value {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: var(--d-type-value);
+    font-weight: 500;
+    line-height: 1;
+    color: var(--d-text-primary);
+  }
+
+  .t-section {
+    font-size: var(--d-type-section);
+    font-weight: 500;
+    line-height: 1.3;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--d-text-muted);
+  }
+
+  .t-body {
+    font-size: var(--d-type-body);
+    line-height: 1.5;
+    color: var(--d-text-secondary);
+  }
+
+  .t-label {
+    font-size: var(--d-type-label);
+    line-height: 1.4;
+    color: var(--d-text-muted);
+  }
+
+  .t-evidence {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: var(--d-type-evidence);
+    line-height: 1.4;
+    color: var(--d-text-muted);
+  }
+
+  .t-control {
+    min-height: var(--d-control-default);
+  }
+
+  .t-control-compact {
+    min-height: var(--d-control-compact);
+  }
+
+  .t-control-prominent {
+    min-height: var(--d-control-prominent);
   }
 }
 

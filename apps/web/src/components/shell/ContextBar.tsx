@@ -125,11 +125,11 @@ export function ContextBar() {
     <header className="flex h-11 shrink-0 items-center gap-3 border-b border-border-subtle bg-surface-0 px-3">
       <Link
         to="/catalog"
-        className="flex shrink-0 items-baseline gap-1.5 rounded-control text-[14px] font-semibold tracking-tight"
+        className="t-product-title flex shrink-0 items-baseline gap-1.5 rounded-control"
         title="DynamisData Performance Laboratory"
       >
         <span>DynamisData</span>
-        <span className="hidden text-[11px] font-normal text-text-muted lg:inline">
+          <span className="t-context hidden font-normal text-text-muted lg:inline">
           Performance Laboratory
         </span>
       </Link>
@@ -149,14 +149,14 @@ export function ContextBar() {
               {crumb.to && index === 0 ? (
                 <Link
                   to={crumb.to}
-                  className="truncate text-[12px] text-text-secondary hover:text-text-primary"
+                    className="t-context truncate text-text-secondary hover:text-text-primary"
                 >
                   {crumb.label}
                 </Link>
               ) : (
                 <span
                   className={cn(
-                    "truncate text-[12px]",
+                    "t-context truncate",
                     index === crumbs.length - 1 ? "text-text-primary" : "text-text-secondary",
                   )}
                   title={crumb.label}
@@ -179,7 +179,7 @@ export function ContextBar() {
       <button
         type="button"
         onClick={() => setPaletteOpen(true)}
-        className="flex h-7 w-56 shrink-0 items-center gap-2 rounded-control border border-border-subtle bg-surface-1 px-2 text-left text-[12px] text-text-muted transition-colors duration-quick hover:border-border-strong hover:text-text-secondary"
+        className="t-control flex h-7 w-56 shrink-0 items-center gap-2 rounded-control border border-border-subtle bg-surface-1 px-2 text-left text-text-muted transition-colors duration-quick hover:border-border-strong hover:text-text-secondary"
       >
         <Command size={12} aria-hidden="true" />
         <span className="flex-1 truncate">Search or run a command</span>

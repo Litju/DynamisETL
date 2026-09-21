@@ -294,7 +294,7 @@ export function PoseViewer() {
             <div className="mb-3">
               <label
                 htmlFor="pose-subject"
-                className="text-[10px] uppercase tracking-wider text-text-muted"
+                className="t-section text-text-muted"
               >
                 subject
               </label>
@@ -317,7 +317,7 @@ export function PoseViewer() {
             </div>
           ) : null}
           <div className="mb-2">
-            <span className="text-[10px] uppercase tracking-wider text-text-muted">camera</span>
+        <span className="t-section text-text-muted">camera</span>
             <div className="mt-1 flex flex-wrap gap-1">
               {CAMERA_PRESETS.map((candidate) => (
                 <button
@@ -345,7 +345,7 @@ export function PoseViewer() {
             provider p90 predicted error radius
           </label>
           <div className="mb-3">
-            <span className="text-[10px] uppercase tracking-wider text-text-muted">
+            <span className="t-section text-text-muted">
               viewer frame
             </span>
             <dl className="mt-1 space-y-0.5 text-[10px] leading-snug text-text-muted">
@@ -364,7 +364,7 @@ export function PoseViewer() {
             </p>
           </div>
           <div className="mb-2">
-            <span className="text-[10px] uppercase tracking-wider text-text-muted">
+            <span className="t-section text-text-muted">
               processor overlays
             </span>
             <p className="text-text-muted">
@@ -374,7 +374,7 @@ export function PoseViewer() {
             </p>
           </div>
           <div className="mb-2">
-            <span className="text-[10px] uppercase tracking-wider text-text-muted">
+            <span className="t-section text-text-muted">
               observed landmarks
             </span>
             <ul className="mt-1 flex flex-wrap gap-1" aria-label="Observed landmarks">
@@ -397,7 +397,7 @@ export function PoseViewer() {
             </ul>
           </div>
           <div className="mb-2">
-            <span className="text-[10px] uppercase tracking-wider text-text-muted">
+            <span className="t-section text-text-muted">
               frame time
             </span>
             <p className="mono text-text-secondary">
@@ -406,7 +406,7 @@ export function PoseViewer() {
           </div>
           {inspected ? (
             <div>
-              <span className="text-[10px] uppercase tracking-wider text-text-muted">
+              <span className="t-section text-text-muted">
                 selected landmark
               </span>
               <p className="mono text-text-secondary">{inspected.jointName}</p>

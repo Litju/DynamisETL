@@ -63,7 +63,7 @@ export function MethodsPage() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="shrink-0 border-b border-border-subtle bg-surface-1 px-4 py-3">
-        <h1 className="text-[16px] font-medium leading-tight text-text-primary">
+        <h1 className="t-surface-title">
           Methodology and provenance
         </h1>
         <p className="mt-0.5 text-[12px] text-text-secondary">
@@ -150,7 +150,7 @@ function MethodDetail({ methodology }: { methodology: MetricMethodology }) {
   return (
     <div className="min-h-0 min-w-0 overflow-y-auto bg-surface-1">
       <header className="border-b border-border-subtle px-4 py-3">
-        <h2 className="text-[15px] font-medium leading-snug text-text-primary">{metric.name}</h2>
+        <h2 className="t-analysis-title">{metric.name}</h2>
         <div className="mt-1.5 flex flex-wrap items-center gap-2">
           <MeasurementClassBadge measurementClass={metric.measurement_class} />
           <span className="rounded-[3px] border border-border-subtle px-1.5 py-px text-[11px] text-text-secondary">
@@ -308,7 +308,7 @@ function ResultChooser({
   return (
     <div className="shrink-0 border-b border-border-subtle">
       <div className="flex flex-wrap items-center gap-2 px-4 py-2">
-        <h2 className="text-[13px] font-medium text-text-primary">Served results</h2>
+        <h2 className="t-analysis-title">Served results</h2>
         <input
           value={filter}
           onChange={(event) => setFilter(event.target.value)}
@@ -374,7 +374,7 @@ function SelectedLineage({ derivedMetricId }: { derivedMetricId: string }) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="border-b border-border-subtle px-4 py-3">
-      <h3 className="mb-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">
+      <h3 className="t-section mb-2 text-text-muted">
         {title}
       </h3>
       {children}
@@ -398,7 +398,7 @@ function Disclosure({
         type="button"
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
-        className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-text-muted hover:text-text-secondary"
+        className="t-section flex items-center gap-1.5 text-text-muted hover:text-text-secondary"
       >
         {open ? (
           <ChevronDown size={12} aria-hidden="true" />

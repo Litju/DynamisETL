@@ -57,7 +57,7 @@ export function QualityPage() {
       <header className="shrink-0 border-b border-border-subtle bg-surface-1 px-4 py-3">
         <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
           <div className="min-w-0">
-            <h1 className="text-[16px] font-medium leading-tight text-text-primary">
+            <h1 className="t-surface-title">
               Quality &amp; rights
             </h1>
             <p className="mt-0.5 max-w-2xl text-[12px] text-text-secondary">
@@ -98,7 +98,7 @@ export function QualityPage() {
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-px bg-border-subtle xl:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
         <section className="flex min-h-64 min-w-0 flex-col bg-surface-1">
           <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border-subtle px-4 py-2">
-            <h2 className="text-[13px] font-medium text-text-primary">Recorded quality issues</h2>
+            <h2 className="t-analysis-title">Recorded quality issues</h2>
             <input
               value={search.dataset ?? ""}
               onChange={(event) => update({ dataset: event.target.value || undefined })}
@@ -150,7 +150,7 @@ export function QualityPage() {
 
         <section className="flex min-h-64 min-w-0 flex-col bg-surface-1">
           <header className="flex shrink-0 items-center gap-2 border-b border-border-subtle px-4 py-2">
-            <h2 className="text-[13px] font-medium text-text-primary">Rights by source</h2>
+            <h2 className="t-analysis-title">Rights by source</h2>
             <span className="text-[11px] text-text-muted">
               declared licence terms that govern every value below them
             </span>
@@ -183,7 +183,7 @@ function Stat({
     <div className="text-right">
       <dd
         className={cn(
-          "mono text-[18px] font-medium leading-none tabular",
+          "t-value mono tabular",
           tone === "warning"
             ? "text-quality-warning"
             : tone === "valid"
@@ -193,7 +193,7 @@ function Stat({
       >
         {value.toLocaleString("en-US")}
       </dd>
-      <dt className="mt-1 text-[10px] uppercase tracking-wider text-text-muted">{label}</dt>
+      <dt className="t-section mt-1 text-text-muted">{label}</dt>
     </div>
   );
 }
@@ -294,7 +294,7 @@ function RightsMatrix({
   return (
     <table className="w-full text-[11px]">
       <thead className="sticky top-0 z-10 bg-surface-1">
-        <tr className="text-left text-[10px] uppercase tracking-wider text-text-muted">
+        <tr className="t-section text-left text-text-muted">
           <th className="px-4 py-2 font-medium">Source</th>
           <th className="px-2 py-2 font-medium">Licence</th>
           <th className="px-2 py-2 font-medium">Attribution</th>

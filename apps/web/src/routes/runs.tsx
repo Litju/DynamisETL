@@ -60,7 +60,7 @@ export function RunsPage() {
       <header className="shrink-0 border-b border-border-subtle bg-surface-1 px-4 py-3">
         <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
           <div className="min-w-0">
-            <h1 className="text-[16px] font-medium leading-tight text-text-primary">
+            <h1 className="t-surface-title">
               Processing runs
             </h1>
             <p className="mt-0.5 max-w-2xl text-[12px] text-text-secondary">
@@ -124,7 +124,7 @@ export function RunsPage() {
             ) : (
               <>
                 <header className="shrink-0 border-b border-border-subtle px-4 py-2">
-                  <h2 className="text-[13px] font-medium text-text-primary">
+                  <h2 className="t-analysis-title">
                     Metrics produced by processor
                   </h2>
                   <p className="mt-0.5 text-[11px] text-text-muted">
@@ -211,7 +211,7 @@ function Stat({
     <div className="text-right">
       <dd
         className={cn(
-          "mono text-[18px] font-medium leading-none tabular",
+          "t-value mono tabular",
           tone === "warning"
             ? "text-quality-warning"
             : tone === "valid"
@@ -221,7 +221,7 @@ function Stat({
       >
         {value.toLocaleString("en-US")}
       </dd>
-      <dt className="mt-1 text-[10px] uppercase tracking-wider text-text-muted">{label}</dt>
+      <dt className="t-section mt-1 text-text-muted">{label}</dt>
     </div>
   );
 }
@@ -323,7 +323,7 @@ function RunDetail({ run }: { run: RunRow }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <header className="shrink-0 border-b border-border-subtle px-4 py-2">
-        <h2 className="truncate text-[13px] font-medium text-text-primary">
+        <h2 className="t-analysis-title truncate">
           {run.algorithm_name ?? run.algorithm_id}
         </h2>
         <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -398,7 +398,7 @@ function RunDetail({ run }: { run: RunRow }) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mb-4 last:mb-0">
-      <h3 className="mb-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">
+      <h3 className="t-section mb-2 text-text-muted">
         {title}
       </h3>
       {children}

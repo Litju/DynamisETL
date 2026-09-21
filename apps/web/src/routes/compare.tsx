@@ -79,7 +79,7 @@ export function ComparePage() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="shrink-0 border-b border-border-subtle bg-surface-1 px-4 py-3">
-        <h1 className="text-[16px] font-medium leading-tight text-text-primary">
+        <h1 className="t-surface-title">
           Compare served values
         </h1>
         <div className="mt-2 flex flex-wrap items-end gap-3">
@@ -238,7 +238,7 @@ function UnpairedComparison({
     <div className="flex min-h-0 flex-1 flex-col">
       <section className="flex min-h-0 flex-1 flex-col bg-surface-1">
         <header className="flex shrink-0 flex-wrap items-baseline justify-between gap-2 border-b border-border-subtle px-4 py-2">
-          <h2 className="text-[13px] font-medium text-text-primary">
+          <h2 className="t-analysis-title">
             {label}
             {unit !== "1" ? (
               <span className="ml-1.5 text-[11px] font-normal text-text-muted">[{unit}]</span>
@@ -280,13 +280,13 @@ function GroupEvidence({
   const show = (value: number) => formatMetricValue(value, unit).text;
   return (
     <section className="shrink-0 border-t border-border-subtle bg-surface-1">
-      <h3 className="px-4 pt-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">
+      <h3 className="t-section px-4 pt-2 text-text-muted">
         Group summary
       </h3>
       <div className="max-h-48 overflow-y-auto px-4 pb-3 pt-1">
         <table className="w-full text-[11px]">
           <thead>
-            <tr className="text-left text-[10px] uppercase tracking-wider text-text-muted">
+            <tr className="t-section text-left text-text-muted">
               <th className="py-1 font-medium">Group</th>
               <th className="py-1 text-right font-medium">n</th>
               <th className="py-1 text-right font-medium">Min</th>
@@ -430,7 +430,7 @@ function ChartPane({
   return (
     <section className="flex min-h-64 min-w-0 flex-col bg-surface-1">
       <header className="flex shrink-0 flex-wrap items-baseline justify-between gap-2 border-b border-border-subtle px-3 py-2">
-        <h2 className="text-[13px] font-medium text-text-primary">{title}</h2>
+        <h2 className="t-analysis-title">{title}</h2>
         <span className="text-[10px] text-text-muted">{note}</span>
       </header>
       <div className="min-h-0 flex-1">{children}</div>
@@ -512,7 +512,7 @@ function PairEvidence({
   return (
     <section className="h-56 shrink-0 border-t border-border-subtle bg-surface-1">
       <header className="flex items-center gap-2 border-b border-border-subtle px-4 py-1.5">
-        <h3 className="text-[11px] font-medium uppercase tracking-wider text-text-muted">
+        <h3 className="t-section text-text-muted">
           Paired evidence
         </h3>
         <span className="text-[10px] text-text-muted">

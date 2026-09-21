@@ -190,7 +190,7 @@ function ProductHeader({
     <header className="shrink-0 border-b border-border-subtle bg-surface-1 px-4 py-3">
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
         <div className="min-w-0">
-          <h1 className="text-[20px] font-semibold leading-tight tracking-tight text-text-primary">
+          <h1 className="t-product-title">
             Multimodal human performance data
           </h1>
           <p className="mt-0.5 max-w-2xl text-[12px] text-text-secondary">
@@ -229,10 +229,10 @@ function ProductHeader({
 function ScaleStat({ label, value }: { label: string; value: number }) {
   return (
     <div className="text-right">
-      <dd className="mono text-[18px] font-medium leading-none tabular text-text-primary">
+      <dd className="t-value mono tabular">
         {value.toLocaleString("en-US")}
       </dd>
-      <dt className="mt-1 text-[10px] uppercase tracking-wider text-text-muted">{label}</dt>
+      <dt className="t-section mt-1 text-text-muted">{label}</dt>
     </div>
   );
 }
@@ -431,7 +431,7 @@ function DatasetPane({ datasetId }: { datasetId: string }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="shrink-0 border-b border-border-subtle px-4 py-3">
-        <h2 className="text-[15px] font-medium leading-snug text-text-primary">{detail.name}</h2>
+        <h2 className="t-analysis-title">{detail.name}</h2>
         <p className="mt-0.5 text-[12px] text-text-secondary">
           {detail.provider} · {detail.domain}
         </p>

@@ -121,7 +121,7 @@ export function LabPage() {
               aria-selected={view === candidate}
               onClick={() => updateSearch({ view: candidate })}
               className={cn(
-                "relative rounded-control px-2.5 py-1 text-[12px] capitalize transition-colors duration-quick",
+                "t-context relative rounded-control px-2.5 py-1 capitalize transition-colors duration-quick",
                 view === candidate
                   ? "bg-surface-3 font-medium text-text-primary"
                   : "text-text-muted hover:bg-surface-2 hover:text-text-secondary",

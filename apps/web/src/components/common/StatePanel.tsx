@@ -35,7 +35,7 @@ export function StatePanel({
         className,
       )}
     >
-      <span className="text-[11px] uppercase tracking-wider text-text-muted">
+      <span className="t-section text-text-muted">
         {STATE_LABELS[state]}
       </span>
       {title ? <p className="text-[13px] text-text-secondary">{title}</p> : null}

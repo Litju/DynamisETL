@@ -33,7 +33,7 @@ export function Explorer() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex h-8 shrink-0 items-center border-b border-border-subtle px-3">
-        <h2 className="text-[11px] font-medium uppercase tracking-wider text-text-muted">
+        <h2 className="t-section">
           Session explorer
         </h2>
       </header>
@@ -114,7 +114,7 @@ function ExplorerForSession({
       <button
         type="button"
         onClick={() => setTrialsOpen((open) => !open)}
-        className="flex w-full items-center gap-1 py-1 text-[11px] uppercase tracking-wider text-text-muted hover:text-text-secondary"
+        className="t-section flex w-full items-center gap-1 py-1 text-text-muted hover:text-text-secondary"
       >
         {trialsOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />} Trials
       </button>
@@ -158,7 +158,7 @@ function ExplorerForSession({
       <button
         type="button"
         onClick={() => setStreamsOpen((open) => !open)}
-        className="flex w-full items-center gap-1 py-1 text-[11px] uppercase tracking-wider text-text-muted hover:text-text-secondary"
+        className="t-section flex w-full items-center gap-1 py-1 text-text-muted hover:text-text-secondary"
       >
         {streamsOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />} Streams
       </button>

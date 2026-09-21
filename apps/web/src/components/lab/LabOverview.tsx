@@ -218,7 +218,7 @@ function ContextStrip({
     <header className="shrink-0 border-b border-border-subtle bg-surface-1 px-4 py-3">
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="min-w-0">
-          <h2 className="text-[16px] font-medium leading-tight text-text-primary">
+          <h2 className="t-surface-title">
             {session.session.label ?? session.session.session_id}
           </h2>
           <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-text-muted">
@@ -242,10 +242,10 @@ function ContextStrip({
           onClick={onSelectFact}
           className="mt-3 flex w-full items-baseline gap-3 rounded-control border border-border-subtle bg-surface-0 px-3 py-2 text-left transition-colors duration-quick hover:border-border-strong hover:bg-surface-2"
         >
-          <span className="text-[11px] uppercase tracking-wider text-text-muted">
+          <span className="t-section text-text-muted">
             {fact.label}
           </span>
-          <span className="mono text-[16px] font-medium tabular text-text-primary">
+          <span className="t-value mono tabular">
             {fact.value}
           </span>
           <span className="mono truncate text-[11px] text-text-muted">{fact.detail}</span>
@@ -261,10 +261,10 @@ function ContextStrip({
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div className="text-right">
-      <dd className="mono text-[16px] font-medium leading-none tabular text-text-primary">
+      <dd className="t-value mono tabular">
         {value.toLocaleString("en-US")}
       </dd>
-      <dt className="mt-1 text-[10px] uppercase tracking-wider text-text-muted">{label}</dt>
+      <dt className="t-section mt-1 text-text-muted">{label}</dt>
     </div>
   );
 }
@@ -285,7 +285,7 @@ function ChartCard({
   return (
     <section className="flex min-h-72 min-w-0 flex-col bg-surface-1">
       <header className="flex shrink-0 flex-wrap items-baseline justify-between gap-2 border-b border-border-subtle px-3 py-2">
-        <h3 className="text-[13px] font-medium text-text-primary">
+        <h3 className="t-analysis-title">
           {title}
           {unit !== "1" ? (
             <span className="ml-1.5 text-[11px] font-normal text-text-muted">[{unit}]</span>
@@ -325,7 +325,7 @@ function StreamContracts({
         ) : (
           <ChevronRight size={13} aria-hidden="true" className="text-text-muted" />
         )}
-        <h3 className="text-[13px] font-medium text-text-primary">Stream contracts</h3>
+        <h3 className="t-analysis-title">Stream contracts</h3>
         <span className="text-[11px] text-text-muted">
           {session.streams.length} streams · clock, frame and synchronization
         </span>
@@ -466,7 +466,7 @@ function MetricTable({
   return (
     <section className={cn("flex min-h-72 min-w-0 flex-col bg-surface-1", className)}>
       <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border-subtle px-3 py-2">
-        <h3 className="text-[13px] font-medium text-text-primary">Derived metrics</h3>
+        <h3 className="t-analysis-title">Derived metrics</h3>
         <input
           value={filter}
           onChange={(event) => setFilter(event.target.value)}

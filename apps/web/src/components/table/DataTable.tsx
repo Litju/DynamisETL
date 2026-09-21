@@ -145,7 +145,7 @@ export function DataTable<T>({
                   sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : "none"
                 }
                 className={cn(
-                  "px-2 py-1 text-[11px] font-medium uppercase tracking-wider text-text-muted",
+                  "t-section px-2 py-1 text-text-muted",
                   column?.align === "right" && "text-right",
                 )}
               >

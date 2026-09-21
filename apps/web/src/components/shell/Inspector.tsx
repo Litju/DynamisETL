@@ -118,7 +118,7 @@ function SelectedResultHeader() {
             >
               {row.metric_name ?? row.metric_id}
             </span>
-            <span className="mono shrink-0 tabular text-[13px] font-medium text-text-primary">
+            <span className="t-value mono shrink-0 tabular">
               {formatMetricValue(row.value_num, row.si_unit).text}
             </span>
           </div>
@@ -160,7 +160,7 @@ function MethodForMetric({ metricId }: { metricId: string }) {
   const { metric, algorithm } = query.data;
   return (
     <div className="p-3">
-      <h3 className="text-[13px] font-medium leading-snug text-text-primary">{metric.name}</h3>
+      <h3 className="t-analysis-title">{metric.name}</h3>
       <div className="mt-1.5 flex flex-wrap items-center gap-2">
         <MeasurementClassBadge measurementClass={metric.measurement_class} compact />
         <span className="rounded-[3px] border border-border-subtle px-1.5 py-px text-[11px] text-text-secondary">
@@ -382,7 +382,7 @@ function RightsFlag({
 function InspectorSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mt-4 border-t border-border-subtle pt-3">
-      <h4 className="mb-2 text-[11px] font-medium uppercase tracking-wider text-text-muted">
+      <h4 className="t-section mb-2 text-text-muted">
         {title}
       </h4>
       {children}
