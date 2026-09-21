@@ -480,10 +480,11 @@ function body(pathname: string): unknown | undefined {
 async function handler(route: Route): Promise<void> {
   const url = new URL(route.request().url());
   if (url.pathname.endsWith("/window") && url.searchParams.get("format") === "arrow") {
+    const payload = body(url.pathname);
     await route.fulfill({
-      status: 415,
+      status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ detail: "Arrow transport is unavailable in this fixture" }),
+      body: JSON.stringify(payload),
     });
     return;
   }
