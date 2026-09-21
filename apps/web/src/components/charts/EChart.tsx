@@ -68,23 +68,62 @@ export function EChart({
       // The handle must stay bound: ECharts guards `on` against a disposed
       // instance through `this`, so a detached reference throws before any
       // series is ever drawn.
-      const onAction = chart.on.bind(chart) as (event: string, handler: () => void) => void;
-      onAction("dataZoom", () => {
+      const onAction = chart.on.bind(chart) as (
+        event: string,
+        handler: (params: unknown) => void,
+      ) => void;
+      onAction("dataZoom", (params) => {
+        const event = params as {
+          start?: number;
+          end?: number;
+          startValue?: number;
+          endValue?: number;
+          batch?: Array<{
+            start?: number;
+            end?: number;
+            startValue?: number;
+            endValue?: number;
+          }>;
+        };
+        const eventState = event.batch?.[0] ?? event;
         const option = chart?.getOption();
         const zoom = option?.dataZoom as
           | Array<{ start?: number; end?: number }>
           | { start?: number; end?: number }
           | undefined;
         const first = Array.isArray(zoom) ? zoom[0] : zoom;
-        const start = Number(first?.start ?? 0);
-        const end = Number(first?.end ?? 100);
+        const start = Number(eventState?.start ?? first?.start ?? 0);
+        const end = Number(eventState?.end ?? first?.end ?? 100);
         const xAxis = (option?.xAxis as Array<{ min?: number; max?: number }> | undefined)?.[0];
-        const min = Number(xAxis?.min ?? 0);
-        const max = Number(xAxis?.max ?? 0);
+        let dataMin = Number.POSITIVE_INFINITY;
+        let dataMax = Number.NEGATIVE_INFINITY;
+        for (const series of (option?.series as Array<{ data?: unknown }> | undefined) ?? []) {
+          for (const point of Array.isArray(series.data) ? series.data : []) {
+            const x = Array.isArray(point) ? Number(point[0]) : Number.NaN;
+            if (!Number.isFinite(x)) continue;
+            dataMin = Math.min(dataMin, x);
+            dataMax = Math.max(dataMax, x);
+          }
+        }
+        const min = Number.isFinite(eventState?.startValue)
+          ? Number(eventState.startValue)
+          : typeof xAxis?.min === "number"
+            ? xAxis.min
+            : dataMin;
+        const max = Number.isFinite(eventState?.endValue)
+          ? Number(eventState.endValue)
+          : typeof xAxis?.max === "number"
+            ? xAxis.max
+            : dataMax;
+        if (!Number.isFinite(min) || !Number.isFinite(max) || max < min) return;
         const span = max - min;
         callbacksRef.current.onRangeZoom?.({
-          fromMs: min + (span * start) / 100,
-          toMs: min + (span * end) / 100,
+          fromMs: Number.isFinite(eventState?.startValue)
+            ? Number(eventState.startValue)
+            : min + (span * start) / 100,
+          toMs: Number.isFinite(eventState?.endValue)
+            ? Number(eventState.endValue)
+            : min + (span * end) / 100,
         });
       });
       observer = new ResizeObserver(() => {

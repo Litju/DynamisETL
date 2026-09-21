@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createRoute, type AnyRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { Scale } from "lucide-react";
 
-import { ErrorPanel, LoadingPanel } from "@/components/common/StatePanel";
+import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
 import type { DatasetSummary, QualityIssueView, RightsPage } from "@/api/types";
 import { datasetsQuery, qualityQuery, rightsQuery, servingStatusQuery } from "@/lib/api/queries";
 import { cn } from "@/lib/cn";
@@ -288,6 +288,15 @@ function RightsMatrix({
   datasets: readonly DatasetSummary[];
   rights: RightsPage;
 }) {
+  if (rights.policies.length === 0) {
+    return (
+      <StatePanel
+        state="unavailable"
+        title="No rights policies recorded."
+        detail="The catalog has no declared licence policy to govern the displayed sources."
+      />
+    );
+  }
   const noticeFor = (policyId: string) =>
     rights.policies.find((policy) => policy.license.policy_id === policyId)?.license.notice ?? "";
 

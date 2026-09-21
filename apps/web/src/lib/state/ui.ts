@@ -14,9 +14,9 @@ export type Theme = "dark" | "light";
 const THEME_KEY = "dynamis.theme";
 const themeSchema = z.enum(["dark", "light"]);
 
-export function readStoredTheme(storage: Storage | undefined = globalThis.localStorage): Theme {
+export function readStoredTheme(storage?: Storage): Theme {
   try {
-    const parsed = themeSchema.safeParse(storage?.getItem(THEME_KEY));
+    const parsed = themeSchema.safeParse((storage ?? globalThis.localStorage)?.getItem(THEME_KEY));
     return parsed.success ? parsed.data : "dark";
   } catch {
     return "dark";

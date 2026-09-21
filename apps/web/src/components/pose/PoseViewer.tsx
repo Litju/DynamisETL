@@ -59,7 +59,6 @@ export function PoseViewer() {
     return streams.find((candidate) => candidate.stream_id === streamId) ?? null;
   }, [session.data, streamId]);
 
-  const effective = playheadNs ?? committedTimeNs;
   const artifactId = stream?.sample_artifact_ids[0] ?? null;
   const artifact = useQuery({ ...artifactQuery(artifactId ?? ""), enabled: Boolean(artifactId) });
 
@@ -91,7 +90,7 @@ export function PoseViewer() {
   const windowBounds = useMemo(
     () =>
       windowAround(artifactData, {
-        anchorNs: effective,
+        anchorNs: committedTimeNs,
         explicit:
           explicitFromNs !== null && explicitToNs !== null
             ? { fromNs: explicitFromNs, toNs: explicitToNs }
@@ -99,7 +98,7 @@ export function PoseViewer() {
         maxPoints: MAX_POSE_POINTS,
         entityScoped: sceneSubjectId !== null,
       }),
-    [artifactData, effective, explicitFromNs, explicitToNs, sceneSubjectId],
+    [artifactData, committedTimeNs, explicitFromNs, explicitToNs, sceneSubjectId],
   );
 
   const window = useQuery({

@@ -76,7 +76,12 @@ function toFloat64(vector: {
   const output = new Float64Array(vector.length);
   for (let index = 0; index < vector.length; index += 1) {
     const value = vector.get(index);
-    output[index] = typeof value === "number" ? value : Number.NaN;
+    output[index] =
+      typeof value === "number"
+        ? value
+        : typeof value === "bigint"
+          ? Number(value)
+          : Number.NaN;
   }
   return output;
 }

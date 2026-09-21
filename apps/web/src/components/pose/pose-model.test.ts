@@ -90,6 +90,7 @@ describe("pose landmark extraction", () => {
 
   it("finds the frame at or before a canonical time", () => {
     expect(frameIndexAt(frames, 0n)).toBe(0);
+    expect(frameIndexAt(frames, -1n)).toBe(-1);
     expect(frameIndexAt(frames, 39_999_999n)).toBe(0);
     expect(frameIndexAt(frames, 40_000_000n)).toBe(1);
     expect(frameIndexAt(frames, 10_000_000_000n)).toBe(2);

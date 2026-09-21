@@ -1,7 +1,10 @@
 ﻿import { useQuery } from "@tanstack/react-query";
 
 import { api, unwrap } from "@/lib/api/client";
-import { fetchWindowArrow } from "@/lib/api/arrow-window";
+import {
+  ArrowTransportUnsupportedError,
+  fetchWindowArrow,
+} from "@/lib/api/arrow-window";
 import {
   tableFromDecoded,
   tableFromJson,
@@ -57,7 +60,8 @@ export function useDenseWindow(request: DenseWindowRequest) {
           transport: "arrow",
           meta: arrow.meta,
         };
-      } catch {
+      } catch (error) {
+        if (!(error instanceof ArrowTransportUnsupportedError)) throw error;
         const json = await unwrap(
           await api.GET("/api/artifacts/{artifact_id}/window", {
             params: {

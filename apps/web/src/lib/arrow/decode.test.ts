@@ -6,6 +6,7 @@ import { decodeWindow, pointsForColumn } from "@/lib/arrow/decode";
 function arrowBuffer(): ArrayBuffer {
   const table = tableFromArrays({
     t_rel_ns: BigInt64Array.from([0n, 40_000_000n, 80_000_000n]),
+    sample_index: BigInt64Array.from([0n, 1n, 2n]),
     subject_id: ["s1", "s1", "s1"],
     x_m: Float64Array.from([0, 1.5, Number.NaN]),
     is_available: [true, true, false],
@@ -28,6 +29,8 @@ describe("Arrow IPC decode", () => {
     // Booleans are non-numeric columns; the reducer renders them as keys.
     const available = decoded.columns.find((column) => column.name === "is_available");
     expect(available?.numeric).toBe(false);
+    const sampleIndex = decoded.columns.find((column) => column.name === "sample_index");
+    expect(Array.from(sampleIndex?.values as Float64Array)).toEqual([0, 1, 2]);
   });
 
   it("shapes renderer points relative to an origin without interpolating nulls", () => {

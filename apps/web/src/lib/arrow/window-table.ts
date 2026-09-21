@@ -98,8 +98,8 @@ export function tableFromJson(window: DenseWindow): WindowTable {
   const stringBuffers = new Map<string, string[]>();
 
   for (const name of columnOrder) {
-    const sample = rows.find((row) => row[name] !== undefined)?.[name];
     if (name === timeColumn) continue;
+    const sample = rows.find((row) => row[name] !== undefined && row[name] !== null)?.[name];
     if (typeof sample === "number" || typeof sample === "bigint") {
       numericBuffers.set(name, new Float64Array(rows.length));
     } else {

@@ -508,7 +508,9 @@ def gold_published(connection: Connection, gold_schema: str) -> bool:
     return relation is not None
 
 
-def _metric_filters_sql(filters: MetricFilters) -> tuple[str, dict[str, Any]]:
+def _metric_filters_sql(
+    filters: MetricFilters, *, gold: bool = False
+) -> tuple[str, dict[str, Any]]:
     clauses: list[str] = []
     parameters = filters.parameters()
     for name, value in parameters.items():
@@ -516,7 +518,11 @@ def _metric_filters_sql(filters: MetricFilters) -> tuple[str, dict[str, Any]]:
             continue
         column = "entity_id" if name == "entity_id" else name
         if name == "entity_id":
-            clauses.append("COALESCE(provenance ->> 'entity_id', '') = :entity_id")
+            clauses.append(
+                "COALESCE(entity_id, '') = :entity_id"
+                if gold
+                else "COALESCE(provenance ->> 'entity_id', '') = :entity_id"
+            )
         else:
             clauses.append(f"{column} = :{name}")
     where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
@@ -557,8 +563,9 @@ def query_metrics(
     offset: int,
 ) -> MetricPage:
     """Current-revision scalar metrics, from Gold serving when published."""
-    where, parameters = _metric_filters_sql(filters)
-    if gold_published(connection, gold_schema):
+    is_gold = gold_published(connection, gold_schema)
+    where, parameters = _metric_filters_sql(filters, gold=is_gold)
+    if is_gold:
         mart = f'"{gold_schema}"."{TRIAL_METRICS_MART}"'
         total = connection.execute(
             sa.text(f"SELECT count(*) FROM {mart}{where}"), parameters

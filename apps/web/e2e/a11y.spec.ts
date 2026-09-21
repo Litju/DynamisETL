@@ -23,7 +23,7 @@ for (const route of ROUTES) {
     await page.goto(route);
     await page.waitForLoadState("networkidle");
     const results = await new AxeBuilder({ page })
-      .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
       .analyze();
     const serious = results.violations.filter(
       (violation) => violation.impact === "serious" || violation.impact === "critical",

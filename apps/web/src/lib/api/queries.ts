@@ -182,6 +182,8 @@ export const qualityQuery = (query: {
       datasetId: query.datasetId,
       sessionId: query.sessionId,
       severity: query.severity,
+      limit: query.limit?.toString(),
+      offset: query.offset?.toString(),
     }),
     queryFn: async () =>
       unwrap(
@@ -202,7 +204,11 @@ export const qualityQuery = (query: {
 
 export const runsQuery = (query: { datasetId?: string | undefined; limit?: number | undefined; offset?: number | undefined }) =>
   queryOptions({
-    queryKey: queryKeys.runs({ datasetId: query.datasetId }),
+    queryKey: queryKeys.runs({
+      datasetId: query.datasetId,
+      limit: query.limit?.toString(),
+      offset: query.offset?.toString(),
+    }),
     queryFn: async () =>
       unwrap(
         await api.GET("/api/runs", {

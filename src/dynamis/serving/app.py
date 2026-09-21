@@ -522,6 +522,7 @@ def create_app(
             raise HTTPException(
                 status_code=404, detail=f"artifact {artifact_id!r} is not registered"
             )
+        wants_arrow = format == "arrow" or ARROW_MEDIA_TYPE in request.headers.get("accept", "")
         etag = window_etag(
             ref,
             from_ns=from_ns,
@@ -529,9 +530,10 @@ def create_app(
             columns=parsed_columns,
             max_points=max_points,
             entity_id=entity_id,
+            representation="arrow" if wants_arrow else "json",
         )
         if request.headers.get("if-none-match") == etag:
-            return Response(status_code=304, headers={"ETag": etag})
+            return Response(status_code=304, headers={"ETag": etag, "Vary": "Accept"})
         result = service.window(
             artifact_id,
             from_ns=from_ns,
@@ -540,8 +542,11 @@ def create_app(
             max_points=max_points,
             entity_id=entity_id,
         )
-        wants_arrow = format == "arrow" or ARROW_MEDIA_TYPE in request.headers.get("accept", "")
-        headers = {"ETag": etag, "X-Dynamis-Window-Meta": window_metadata_header(result.meta)}
+        headers = {
+            "ETag": etag,
+            "Vary": "Accept",
+            "X-Dynamis-Window-Meta": window_metadata_header(result.meta),
+        }
         if wants_arrow:
             return Response(
                 content=arrow_ipc_stream(result.table),

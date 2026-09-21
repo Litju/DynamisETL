@@ -66,6 +66,10 @@ const TRANSIENT_DEFAULTS = {
   hoverTimeNs: null,
   brushRangeNs: null,
   playing: false,
+  nominalRateHz: null,
+  hoveredEntityId: null,
+  hoveredJoint: null,
+  selectedJoint: null,
   interacting: false,
 } as const;
 

@@ -482,13 +482,22 @@ def test_dense_window_json_arrow_and_etag(client: TestClient) -> None:
         headers={"if-none-match": etag},
     )
     assert cached.status_code == 304
+    assert cached.headers["vary"] == "Accept"
     arrow = client.get(
         f"/api/artifacts/{ARTIFACT.artifact_id}/window",
         params={"format": "arrow"},
     )
     assert arrow.status_code == 200
     assert arrow.headers["content-type"].startswith(ARROW_MEDIA_TYPE)
+    assert arrow.headers["etag"] != etag
     assert json.loads(arrow.headers["x-dynamis-window-meta"])["returned_rows"] == 2
+    arrow_cached = client.get(
+        f"/api/artifacts/{ARTIFACT.artifact_id}/window",
+        params={"format": "arrow"},
+        headers={"if-none-match": arrow.headers["etag"]},
+    )
+    assert arrow_cached.status_code == 304
+    assert arrow_cached.headers["vary"] == "Accept"
     assert client.get("/api/artifacts/unknown/window").status_code == 404
 
 
@@ -603,6 +612,7 @@ def test_dense_window_scopes_to_one_entity(tmp_settings: Settings) -> None:
     everyone = load_artifact_window(tmp_settings, ref, max_points=60)
     assert everyone.meta.source_rows == 150
     assert everyone.meta.reduction is not None
+    assert everyone.meta.returned_rows <= 60
 
     # The same budget serves exact frames once the window names one entity.
     scoped = load_artifact_window(tmp_settings, ref, max_points=60, entity_id="p2")

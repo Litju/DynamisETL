@@ -67,6 +67,13 @@ function ExplorerForSession({
 
   const handleTreeKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    if (
+      event.target instanceof HTMLElement &&
+      (event.target.isContentEditable ||
+        ["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName))
+    ) {
+      return;
+    }
     const items = Array.from(
       event.currentTarget.querySelectorAll<HTMLAnchorElement>("a[data-nav-item]"),
     );
@@ -129,6 +136,7 @@ function ExplorerForSession({
                 search={(previous: LabSearch) => ({
                   ...previous,
                   trial: trial.trial_id,
+                  stream: previous.trial === trial.trial_id ? previous.stream : undefined,
                 })}
                 title={trial.label ? `${trial.trial_id} — ${trial.label}` : trial.trial_id}
                 className={cn(

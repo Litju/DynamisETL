@@ -341,7 +341,7 @@ export async function createPitchRenderer(
   }
 
   // Direct selection: nearest entity within 1.5 m of the pointer position.
-  host.addEventListener("pointerdown", (event) => {
+  const handleSelectPointerDown = (event: PointerEvent) => {
     const rect = host.getBoundingClientRect();
     const pitch = screenToPitch(
       event.clientX - rect.left,
@@ -356,31 +356,26 @@ export async function createPitchRenderer(
       }
     }
     if (best) onSelect(best.id);
-  });
+  };
 
   // Zoom and pan are renderer-local interaction state; React never re-renders.
   // Once the reader adjusts the viewport it becomes theirs, and a later resize
   // keeps it instead of snapping back to the fitted pitch.
   let readerAdjusted = false;
 
-  host.addEventListener(
-    "wheel",
-    (event) => {
-      event.preventDefault();
-      const factor = Math.exp(-event.deltaY * 0.0012);
-      const next = Math.min(40, Math.max(1.5, viewport.current.scale * factor));
-      viewport.current = { ...viewport.current, scale: next };
-      readerAdjusted = true;
-      redraw();
-    },
-    { passive: false },
-  );
-
   let dragging: { x: number; y: number } | null = null;
-  host.addEventListener("pointerdown", (event) => {
+  const handleWheel = (event: WheelEvent) => {
+    event.preventDefault();
+    const factor = Math.exp(-event.deltaY * 0.0012);
+    const next = Math.min(40, Math.max(1.5, viewport.current.scale * factor));
+    viewport.current = { ...viewport.current, scale: next };
+    readerAdjusted = true;
+    redraw();
+  };
+  const handleDragStart = (event: PointerEvent) => {
     dragging = { x: event.clientX, y: event.clientY };
-  });
-  host.addEventListener("pointermove", (event) => {
+  };
+  const handlePointerMove = (event: PointerEvent) => {
     if (dragging === null || event.buttons === 0) return;
     const dx = event.clientX - dragging.x;
     const dy = event.clientY - dragging.y;
@@ -392,10 +387,15 @@ export async function createPitchRenderer(
     };
     readerAdjusted = true;
     redraw();
-  });
-  host.addEventListener("pointerup", () => {
+  };
+  const handlePointerUp = () => {
     dragging = null;
-  });
+  };
+  host.addEventListener("pointerdown", handleSelectPointerDown);
+  host.addEventListener("wheel", handleWheel, { passive: false });
+  host.addEventListener("pointerdown", handleDragStart);
+  host.addEventListener("pointermove", handlePointerMove);
+  host.addEventListener("pointerup", handlePointerUp);
 
   /** Reapply the viewport and repaint every layer that depends on it. */
   function redraw() {
@@ -464,6 +464,11 @@ export async function createPitchRenderer(
     },
     destroy() {
       resizeObserver.disconnect();
+      host.removeEventListener("pointerdown", handleSelectPointerDown);
+      host.removeEventListener("wheel", handleWheel);
+      host.removeEventListener("pointerdown", handleDragStart);
+      host.removeEventListener("pointermove", handlePointerMove);
+      host.removeEventListener("pointerup", handlePointerUp);
       app.destroy(true, { children: true });
     },
   };

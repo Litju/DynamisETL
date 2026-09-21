@@ -307,10 +307,22 @@ function RightsTab() {
   const query = useQuery(rightsQuery());
   if (query.isPending) return <LoadingPanel label="Loading rights context" />;
   if (query.isError) return <ErrorPanel error={query.error} onRetry={() => void query.refetch()} />;
-  const relevant = query.data.policies.filter(
-    (policy) => !context || policy.dataset_ids.includes(context.datasetId),
-  );
-  const policies = relevant.length > 0 ? relevant : query.data.policies;
+  const policies = context
+    ? query.data.policies.filter((policy) => policy.dataset_ids.includes(context.datasetId))
+    : query.data.policies;
+  if (policies.length === 0) {
+    return (
+      <StatePanel
+        state="unavailable"
+        title="No rights policy recorded."
+        detail={
+          context
+            ? "No governing rights policy is recorded for the selected dataset."
+            : "No rights policies are recorded for the available datasets."
+        }
+      />
+    );
+  }
   return (
     <div className="p-3">
       {policies.map((policy) => {

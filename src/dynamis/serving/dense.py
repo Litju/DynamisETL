@@ -41,7 +41,8 @@ ENTITY_COLUMNS: tuple[str, ...] = ("object_id", "subject_id")
 REDUCTION_METHOD = "min_max_envelope_per_time_bucket"
 REDUCTION_NOTE = (
     "Display-only extrema-preserving reduction. Scientific metric values and processor "
-    "results always come from canonical artifacts, never from this representation."
+    "results always come from canonical artifacts, never from this representation. "
+    "When identity keys are interleaved, the max_points budget is divided across them."
 )
 EXACT_WINDOW_NOTE = (
     "Exact canonical samples in the requested time window; no display reduction was applied."
@@ -238,6 +239,8 @@ def load_artifact_window(
                 "from_ns": lower,
                 "to_ns": upper,
                 "max_points": int(max_points),
+                "identity_count": identity_count,
+                "points_per_identity": points_per_identity,
                 "bucket_count": table.num_rows,
             },
             source_points=source_rows,
@@ -398,10 +401,19 @@ def _reduced_window(
         raise DenseWindowError("max_points must be at least 1")
     identity = [field.name for field in schema if _is_identity_key(field)]
     measures = [name for name in selected if _is_measure(schema.field(name))]
-    # One extra nanosecond makes the bucket count a hard bound of max_points even
-    # when the last observed sample sits exactly on a bucket boundary.
+    identity_count = _identity_count(
+        path,
+        from_ns=from_ns,
+        to_ns=to_ns,
+        identity=identity,
+        entity_sql=entity_sql,
+        entity_params=entity_params,
+    )
+    points_per_identity = max(1, max_points // identity_count)
+    # One extra nanosecond makes the bucket count a hard bound of the per-key
+    # budget even when the last observed sample sits exactly on a bucket boundary.
     span_ns = max(1, to_ns - from_ns + 1)
-    bucket_ns = max(1, math.ceil(span_ns / max_points))
+    bucket_ns = max(1, math.ceil(span_ns / points_per_identity))
     key_sql = ", ".join(f'"{name}"' for name in identity)
     select_keys = f"{key_sql}, " if identity else ""
     group_keys = f"{key_sql}, __bucket" if identity else "__bucket"
@@ -438,6 +450,32 @@ def _reduced_window(
         connection.close()
 
 
+def _identity_count(
+    path: Path,
+    *,
+    from_ns: int,
+    to_ns: int,
+    identity: list[str],
+    entity_sql: str,
+    entity_params: list[Any] | None,
+) -> int:
+    if not identity:
+        return 1
+    key_sql = ", ".join(f'"{name}"' for name in identity)
+    connection = _connect()
+    try:
+        row = connection.execute(
+            "SELECT count(*) FROM ("
+            f"SELECT DISTINCT {key_sql} FROM read_parquet(?) "
+            f"WHERE t_rel_ns >= ? AND t_rel_ns <= ?{entity_sql}"
+            ")",
+            [path.as_posix(), from_ns, to_ns, *(entity_params or [])],
+        ).fetchone()
+    finally:
+        connection.close()
+    return max(1, int(row[0])) if row and row[0] is not None else 1
+
+
 def arrow_ipc_stream(table: pa.Table) -> bytes:
     """Serialize a window table as Apache Arrow IPC stream (dense transport)."""
     sink = pa.BufferOutputStream()
@@ -454,6 +492,7 @@ def window_etag(
     columns: tuple[str, ...],
     max_points: int | None,
     entity_id: str | None = None,
+    representation: str = "json",
 ) -> str:
     """Strong ETag derived from immutable artifact identity and query parameters."""
     identity = json.dumps(
@@ -464,6 +503,7 @@ def window_etag(
             "columns": sorted(columns),
             "max_points": max_points,
             "entity_id": entity_id,
+            "representation": representation,
         },
         sort_keys=True,
         separators=(",", ":"),

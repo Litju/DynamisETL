@@ -79,8 +79,6 @@ export function PitchReplay() {
   }, [session.data, streamId]);
 
   const committedTimeNs = useAnalysisStore((state) => state.committedTimeNs);
-  const playheadNs = useAnalysisStore((state) => state.playheadNs);
-  const effective = playheadNs ?? committedTimeNs;
   const fromNs = context?.fromNs ?? null;
   const toNs = context?.toNs ?? null;
 
@@ -97,11 +95,11 @@ export function PitchReplay() {
   const windowBounds = useMemo(
     () =>
       windowAround(artifact.data, {
-        anchorNs: effective,
+        anchorNs: committedTimeNs,
         explicit: fromNs !== null && toNs !== null ? { fromNs, toNs } : null,
         maxPoints: MAX_REPLAY_POINTS,
       }),
-    [artifact.data, effective, fromNs, toNs],
+    [artifact.data, committedTimeNs, fromNs, toNs],
   );
   // Discrete source events inside the same window. They are context for the
   // tracked frame, so an absent event stream simply means no marks, never an
@@ -351,10 +349,16 @@ function PitchView({
       setRendererReady(true);
       created.setLayers(layersRef.current);
       created.setEvents(eventsRef.current);
-      created.setFrame(
-        entitiesAt(frames, useAnalysisStore.getState().playheadNs),
+      const current = useAnalysisStore.getState();
+      created.setTrail(
+        trailForRange(frames, current.committedRangeNs, current.selectedEntityId),
         groups,
-        useAnalysisStore.getState().selectedEntityId,
+        current.selectedEntityId,
+      );
+      created.setFrame(
+        entitiesAt(frames, current.playheadNs ?? current.committedTimeNs),
+        groups,
+        current.selectedEntityId,
       );
     });
     return () => {
