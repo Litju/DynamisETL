@@ -6,6 +6,7 @@ import {
   useParams,
   useSearch,
 } from "@tanstack/react-router";
+import { motion } from "motion/react";
 import { useCallback, useEffect, useMemo } from "react";
 
 import { LabOverview } from "@/components/lab/LabOverview";
@@ -129,8 +130,10 @@ export function LabPage() {
             >
               {candidate}
               {view === candidate ? (
-                <span
+                <motion.span
                   aria-hidden="true"
+                  layoutId="lab-tab-indicator"
+                  transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
                   className="absolute inset-x-2 -bottom-[5px] h-0.5 rounded-full bg-accent"
                 />
               ) : null}
