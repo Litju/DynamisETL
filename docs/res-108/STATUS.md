@@ -51,7 +51,7 @@ Ten atomic commits, one per completed item, in the order RES-108 specifies.
 | `c9836e2` | Real-browser ECharts, Pixi and R3F smoke coverage; React Flow attribution fix |
 | `b41d977` | Explicit right-handed pose display transform and proportional-bias guard |
 | `0bd0a5a` | Item 8 — restrained tab motion with reduced-motion CSS equivalence |
-| `TBD` | Item 10 — acceptance, lazy-loading, accessibility and screenshot seal |
+| `c22dd5c` | Item 10 — acceptance, lazy-loading, accessibility and screenshot seal |
 
 64 files changed, +8,363 / −1,661.
 
