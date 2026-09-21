@@ -19,6 +19,7 @@ from typing import Any
 
 import duckdb
 import pyarrow as pa
+import pyarrow.dataset as ds
 import pyarrow.parquet as pq
 
 from dynamis.config import Settings
@@ -251,8 +252,7 @@ def load_artifact_window(
             from_ns=lower,
             to_ns=upper,
             selected=selected,
-            entity_sql=entity_sql,
-            entity_params=entity_params,
+            entity_id=entity_id,
         )
     meta = DenseWindowMeta(
         artifact=ref,
@@ -367,20 +367,22 @@ def _exact_window(
     from_ns: int,
     to_ns: int,
     selected: tuple[str, ...],
-    entity_sql: str = "",
-    entity_params: list[Any] | None = None,
+    entity_id: str | None = None,
 ) -> pa.Table:
-    projection = ", ".join(f'"{name}"' for name in selected)
-    connection = _connect()
-    try:
-        return connection.execute(
-            f"SELECT {projection} FROM read_parquet(?) "
-            f"WHERE {TIME_COLUMN} >= ? AND {TIME_COLUMN} <= ?{entity_sql} "
-            f"ORDER BY {TIME_COLUMN}",
-            [path.as_posix(), from_ns, to_ns, *(entity_params or [])],
-        ).to_arrow_table()
-    finally:
-        connection.close()
+    predicate = (ds.field(TIME_COLUMN) >= from_ns) & (ds.field(TIME_COLUMN) <= to_ns)
+    schema = pq.read_schema(path)
+    column = entity_column(schema)
+    if entity_id is not None:
+        if column is None:
+            raise DenseWindowError(
+                "this artifact declares no entity column, so it cannot be scoped to an entity"
+            )
+        predicate = predicate & (ds.field(column) == entity_id)
+    read_columns = list(selected) if TIME_COLUMN in selected else [*selected, TIME_COLUMN]
+    table = ds.dataset(path, format="parquet").to_table(columns=read_columns, filter=predicate)
+    if table.num_rows > 1:
+        table = table.sort_by([(TIME_COLUMN, "ascending")])
+    return table if TIME_COLUMN in selected else table.select(list(selected))
 
 
 def _reduced_window(
