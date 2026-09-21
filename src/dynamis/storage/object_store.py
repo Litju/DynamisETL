@@ -125,6 +125,8 @@ class S3ObjectStore:
                 "x-amz-meta-sha256": checksum_sha256,
             },
         )
+        if response is None:
+            raise ObjectStoreError(f"S3 PUT {key} returned no response")
         etag = response.headers.get("ETag")
         return ObjectMetadata(key=key, size_bytes=len(data), sha256=checksum_sha256, etag=etag)
 
@@ -144,7 +146,10 @@ class S3ObjectStore:
         if start < 0 or (end is not None and end < start):
             raise ObjectStoreError("invalid object byte range")
         range_value = f"bytes={start}-{'' if end is None else end}"
-        return self._request("GET", key, headers={"range": range_value}).content
+        response = self._request("GET", key, headers={"range": range_value})
+        if response is None:
+            raise ObjectStoreError(f"S3 GET {key} returned no response")
+        return response.content
 
     def _request(
         self,
@@ -201,21 +206,25 @@ class S3ObjectStore:
 def object_store(settings: Settings) -> LocalObjectStore | S3ObjectStore:
     if settings.object_store_provider == "local":
         return LocalObjectStore(settings.dataset_root)
-    required = (
-        settings.object_store_endpoint,
-        settings.object_store_bucket,
-        settings.object_store_access_key,
-        settings.object_store_secret_key,
-    )
-    if any(value is None or value == "" for value in required):
+    endpoint = settings.object_store_endpoint
+    bucket = settings.object_store_bucket
+    access_key = settings.object_store_access_key
+    secret_key = settings.object_store_secret_key
+    if any(value is None or value == "" for value in (endpoint, bucket, access_key, secret_key)):
         raise ObjectStoreError(
             "S3 object store requires endpoint, bucket, access key, and secret key"
         )
+    assert (
+        endpoint is not None
+        and bucket is not None
+        and access_key is not None
+        and secret_key is not None
+    )
     return S3ObjectStore(
-        endpoint=settings.object_store_endpoint,
-        bucket=settings.object_store_bucket,
-        access_key=settings.object_store_access_key,
-        secret_key=settings.object_store_secret_key,
+        endpoint=endpoint,
+        bucket=bucket,
+        access_key=access_key,
+        secret_key=secret_key,
         region=settings.object_store_region,
     )
 
