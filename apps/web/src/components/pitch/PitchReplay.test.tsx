@@ -8,11 +8,25 @@ import { useAnalysisStore } from "@/lib/state/analysis";
 
 const setFrame = vi.fn();
 const setTrail = vi.fn();
+const setEvents = vi.fn();
+const setLayers = vi.fn();
+const resetView = vi.fn();
 const destroy = vi.fn();
-const createPitchRenderer = vi.fn(async () => ({ setFrame, setTrail, destroy }));
+const createPitchRenderer = vi.fn(async () => ({
+  setFrame,
+  setTrail,
+  setEvents,
+  setLayers,
+  resetView,
+  destroy,
+}));
 
+// The mock replaces the whole module, so the layer defaults the component
+// reads as a value have to come with it.
 vi.mock("@/components/pitch/pitch-renderer", () => ({
   createPitchRenderer: (...args: unknown[]) => createPitchRenderer(...(args as [])),
+  DEFAULT_PITCH_LAYERS: { trails: true, labels: true, events: true },
+  shortEntityLabel: (objectId: string) => objectId,
 }));
 
 const STREAM = {
@@ -200,8 +214,12 @@ it("renders an exact tracking window and drives the renderer imperatively", asyn
   expect(entities.map((entity) => entity.objectId).sort()).toEqual(["ball", "p1", "p2"]);
   expect(call?.[2]).toBeNull();
   expect(screen.getByText(/2 players · 1 extrapolated/)).toBeInTheDocument();
-  expect(screen.getByText(/ball detected/)).toBeInTheDocument();
-  expect(screen.getByText("detected ≠ extrapolated; trails cover the committed range only")).toBeInTheDocument();
+  expect(screen.getByText(/Ball detected/)).toBeInTheDocument();
+  // Detection state is carried by a legend with a shape cue, not by colour
+  // alone, and the trail's temporal scope stays stated.
+  expect(screen.getByText("Detected")).toBeInTheDocument();
+  expect(screen.getByText("Extrapolated (hollow)")).toBeInTheDocument();
+  expect(screen.getByText("Trails cover the committed range only")).toBeInTheDocument();
 });
 
 it("refuses a reduced window because replay needs exact entity frames", async () => {
