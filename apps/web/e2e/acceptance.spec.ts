@@ -21,11 +21,12 @@ test("1. deep link loads deterministic analytical context and survives reload", 
 });
 
 test("1b. individual selection is URL-owned across reload, scrub and history", async ({ page }) => {
-  await page.goto("/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P1&view=pose&t_ns=0");
+  await page.goto("/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P1&view=pose&t_ns=50000000");
   const picker = page.locator("#pose-subject");
   await expect(picker).toHaveValue("SC-P1");
   await picker.selectOption("SC-P2");
   await expect(page).toHaveURL(/subject=SC-P2/);
+  await expect(page).toHaveURL(/t_ns=0/);
   await page.keyboard.press("ArrowRight");
   await expect(page).toHaveURL(/subject=SC-P2/);
   await page.reload();
@@ -34,6 +35,25 @@ test("1b. individual selection is URL-owned across reload, scrub and history", a
   await expect(page).toHaveURL(/subject=SC-P1/);
   await page.goForward();
   await expect(page).toHaveURL(/subject=SC-P2/);
+});
+
+test("1e. all-subject Pose mode uses one fixed world without entity scoping", async ({ page }) => {
+  const poseWindowRequests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/api/artifacts/pose-sample/window")) {
+      poseWindowRequests.push(request.url());
+    }
+  });
+  await page.goto(
+    "/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P1&view=pose&t_ns=0",
+  );
+  const toggle = page.getByTestId("pose-all-subjects-toggle");
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText("all subjects · fixed camera (2)")).toBeVisible();
+  await expect(page.getByText(/2 subjects share one source-coordinate world/)).toBeVisible();
+  expect(poseWindowRequests.some((url) => !url.includes("entity_id="))).toBe(true);
 });
 
 test("1c. Pose playback advances both the playhead and rendered scene", async ({ page }) => {

@@ -56,6 +56,7 @@ export function AnalysisContextProvider({ children }: { children: ReactNode }) {
           search: (previous: LabSearch) => ({
             ...previous,
             subject: subjectIdValue === null ? undefined : subjectIdValue,
+            ...(options?.resetTime ? { t_ns: "0" } : {}),
           }),
           replace: options?.replace ?? false,
         }),

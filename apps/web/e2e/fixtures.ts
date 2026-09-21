@@ -156,6 +156,8 @@ const POSE_ARTIFACT = {
   coordinate_frame_id: "skillcorner-pose-hybrid-m",
   artifact_kind: "sample",
   modality: "pose",
+  row_count: 116,
+  byte_size: 8192,
   entity_column: "subject_id",
   entity_count: 2,
   entity_ids: ["SC-P1", "SC-P2"],
@@ -242,7 +244,18 @@ const POSE_ROWS_LATER = POSE_ROWS.map((row) => ({
   t_rel_ns: 40_000_000,
   x_m: row.x_m + 0.12,
 }));
-const POSE_WINDOW_ROWS = [...POSE_ROWS, ...POSE_ROWS_LATER];
+const POSE_ROWS_P2 = POSE_ROWS.map((row) => ({
+  ...row,
+  subject_id: "SC-P2",
+  x_m: row.x_m + 3,
+  y_m: row.y_m - 2,
+}));
+const POSE_ROWS_P2_LATER = POSE_ROWS_P2.map((row) => ({
+  ...row,
+  t_rel_ns: 40_000_000,
+  x_m: row.x_m + 0.12,
+}));
+const POSE_WINDOW_ROWS = [...POSE_ROWS, ...POSE_ROWS_LATER, ...POSE_ROWS_P2, ...POSE_ROWS_P2_LATER];
 
 const POSE_WINDOW = {
   meta: {

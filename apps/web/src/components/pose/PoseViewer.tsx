@@ -7,12 +7,14 @@ import {
   CAMERA_PRESETS,
   extractFrames,
   frameIndexAt,
+  groupFramesBySubject,
   landmarksAt,
   NO_OVERLAYS,
   overlaysFromParameters,
   summarizeFrame,
   type CameraPreset,
   type DisplayConnectionDefinition,
+  type PoseSubjectFrames,
   type PoseLandmark,
 } from "@/components/pose/pose-model";
 import type { StreamView } from "@/api/types";
@@ -46,6 +48,7 @@ export function PoseViewer() {
   const selectedJoint = useAnalysisStore((state) => state.selectedJoint);
   const hoveredJoint = useAnalysisStore((state) => state.hoveredJoint);
   const [rendererReady, setRendererReady] = useState(false);
+  const [allSubjects, setAllSubjects] = useState(false);
 
   const session = useQuery({
     ...sessionQuery(datasetId ?? "", sessionId ?? ""),
@@ -84,6 +87,7 @@ export function PoseViewer() {
   const explicitFromNs = context?.fromNs ?? null;
   const explicitToNs = context?.toNs ?? null;
   const artifactData = artifact.data;
+  const sceneSubjectId = allSubjects ? null : subjectId;
   const windowBounds = useMemo(
     () =>
       windowAround(artifactData, {
@@ -93,9 +97,9 @@ export function PoseViewer() {
             ? { fromNs: explicitFromNs, toNs: explicitToNs }
             : null,
         maxPoints: MAX_POSE_POINTS,
-        entityScoped: subjectId !== null,
+        entityScoped: sceneSubjectId !== null,
       }),
-    [artifactData, effective, explicitFromNs, explicitToNs, subjectId],
+    [artifactData, effective, explicitFromNs, explicitToNs, sceneSubjectId],
   );
 
   const window = useQuery({
@@ -104,7 +108,7 @@ export function PoseViewer() {
       ...(windowBounds
         ? { fromNs: Number(windowBounds.fromNs), toNs: Number(windowBounds.toNs) }
         : {}),
-      ...(subjectId !== null ? { entityId: subjectId } : {}),
+      ...(sceneSubjectId !== null ? { entityId: sceneSubjectId } : {}),
       columns: [
         "t_rel_ns",
         "subject_id",
@@ -154,9 +158,20 @@ export function PoseViewer() {
           z_m?: unknown;
           error_m?: unknown;
         }>,
-        subjectId,
+        sceneSubjectId,
       ),
-    [subjectId, window.data],
+    [sceneSubjectId, window.data],
+  );
+  const subjectFrames = useMemo<PoseSubjectFrames[]>(
+    () => (allSubjects ? groupFramesBySubject(frames) : []),
+    [allSubjects, frames],
+  );
+  const selectedFrames = useMemo(
+    () =>
+      allSubjects
+        ? subjectFrames.find((candidate) => candidate.subjectId === subjectId)?.frames ?? []
+        : frames,
+    [allSubjects, frames, subjectFrames, subjectId],
   );
   const overlays = useMemo(
     () =>
@@ -194,6 +209,13 @@ export function PoseViewer() {
       selectSubject?.(subjectId, { replace: true });
     }
   }, [selectSubject, selectedSubject, subjectId]);
+
+  const handleSubjectChange = (nextSubjectId: string) => {
+    if (nextSubjectId === subjectId) return;
+    useAnalysisStore.getState().setPlaying(false);
+    useAnalysisStore.getState().commitTime(0n);
+    context?.selectSubject(nextSubjectId, { resetTime: true });
+  };
 
   if (!context) return <StatePanel state="empty" title="Open a laboratory session first." />;
   if (session.isPending) return <LoadingPanel label="Loading session streams" />;
@@ -265,7 +287,10 @@ export function PoseViewer() {
       />
     );
   }
-  if (frames.length === 0 || frames.every((frame) => !frame.observed)) {
+  const hasObservedFrames = allSubjects
+    ? subjectFrames.some((candidate) => candidate.frames.some((frame) => frame.observed))
+    : frames.some((frame) => frame.observed);
+  if (!hasObservedFrames) {
     return (
       <StatePanel
         state="unavailable"
@@ -280,10 +305,10 @@ export function PoseViewer() {
   }
 
   const currentTime = playheadNs ?? committedTimeNs;
-  const currentLandmarks = landmarksAt(frames, currentTime);
-  const currentFrameIndex = currentTime === null ? 0 : frameIndexAt(frames, currentTime);
+  const currentLandmarks = landmarksAt(selectedFrames, currentTime);
+  const currentFrameIndex = currentTime === null ? 0 : frameIndexAt(selectedFrames, currentTime);
   const summary = summarizeFrame(
-    currentFrameIndex >= 0 ? (frames[currentFrameIndex] ?? null) : null,
+    currentFrameIndex >= 0 ? (selectedFrames[currentFrameIndex] ?? null) : null,
   );
   const inspected = [...currentLandmarks].find(
     (landmark: PoseLandmark) => landmark.jointName === (selectedJoint ?? hoveredJoint),
@@ -296,9 +321,13 @@ export function PoseViewer() {
         <span className="mono">{stream.stream_id}</span>
         <MeasurementClassBadge measurementClass={stream.measurement_class} compact />
         <span className="mono">skeleton {stream.skeleton_id ?? "unregistered"}</span>
-        <span>
-          individual <span className="mono text-text-secondary">{subjectId ?? "not scoped"}</span>
-        </span>
+        {allSubjects ? (
+          <span>all subjects · fixed camera ({subjectFrames.length})</span>
+        ) : (
+          <span>
+            individual <span className="mono text-text-secondary">{subjectId ?? "not scoped"}</span>
+          </span>
+        )}
         <span className="text-quality-warning">
           local analytical frame · Z is player-centroid-relative, not absolute height
         </span>
@@ -322,6 +351,8 @@ export function PoseViewer() {
           <Suspense fallback={<LoadingPanel label="Loading 3D renderer" />}>
             <PoseCanvas
               frames={frames}
+              subjectFrames={subjectFrames}
+              allSubjects={allSubjects}
               overlays={overlays}
               providerConnections={providerConnections}
               preset={preset}
@@ -351,7 +382,7 @@ export function PoseViewer() {
               <select
                 id="pose-subject"
                 value={subjectId ?? ""}
-                onChange={(event) => context?.selectSubject(event.target.value)}
+                onChange={(event) => handleSubjectChange(event.target.value)}
                 className="mono mt-1 h-7 w-full rounded-control border border-border-subtle bg-surface-0 px-1.5 text-[12px] text-text-secondary outline-none focus:border-accent"
               >
                 {[...new Set(subjectId ? [...observed.subjects, subjectId] : observed.subjects)].map((candidate) => (
@@ -366,6 +397,30 @@ export function PoseViewer() {
               </p>
             </div>
           ) : null}
+          <div className="mb-3">
+            <span className="t-section text-text-muted">render mode</span>
+            <button
+              type="button"
+              data-testid="pose-all-subjects-toggle"
+              aria-pressed={allSubjects}
+              onClick={() => {
+                setAllSubjects((current) => !current);
+                setPreset("reset");
+              }}
+              className={
+                allSubjects
+                  ? "mt-1 w-full rounded-control bg-surface-3 px-1.5 py-1 text-left text-text-primary"
+                  : "mt-1 w-full rounded-control border border-border-subtle px-1.5 py-1 text-left text-text-muted hover:text-text-secondary"
+              }
+            >
+              all subjects · fixed camera
+            </button>
+            <p className="mt-1 text-[10px] text-text-muted">
+              {allSubjects
+                ? `${subjectFrames.length} subjects share one source-coordinate world; camera follow is disabled.`
+                : "Render only the selected identity with playback camera follow."}
+            </p>
+          </div>
           <div className="mb-2">
         <span className="t-section text-text-muted">camera</span>
             <div className="mt-1 flex flex-wrap gap-1">

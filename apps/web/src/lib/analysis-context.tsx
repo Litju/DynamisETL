@@ -16,6 +16,8 @@ export interface DurableRange {
 
 export interface SubjectSelectionOptions {
   readonly replace?: boolean;
+  /** Rewind the durable playback position when a user changes identity. */
+  readonly resetTime?: boolean;
 }
 
 export interface AnalysisContextValue {

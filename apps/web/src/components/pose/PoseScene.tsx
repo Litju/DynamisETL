@@ -16,6 +16,7 @@ import {
   type DisplayConnectionDefinition,
   type PoseFrame,
   type PoseLandmark,
+  type PoseSubjectFrames,
   type ProcessorOverlays,
   type ViewerPoint,
   withoutDuplicateAngles,
@@ -88,7 +89,33 @@ const ARTICULATION_ANGLE_CUES: readonly AngleDefinition[] = [
  * are rendered on demand. No realistic body mesh and no invented parent tree:
  * processor segments/angles appear only when declared in parameters.
  */
-export function PoseScene({
+export interface PoseSceneProps {
+  frames: readonly PoseFrame[];
+  subjectFrames: readonly PoseSubjectFrames[];
+  allSubjects: boolean;
+  overlays: ProcessorOverlays;
+  providerConnections: readonly DisplayConnectionDefinition[];
+  preset: CameraPreset;
+  showProviderSkeleton: boolean;
+  showTorsoCue: boolean;
+  showFootContact: boolean;
+  showHandContact: boolean;
+  showHeadNeck: boolean;
+  showArticulationAngles: boolean;
+  showSegments: boolean;
+  showAngles: boolean;
+  showErrorRadii: boolean;
+}
+
+export function PoseScene(props: PoseSceneProps) {
+  return props.allSubjects ? (
+    <AllSubjectsPoseScene {...props} />
+  ) : (
+    <SinglePoseScene {...props} />
+  );
+}
+
+function SinglePoseScene({
   frames,
   overlays,
   providerConnections,
@@ -102,21 +129,7 @@ export function PoseScene({
   showSegments,
   showAngles,
   showErrorRadii,
-}: {
-  frames: readonly PoseFrame[];
-  overlays: ProcessorOverlays;
-  providerConnections: readonly DisplayConnectionDefinition[];
-  preset: CameraPreset;
-  showProviderSkeleton: boolean;
-  showTorsoCue: boolean;
-  showFootContact: boolean;
-  showHandContact: boolean;
-  showHeadNeck: boolean;
-  showArticulationAngles: boolean;
-  showSegments: boolean;
-  showAngles: boolean;
-  showErrorRadii: boolean;
-}) {
+}: PoseSceneProps) {
   const framesRef = useRef(frames);
   useEffect(() => {
     framesRef.current = frames;
@@ -479,6 +492,364 @@ export function PoseScene({
   );
 }
 
+const ALL_SUBJECT_COLORS = [
+  "#7fd1e8",
+  "#f2a65a",
+  "#c39bea",
+  "#8bd17c",
+  "#f48fb1",
+  "#ffd166",
+] as const;
+
+function AllSubjectsPoseScene({
+  subjectFrames,
+  overlays,
+  providerConnections,
+  preset,
+  showProviderSkeleton,
+  showTorsoCue,
+  showFootContact,
+  showHandContact,
+  showHeadNeck,
+  showArticulationAngles,
+  showSegments,
+  showAngles,
+  showErrorRadii,
+}: PoseSceneProps) {
+  const { invalidate, setFrameloop } = useThree();
+  const playing = useAnalysisStore((state) => state.playing);
+  const controlsRef = useRef<ComponentRef<typeof CameraControls> | null>(null);
+  const articulationAngles = useMemo(
+    () => withoutDuplicateAngles(ARTICULATION_ANGLE_CUES, overlays.angles),
+    [overlays.angles],
+  );
+  const firstLandmarks = useMemo(
+    () =>
+      subjectFrames.flatMap((subject) => {
+        const firstObserved = subject.frames.find((frame) => frame.observed);
+        return firstObserved?.landmarks ?? [];
+      }),
+    [subjectFrames],
+  );
+  const allLandmarks = useMemo(
+    () => subjectFrames.flatMap((subject) => subject.frames.flatMap((frame) => frame.landmarks)),
+    [subjectFrames],
+  );
+  const centre = useMemo(() => planarCentre(firstLandmarks), [firstLandmarks]);
+  const bounds = useMemo(() => boundsOf(allLandmarks, centre), [allLandmarks, centre]);
+
+  useEffect(
+    () =>
+      useAnalysisStore.subscribe((state, previous) => {
+        if (state.playheadNs !== previous.playheadNs || state.playing !== previous.playing) {
+          invalidate();
+        }
+      }),
+    [invalidate],
+  );
+
+  useEffect(() => {
+    setFrameloop(playing ? "always" : "demand");
+    invalidate();
+  }, [invalidate, playing, setFrameloop]);
+
+  useEffect(() => {
+    const controls = controlsRef.current;
+    if (!controls) return;
+    const { position, target } = cameraFor(preset, bounds);
+    void controls.setLookAt(
+      position[0],
+      position[1],
+      position[2],
+      target[0],
+      target[1],
+      target[2],
+      false,
+    );
+    invalidate();
+  }, [bounds, invalidate, preset]);
+
+  return (
+    <>
+      <color attach="background" args={["#12161c"]} />
+      <fog attach="fog" args={["#12161c", bounds.radius * 3, bounds.radius * 9]} />
+      <ambientLight intensity={0.9} />
+      <directionalLight position={[2, 4, 3]} intensity={1.1} />
+      <Grid
+        args={[bounds.radius * 2.6, bounds.radius * 2.6]}
+        position={[bounds.center[0], bounds.min[1], bounds.center[2]]}
+        cellSize={bounds.radius / 8}
+        cellColor="#242c37"
+        sectionSize={bounds.radius / 2}
+        sectionColor="#33404f"
+        fadeDistance={bounds.radius * 14}
+        fadeStrength={1.5}
+      />
+      <CameraControls ref={controlsRef} makeDefault />
+      {subjectFrames.map((subject, index) => (
+        <AllSubjectLayer
+          key={subject.subjectId}
+          subjectId={subject.subjectId}
+          frames={subject.frames}
+          centre={centre}
+          color={ALL_SUBJECT_COLORS[index % ALL_SUBJECT_COLORS.length] ?? ALL_SUBJECT_COLORS[0]}
+          overlays={overlays}
+          articulationAngles={articulationAngles}
+          providerConnections={providerConnections}
+          showProviderSkeleton={showProviderSkeleton}
+          showTorsoCue={showTorsoCue}
+          showFootContact={showFootContact}
+          showHandContact={showHandContact}
+          showHeadNeck={showHeadNeck}
+          showArticulationAngles={showArticulationAngles}
+          showSegments={showSegments}
+          showAngles={showAngles}
+          showErrorRadii={showErrorRadii}
+        />
+      ))}
+    </>
+  );
+}
+
+function AllSubjectLayer({
+  subjectId,
+  frames,
+  centre,
+  color,
+  overlays,
+  articulationAngles,
+  providerConnections,
+  showProviderSkeleton,
+  showTorsoCue,
+  showFootContact,
+  showHandContact,
+  showHeadNeck,
+  showArticulationAngles,
+  showSegments,
+  showAngles,
+  showErrorRadii,
+}: {
+  subjectId: string;
+  frames: readonly PoseFrame[];
+  centre: { readonly xM: number; readonly yM: number };
+  color: string;
+  overlays: ProcessorOverlays;
+  articulationAngles: readonly AngleDefinition[];
+  providerConnections: readonly DisplayConnectionDefinition[];
+  showProviderSkeleton: boolean;
+  showTorsoCue: boolean;
+  showFootContact: boolean;
+  showHandContact: boolean;
+  showHeadNeck: boolean;
+  showArticulationAngles: boolean;
+  showSegments: boolean;
+  showAngles: boolean;
+  showErrorRadii: boolean;
+}) {
+  const selectedJoint = useAnalysisStore((state) => state.selectedJoint);
+  const framesRef = useRef(frames);
+  const landmarksRef = useRef<readonly PoseLandmark[]>([]);
+  const jointRefs = useRef<Map<string, Mesh>>(new Map());
+  useEffect(() => {
+    framesRef.current = frames;
+  }, [frames]);
+
+  const allNames = useMemo(() => {
+    const names = new Set<string>();
+    for (const frame of frames.slice(0, 200)) {
+      for (const landmark of frame.landmarks) names.add(landmark.jointName);
+    }
+    return Array.from(names).sort();
+  }, [frames]);
+  const setJointRef = useCallback((name: string, mesh: Mesh | null) => {
+    if (mesh) jointRefs.current.set(name, mesh);
+    else jointRefs.current.delete(name);
+  }, []);
+
+  useFrame(() => {
+    const state = useAnalysisStore.getState();
+    const currentLandmarks = landmarksAt(
+      framesRef.current,
+      state.playheadNs ?? state.committedTimeNs,
+    );
+    landmarksRef.current = currentLandmarks;
+    const currentByName = new Map(
+      currentLandmarks.map((landmark) => [landmark.jointName, landmark]),
+    );
+    for (const [name, mesh] of jointRefs.current) {
+      const landmark = currentByName.get(name);
+      if (!landmark) {
+        mesh.visible = false;
+        continue;
+      }
+      mesh.visible = true;
+      mesh.position.set(...toViewerPoint(landmark, centre));
+    }
+  });
+
+  const currentTime =
+    useAnalysisStore.getState().playheadNs ?? useAnalysisStore.getState().committedTimeNs;
+  const landmarks = landmarksAt(frames, currentTime);
+  const byName = new Map(landmarks.map((landmark) => [landmark.jointName, landmark]));
+  const currentConnectionPoints = useCallback(
+    (connection: DisplayConnectionDefinition) =>
+      connectionPoints(landmarksRef.current, connection, centre),
+    [centre],
+  );
+  const renderConnections = (
+    connections: readonly DisplayConnectionDefinition[],
+    prefix: string,
+    lineColor: string,
+    lineWidth: number,
+  ) =>
+    connections.map((connection) => (
+      <DynamicPoseLine
+        key={`${subjectId}-${prefix}-${connection.startLandmark}-${connection.endLandmark}`}
+        initialPoints={connectionPoints(landmarks, connection, centre)}
+        // eslint-disable-next-line react-hooks/refs -- DynamicPoseLine invokes this from useFrame.
+        getPoints={() => currentConnectionPoints(connection)}
+        color={lineColor}
+        lineWidth={lineWidth}
+      />
+    ));
+
+  return (
+    <>
+      {allNames.map((name) => (
+        <mesh
+          key={`${subjectId}-${name}`}
+          ref={(mesh) => setJointRef(name, mesh)}
+          onClick={(event) => {
+            event.stopPropagation();
+            useAnalysisStore.getState().selectJoint(name);
+          }}
+          onPointerOver={(event) => {
+            event.stopPropagation();
+            useAnalysisStore.getState().hoverJoint(name);
+          }}
+          onPointerOut={() => useAnalysisStore.getState().hoverJoint(null)}
+        >
+          <sphereGeometry args={[selectedJoint === name ? 0.042 : 0.026, 16, 16]} />
+          <meshStandardMaterial
+            color={selectedJoint === name ? SELECTED_JOINT_COLOR : color}
+            emissive={selectedJoint === name ? SELECTED_JOINT_COLOR : "#000000"}
+            emissiveIntensity={selectedJoint === name ? 0.45 : 0}
+            roughness={0.35}
+            metalness={0.05}
+          />
+        </mesh>
+      ))}
+      {selectedJoint !== null && byName.has(selectedJoint) ? (
+        <mesh position={toViewerPoint(byName.get(selectedJoint)!, centre)}>
+          <sphereGeometry args={[0.07, 16, 16]} />
+          <meshBasicMaterial color={SELECTED_JOINT_COLOR} wireframe transparent opacity={0.55} />
+        </mesh>
+      ) : null}
+      {showErrorRadii
+        ? landmarks
+            .filter((landmark) => landmark.errorM !== null && landmark.errorM > 0)
+            .map((landmark) => (
+              <mesh
+                key={`${subjectId}-error-${landmark.jointName}`}
+                position={toViewerPoint(landmark, centre)}
+              >
+                <sphereGeometry args={[landmark.errorM ?? 0, 10, 10]} />
+                <meshBasicMaterial
+                  color={ERROR_RADIUS_COLOR}
+                  transparent
+                  opacity={0.12}
+                  depthWrite={false}
+                />
+              </mesh>
+            ))
+        : null}
+      {showProviderSkeleton
+        ? renderConnections(providerConnections, "provider", color, 1.8)
+        : null}
+      {showTorsoCue
+        ? renderConnections(TORSO_CUE_CONNECTIONS, "torso", TORSO_CUE_COLOR, 1.5)
+        : null}
+      {showFootContact
+        ? renderConnections(FOOT_CONTACT_CUE_CONNECTIONS, "foot", FOOT_CONTACT_CUE_COLOR, 1.5)
+        : null}
+      {showHandContact
+        ? renderConnections(HAND_CONTACT_CUE_CONNECTIONS, "hand", FOOT_CONTACT_CUE_COLOR, 1.5)
+        : null}
+      {showHeadNeck
+        ? renderConnections(HEAD_NECK_CUE_CONNECTIONS, "head", HEAD_NECK_CUE_COLOR, 1.5)
+        : null}
+      {showSegments
+        ? overlays.segments.map((segment) => {
+            const start = byName.get(segment.startLandmark);
+            const end = byName.get(segment.endLandmark);
+            return (
+              <DynamicPoseLine
+                key={`${subjectId}-segment-${segment.name}`}
+                initialPoints={start && end ? [toViewerPoint(start, centre), toViewerPoint(end, centre)] : null}
+                getPoints={() => {
+                  const current = new Map(
+                    landmarksRef.current.map((landmark) => [landmark.jointName, landmark]),
+                  );
+                  const currentStart = current.get(segment.startLandmark);
+                  const currentEnd = current.get(segment.endLandmark);
+                  return currentStart && currentEnd
+                    ? [toViewerPoint(currentStart, centre), toViewerPoint(currentEnd, centre)]
+                    : null;
+                }}
+                color={SEGMENT_COLOR}
+                lineWidth={2.5}
+              />
+            );
+          })
+        : null}
+      {showAngles
+        ? overlays.angles.map((angle) => {
+            const vertex = byName.get(angle.vertexLandmark);
+            const first = byName.get(angle.firstLandmark);
+            const second = byName.get(angle.secondLandmark);
+            const radians = vertex && first && second ? angleAt(vertex, first, second) : null;
+            return (
+              <DynamicPoseLine
+                key={`${subjectId}-angle-${angle.name}`}
+                initialPoints={
+                  vertex && first && second && radians !== null
+                    ? arcPoints(vertex, first, second, radians, centre)
+                    : null
+                }
+                getPoints={() => {
+                  const current = new Map(
+                    landmarksRef.current.map((landmark) => [landmark.jointName, landmark]),
+                  );
+                  const currentVertex = current.get(angle.vertexLandmark);
+                  const currentFirst = current.get(angle.firstLandmark);
+                  const currentSecond = current.get(angle.secondLandmark);
+                  if (!currentVertex || !currentFirst || !currentSecond) return null;
+                  const currentRadians = angleAt(currentVertex, currentFirst, currentSecond);
+                  return currentRadians === null
+                    ? null
+                    : arcPoints(currentVertex, currentFirst, currentSecond, currentRadians, centre);
+                }}
+                color={ANGLE_COLOR}
+                lineWidth={2}
+              />
+            );
+          })
+        : null}
+      {showArticulationAngles
+        ? articulationAngles.map((angle) => (
+            <DynamicPoseLine
+              key={`${subjectId}-articulation-${angle.name}`}
+              initialPoints={anglePointsAt(landmarks, angle, centre, 0.075)}
+              getPoints={() => anglePointsAt(landmarksRef.current, angle, centre, 0.075)}
+              color={ARTICULATION_ANGLE_CUE_COLOR}
+              lineWidth={1.3}
+            />
+          ))
+        : null}
+    </>
+  );
+}
+
 function connectionPoints(
   landmarks: readonly PoseLandmark[],
   connection: DisplayConnectionDefinition,
@@ -597,6 +968,8 @@ export function arcPoints(
 
 export function PoseCanvas({
   frames,
+  subjectFrames,
+  allSubjects,
   overlays,
   providerConnections,
   preset,
@@ -613,6 +986,8 @@ export function PoseCanvas({
   onReady,
 }: {
   frames: readonly PoseFrame[];
+  subjectFrames: readonly PoseSubjectFrames[];
+  allSubjects: boolean;
   overlays: ProcessorOverlays;
   providerConnections: readonly DisplayConnectionDefinition[];
   preset: CameraPreset;
@@ -638,6 +1013,8 @@ export function PoseCanvas({
     >
       <PoseScene
         frames={frames}
+        subjectFrames={subjectFrames}
+        allSubjects={allSubjects}
         overlays={overlays}
         providerConnections={providerConnections}
         preset={preset}

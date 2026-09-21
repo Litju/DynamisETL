@@ -7,6 +7,7 @@ import {
   drawableDisplayConnections,
   extractFrames,
   frameIndexAt,
+  groupFramesBySubject,
   landmarksAt,
   overlaysFromParameters,
   planarCentre,
@@ -61,6 +62,30 @@ describe("pose landmark extraction", () => {
         { startLandmark: "nose", endLandmark: "lKnee" },
       ]),
     ).toHaveLength(1);
+  });
+
+  it("groups multi-subject playback without merging landmark frames", () => {
+    const mixed = [
+      ...ROWS,
+      {
+        t_rel_ns: 0,
+        subject_id: "s2",
+        joint_name: "nose",
+        is_available: true,
+        x_m: 10,
+        y_m: 0,
+        z_m: 0,
+      },
+    ] satisfies PoseRow[];
+    const grouped = groupFramesBySubject(extractFrames(mixed));
+    expect(grouped.map((subject) => subject.subjectId)).toEqual(["s1", "s2"]);
+    expect(grouped[0]?.frames[0]?.landmarks.map((landmark) => landmark.jointName)).toEqual([
+      "lHip",
+      "nose",
+    ]);
+    expect(grouped[1]?.frames[0]?.landmarks.map((landmark) => landmark.jointName)).toEqual([
+      "nose",
+    ]);
   });
 
   it("finds the frame at or before a canonical time", () => {

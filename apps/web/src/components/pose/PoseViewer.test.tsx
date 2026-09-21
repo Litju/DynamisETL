@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 
 import { AnalysisContext, type AnalysisContextValue } from "@/lib/analysis-context";
@@ -294,4 +294,16 @@ it("keeps a durable subject selected when the current window only returns anothe
     await screen.findByText("Individual s2 is not observed at this time/window."),
   ).toBeInTheDocument();
   expect(screen.queryByTestId("pose-scene-stub")).not.toBeInTheDocument();
+});
+
+it("rewinds playback to zero before changing the selected subject", async () => {
+  installFetch();
+  const selectSubject = vi.fn();
+  renderViewer({ subjectId: "s1", selectSubject });
+  const picker = await screen.findByLabelText("subject");
+  useAnalysisStore.getState().commitTime(50_000_000n);
+  fireEvent.change(picker, { target: { value: "s2" } });
+  expect(useAnalysisStore.getState().committedTimeNs).toBe(0n);
+  expect(useAnalysisStore.getState().playing).toBe(false);
+  expect(selectSubject).toHaveBeenCalledWith("s2", { resetTime: true });
 });

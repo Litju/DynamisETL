@@ -27,6 +27,11 @@ export interface PoseFrame {
   readonly observed: boolean;
 }
 
+export interface PoseSubjectFrames {
+  readonly subjectId: string;
+  readonly frames: readonly PoseFrame[];
+}
+
 export interface PoseRow {
   readonly t_rel_ns?: unknown;
   readonly subject_id?: unknown;
@@ -133,6 +138,20 @@ export function extractFrames(
         .sort(),
       observed: entry.landmarks.length > 0,
     }));
+}
+
+/** Group exact frames by their real subject identity for multi-subject display. */
+export function groupFramesBySubject(frames: readonly PoseFrame[]): PoseSubjectFrames[] {
+  const grouped = new Map<string, PoseFrame[]>();
+  for (const frame of frames) {
+    const subjectId = frame.subjectId ?? "unscoped";
+    const subjectFrames = grouped.get(subjectId) ?? [];
+    subjectFrames.push(frame);
+    grouped.set(subjectId, subjectFrames);
+  }
+  return [...grouped.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([subjectId, subjectFrames]) => ({ subjectId, frames: subjectFrames }));
 }
 
 /** Remove display cues that duplicate processor-declared angle geometry. */
