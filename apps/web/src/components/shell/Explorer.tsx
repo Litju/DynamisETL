@@ -130,13 +130,25 @@ function ExplorerForSession({
                   ...previous,
                   trial: trial.trial_id,
                 })}
+                title={trial.label ? `${trial.trial_id} — ${trial.label}` : trial.trial_id}
                 className={cn(
-                  "flex items-center justify-between rounded-control px-2 py-1 hover:bg-surface-2",
-                  selectedTrial === trial.trial_id && "bg-surface-3 text-text-primary",
+                  "flex min-w-0 flex-col rounded-control border-l-2 border-transparent px-2 py-1 transition-colors duration-quick hover:bg-surface-2",
+                  selectedTrial === trial.trial_id &&
+                    "border-accent bg-surface-3 text-text-primary",
                 )}
               >
-                <span className="truncate">{trial.label ?? trial.trial_id}</span>
-                <span className="mono text-[10px] text-text-muted">{trial.trial_id}</span>
+                {/*
+                  Provider trial labels carry the whole condition and index
+                  description; at explorer width they wrap into an unreadable
+                  block, so the id leads and the label follows as one clipped
+                  line with the full text on hover.
+                */}
+                <span className="mono truncate text-[11px] text-text-secondary">
+                  {trial.trial_id}
+                </span>
+                {trial.label ? (
+                  <span className="truncate text-[10px] text-text-muted">{trial.label}</span>
+                ) : null}
               </Link>
             </li>
           ))}
@@ -164,8 +176,9 @@ function ExplorerForSession({
                   trial: stream.trial_id ?? previous.trial,
                 })}
                 className={cn(
-                  "flex items-center justify-between gap-2 rounded-control px-2 py-1 hover:bg-surface-2",
-                  selectedStream === stream.stream_id && "bg-surface-3 text-text-primary",
+                  "flex items-center justify-between gap-2 rounded-control border-l-2 border-transparent px-2 py-1 transition-colors duration-quick hover:bg-surface-2",
+                  selectedStream === stream.stream_id &&
+                    "border-accent bg-surface-3 text-text-primary",
                 )}
                 title={`${stream.modality} · ${stream.measurement_class}`}
               >

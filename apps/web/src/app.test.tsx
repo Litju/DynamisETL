@@ -7,6 +7,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createAppRouter } from "@/router";
 import type { DatasetSummary, MetricPage, SessionDetail } from "@/api/types";
 
+// jsdom has no canvas rasteriser, so the real chart engine cannot initialise
+// here. The shell test is about routing, durable state and composition; the
+// option builders have their own tests against the real contracts.
+vi.mock("echarts", () => ({
+  init: () => ({
+    setOption: () => undefined,
+    resize: () => undefined,
+    dispose: () => undefined,
+    getOption: () => ({}),
+    on: () => undefined,
+  }),
+}));
+
 const DATASET: DatasetSummary = {
   dataset_id: "skillcorner-opendata",
   name: "SkillCorner Open Data",
@@ -210,8 +223,14 @@ describe("workbench shell", () => {
     // Derived metric with its measurement class is listed in the overview.
     expect(await screen.findByText("pose.angular_rom.left_knee")).toBeInTheDocument();
     expect(screen.getAllByText("pipeline-derived").length).toBeGreaterThan(0);
-    // Stream synchronization context is explicit.
-    expect(screen.getByText(/skillcorner-source-provided-match-clock/)).toBeInTheDocument();
+    // Stream contracts are subordinate to the analysis but stay one click
+    // away, and the synchronization specification remains explicit.
+    const contracts = screen.getByRole("button", { name: /Stream contracts/ });
+    expect(contracts).toHaveAttribute("aria-expanded", "false");
+    await userEvent.setup().click(contracts);
+    expect(
+      await screen.findByText(/skillcorner-source-provided-match-clock/),
+    ).toBeInTheDocument();
   });
 
   it("opens a non-overview view from the deep link without inventing results", async () => {
