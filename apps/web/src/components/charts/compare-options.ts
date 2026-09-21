@@ -222,7 +222,7 @@ export function pairedScatterOption(
   };
 }
 
-/** Difference against mean, with the descriptive spread of the differences. */
+/** Difference against mean, with limits withheld when magnitude bias is visible. */
 export function differenceOption(
   summary: DifferenceSummary,
   labels: { readonly a: string; readonly b: string; readonly unit: string },
@@ -245,7 +245,9 @@ export function differenceOption(
     backgroundColor: "transparent",
     aria: {
       enabled: true,
-      description: `Difference between ${labels.b} and ${labels.a} against their mean, for each paired observation.`,
+      description: summary.proportionalBias
+        ? `Difference between ${labels.b} and ${labels.a} against their mean, for each paired observation. Magnitude-dependent bias is visible, so agreement limits are withheld.`
+        : `Difference between ${labels.b} and ${labels.a} against their mean, for each paired observation.`,
     },
     grid: { left: 8, right: 20, top: 16, bottom: 34, containLabel: true },
     tooltip: {
@@ -295,8 +297,12 @@ export function differenceOption(
           lineStyle: { color: palette.reference, width: 1, type: "dashed" },
           data: [
             reference(summary.meanDifference, "mean difference"),
-            reference(summary.upperLimit, "+1.96 SD"),
-            reference(summary.lowerLimit, "−1.96 SD"),
+            ...(summary.proportionalBias
+              ? []
+              : [
+                  reference(summary.upperLimit, "+1.96 SD"),
+                  reference(summary.lowerLimit, "−1.96 SD"),
+                ]),
           ],
         },
       },

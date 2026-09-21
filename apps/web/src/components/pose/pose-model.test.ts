@@ -49,7 +49,7 @@ describe("pose landmark extraction", () => {
     // height. Mapping them straight onto the renderer would lay the subject on
     // its side, so the viewer's up axis carries source z.
     const centre = planarCentre(frames[0]!.landmarks);
-    expect(toViewerPoint({ xM: 1, yM: 2, zM: 3 }, { xM: 1, yM: 2 })).toEqual([0, 3, 0]);
+    expect(toViewerPoint({ xM: 1, yM: 3, zM: 3 }, { xM: 1, yM: 2 })).toEqual([0, 3, -1]);
 
     const bounds = boundsOf(frames[0]!.landmarks);
     // nose z = 0.1, hip z = -0.4, so the vertical midpoint is -0.15.

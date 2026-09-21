@@ -120,7 +120,22 @@ describe("difference summary", () => {
     // A constant offset has no spread, so the limits sit on the mean.
     expect(summary?.lowerLimit).toBeCloseTo(-0.002, 6);
     expect(summary?.upperLimit).toBeCloseTo(-0.002, 6);
+    expect(summary?.proportionalBias).toBe(false);
     expect(summary?.points[0]?.[0]).toBeCloseTo(0.399, 6);
+  });
+
+  it("withholds classical limits when difference grows with magnitude", () => {
+    const pairs = Array.from({ length: 10 }, (_value, index) => ({
+      key: `pair-${index}`,
+      label: `pair-${index}`,
+      a: index + 1,
+      b: (index + 1) * 1.2,
+      derivedMetricIdA: `a-${index}`,
+      derivedMetricIdB: `b-${index}`,
+    }));
+    const summary = differenceSummary(pairs);
+    expect(summary?.proportionalBias).toBe(true);
+    expect(summary?.biasCorrelation).toBeCloseTo(1, 9);
   });
 
   it("declines a spread below three pairs, where it would be noise", () => {

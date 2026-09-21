@@ -152,8 +152,10 @@ export type ViewerPoint = readonly [number, number, number];
  * The SkillCorner hybrid frame carries X and Y as pitch-plane metres and Z as
  * a player-centroid-relative vertical. Mapping those axes straight onto the
  * renderer would put the pitch's lateral axis on screen-up and lay the subject
- * on its side, so the viewer maps the centroid-relative vertical to screen-up
- * and the two pitch-plane axes to the horizontal plane.
+ * on its side, so the viewer applies the explicit rigid rotation
+ * R_x(+90°): [source x, source y, source z] → [viewer right, viewer up,
+ * viewer depth] = [x, z, −y]. The negative depth keeps the display frame
+ * right-handed (determinant +1); it is not a scientific coordinate rewrite.
  *
  * Landmarks are also expressed relative to `centre`, the observed cloud's own
  * centre. Both operations are display-only and change nothing scientific: the
@@ -168,7 +170,7 @@ export function toViewerPoint(
   landmark: { readonly xM: number; readonly yM: number; readonly zM: number },
   centre: { readonly xM: number; readonly yM: number },
 ): ViewerPoint {
-  return [landmark.xM - centre.xM, landmark.zM, landmark.yM - centre.yM];
+  return [landmark.xM - centre.xM, landmark.zM, -(landmark.yM - centre.yM)];
 }
 
 /** Pitch-plane centre of the observed landmarks; the viewer's local origin. */

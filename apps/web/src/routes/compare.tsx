@@ -385,8 +385,12 @@ function PairedComparison({
         </ChartPane>
         {difference ? (
           <ChartPane
-            title="Difference against mean"
-            note="limits describe the spread of the plotted differences"
+            title={difference.proportionalBias ? "Difference against magnitude" : "Difference against mean"}
+            note={
+              difference.proportionalBias
+                ? "magnitude-dependent bias detected; agreement limits withheld"
+                : "limits describe the spread of the plotted differences"
+            }
           >
             <EChart
               ariaLabel={`Difference between ${labelB} and ${labelA} against their mean`}
