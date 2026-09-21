@@ -12,13 +12,13 @@ test("catalog does not download renderer engines before a laboratory opens", asy
   const catalogRequests = requests.join("\n");
   expect(catalogRequests).not.toMatch(/echarts|pixi\.js|three(?:\.module)?|PoseScene|LineageGraph/i);
 
-  const eChartsRequest = page.waitForRequest(
-    (request) => /echarts/i.test(request.url()),
+  const uPlotRequest = page.waitForRequest(
+    (request) => /uplot/i.test(request.url()),
     { timeout: 10_000 },
   );
   await page.goto(
     "/lab/skillcorner-opendata/1925299?stream=tracking-1&view=signals&t_ns=50000000",
   );
-  await expect(page.getByTestId("echart")).toHaveAttribute("data-renderer-ready", "true");
-  expect((await eChartsRequest).url()).toMatch(/echarts/i);
+  await expect(page.getByTestId("uplot")).toHaveAttribute("data-renderer-ready", "true");
+  expect((await uPlotRequest).url()).toMatch(/uplot/i);
 });

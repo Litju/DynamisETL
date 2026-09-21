@@ -111,7 +111,7 @@ test("3/4. committed time propagates from the keyboard to the transport and pose
 }) => {
   await page.goto("/lab/skillcorner-opendata/1925299?stream=tracking-1&view=signals&t_ns=50000000");
   await expect(page.getByText(/json transport/)).toBeVisible();
-  await expect(page.getByTestId("echart")).toBeVisible();
+  await expect(page.getByTestId("uplot")).toBeVisible();
   await page.keyboard.press("ArrowRight");
   await expect(page).toHaveURL(/t_ns=/);
   const committed = page.getByText(/^committed$/).locator("xpath=following-sibling::span");
