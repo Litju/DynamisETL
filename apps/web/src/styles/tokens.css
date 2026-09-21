@@ -16,6 +16,7 @@
   --d-surface-3: oklch(0.285 0.015 255);
   --d-border-subtle: oklch(0.3 0.012 255);
   --d-border-strong: oklch(0.42 0.015 255);
+  --d-border-divider: oklch(0.34 0.012 255);
 
   --d-text-primary: oklch(0.93 0.005 255);
   --d-text-secondary: oklch(0.82 0.01 255);
@@ -67,6 +68,7 @@
   --d-surface-3: oklch(0.92 0.006 255);
   --d-border-subtle: oklch(0.87 0.006 255);
   --d-border-strong: oklch(0.72 0.01 255);
+  --d-border-divider: oklch(0.82 0.006 255);
 
   --d-text-primary: oklch(0.24 0.012 255);
   --d-text-secondary: oklch(0.4 0.012 255);
@@ -96,6 +98,23 @@
   --d-shadow-overlay: 0 12px 28px oklch(0.4 0.01 255 / 0.18);
 }
 
+/* Type and control tokens shared by every surface. Keep the instrument dense,
+ * but make the hierarchy and touch targets deliberate instead of accidental. */
+:root {
+  --d-type-product: 1.25rem;
+  --d-type-surface: 1rem;
+  --d-type-analysis: 0.8125rem;
+  --d-type-context: 0.75rem;
+  --d-type-value: 1.125rem;
+  --d-type-section: 0.6875rem;
+  --d-type-body: 0.75rem;
+  --d-type-label: 0.6875rem;
+  --d-type-evidence: 0.625rem;
+  --d-control-compact: 1.5rem;
+  --d-control-default: 1.75rem;
+  --d-control-prominent: 2rem;
+}
+
 @theme inline {
   --color-surface-0: var(--d-surface-0);
   --color-surface-1: var(--d-surface-1);
@@ -103,6 +122,7 @@
   --color-surface-3: var(--d-surface-3);
   --color-border-subtle: var(--d-border-subtle);
   --color-border-strong: var(--d-border-strong);
+  --color-border-divider: var(--d-border-divider);
 
   --color-text-primary: var(--d-text-primary);
   --color-text-secondary: var(--d-text-secondary);
@@ -150,6 +170,16 @@
   --spacing-inspector: 22.5rem;
   --radius-panel: 6px;
   --radius-control: 4px;
+
+  --text-product-title: var(--d-type-product);
+  --text-surface-title: var(--d-type-surface);
+  --text-analysis-title: var(--d-type-analysis);
+  --text-context: var(--d-type-context);
+  --text-value: var(--d-type-value);
+  --text-section: var(--d-type-section);
+  --text-body: var(--d-type-body);
+  --text-label: var(--d-type-label);
+  --text-evidence: var(--d-type-evidence);
 
   /* Animation: functional, never decorative. */
   --duration-instant: 60ms;

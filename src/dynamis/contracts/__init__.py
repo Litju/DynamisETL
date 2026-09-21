@@ -73,6 +73,7 @@ from dynamis.contracts.frames import (
     FrameTransform,
     JointDefinition,
     SkeletonDefinition,
+    SkeletonDisplayConnection,
     transform_points,
 )
 from dynamis.contracts.invariants import (
@@ -198,6 +199,7 @@ __all__ = [
     "SessionParticipant",
     "Severity",
     "SkeletonDefinition",
+    "SkeletonDisplayConnection",
     "SkeletonTopology",
     "Subject",
     "SyncAlignment",

@@ -4,11 +4,16 @@ import {
   angleAt,
   boundsOf,
   cameraFor,
+  drawableDisplayConnections,
   extractFrames,
   frameIndexAt,
+  groupFramesBySubject,
   landmarksAt,
   overlaysFromParameters,
+  planarCentre,
   summarizeFrame,
+  toViewerPoint,
+  withoutDuplicateAngles,
   type PoseRow,
 } from "@/components/pose/pose-model";
 
@@ -31,8 +36,61 @@ describe("pose landmark extraction", () => {
     expect(frames[2]?.observed).toBe(false);
   });
 
+  it("keeps pose subjects separate and draws provider edges only for available endpoints", () => {
+    const mixed = [
+      ...ROWS,
+      {
+        t_rel_ns: 0,
+        subject_id: "s2",
+        joint_name: "nose",
+        is_available: true,
+        x_m: 10,
+        y_m: 0,
+        z_m: 0,
+      },
+    ] satisfies PoseRow[];
+    expect(extractFrames(mixed, "s1")[0]?.landmarks.map((landmark) => landmark.jointName)).toEqual([
+      "lHip",
+      "nose",
+    ]);
+    expect(extractFrames(mixed)).toHaveLength(4);
+
+    const landmarks = extractFrames(ROWS, "s1")[0]!.landmarks;
+    expect(
+      drawableDisplayConnections(landmarks, [
+        { startLandmark: "nose", endLandmark: "lHip" },
+        { startLandmark: "nose", endLandmark: "lKnee" },
+      ]),
+    ).toHaveLength(1);
+  });
+
+  it("groups multi-subject playback without merging landmark frames", () => {
+    const mixed = [
+      ...ROWS,
+      {
+        t_rel_ns: 0,
+        subject_id: "s2",
+        joint_name: "nose",
+        is_available: true,
+        x_m: 10,
+        y_m: 0,
+        z_m: 0,
+      },
+    ] satisfies PoseRow[];
+    const grouped = groupFramesBySubject(extractFrames(mixed));
+    expect(grouped.map((subject) => subject.subjectId)).toEqual(["s1", "s2"]);
+    expect(grouped[0]?.frames[0]?.landmarks.map((landmark) => landmark.jointName)).toEqual([
+      "lHip",
+      "nose",
+    ]);
+    expect(grouped[1]?.frames[0]?.landmarks.map((landmark) => landmark.jointName)).toEqual([
+      "nose",
+    ]);
+  });
+
   it("finds the frame at or before a canonical time", () => {
     expect(frameIndexAt(frames, 0n)).toBe(0);
+    expect(frameIndexAt(frames, -1n)).toBe(-1);
     expect(frameIndexAt(frames, 39_999_999n)).toBe(0);
     expect(frameIndexAt(frames, 40_000_000n)).toBe(1);
     expect(frameIndexAt(frames, 10_000_000_000n)).toBe(2);
@@ -42,15 +100,33 @@ describe("pose landmark extraction", () => {
     ]);
   });
 
-  it("computes local-frame bounds and a stable camera preset", () => {
+  it("puts the centroid-relative vertical on the viewer's up axis", () => {
+    // Source x/y are pitch-plane metres and source z is centroid-relative
+    // height. Mapping them straight onto the renderer would lay the subject on
+    // its side, so the viewer's up axis carries source z.
+    const centre = planarCentre(frames[0]!.landmarks);
+    expect(toViewerPoint({ xM: 1, yM: 3, zM: 3 }, { xM: 1, yM: 2 })).toEqual([0, 3, -1]);
+
     const bounds = boundsOf(frames[0]!.landmarks);
-    expect(bounds.center[2]).toBeCloseTo(-0.15, 9);
+    // nose z = 0.1, hip z = -0.4, so the vertical midpoint is -0.15.
+    expect(bounds.center[1]).toBeCloseTo(-0.15, 9);
+    // Both landmarks sit at the same pitch-plane point, so the horizontal
+    // extent is zero once the cloud is re-centred on its own origin.
+    expect(centre).toEqual({ xM: 0, yM: 0 });
+    expect(bounds.center[0]).toBeCloseTo(0, 9);
+    expect(bounds.center[2]).toBeCloseTo(0, 9);
     expect(bounds.radius).toBeGreaterThan(0);
+  });
+
+  it("frames the observed cloud from every camera preset", () => {
+    const bounds = boundsOf(frames[0]!.landmarks);
     const front = cameraFor("front", bounds);
     expect(front.target).toEqual(bounds.center);
     expect(front.position[2]).toBeGreaterThan(bounds.center[2]!);
     const left = cameraFor("left", bounds);
     expect(left.position[0]).toBeLessThan(bounds.center[0]!);
+    const top = cameraFor("top", bounds);
+    expect(top.position[1]).toBeGreaterThan(bounds.center[1]!);
     expect(cameraFor("reset", bounds).position).toEqual(cameraFor("free", bounds).position);
   });
 
@@ -65,6 +141,14 @@ describe("pose landmark extraction", () => {
 });
 
 describe("processor overlays", () => {
+  it("does not draw a duplicate display angle when the processor owns it", () => {
+    const display = [
+      { name: "left_knee", vertexLandmark: "lKnee", firstLandmark: "lHip", secondLandmark: "lAnkle" },
+      { name: "left_elbow", vertexLandmark: "lElbow", firstLandmark: "lShoulder", secondLandmark: "lWrist" },
+    ];
+    expect(withoutDuplicateAngles(display, [display[0]!])).toEqual([display[1]]);
+  });
+
   it("reads segments and angles only from processor parameters", () => {
     const overlays = overlaysFromParameters({
       segments: [

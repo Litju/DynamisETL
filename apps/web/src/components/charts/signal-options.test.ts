@@ -2,79 +2,131 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildSignalOption,
-  detectBands,
-  measureColumns,
+  canonicalSeconds,
+  crossesZero,
+  formatAxisTime,
+  formatSignalValue,
+  paneLayout,
   rangeLabel,
   reductionNote,
-  toPoints,
 } from "@/components/charts/signal-options";
+import {
+  defaultGroupId,
+  groupChannels,
+} from "@/components/charts/signal-channels";
 import { readPalette, seriesColor } from "@/lib/chart-palette";
 
 const PALETTE = readPalette();
 
-describe("signal option builder", () => {
-  const option = buildSignalOption({
-    series: [
-      {
-        name: "x_m",
-        unit: "m",
-        measurementClass: "MODEL_ESTIMATED",
-        points: [
-          [0, 0],
-          [10, 1],
-          [20, null],
-          [30, 3],
-        ],
-      },
-    ],
-    playheadMs: 12,
-    rangeMs: { fromMs: 5, toMs: 25 },
-    palette: PALETTE,
-  });
+const OPTION = buildSignalOption({
+  panes: [{ id: "force", label: "Ground reaction force", unit: "N" }],
+  series: [
+    {
+      name: "Force Z (vertical)",
+      unit: "N",
+      measurementClass: "SOURCE_DERIVED",
+      paneIndex: 0,
+      points: [
+        [0, -20],
+        [10, 1],
+        [20, null],
+        [30, 3],
+      ],
+    },
+  ],
+  playheadMs: 12,
+  rangeMs: { fromMs: 5, toMs: 25 },
+  palette: PALETTE,
+  originNs: -1_345_000_000n,
+  timeReference: "takeoff",
+});
 
+function seriesOf(option: typeof OPTION) {
+  return option.series as Array<Record<string, unknown>>;
+}
+
+describe("signal option builder", () => {
   it("draws exact polylines: no smoothing, no sampling, no gap bridging", () => {
-    const series = (option.series as Array<Record<string, unknown>>)[0]!;
-    expect(series.type).toBe("line");
-    expect(series.smooth).toBe(false);
-    expect(series.sampling).toBe("none");
-    expect(series.connectNulls).toBe(false);
-    expect(series.data).toEqual([
-      [0, 0],
+    const trace = seriesOf(OPTION).find((entry) => entry.id === "series-0")!;
+    expect(trace.type).toBe("line");
+    expect(trace.smooth).toBe(false);
+    expect(trace.sampling).toBe("none");
+    expect(trace.connectNulls).toBe(false);
+    expect(trace.data).toEqual([
+      [0, -20],
       [10, 1],
       [20, null],
       [30, 3],
     ]);
-    expect(option.animation).toBe(false);
+    expect(OPTION.animation).toBe(false);
   });
 
-  it("marks the playhead and the committed range and labels the x axis", () => {
-    const series = (option.series as Array<Record<string, unknown>>)[0]!;
-    const markLine = series.markLine as { data: Array<{ xAxis: number }> };
+  it("carries the playhead and range on an overlay, not on a toggleable trace", () => {
+    // A reader can hide a series in the legend; the committed time and range
+    // must survive that, so they ride their own silent carrier.
+    const overlay = seriesOf(OPTION).find((entry) => entry.id === "overlay-0")!;
+    const markLine = overlay.markLine as { data: Array<{ xAxis: number }> };
     expect(markLine.data).toEqual([{ xAxis: 12 }]);
-    const markArea = series.markArea as { data: Array<Array<{ xAxis: number }>> };
+    const markArea = overlay.markArea as { data: Array<Array<{ xAxis: number }>> };
     expect(markArea.data[0]?.[1]).toEqual({ xAxis: 25 });
-    expect((option.xAxis as { name: string }).name).toContain("ms from window start");
-    expect((option.yAxis as Array<{ name: string }>)[0]?.name).toBe("[m]");
+    expect(overlay.silent).toBe(true);
   });
 
-  it("omits the playhead mark when no time is committed", () => {
-    const without = buildSignalOption({
-      series: [],
-      playheadMs: null,
-      rangeMs: null,
-      palette: PALETTE,
-    });
-    expect(without.series).toEqual([]);
+  it("labels the time axis against the canonical clock reference", () => {
+    const xAxes = OPTION.xAxis as Array<{ name?: string }>;
+    expect(xAxes[0]?.name).toBe("Time (s relative to takeoff)");
+    const yAxes = OPTION.yAxis as Array<{ name: string }>;
+    expect(yAxes[0]?.name).toBe("Ground reaction force [N]");
   });
 
-  it("renders a reduced window as an extrema envelope", () => {
+  it("converts renderer-local milliseconds back to canonical seconds", () => {
+    // A White CMJ trial is takeoff-aligned: its window starts at -1.345 s.
+    expect(canonicalSeconds(-1_345_000_000n, 0)).toBeCloseTo(-1.345);
+    expect(canonicalSeconds(-1_345_000_000n, 1345)).toBeCloseTo(0);
+  });
+
+  it("draws a zero reference only where the trace actually crosses it", () => {
+    const trace = seriesOf(OPTION).find((entry) => entry.id === "series-0")!;
+    expect((trace.markLine as { data: unknown[] }).data).toEqual([{ yAxis: 0 }]);
+    expect(crossesZero([[0, 1], [1, 2]])).toBe(false);
+    expect(crossesZero([[0, -1], [1, 2]])).toBe(true);
+    expect(crossesZero([[0, null], [1, 3]])).toBe(false);
+  });
+
+  it("uses the semantic measurement color", () => {
+    const trace = seriesOf(OPTION).find((entry) => entry.id === "series-0")!;
+    expect(trace.color).toBe(PALETTE.measurement.SOURCE_DERIVED);
+    expect(seriesColor(PALETTE, "PIPELINE_DERIVED")).toBe(PALETTE.measurement.PIPELINE_DERIVED);
+  });
+
+  it("formats values to a defensible precision for their magnitude", () => {
+    expect(formatSignalValue(1234.5678, "N")).toBe("1234.6 N");
+    expect(formatSignalValue(2.71828, "1")).toBe("2.72");
+    expect(formatSignalValue(0.000123, "m")).toBe("0.0001 m");
+    expect(formatSignalValue(Number.NaN, "m")).toBe("unavailable");
+  });
+
+  it("renders a reduced window as an extrema envelope, not as uncertainty", () => {
     const reduced = buildSignalOption({
-      series: [],
+      panes: [{ id: "position", label: "Position", unit: "m" }],
+      series: [
+        {
+          name: "Velocity X",
+          unit: "m/s",
+          measurementClass: "MODEL_ESTIMATED",
+          paneIndex: 0,
+          points: [
+            [0, 0],
+            [10, 1],
+          ],
+        },
+      ],
       bands: [
         {
-          name: "x_m",
+          name: "Position X",
           unit: "m",
           measurementClass: "MODEL_ESTIMATED",
+          paneIndex: 0,
           points: [
             [0, 0, 5],
             [10, 1, 7],
@@ -84,66 +136,121 @@ describe("signal option builder", () => {
       playheadMs: null,
       rangeMs: null,
       palette: PALETTE,
+      originNs: 0n,
     });
-    const series = reduced.series as Array<Record<string, unknown>>;
-    expect(series).toHaveLength(2);
-    expect(series[0]?.name).toBe("x_m (min)");
-    expect(series[1]?.name).toBe("x_m (max−min)");
-    expect((series[1] as { areaStyle: { opacity: number } }).areaStyle.opacity).toBeCloseTo(0.18);
-    expect(series[1]?.stack).toBe("band-0");
-  });
-
-  it("uses the semantic measurement color and keeps legend/tooltips deterministic", () => {
-    const series = (option.series as Array<Record<string, unknown>>)[0]!;
-    expect(series.color).toBe(PALETTE.measurement.MODEL_ESTIMATED);
-    expect(seriesColor(PALETTE, "PIPELINE_DERIVED")).toBe(
-      PALETTE.measurement.PIPELINE_DERIVED,
+    const bands = seriesOf(reduced).filter((entry) =>
+      String(entry.id ?? "").startsWith("band-"),
     );
-    const tooltip = option.tooltip as { valueFormatter: (value: unknown) => string };
-    expect(tooltip.valueFormatter(1.23456)).toBe("1.235");
-    expect(tooltip.valueFormatter(null)).toBe("—");
+    expect(bands).toHaveLength(2);
+    expect(bands[0]?.name).toBe("Position X — reduction envelope");
+    expect(bands[1]?.name).toBe("Position X — envelope span");
+    expect(bands[1]?.stack).toBe("band-0");
+    // The legend never offers the span carrier as if it were a measurement.
+    const legend = reduced.legend as { data?: string[] };
+    expect(legend.data ?? []).not.toContain("Position X — envelope span");
   });
 });
 
-describe("window column selection", () => {
-  it("detects min/max envelope pairs and ignores unpaired columns", () => {
-    expect(
-      detectBands(["t_rel_ns", "x_m_min", "x_m_max", "y_m_min", "y_m_max", "z_min"]),
-    ).toEqual([
-      { base: "x_m", minKey: "x_m_min", maxKey: "x_m_max" },
-      { base: "y_m", minKey: "y_m_min", maxKey: "y_m_max" },
-    ]);
+describe("time axis formatting", () => {
+  it("keeps sub-second resolution for a jump trial", () => {
+    // A White CMJ trial spans about 1.3 s and counts down to takeoff.
+    expect(formatAxisTime(-1.2, 1.345)).toBe("-1.20");
+    expect(formatAxisTime(0, 1.345)).toBe("0.00");
+    expect(formatAxisTime(-12.5, 30)).toBe("-12.5");
   });
 
-  it("selects numeric measures and excludes identity, time and band members", () => {
-    const columns = [
-      "dataset_id",
-      "subject_id",
-      "t_rel_ns",
-      "sample_index",
-      "x_m",
-      "x_m_min",
-      "x_m_max",
-      "flag",
-    ];
-    const units = { x_m: "m", x_m_min: "m", x_m_max: "m" };
-    expect(measureColumns(columns, units, { flag: true })).toEqual(["x_m"]);
-    expect(measureColumns(["a", "b"], {}, { a: 1, b: "text" })).toEqual(["a"]);
+  it("switches to a minute clock for a match period", () => {
+    expect(formatAxisTime(3570, 3022)).toBe("59:30");
+    expect(formatAxisTime(0, 3022)).toBe("0:00");
+    expect(formatAxisTime(65, 3022)).toBe("1:05");
   });
 
-  it("converts rows to renderer-local ms points with explicit gaps", () => {
-    const points = toPoints(
-      [
-        { t_rel_ns: 1_000_000_000, v: 1 },
-        { t_rel_ns: 2_000_000_000, v: Number.NaN },
-      ],
-      "v",
-      1_000_000_000n,
+  it("keeps the sign of an event-aligned countdown", () => {
+    expect(formatAxisTime(-125, 600)).toBe("-2:05");
+  });
+});
+
+describe("pane layout", () => {
+  it("reserves room for the legend and the shared range slider", () => {
+    const [only] = paneLayout(1);
+    expect(only!.topPercent).toBeGreaterThan(0);
+    expect(only!.topPercent + only!.heightPercent).toBeLessThan(100);
+  });
+
+  it("stacks panes without overlapping them", () => {
+    const layout = paneLayout(3);
+    expect(layout).toHaveLength(3);
+    for (let index = 1; index < layout.length; index += 1) {
+      const previous = layout[index - 1]!;
+      const current = layout[index]!;
+      expect(current.topPercent).toBeGreaterThan(previous.topPercent + previous.heightPercent);
+    }
+  });
+});
+
+describe("channel grouping", () => {
+  const FORCE_COLUMNS = [
+    "force_x_n",
+    "force_y_n",
+    "force_z_n",
+    "force_z_body_weight_ratio",
+    "moment_x_n_m",
+    "cop_x_m",
+  ];
+  const FORCE_UNITS = {
+    force_x_n: "N",
+    force_y_n: "N",
+    force_z_n: "N",
+    force_z_body_weight_ratio: "1",
+    moment_x_n_m: "N*m",
+    cop_x_m: "m",
+  };
+
+  it("keeps quantities with different units on different axes", () => {
+    const groups = groupChannels(FORCE_COLUMNS, FORCE_UNITS);
+    const units = new Map(groups.map((group) => [group.id, group.unit]));
+    expect(units.get("force")).toBe("N");
+    expect(units.get("body_weight_ratio")).toBe("1");
+    expect(units.get("moment")).toBe("N*m");
+    expect(units.get("cop")).toBe("m");
+  });
+
+  it("opens a force plate on the ground reaction force", () => {
+    const groups = groupChannels(FORCE_COLUMNS, FORCE_UNITS);
+    expect(defaultGroupId(groups, "force")).toBe("force");
+  });
+
+  it("opens an inertial unit on acceleration, not on the magnetometer", () => {
+    const groups = groupChannels(
+      ["mag_x_ut", "gyro_x_rad_s", "accel_x_m_s2", "temperature_deg_c"],
+      {
+        mag_x_ut: "uT",
+        gyro_x_rad_s: "rad/s",
+        accel_x_m_s2: "m/s**2",
+        temperature_deg_c: "degC",
+      },
     );
-    expect(points).toEqual([
-      [0, 1],
-      [1000, null],
-    ]);
+    expect(defaultGroupId(groups, "imu")).toBe("accel");
+  });
+
+  it("opens GNSS on speed over ground", () => {
+    const groups = groupChannels(["latitude_deg", "speed_m_s", "hdop"], {
+      latitude_deg: "deg",
+      speed_m_s: "m/s",
+      hdop: "1",
+    });
+    expect(defaultGroupId(groups, "gnss")).toBe("speed");
+  });
+
+  it("surfaces an unrecognised canonical measure instead of dropping it", () => {
+    const groups = groupChannels(["novel_measure_kg"], { novel_measure_kg: "kg" });
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.channels[0]?.id).toBe("novel_measure_kg");
+    expect(defaultGroupId(groups, "force")).toBe("novel_measure_kg");
+  });
+
+  it("names nothing when the window holds no measure", () => {
+    expect(defaultGroupId([], "force")).toBeNull();
   });
 });
 

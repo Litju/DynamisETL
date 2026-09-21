@@ -1,10 +1,24 @@
 ﻿import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createAppRouter } from "@/router";
 import type { DatasetSummary, MetricPage, SessionDetail } from "@/api/types";
+
+// jsdom has no canvas rasteriser, so the real chart engine cannot initialise
+// here. The shell test is about routing, durable state and composition; the
+// option builders have their own tests against the real contracts.
+vi.mock("echarts", () => ({
+  init: () => ({
+    setOption: () => undefined,
+    resize: () => undefined,
+    dispose: () => undefined,
+    getOption: () => ({}),
+    on: () => undefined,
+  }),
+}));
 
 const DATASET: DatasetSummary = {
   dataset_id: "skillcorner-opendata",
@@ -147,6 +161,21 @@ function installFetchStub(): void {
       if (path === "/api/metrics") {
         return jsonResponse(METRICS);
       }
+      if (path === "/api/metrics/definitions") {
+        return jsonResponse([
+          {
+            metric_id: "pose.angular_rom.left_knee",
+            name: "Range of motion for angle left_knee",
+            si_unit: "rad",
+            measurement_class: "PIPELINE_DERIVED",
+            value_kind: "scalar",
+            description: null,
+            algorithm_id: "pose.translation_invariant_kinematics",
+            dataset_ids: ["skillcorner-opendata"],
+            value_count: 4,
+          },
+        ]);
+      }
       return jsonResponse({ detail: `unhandled ${path}` }, 404);
     }),
   );
@@ -177,9 +206,21 @@ describe("workbench shell", () => {
     renderAt("/catalog");
     expect(await screen.findByRole("navigation", { name: "Product surfaces" })).toBeInTheDocument();
     expect(screen.getByText(/Performance Laboratory/)).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Inspector" })).toBeInTheDocument();
     expect(await screen.findByText("SkillCorner Open Data")).toBeInTheDocument();
     expect(screen.getByText("CC BY 4.0")).toBeInTheDocument();
+  });
+
+  it("compacts the inspector to a rail where nothing is inspectable", async () => {
+    const user = userEvent.setup();
+    renderAt("/catalog");
+    // The catalog owns its own dataset evidence, so the inspector must not
+    // reserve flagship width with an empty pane.
+    await screen.findByRole("navigation", { name: "Product surfaces" });
+    expect(screen.queryByRole("region", { name: "Inspector" })).not.toBeInTheDocument();
+
+    // It stays one click away.
+    await user.click(screen.getByRole("button", { name: "Open the inspector" }));
+    expect(await screen.findByRole("region", { name: "Inspector" })).toBeInTheDocument();
   });
 
   it("restores the full durable context from a deep link", async () => {
@@ -197,8 +238,14 @@ describe("workbench shell", () => {
     // Derived metric with its measurement class is listed in the overview.
     expect(await screen.findByText("pose.angular_rom.left_knee")).toBeInTheDocument();
     expect(screen.getAllByText("pipeline-derived").length).toBeGreaterThan(0);
-    // Stream synchronization context is explicit.
-    expect(screen.getByText(/skillcorner-source-provided-match-clock/)).toBeInTheDocument();
+    // Stream contracts are subordinate to the analysis but stay one click
+    // away, and the synchronization specification remains explicit.
+    const contracts = screen.getByRole("button", { name: /Stream contracts/ });
+    expect(contracts).toHaveAttribute("aria-expanded", "false");
+    await userEvent.setup().click(contracts);
+    expect(
+      await screen.findByText(/skillcorner-source-provided-match-clock/),
+    ).toBeInTheDocument();
   });
 
   it("opens a non-overview view from the deep link without inventing results", async () => {
@@ -213,7 +260,10 @@ describe("workbench shell", () => {
 
   it("keeps compare mode on an explicit empty state until configured", async () => {
     renderAt("/compare");
-    expect(await screen.findByText("No comparison configured.")).toBeInTheDocument();
+    // Discovery comes first: the metric vocabulary is offered rather than an
+    // internal id being demanded.
+    expect(await screen.findByText("Choose a metric to compare.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Metric")).toBeInTheDocument();
   });
 });
 

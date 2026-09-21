@@ -31,12 +31,21 @@ export function Explorer() {
     );
   }
   return (
-    <ExplorerForSession
-      datasetId={datasetId}
-      sessionId={sessionId}
-      selectedStream={selectedStream}
-      selectedTrial={selectedTrial}
-    />
+    <div className="flex h-full min-h-0 flex-col">
+      <header className="flex h-8 shrink-0 items-center border-b border-border-subtle px-3">
+        <h2 className="t-section">
+          Session explorer
+        </h2>
+      </header>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <ExplorerForSession
+          datasetId={datasetId}
+          sessionId={sessionId}
+          selectedStream={selectedStream}
+          selectedTrial={selectedTrial}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -58,6 +67,13 @@ function ExplorerForSession({
 
   const handleTreeKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    if (
+      event.target instanceof HTMLElement &&
+      (event.target.isContentEditable ||
+        ["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName))
+    ) {
+      return;
+    }
     const items = Array.from(
       event.currentTarget.querySelectorAll<HTMLAnchorElement>("a[data-nav-item]"),
     );
@@ -105,7 +121,7 @@ function ExplorerForSession({
       <button
         type="button"
         onClick={() => setTrialsOpen((open) => !open)}
-        className="flex w-full items-center gap-1 py-1 text-[11px] uppercase tracking-wider text-text-muted hover:text-text-secondary"
+        className="t-section t-control-compact flex w-full items-center gap-1 py-1 text-text-muted hover:text-text-secondary"
       >
         {trialsOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />} Trials
       </button>
@@ -120,14 +136,27 @@ function ExplorerForSession({
                 search={(previous: LabSearch) => ({
                   ...previous,
                   trial: trial.trial_id,
+                  stream: previous.trial === trial.trial_id ? previous.stream : undefined,
                 })}
+                title={trial.label ? `${trial.trial_id} — ${trial.label}` : trial.trial_id}
                 className={cn(
-                  "flex items-center justify-between rounded-control px-2 py-1 hover:bg-surface-2",
-                  selectedTrial === trial.trial_id && "bg-surface-3 text-text-primary",
+                  "flex min-w-0 flex-col rounded-control border-l-2 border-transparent px-2 py-1 transition-colors duration-quick hover:bg-surface-2",
+                  selectedTrial === trial.trial_id &&
+                    "border-accent bg-surface-3 text-text-primary",
                 )}
               >
-                <span className="truncate">{trial.label ?? trial.trial_id}</span>
-                <span className="mono text-[10px] text-text-muted">{trial.trial_id}</span>
+                {/*
+                  Provider trial labels carry the whole condition and index
+                  description; at explorer width they wrap into an unreadable
+                  block, so the id leads and the label follows as one clipped
+                  line with the full text on hover.
+                */}
+                <span className="mono truncate text-[11px] text-text-secondary">
+                  {trial.trial_id}
+                </span>
+                {trial.label ? (
+                  <span className="truncate text-[10px] text-text-muted">{trial.label}</span>
+                ) : null}
               </Link>
             </li>
           ))}
@@ -137,7 +166,7 @@ function ExplorerForSession({
       <button
         type="button"
         onClick={() => setStreamsOpen((open) => !open)}
-        className="flex w-full items-center gap-1 py-1 text-[11px] uppercase tracking-wider text-text-muted hover:text-text-secondary"
+        className="t-section t-control-compact flex w-full items-center gap-1 py-1 text-text-muted hover:text-text-secondary"
       >
         {streamsOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />} Streams
       </button>
@@ -155,8 +184,9 @@ function ExplorerForSession({
                   trial: stream.trial_id ?? previous.trial,
                 })}
                 className={cn(
-                  "flex items-center justify-between gap-2 rounded-control px-2 py-1 hover:bg-surface-2",
-                  selectedStream === stream.stream_id && "bg-surface-3 text-text-primary",
+                  "flex items-center justify-between gap-2 rounded-control border-l-2 border-transparent px-2 py-1 transition-colors duration-quick hover:bg-surface-2",
+                  selectedStream === stream.stream_id &&
+                    "border-accent bg-surface-3 text-text-primary",
                 )}
                 title={`${stream.modality} · ${stream.measurement_class}`}
               >

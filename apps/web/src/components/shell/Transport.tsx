@@ -137,7 +137,7 @@ export function Transport({ nominalRateHz }: { nominalRateHz: number | null }) {
         </button>
       </div>
 
-      <label className="flex items-center gap-1 text-[11px] text-text-muted">
+      <label className="t-label flex items-center gap-1 text-text-muted">
         rate
         <select
           aria-label="Playback rate"
@@ -156,10 +156,10 @@ export function Transport({ nominalRateHz }: { nominalRateHz: number | null }) {
 
       <div className="flex items-baseline gap-4">
         <div>
-          <span className="mr-2 text-[10px] uppercase tracking-wider text-text-muted">
+          <span className="t-section mr-2 text-text-muted">
             playhead
           </span>
-          <span className="mono text-[13px] tabular text-text-primary">
+          <span className="t-value mono tabular">
             {effective !== null ? formatClockNs(effective) : "—"}
           </span>
           <span className="mono ml-2 text-[10px] text-text-muted">
@@ -167,7 +167,7 @@ export function Transport({ nominalRateHz }: { nominalRateHz: number | null }) {
           </span>
         </div>
         <div>
-          <span className="mr-2 text-[10px] uppercase tracking-wider text-text-muted">range</span>
+          <span className="t-section mr-2 text-text-muted">range</span>
           <span className="mono text-[12px] tabular text-text-secondary">
             {committedRangeNs
               ? `${formatDurationNs(committedRangeNs.toNs - committedRangeNs.fromNs)}`
@@ -175,7 +175,7 @@ export function Transport({ nominalRateHz }: { nominalRateHz: number | null }) {
           </span>
         </div>
         <div>
-          <span className="mr-2 text-[10px] uppercase tracking-wider text-text-muted">
+          <span className="t-section mr-2 text-text-muted">
             committed
           </span>
           <span className="mono text-[12px] tabular text-text-secondary">
@@ -186,11 +186,11 @@ export function Transport({ nominalRateHz }: { nominalRateHz: number | null }) {
 
       <div
         className={cn(
-          "ml-auto flex h-6 min-w-64 flex-1 items-center gap-2 rounded-control border border-border-subtle bg-surface-1 px-2 text-[11px] text-text-muted",
+          "t-label ml-auto flex h-6 min-w-64 flex-1 items-center gap-2 rounded-control border border-border-subtle bg-surface-1 px-2 text-text-muted",
         )}
         title="Quality and availability ribbon: quarantined intervals, pose availability, detected/extrapolated tracking"
       >
-        <span className="uppercase tracking-wider text-[10px]">quality ribbon</span>
+        <span className="t-section">quality ribbon</span>
         <span className="truncate">
           {disabled
             ? "open a laboratory session to see availability"

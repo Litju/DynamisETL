@@ -5,6 +5,7 @@ import {
   compareSearchSchema,
   labSearchSchema,
   labSearchToParams,
+  normalizeLabSearch,
   parseSearch,
 } from "@/lib/search";
 
@@ -41,10 +42,16 @@ describe("durable search parameter validation", () => {
     expect(typeof parsed.t_ns).toBe("string");
   });
 
+  it("normalizes every numeric subject identity at the root context seam", () => {
+    for (const subject of [11897, 287934, 809166, 965697]) {
+      expect(normalizeLabSearch({ subject }).subject).toBe(String(subject));
+    }
+  });
+
   it("drops invalid values instead of entering the state spine unchecked", () => {
     const parsed = parseSearch(labSearchSchema, {
       t_ns: "not-a-time",
-      from_ns: "-5",
+      from_ns: "1.5e3",
       view: "cinema",
       unknown: "dropped",
     });
@@ -52,6 +59,19 @@ describe("durable search parameter validation", () => {
     expect(parsed.from_ns).toBeUndefined();
     expect(parsed.view).toBe("overview");
     expect("unknown" in parsed).toBe(false);
+  });
+
+  it("accepts signed canonical time from an event-aligned trial", () => {
+    // White CMJ trials are takeoff-aligned and run up to zero from a negative
+    // time; the durable playhead and range must survive that.
+    const parsed = parseSearch(labSearchSchema, {
+      t_ns: "-1345000000",
+      from_ns: -1_345_000_000,
+      to_ns: "0",
+    });
+    expect(parsed.t_ns).toBe("-1345000000");
+    expect(parsed.from_ns).toBe("-1345000000");
+    expect(parsed.to_ns).toBe("0");
   });
 
   it("fails closed on an unsafe nanosecond integer", () => {

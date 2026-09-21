@@ -56,11 +56,24 @@ const TRACKING_STREAM = {
   sample_row_count: 3,
 };
 
+const POSE_DISPLAY_CONNECTIONS = [
+  ["nose", "neck"], ["nose", "lEye"], ["nose", "rEye"],
+  ["lEye", "lEar"], ["rEye", "rEar"], ["neck", "lShoulder"],
+  ["neck", "rShoulder"], ["neck", "midHip"], ["lShoulder", "lElbow"],
+  ["lElbow", "lWrist"], ["rShoulder", "rElbow"], ["rElbow", "rWrist"],
+  ["lWrist", "lThumb"], ["lWrist", "lPinky"], ["rWrist", "rThumb"],
+  ["rWrist", "rPinky"], ["midHip", "lHip"], ["midHip", "rHip"],
+  ["lHip", "lKnee"], ["lKnee", "lAnkle"], ["rHip", "rKnee"],
+  ["rKnee", "rAnkle"], ["lAnkle", "lHeel"], ["lAnkle", "lBigToe"],
+  ["lBigToe", "lSmallToe"], ["rAnkle", "rHeel"], ["rAnkle", "rBigToe"],
+  ["rBigToe", "rSmallToe"],
+].map(([start_joint_name, end_joint_name]) => ({ start_joint_name, end_joint_name }));
+
 const POSE_STREAM = {
   stream_id: "pose-1",
   modality: "pose",
   measurement_class: "MODEL_ESTIMATED",
-  subject_id: "SC-P1",
+  subject_id: null,
   trial_id: "period-1",
   device_id: null,
   nominal_sampling_rate_hz: 25,
@@ -70,6 +83,14 @@ const POSE_STREAM = {
   synchronization_spec_id: "skillcorner-source-provided-match-clock",
   clock_id: "skillcorner-match-clock",
   skeleton_id: "skillcorner-bodypose-29-landmarks",
+  skeleton_topology: "landmark_set",
+  skeleton_joint_names: [
+    "nose", "neck", "lEye", "rEye", "lEar", "rEar", "lShoulder", "rShoulder",
+    "lElbow", "rElbow", "lWrist", "rWrist", "lThumb", "rThumb", "lPinky", "rPinky",
+    "midHip", "lHip", "rHip", "lKnee", "rKnee", "lAnkle", "rAnkle", "lHeel",
+    "rHeel", "lBigToe", "rBigToe", "lSmallToe", "rSmallToe",
+  ],
+  skeleton_display_connections: POSE_DISPLAY_CONNECTIONS,
   sample_artifact_ids: ["pose-sample"],
   sample_row_count: 3,
 };
@@ -120,6 +141,11 @@ const TRACKING_ARTIFACT = {
   si_units: ["m"],
   coordinate_frame_id: "skillcorner-pitch-m",
   synchronization_spec_id: "skillcorner-source-provided-match-clock",
+  canonical_time_min_ns: 0,
+  canonical_time_max_ns: 100_000_000,
+  entity_column: "object_id",
+  entity_count: 2,
+  entity_ids: ["p1", "p2"],
 };
 
 const POSE_ARTIFACT = {
@@ -130,6 +156,11 @@ const POSE_ARTIFACT = {
   coordinate_frame_id: "skillcorner-pose-hybrid-m",
   artifact_kind: "sample",
   modality: "pose",
+  row_count: 116,
+  byte_size: 8192,
+  entity_column: "subject_id",
+  entity_count: 2,
+  entity_ids: ["SC-P1", "SC-P2"],
 };
 
 const TRACKING_WINDOW = {
@@ -156,6 +187,76 @@ const TRACKING_WINDOW = {
   ],
 };
 
+const POSE_LANDMARKS = [
+  "nose", "neck", "lEye", "rEye", "lEar", "rEar", "lShoulder", "rShoulder",
+  "lElbow", "rElbow", "lWrist", "rWrist", "lThumb", "rThumb", "lPinky", "rPinky",
+  "midHip", "lHip", "rHip", "lKnee", "rKnee", "lAnkle", "rAnkle", "lHeel",
+  "rHeel", "lBigToe", "rBigToe", "lSmallToe", "rSmallToe",
+] as const;
+
+const POSE_LANDMARK_COORDINATES: Record<string, [number, number, number]> = {
+  nose: [0, 0, 0.9],
+  neck: [0, 0, 0.55],
+  lEye: [-0.06, -0.01, 0.94],
+  rEye: [0.06, -0.01, 0.94],
+  lEar: [-0.12, 0, 0.88],
+  rEar: [0.12, 0, 0.88],
+  lShoulder: [-0.25, 0, 0.5],
+  rShoulder: [0.25, 0, 0.5],
+  lElbow: [-0.45, 0, 0.18],
+  rElbow: [0.45, 0, 0.18],
+  lWrist: [-0.58, 0, -0.12],
+  rWrist: [0.58, 0, -0.12],
+  lThumb: [-0.66, -0.03, -0.2],
+  rThumb: [0.66, -0.03, -0.2],
+  lPinky: [-0.66, 0.04, -0.16],
+  rPinky: [0.66, 0.04, -0.16],
+  midHip: [0, 0, -0.35],
+  lHip: [-0.18, 0, -0.4],
+  rHip: [0.18, 0, -0.4],
+  lKnee: [-0.2, 0.01, -0.85],
+  rKnee: [0.2, 0.01, -0.85],
+  lAnkle: [-0.18, 0.02, -1.25],
+  rAnkle: [0.18, 0.02, -1.25],
+  lHeel: [-0.18, -0.08, -1.3],
+  rHeel: [0.18, -0.08, -1.3],
+  lBigToe: [-0.18, 0.12, -1.3],
+  rBigToe: [0.18, 0.12, -1.3],
+  lSmallToe: [-0.28, 0.12, -1.3],
+  rSmallToe: [0.28, 0.12, -1.3],
+};
+
+const POSE_ROWS = POSE_LANDMARKS.map((joint_name) => {
+  const coordinates = POSE_LANDMARK_COORDINATES[joint_name] ?? [0, 0, 0];
+  return {
+    t_rel_ns: 0,
+    subject_id: "SC-P1",
+    joint_name,
+    is_available: true,
+    x_m: coordinates[0],
+    y_m: coordinates[1],
+    z_m: coordinates[2],
+    error_m: joint_name === "lKnee" ? 0.04 : joint_name === "lAnkle" ? 0.05 : 0.03,
+  };
+});
+const POSE_ROWS_LATER = POSE_ROWS.map((row) => ({
+  ...row,
+  t_rel_ns: 40_000_000,
+  x_m: row.x_m + 0.12,
+}));
+const POSE_ROWS_P2 = POSE_ROWS.map((row) => ({
+  ...row,
+  subject_id: "SC-P2",
+  x_m: row.x_m + 3,
+  y_m: row.y_m - 2,
+}));
+const POSE_ROWS_P2_LATER = POSE_ROWS_P2.map((row) => ({
+  ...row,
+  t_rel_ns: 40_000_000,
+  x_m: row.x_m + 0.12,
+}));
+const POSE_WINDOW_ROWS = [...POSE_ROWS, ...POSE_ROWS_LATER, ...POSE_ROWS_P2, ...POSE_ROWS_P2_LATER];
+
 const POSE_WINDOW = {
   meta: {
     artifact: POSE_ARTIFACT,
@@ -171,8 +272,8 @@ const POSE_WINDOW = {
       "z_m",
       "error_m",
     ],
-    source_rows: 4,
-    returned_rows: 4,
+    source_rows: POSE_WINDOW_ROWS.length,
+    returned_rows: POSE_WINDOW_ROWS.length,
     canonical_time_min_ns: 0,
     canonical_time_max_ns: 100_000_000,
     reduction: null,
@@ -181,12 +282,7 @@ const POSE_WINDOW = {
     measurement_class: "MODEL_ESTIMATED",
     display_note: "Exact.",
   },
-  rows: [
-    { t_rel_ns: 0, subject_id: "SC-P1", joint_name: "lHip", is_available: true, x_m: 0, y_m: 0, z_m: -0.4, error_m: 0.03 },
-    { t_rel_ns: 0, subject_id: "SC-P1", joint_name: "lKnee", is_available: true, x_m: 0.05, y_m: 0, z_m: -0.85, error_m: 0.04 },
-    { t_rel_ns: 0, subject_id: "SC-P1", joint_name: "lAnkle", is_available: true, x_m: 0.1, y_m: 0.05, z_m: -1.25, error_m: 0.05 },
-    { t_rel_ns: 0, subject_id: "SC-P1", joint_name: "nose", is_available: false, x_m: null, y_m: null, z_m: null, error_m: null },
-  ],
+  rows: POSE_WINDOW_ROWS,
 };
 
 export const METRIC = {
@@ -213,6 +309,20 @@ export const METRIC = {
   computed_at: "2026-09-18T12:00:00+00:00",
   provenance: { gap_policy: { strategy: "contiguous_segments" } },
 };
+
+const METRIC_DEFINITIONS = [
+  {
+    metric_id: METRIC.metric_id,
+    name: METRIC.metric_name,
+    si_unit: METRIC.si_unit,
+    measurement_class: METRIC.measurement_class,
+    value_kind: METRIC.value_kind,
+    description: METRIC.metric_description,
+    algorithm_id: METRIC.algorithm_id,
+    dataset_ids: [DATASET.dataset_id],
+    value_count: 1,
+  },
+];
 
 export const PROVENANCE = {
   derived_metric_id: "dm-pose-rom",
@@ -354,6 +464,7 @@ function body(pathname: string): unknown | undefined {
   if (pathname === "/api/catalog/datasets/skillcorner-opendata/sessions") return [SESSION.session];
   if (pathname === "/api/catalog/datasets/skillcorner-opendata/sessions/1925299") return SESSION;
   if (pathname === "/api/metrics") return { source: "gold", total: 1, limit: 250, offset: 0, rows: [METRIC] };
+  if (pathname === "/api/metrics/definitions") return METRIC_DEFINITIONS;
   if (pathname.startsWith("/api/metrics/methodology/")) return METHODOLOGY;
   if (pathname === `/api/derived-metrics/${METRIC.derived_metric_id}/provenance`) return PROVENANCE;
   if (pathname === "/api/quality") return QUALITY;
@@ -368,6 +479,15 @@ function body(pathname: string): unknown | undefined {
 
 async function handler(route: Route): Promise<void> {
   const url = new URL(route.request().url());
+  if (url.pathname.endsWith("/window") && url.searchParams.get("format") === "arrow") {
+    const payload = body(url.pathname);
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(payload),
+    });
+    return;
+  }
   const payload = body(url.pathname);
   if (payload === undefined) {
     await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ detail: `unhandled ${url.pathname}` }) });

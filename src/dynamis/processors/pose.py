@@ -529,17 +529,14 @@ def process_pose(
             for start, stop in temporal_segments:
                 if stop - start < 2:
                     continue
-                try:
-                    filtered_angle = derivative_spec.filter.apply(
-                        angle_series[start:stop], rate_hz=rate_hz
-                    )
-                    velocity[start:stop] = derivative_variable(
-                        filtered_angle,
-                        frames[start:stop],
-                        edge_policy=derivative_spec.edge_policy,
-                    )
-                except ValueError:
-                    continue
+                filtered_angle = derivative_spec.filter.apply(
+                    angle_series[start:stop], rate_hz=rate_hz
+                )
+                velocity[start:stop] = derivative_variable(
+                    filtered_angle,
+                    frames[start:stop],
+                    edge_policy=derivative_spec.edge_policy,
+                )
             columns[f"angular_velocity_{token}_rad_s"] = pa.array(velocity, type=pa.float64())
             if finite.size >= 2:
                 metrics.append(

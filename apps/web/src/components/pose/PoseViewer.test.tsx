@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 
 import { AnalysisContext, type AnalysisContextValue } from "@/lib/analysis-context";
@@ -62,6 +62,13 @@ const ARTIFACT = {
   si_units: ["m"],
   coordinate_frame_id: "skillcorner-pose-hybrid-m",
   synchronization_spec_id: "skillcorner-provided",
+  // The viewer sizes its window from the artifact's own canonical bounds and
+  // scopes it to one subject, so the fixture must serve both.
+  canonical_time_min_ns: 0,
+  canonical_time_max_ns: 100_000_000,
+  entity_column: "subject_id",
+  entity_count: 1,
+  entity_ids: ["s1", "s2"],
 };
 
 const POSE_ROWS = [
@@ -278,4 +285,25 @@ it("requires a pose stream and never renders another modality", async () => {
   installFetch();
   renderViewer({ streamId: null });
   expect(await screen.findByText("No stream selected.")).toBeInTheDocument();
+});
+
+it("keeps a durable subject selected when the current window only returns another subject", async () => {
+  installFetch();
+  renderViewer({ subjectId: "s2" });
+  expect(
+    await screen.findByText("Individual s2 is not observed at this time/window."),
+  ).toBeInTheDocument();
+  expect(screen.queryByTestId("pose-scene-stub")).not.toBeInTheDocument();
+});
+
+it("rewinds playback to zero before changing the selected subject", async () => {
+  installFetch();
+  const selectSubject = vi.fn();
+  renderViewer({ subjectId: "s1", selectSubject });
+  const picker = await screen.findByLabelText("subject");
+  useAnalysisStore.getState().commitTime(50_000_000n);
+  fireEvent.change(picker, { target: { value: "s2" } });
+  expect(useAnalysisStore.getState().committedTimeNs).toBe(0n);
+  expect(useAnalysisStore.getState().playing).toBe(false);
+  expect(selectSubject).toHaveBeenCalledWith("s2", { resetTime: true });
 });

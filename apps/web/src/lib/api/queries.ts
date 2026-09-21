@@ -28,6 +28,12 @@ export interface WindowQuery {
   readonly toNs?: number | undefined;
   readonly columns?: readonly string[] | undefined;
   readonly maxPoints?: number | undefined;
+  /**
+   * Scope the window to one tracked entity. A dense artifact interleaves every
+   * entity on the same time axis, so a viewer that renders one player or one
+   * subject must say so or pay for every other entity's rows.
+   */
+  readonly entityId?: string | undefined;
 }
 
 function compact(params: Record<string, string | number | undefined>): Record<string, string> {
@@ -48,6 +54,7 @@ export const queryKeys = {
   session: (datasetId: string, sessionId: string) =>
     ["catalog", "datasets", datasetId, "sessions", sessionId] as const,
   metrics: (query: MetricQuery) => ["metrics", query] as const,
+  metricDefinitions: ["metrics", "definitions"] as const,
   methodology: (metricId: string) => ["metrics", "methodology", metricId] as const,
   provenance: (derivedMetricId: string) =>
     ["derived-metrics", derivedMetricId, "provenance"] as const,
@@ -132,6 +139,14 @@ export const metricsQuery = (query: MetricQuery) =>
     staleTime: 15_000,
   });
 
+/** The registered metric vocabulary, for discovery and comparison selection. */
+export const metricDefinitionsQuery = () =>
+  queryOptions({
+    queryKey: queryKeys.metricDefinitions,
+    queryFn: async () => unwrap(await api.GET("/api/metrics/definitions")),
+    staleTime: 5 * 60_000,
+  });
+
 export const methodologyQuery = (metricId: string) =>
   queryOptions({
     queryKey: queryKeys.methodology(metricId),
@@ -167,6 +182,8 @@ export const qualityQuery = (query: {
       datasetId: query.datasetId,
       sessionId: query.sessionId,
       severity: query.severity,
+      limit: query.limit?.toString(),
+      offset: query.offset?.toString(),
     }),
     queryFn: async () =>
       unwrap(
@@ -187,7 +204,11 @@ export const qualityQuery = (query: {
 
 export const runsQuery = (query: { datasetId?: string | undefined; limit?: number | undefined; offset?: number | undefined }) =>
   queryOptions({
-    queryKey: queryKeys.runs({ datasetId: query.datasetId }),
+    queryKey: queryKeys.runs({
+      datasetId: query.datasetId,
+      limit: query.limit?.toString(),
+      offset: query.offset?.toString(),
+    }),
     queryFn: async () =>
       unwrap(
         await api.GET("/api/runs", {
@@ -235,6 +256,7 @@ export const windowQuery = (query: WindowQuery) =>
               to_ns: query.toNs,
               columns: query.columns?.join(","),
               max_points: query.maxPoints,
+              entity_id: query.entityId,
             }),
           },
         }),

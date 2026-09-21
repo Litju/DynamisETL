@@ -83,7 +83,8 @@ def assert_serving_code_sha(connection, *, allow_unknown: bool) -> None:
         sa.text(
             "SELECT r.run_id FROM processing_run r "
             "JOIN algorithm_spec a ON a.algorithm_id = r.algorithm_id "
-            "WHERE a.kind = 'processor' AND r.code_git_sha IS NULL"
+            "WHERE a.kind = 'processor' AND r.status = 'completed' "
+            "AND r.code_git_sha IS NULL"
         )
     ).fetchall()
     if unknown_runs:

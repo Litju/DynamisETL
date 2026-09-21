@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 ServingSource = Literal["gold", "control_plane"]
 
@@ -79,6 +79,11 @@ class TrialView(BaseModel):
     ended_at: str | None
 
 
+class SkeletonDisplayConnectionView(BaseModel):
+    start_joint_name: str
+    end_joint_name: str
+
+
 class StreamView(BaseModel):
     stream_id: str
     modality: str
@@ -93,6 +98,9 @@ class StreamView(BaseModel):
     synchronization_spec_id: str
     clock_id: str
     skeleton_id: str | None
+    skeleton_topology: str | None = None
+    skeleton_joint_names: list[str] = Field(default_factory=list)
+    skeleton_display_connections: list[SkeletonDisplayConnectionView] = Field(default_factory=list)
     sample_artifact_ids: list[str]
     sample_row_count: int
 
@@ -165,6 +173,19 @@ class MetricDefinitionView(BaseModel):
     value_kind: str
     description: str | None
     algorithm_id: str | None
+
+
+class MetricCatalogEntry(MetricDefinitionView):
+    """One registered metric plus where it is actually served.
+
+    `dataset_ids` and `value_count` come from the derived rows, so the catalog
+    can distinguish a metric the registry defines from one the pipeline has
+    genuinely computed; discovery should not offer the former as if it were
+    analysable.
+    """
+
+    dataset_ids: list[str]
+    value_count: int
 
 
 class AlgorithmView(BaseModel):
@@ -295,6 +316,26 @@ class ArtifactRefView(BaseModel):
     si_units: list[str]
     coordinate_frame_id: str | None
     synchronization_spec_id: str | None
+
+
+class ArtifactDetail(ArtifactRefView):
+    """One artifact plus the canonical time bounds of its samples.
+
+    The bounds require reading the Parquet footer/column statistics, so they are
+    served only for a single requested artifact and never inside a list
+    response. A laboratory uses them to choose a deterministic first window
+    instead of asking the reader to guess a time range.
+    """
+
+    canonical_time_min_ns: int | None = None
+    canonical_time_max_ns: int | None = None
+    #: The column that identifies one tracked entity, when the artifact has one.
+    entity_column: str | None = None
+    #: Distinct entities interleaved on this artifact's time axis. A viewer
+    #: divides by it to size a window that fits its point budget.
+    entity_count: int | None = None
+    #: Stable artifact-level identities, when the artifact carries an entity key.
+    entity_ids: list[str] | None = None
 
 
 class DenseWindowMeta(BaseModel):

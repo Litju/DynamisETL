@@ -145,7 +145,7 @@ export function DataTable<T>({
                   sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : "none"
                 }
                 className={cn(
-                  "px-2 py-1 text-[11px] font-medium uppercase tracking-wider text-text-muted",
+                  "t-section px-2 py-1 text-text-muted",
                   column?.align === "right" && "text-right",
                 )}
               >
@@ -201,9 +201,15 @@ export function DataTable<T>({
                     : undefined
                 }
                 className={cn(
-                  "absolute left-0 top-0 grid w-full border-b border-border-subtle/60",
-                  onRowClick && "cursor-pointer hover:bg-surface-2",
-                  selectedRowId === rowId && "bg-surface-3",
+                  // Rows are absolutely positioned at index * rowHeight, so
+                  // content taller than the row would bleed into its
+                  // neighbour. Clipping keeps a two-line cell readable and the
+                  // row rhythm exact.
+                  "absolute left-0 top-0 grid w-full overflow-hidden border-b border-border-subtle/60",
+                  onRowClick &&
+                    "cursor-pointer hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none",
+                  selectedRowId === rowId &&
+                    "bg-surface-3 shadow-[inset_2px_0_0_0_var(--d-accent)]",
                 )}
                 style={{
                   gridTemplateColumns: template,

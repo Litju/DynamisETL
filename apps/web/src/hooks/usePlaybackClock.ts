@@ -21,7 +21,7 @@ export function usePlaybackClock(): void {
       const previous = last.current ?? now;
       last.current = now;
       const elapsedMs = Math.max(0, now - previous);
-      const elapsedNs = BigInt(Math.round(elapsedMs * 1e6)) * BigInt(Math.round(current.playbackRate));
+      const elapsedNs = BigInt(Math.round(elapsedMs * 1e6 * current.playbackRate));
       if (elapsedNs > 0n) {
         const base = current.playheadNs ?? current.committedTimeNs ?? 0n;
         current.setPlayhead(base + elapsedNs);

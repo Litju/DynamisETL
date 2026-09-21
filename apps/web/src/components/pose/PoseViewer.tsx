@@ -1,5 +1,5 @@
 ﻿import { useQuery } from "@tanstack/react-query";
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 
 import { MeasurementClassBadge, ModalityBadge } from "@/components/common/Badges";
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
@@ -7,25 +7,29 @@ import {
   CAMERA_PRESETS,
   extractFrames,
   frameIndexAt,
+  groupFramesBySubject,
   landmarksAt,
   NO_OVERLAYS,
   overlaysFromParameters,
   summarizeFrame,
   type CameraPreset,
+  type DisplayConnectionDefinition,
+  type PoseSubjectFrames,
   type PoseLandmark,
 } from "@/components/pose/pose-model";
 import type { StreamView } from "@/api/types";
 import { useAnalysisContext } from "@/lib/analysis-context";
 import { ApiError } from "@/lib/api/client";
 import { artifactQuery, methodologyQuery, metricsQuery, sessionQuery, windowQuery } from "@/lib/api/queries";
+import { usePoseSubjects } from "@/components/pose/use-pose-subjects";
+import { windowAround } from "@/lib/dense-window";
 import { formatMetricValue } from "@/lib/measurement";
 import { useAnalysisStore } from "@/lib/state/analysis";
-import { formatClockNs, NS_PER_SECOND } from "@/lib/time";
+import { formatClockNs } from "@/lib/time";
 
 const PoseCanvas = lazy(() => import("@/components/pose/PoseScene"));
 
 const MAX_POSE_POINTS = 20_000;
-const DEFAULT_WINDOW_NS = 10n * NS_PER_SECOND;
 
 /**
  * 3D biomechanics laboratory: source landmarks in a local analytical frame.
@@ -43,6 +47,8 @@ export function PoseViewer() {
   const playing = useAnalysisStore((state) => state.playing);
   const selectedJoint = useAnalysisStore((state) => state.selectedJoint);
   const hoveredJoint = useAnalysisStore((state) => state.hoveredJoint);
+  const [rendererReady, setRendererReady] = useState(false);
+  const [allSubjects, setAllSubjects] = useState(false);
 
   const session = useQuery({
     ...sessionQuery(datasetId ?? "", sessionId ?? ""),
@@ -53,23 +59,55 @@ export function PoseViewer() {
     return streams.find((candidate) => candidate.stream_id === streamId) ?? null;
   }, [session.data, streamId]);
 
-  const effective = playheadNs ?? committedTimeNs;
-  const windowBounds = useMemo(() => {
-    if (context?.fromNs != null && context.toNs != null) {
-      return { fromNs: Number(context.fromNs), toNs: Number(context.toNs) };
-    }
-    if (effective !== null) {
-      return { fromNs: Number(effective - DEFAULT_WINDOW_NS), toNs: Number(effective + DEFAULT_WINDOW_NS) };
-    }
-    return null;
-  }, [context?.fromNs, context?.toNs, effective]);
-
   const artifactId = stream?.sample_artifact_ids[0] ?? null;
   const artifact = useQuery({ ...artifactQuery(artifactId ?? ""), enabled: Boolean(artifactId) });
+
+  // A pose artifact interleaves every observed subject on one time axis: the
+  // SkillCorner period holds 21.4M rows across 23 subjects. Landmark viewing
+  // needs exact frames, so the window is both scoped to one subject and sized
+  // from the artifact's measured per-subject density.
+  //
+  // A pose stream that declares no subject of its own resolves identities from
+  // the stable artifact/session authority; the current playhead never changes
+  // the selected individual.
+  const observed = usePoseSubjects(
+    artifact.data,
+    session.data?.participants ?? [],
+    stream?.subject_id ?? null,
+  );
+  const observedSubjectList = observed.subjects;
+  const selectedSubject = context?.subjectId ?? null;
+  const streamSubject = stream?.subject_id ?? null;
+  const subjectId = useMemo(() => {
+    if (selectedSubject !== null) return selectedSubject;
+    return observedSubjectList[0] ?? streamSubject;
+  }, [observedSubjectList, selectedSubject, streamSubject]);
+
+  const explicitFromNs = context?.fromNs ?? null;
+  const explicitToNs = context?.toNs ?? null;
+  const artifactData = artifact.data;
+  const sceneSubjectId = allSubjects ? null : subjectId;
+  const windowBounds = useMemo(
+    () =>
+      windowAround(artifactData, {
+        anchorNs: committedTimeNs,
+        explicit:
+          explicitFromNs !== null && explicitToNs !== null
+            ? { fromNs: explicitFromNs, toNs: explicitToNs }
+            : null,
+        maxPoints: MAX_POSE_POINTS,
+        entityScoped: sceneSubjectId !== null,
+      }),
+    [artifactData, committedTimeNs, explicitFromNs, explicitToNs, sceneSubjectId],
+  );
+
   const window = useQuery({
     ...windowQuery({
       artifactId: artifactId ?? "",
-      ...(windowBounds ? { fromNs: windowBounds.fromNs, toNs: windowBounds.toNs } : {}),
+      ...(windowBounds
+        ? { fromNs: Number(windowBounds.fromNs), toNs: Number(windowBounds.toNs) }
+        : {}),
+      ...(sceneSubjectId !== null ? { entityId: sceneSubjectId } : {}),
       columns: [
         "t_rel_ns",
         "subject_id",
@@ -82,20 +120,28 @@ export function PoseViewer() {
       ],
       maxPoints: MAX_POSE_POINTS,
     }),
-    enabled: Boolean(artifactId),
+    enabled: Boolean(artifactId) && windowBounds !== null,
   });
   const metrics = useQuery({
-    ...metricsQuery({ streamId: streamId ?? undefined, limit: 50 }),
+    ...metricsQuery({
+      streamId: streamId ?? undefined,
+      ...(subjectId !== null ? { subjectId } : {}),
+      limit: 50,
+    }),
     enabled: Boolean(streamId),
   });
-  const processorAlgorithmId = useMemo(() => {
+  // Analytical overlays come from the processor revision that produced this
+  // stream's metrics, and the methodology endpoint is keyed by metric id: an
+  // algorithm id resolves to nothing there, which silently emptied every
+  // overlay. The first pose metric of the stream names the revision to read.
+  const poseMetricId = useMemo(() => {
     const rows = metrics.data?.rows ?? [];
     const poseMetric = rows.find((row) => (row.algorithm_id ?? "").startsWith("pose."));
-    return poseMetric?.algorithm_id ?? null;
+    return poseMetric?.metric_id ?? null;
   }, [metrics.data]);
   const methodology = useQuery({
-    ...methodologyQuery(processorAlgorithmId ?? ""),
-    enabled: Boolean(processorAlgorithmId),
+    ...methodologyQuery(poseMetricId ?? ""),
+    enabled: Boolean(poseMetricId),
   });
 
   const frames = useMemo(
@@ -111,8 +157,20 @@ export function PoseViewer() {
           z_m?: unknown;
           error_m?: unknown;
         }>,
+        sceneSubjectId,
       ),
-    [window.data],
+    [sceneSubjectId, window.data],
+  );
+  const subjectFrames = useMemo<PoseSubjectFrames[]>(
+    () => (allSubjects ? groupFramesBySubject(frames) : []),
+    [allSubjects, frames],
+  );
+  const selectedFrames = useMemo(
+    () =>
+      allSubjects
+        ? subjectFrames.find((candidate) => candidate.subjectId === subjectId)?.frames ?? []
+        : frames,
+    [allSubjects, frames, subjectFrames, subjectId],
   );
   const overlays = useMemo(
     () =>
@@ -123,7 +181,40 @@ export function PoseViewer() {
   );
 
   const [preset, setPreset] = useState<CameraPreset>("reset");
+  const [showProviderSkeleton, setShowProviderSkeleton] = useState(true);
+  const [showTorsoCue, setShowTorsoCue] = useState(true);
+  const [showFootContact, setShowFootContact] = useState(true);
+  const [showHandContact, setShowHandContact] = useState(true);
+  const [showHeadNeck, setShowHeadNeck] = useState(true);
+  const [showArticulationAngles, setShowArticulationAngles] = useState(true);
+  const [showSegments, setShowSegments] = useState(true);
+  const [showAngles, setShowAngles] = useState(true);
   const [showErrorRadii, setShowErrorRadii] = useState(false);
+
+  const providerConnections = useMemo<DisplayConnectionDefinition[]>(
+    () =>
+      (stream?.skeleton_display_connections ?? []).map((connection) => ({
+        startLandmark: connection.start_joint_name,
+        endLandmark: connection.end_joint_name,
+      })),
+    [stream?.skeleton_display_connections],
+  );
+
+  // Publish the resolved subject so the pitch, metric tables and inspector
+  // follow the same entity. Committing it durably keeps the view shareable.
+  const selectSubject = context?.selectSubject;
+  useEffect(() => {
+    if (selectedSubject === null && subjectId !== null) {
+      selectSubject?.(subjectId, { replace: true });
+    }
+  }, [selectSubject, selectedSubject, subjectId]);
+
+  const handleSubjectChange = (nextSubjectId: string) => {
+    if (nextSubjectId === subjectId) return;
+    useAnalysisStore.getState().setPlaying(false);
+    useAnalysisStore.getState().commitTime(0n);
+    context?.selectSubject(nextSubjectId, { resetTime: true });
+  };
 
   if (!context) return <StatePanel state="empty" title="Open a laboratory session first." />;
   if (session.isPending) return <LoadingPanel label="Loading session streams" />;
@@ -183,7 +274,9 @@ export function PoseViewer() {
       />
     );
   }
-  if (artifact.isPending || window.isPending) return <LoadingPanel label="Loading pose window" />;
+  if (artifact.isPending || windowBounds === null || window.isPending) {
+    return <LoadingPanel label="Loading pose window" />;
+  }
   if (window.data.meta.reduction !== null) {
     return (
       <StatePanel
@@ -193,21 +286,28 @@ export function PoseViewer() {
       />
     );
   }
-  if (frames.length === 0 || frames.every((frame) => !frame.observed)) {
+  const hasObservedFrames = allSubjects
+    ? subjectFrames.some((candidate) => candidate.frames.some((frame) => frame.observed))
+    : frames.some((frame) => frame.observed);
+  if (!hasObservedFrames) {
     return (
       <StatePanel
         state="unavailable"
-        title="No observed landmark is available in this window."
-        detail="Unavailable joints are never imputed or replaced."
+        title={
+          subjectId === null
+            ? "No observed landmark is available in this window."
+            : `Individual ${subjectId} is not observed at this time/window.`
+        }
+        detail="The selected identity remains unchanged; unavailable joints are never imputed or replaced."
       />
     );
   }
 
   const currentTime = playheadNs ?? committedTimeNs;
-  const currentLandmarks = landmarksAt(frames, currentTime);
-  const currentFrameIndex = currentTime === null ? 0 : frameIndexAt(frames, currentTime);
+  const currentLandmarks = landmarksAt(selectedFrames, currentTime);
+  const currentFrameIndex = currentTime === null ? 0 : frameIndexAt(selectedFrames, currentTime);
   const summary = summarizeFrame(
-    currentFrameIndex >= 0 ? (frames[currentFrameIndex] ?? null) : null,
+    currentFrameIndex >= 0 ? (selectedFrames[currentFrameIndex] ?? null) : null,
   );
   const inspected = [...currentLandmarks].find(
     (landmark: PoseLandmark) => landmark.jointName === (selectedJoint ?? hoveredJoint),
@@ -220,6 +320,13 @@ export function PoseViewer() {
         <span className="mono">{stream.stream_id}</span>
         <MeasurementClassBadge measurementClass={stream.measurement_class} compact />
         <span className="mono">skeleton {stream.skeleton_id ?? "unregistered"}</span>
+        {allSubjects ? (
+          <span>all subjects · fixed camera ({subjectFrames.length})</span>
+        ) : (
+          <span>
+            individual <span className="mono text-text-secondary">{subjectId ?? "not scoped"}</span>
+          </span>
+        )}
         <span className="text-quality-warning">
           local analytical frame · Z is player-centroid-relative, not absolute height
         </span>
@@ -234,20 +341,87 @@ export function PoseViewer() {
         ) : null}
       </header>
       <div className="flex min-h-0 flex-1">
-        <div className="relative min-h-0 flex-1" data-testid="pose-canvas">
+        <div
+          className="relative min-h-0 flex-1"
+          data-testid="pose-canvas"
+          data-renderer="r3f"
+          data-renderer-ready={rendererReady ? "true" : "false"}
+        >
           <Suspense fallback={<LoadingPanel label="Loading 3D renderer" />}>
             <PoseCanvas
               frames={frames}
+              subjectFrames={subjectFrames}
+              allSubjects={allSubjects}
               overlays={overlays}
+              providerConnections={providerConnections}
               preset={preset}
               playing={playing}
+              showProviderSkeleton={showProviderSkeleton}
+              showTorsoCue={showTorsoCue}
+              showFootContact={showFootContact}
+              showHandContact={showHandContact}
+              showHeadNeck={showHeadNeck}
+              showArticulationAngles={showArticulationAngles}
+              showSegments={showSegments}
+              showAngles={showAngles}
               showErrorRadii={showErrorRadii}
+              onReady={() => setRendererReady(true)}
             />
           </Suspense>
         </div>
         <aside className="w-60 shrink-0 overflow-y-auto border-l border-border-subtle bg-surface-1 p-2 text-[11px]">
+          {observed.subjects.length > 0 ? (
+            <div className="mb-3">
+              <label
+                htmlFor="pose-subject"
+                className="t-section text-text-muted"
+              >
+                subject
+              </label>
+              <select
+                id="pose-subject"
+                value={subjectId ?? ""}
+                onChange={(event) => handleSubjectChange(event.target.value)}
+                className="mono mt-1 h-7 w-full rounded-control border border-border-subtle bg-surface-0 px-1.5 text-[12px] text-text-secondary outline-none focus:border-accent"
+              >
+                {[...new Set(subjectId ? [...observed.subjects, subjectId] : observed.subjects)].map((candidate) => (
+                  <option key={candidate} value={candidate}>
+                    {candidate}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-[10px] text-text-muted">
+                {observed.subjects.length} individuals in the artifact/session authority;
+                landmarks are never merged across subjects.
+              </p>
+            </div>
+          ) : null}
+          <div className="mb-3">
+            <span className="t-section text-text-muted">render mode</span>
+            <button
+              type="button"
+              data-testid="pose-all-subjects-toggle"
+              aria-pressed={allSubjects}
+              onClick={() => {
+                setAllSubjects((current) => !current);
+                setPreset("reset");
+              }}
+              className={
+                allSubjects
+                  ? "mt-1 w-full rounded-control bg-surface-3 px-1.5 py-1 text-left text-text-primary"
+                  : "mt-1 w-full rounded-control border border-border-subtle px-1.5 py-1 text-left text-text-muted hover:text-text-secondary"
+              }
+            >
+              all subjects · fixed camera
+            </button>
+            <p className="mt-1 text-[10px] text-text-muted">
+              {allSubjects
+                ? `${subjectFrames.length} subjects share one source-coordinate world; camera follow is disabled.`
+                : "Render only the selected identity with playback camera follow."}
+            </p>
+          </div>
           <div className="mb-2">
-            <span className="text-[10px] uppercase tracking-wider text-text-muted">camera</span>
+        <span className="t-section text-text-muted">camera</span>
             <div className="mt-1 flex flex-wrap gap-1">
               {CAMERA_PRESETS.map((candidate) => (
                 <button
@@ -269,13 +443,125 @@ export function PoseViewer() {
           <label className="mb-2 flex items-center gap-1 text-text-muted">
             <input
               type="checkbox"
+              className="size-6 shrink-0"
               checked={showErrorRadii}
               onChange={(event) => setShowErrorRadii(event.target.checked)}
             />
             provider p90 predicted error radius
           </label>
+          <div className="mb-3 space-y-1">
+            <span className="t-section text-text-muted">layers</span>
+            <label className="flex items-center gap-1 text-text-muted">
+              <input
+                type="checkbox"
+                className="size-6 shrink-0"
+                checked={showProviderSkeleton}
+                onChange={(event) => setShowProviderSkeleton(event.target.checked)}
+              />
+              provider skeleton / landmark connections
+            </label>
+            <label className="flex items-center gap-1 text-text-muted">
+              <input
+                type="checkbox"
+                className="size-6 shrink-0"
+                checked={showSegments}
+                onChange={(event) => setShowSegments(event.target.checked)}
+              />
+              analytical segments
+            </label>
+            <label className="flex items-center gap-1 text-text-muted">
+              <input
+                type="checkbox"
+                className="size-6 shrink-0"
+                checked={showTorsoCue}
+                onChange={(event) => setShowTorsoCue(event.target.checked)}
+              />
+              view-only torso cue
+            </label>
+            <label className="flex items-center gap-1 text-text-muted">
+              <input
+                type="checkbox"
+                className="size-6 shrink-0"
+                checked={showFootContact}
+                onChange={(event) => setShowFootContact(event.target.checked)}
+              />
+              foot contact triangles
+            </label>
+            <label className="flex items-center gap-1 text-text-muted">
+              <input
+                type="checkbox"
+                className="size-6 shrink-0"
+                checked={showHandContact}
+                onChange={(event) => setShowHandContact(event.target.checked)}
+              />
+              hand thumb / pinky closures
+            </label>
+            <label className="flex items-center gap-1 text-text-muted">
+              <input
+                type="checkbox"
+                className="size-6 shrink-0"
+                checked={showHeadNeck}
+                onChange={(event) => setShowHeadNeck(event.target.checked)}
+              />
+              head / neck completeness
+            </label>
+            <label className="flex items-center gap-1 text-text-muted">
+              <input
+                type="checkbox"
+                className="size-6 shrink-0"
+                checked={showArticulationAngles}
+                onChange={(event) => setShowArticulationAngles(event.target.checked)}
+              />
+              view-only articulation angles
+            </label>
+            <label className="flex items-center gap-1 text-text-muted">
+              <input
+                type="checkbox"
+                className="size-6 shrink-0"
+                checked={showAngles}
+                onChange={(event) => setShowAngles(event.target.checked)}
+              />
+              joint angles
+            </label>
+          </div>
+          <div className="mb-3">
+            <span className="t-section text-text-muted">
+              viewer frame
+            </span>
+            <dl className="mt-1 space-y-0.5 text-[10px] leading-snug text-text-muted">
+              <div className="flex justify-between gap-2">
+                <dt>screen up</dt>
+                <dd className="mono text-text-secondary">source z (centroid-relative)</dd>
+              </div>
+              <div className="flex justify-between gap-2">
+                <dt>screen depth</dt>
+                <dd className="mono text-text-secondary">−source y (right-handed)</dd>
+              </div>
+            </dl>
+            <p className="t-evidence mt-1">
+              display R<sub>x</sub>(+90°): [x, y, z] → [x, z, −y]
+            </p>
+            <p className="mt-1 text-[10px] leading-relaxed text-text-muted">
+              Display orientation only. Every served pose metric is computed from relative
+              vectors, so the view carries no absolute height or pitch position.
+            </p>
+          </div>
           <div className="mb-2">
-            <span className="text-[10px] uppercase tracking-wider text-text-muted">
+            <span className="t-section text-text-muted">
+              provider structure
+            </span>
+            <p className="text-text-muted">
+              {providerConnections.length} provider display connection(s) · landmark_set · no parent tree
+            </p>
+            <p className="text-[10px] text-text-muted">
+              Shoulder-to-hip torso cue is display-only and not provider topology or processor anatomy.
+            </p>
+            <p className="text-[10px] text-text-muted">
+              Foot/head/neck closures and articulation angle cues are display-only; processor angles remain separate.
+            </p>
+          </div>
+          <div className="mb-2">
+            <span className="t-section text-text-muted">
               processor overlays
             </span>
             <p className="text-text-muted">
@@ -285,7 +571,7 @@ export function PoseViewer() {
             </p>
           </div>
           <div className="mb-2">
-            <span className="text-[10px] uppercase tracking-wider text-text-muted">
+            <span className="t-section text-text-muted">
               observed landmarks
             </span>
             <ul className="mt-1 flex flex-wrap gap-1" aria-label="Observed landmarks">
@@ -308,7 +594,7 @@ export function PoseViewer() {
             </ul>
           </div>
           <div className="mb-2">
-            <span className="text-[10px] uppercase tracking-wider text-text-muted">
+            <span className="t-section text-text-muted">
               frame time
             </span>
             <p className="mono text-text-secondary">
@@ -317,7 +603,7 @@ export function PoseViewer() {
           </div>
           {inspected ? (
             <div>
-              <span className="text-[10px] uppercase tracking-wider text-text-muted">
+              <span className="t-section text-text-muted">
                 selected landmark
               </span>
               <p className="mono text-text-secondary">{inspected.jointName}</p>

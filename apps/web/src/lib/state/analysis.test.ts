@@ -67,11 +67,19 @@ describe("transient analysis state spine", () => {
     expect(useAnalysisStore.getState().focusedPanel).toBe("pose");
     store.setHoverTime(9n);
     store.setPlaying(true);
+    store.setNominalRate(25);
+    store.hoverEntity("entity-1");
+    store.hoverJoint("knee");
+    store.selectJoint("knee");
     useAnalysisStore.getState().resetTransient();
     const state = useAnalysisStore.getState();
     expect(state.hoverTimeNs).toBeNull();
     expect(state.playing).toBe(false);
     expect(state.playheadNs).toBeNull();
+    expect(state.nominalRateHz).toBeNull();
+    expect(state.hoveredEntityId).toBeNull();
+    expect(state.hoveredJoint).toBeNull();
+    expect(state.selectedJoint).toBeNull();
     // Committed identity survives transient resets.
     expect(state.committedTimeNs).toBe(42n);
     expect(state.selectedEntityId).toBe("SC-P1");

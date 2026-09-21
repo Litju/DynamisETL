@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Protocol
 
+import pyarrow.parquet as pq
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy import Engine
@@ -25,17 +26,24 @@ from dynamis.serving.dense import (
     DenseWindowResult,
     DenseWindowTooLarge,
     arrow_ipc_stream,
+    canonical_timespan,
+    entity_cardinality,
+    entity_column,
+    entity_ids,
     load_artifact_window,
+    resolve_artifact_path,
     table_records,
     window_etag,
     window_metadata_header,
 )
 from dynamis.serving.models import (
+    ArtifactDetail,
     ArtifactRefView,
     DatasetDetail,
     DatasetSummary,
     DenseWindow,
     HealthStatus,
+    MetricCatalogEntry,
     MetricMethodology,
     MetricPage,
     ProvenanceGraph,
@@ -74,6 +82,8 @@ class ServingBackend(Protocol):
 
     def methodology(self, metric_id: str) -> MetricMethodology | None: ...
 
+    def metric_definitions(self) -> list[MetricCatalogEntry]: ...
+
     def provenance(self, derived_metric_id: str) -> ProvenanceGraph | None: ...
 
     def quality(
@@ -93,6 +103,8 @@ class ServingBackend(Protocol):
 
     def artifact(self, artifact_id: str) -> ArtifactRefView | None: ...
 
+    def artifact_detail(self, artifact_id: str) -> ArtifactDetail | None: ...
+
     def window(
         self,
         artifact_id: str,
@@ -101,6 +113,7 @@ class ServingBackend(Protocol):
         to_ns: int | None,
         columns: tuple[str, ...],
         max_points: int | None,
+        entity_id: str | None = None,
     ) -> DenseWindowResult: ...
 
 
@@ -186,6 +199,10 @@ class PostgresServingBackend:
                 connection, dataset_id=dataset_id, limit=limit, offset=offset
             )
 
+    def metric_definitions(self) -> list[MetricCatalogEntry]:
+        with self._connect() as connection:
+            return repository.list_metric_definitions(connection)
+
     def licenses(self) -> list[RightsPolicyView]:
         with self._connect() as connection:
             return repository.list_licenses(connection)
@@ -193,6 +210,21 @@ class PostgresServingBackend:
     def artifact(self, artifact_id: str) -> ArtifactRefView | None:
         with self._connect() as connection:
             return repository.resolve_artifact(connection, artifact_id)
+
+    def artifact_detail(self, artifact_id: str) -> ArtifactDetail | None:
+        ref = self.artifact(artifact_id)
+        if ref is None:
+            return None
+        minimum, maximum = canonical_timespan(self.settings, ref)
+        path = resolve_artifact_path(self.settings, ref)
+        return ArtifactDetail(
+            **ref.model_dump(),
+            canonical_time_min_ns=minimum,
+            canonical_time_max_ns=maximum,
+            entity_column=entity_column(pq.read_schema(path)),
+            entity_count=entity_cardinality(self.settings, ref),
+            entity_ids=entity_ids(self.settings, ref),
+        )
 
     def window(
         self,
@@ -202,6 +234,7 @@ class PostgresServingBackend:
         to_ns: int | None,
         columns: tuple[str, ...],
         max_points: int | None,
+        entity_id: str | None = None,
     ) -> DenseWindowResult:
         ref = self.artifact(artifact_id)
         if ref is None:
@@ -213,6 +246,7 @@ class PostgresServingBackend:
             to_ns=to_ns,
             columns=columns,
             max_points=max_points,
+            entity_id=entity_id,
         )
 
 
@@ -386,6 +420,16 @@ def create_app(
             offset=offset,
         )
 
+    # Declared before the `{metric_id:path}` route so the literal path is not
+    # captured as a metric id.
+    @app.get(
+        "/api/metrics/definitions",
+        response_model=list[MetricCatalogEntry],
+        tags=["metrics"],
+    )
+    def metric_definitions(service: BackendDependency) -> list[MetricCatalogEntry]:
+        return service.metric_definitions()
+
     @app.get(
         "/api/metrics/methodology/{metric_id:path}",
         response_model=MetricMethodology,
@@ -440,11 +484,11 @@ def create_app(
 
     @app.get(
         "/api/artifacts/{artifact_id}",
-        response_model=ArtifactRefView,
+        response_model=ArtifactDetail,
         tags=["dense"],
     )
-    def artifact(artifact_id: str, service: BackendDependency) -> ArtifactRefView:
-        found = service.artifact(artifact_id)
+    def artifact(artifact_id: str, service: BackendDependency) -> ArtifactDetail:
+        found = service.artifact_detail(artifact_id)
         if found is None:
             raise HTTPException(
                 status_code=404, detail=f"artifact {artifact_id!r} is not registered"
@@ -462,10 +506,14 @@ def create_app(
         artifact_id: str,
         request: Request,
         service: BackendDependency,
-        from_ns: int | None = Query(default=None, ge=0),
-        to_ns: int | None = Query(default=None, ge=0),
+        # Canonical t_rel_ns is signed: a trial aligned on a source event (the
+        # White CMJ takeoff) runs from a negative time up to zero, so the
+        # window bounds must accept negative nanoseconds.
+        from_ns: int | None = Query(default=None),
+        to_ns: int | None = Query(default=None),
         columns: str | None = Query(default=None),
         max_points: int | None = Query(default=None, ge=1, le=100_000),
+        entity_id: str | None = Query(default=None, max_length=128),
         format: str = Query(default="json", pattern="^(json|arrow)$"),
     ) -> Response:
         parsed_columns = _parse_columns(columns)
@@ -474,20 +522,31 @@ def create_app(
             raise HTTPException(
                 status_code=404, detail=f"artifact {artifact_id!r} is not registered"
             )
+        wants_arrow = format == "arrow" or ARROW_MEDIA_TYPE in request.headers.get("accept", "")
         etag = window_etag(
-            ref, from_ns=from_ns, to_ns=to_ns, columns=parsed_columns, max_points=max_points
+            ref,
+            from_ns=from_ns,
+            to_ns=to_ns,
+            columns=parsed_columns,
+            max_points=max_points,
+            entity_id=entity_id,
+            representation="arrow" if wants_arrow else "json",
         )
         if request.headers.get("if-none-match") == etag:
-            return Response(status_code=304, headers={"ETag": etag})
+            return Response(status_code=304, headers={"ETag": etag, "Vary": "Accept"})
         result = service.window(
             artifact_id,
             from_ns=from_ns,
             to_ns=to_ns,
             columns=parsed_columns,
             max_points=max_points,
+            entity_id=entity_id,
         )
-        wants_arrow = format == "arrow" or ARROW_MEDIA_TYPE in request.headers.get("accept", "")
-        headers = {"ETag": etag, "X-Dynamis-Window-Meta": window_metadata_header(result.meta)}
+        headers = {
+            "ETag": etag,
+            "Vary": "Accept",
+            "X-Dynamis-Window-Meta": window_metadata_header(result.meta),
+        }
         if wants_arrow:
             return Response(
                 content=arrow_ipc_stream(result.table),

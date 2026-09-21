@@ -83,6 +83,209 @@
         "title": "AlgorithmView",
         "type": "object"
       },
+      "ArtifactDetail": {
+        "description": "One artifact plus the canonical time bounds of its samples.\n\nThe bounds require reading the Parquet footer/column statistics, so they are\nserved only for a single requested artifact and never inside a list\nresponse. A laboratory uses them to choose a deterministic first window\ninstead of asking the reader to guess a time range.",
+        "properties": {
+          "artifact_id": {
+            "title": "Artifact Id",
+            "type": "string"
+          },
+          "artifact_kind": {
+            "enum": [
+              "sample",
+              "processing"
+            ],
+            "title": "Artifact Kind",
+            "type": "string"
+          },
+          "byte_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Byte Size"
+          },
+          "canonical_time_max_ns": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Time Max Ns"
+          },
+          "canonical_time_min_ns": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Time Min Ns"
+          },
+          "checksum_sha256": {
+            "title": "Checksum Sha256",
+            "type": "string"
+          },
+          "compression": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compression"
+          },
+          "coordinate_frame_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coordinate Frame Id"
+          },
+          "dataset_id": {
+            "title": "Dataset Id",
+            "type": "string"
+          },
+          "entity_column": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Column"
+          },
+          "entity_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Count"
+          },
+          "entity_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Ids"
+          },
+          "format": {
+            "title": "Format",
+            "type": "string"
+          },
+          "layer": {
+            "title": "Layer",
+            "type": "string"
+          },
+          "measurement_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measurement Class"
+          },
+          "modality": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modality"
+          },
+          "relative_path": {
+            "title": "Relative Path",
+            "type": "string"
+          },
+          "row_count": {
+            "title": "Row Count",
+            "type": "integer"
+          },
+          "si_units": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Si Units",
+            "type": "array"
+          },
+          "stream_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stream Id"
+          },
+          "synchronization_spec_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synchronization Spec Id"
+          }
+        },
+        "required": [
+          "artifact_id",
+          "dataset_id",
+          "stream_id",
+          "layer",
+          "relative_path",
+          "format",
+          "compression",
+          "checksum_sha256",
+          "row_count",
+          "byte_size",
+          "artifact_kind",
+          "modality",
+          "measurement_class",
+          "si_units",
+          "coordinate_frame_id",
+          "synchronization_spec_id"
+        ],
+        "title": "ArtifactDetail",
+        "type": "object"
+      },
       "ArtifactRefView": {
         "properties": {
           "artifact_id": {
@@ -730,6 +933,77 @@
           "notice"
         ],
         "title": "LicenseView",
+        "type": "object"
+      },
+      "MetricCatalogEntry": {
+        "description": "One registered metric plus where it is actually served.\n\n`dataset_ids` and `value_count` come from the derived rows, so the catalog\ncan distinguish a metric the registry defines from one the pipeline has\ngenuinely computed; discovery should not offer the former as if it were\nanalysable.",
+        "properties": {
+          "algorithm_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Algorithm Id"
+          },
+          "dataset_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Dataset Ids",
+            "type": "array"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "measurement_class": {
+            "title": "Measurement Class",
+            "type": "string"
+          },
+          "metric_id": {
+            "title": "Metric Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "si_unit": {
+            "title": "Si Unit",
+            "type": "string"
+          },
+          "value_count": {
+            "title": "Value Count",
+            "type": "integer"
+          },
+          "value_kind": {
+            "title": "Value Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "metric_id",
+          "name",
+          "si_unit",
+          "measurement_class",
+          "value_kind",
+          "description",
+          "algorithm_id",
+          "dataset_ids",
+          "value_count"
+        ],
+        "title": "MetricCatalogEntry",
         "type": "object"
       },
       "MetricDefinitionView": {
@@ -1801,6 +2075,24 @@
         "title": "SessionSummary",
         "type": "object"
       },
+      "SkeletonDisplayConnectionView": {
+        "properties": {
+          "end_joint_name": {
+            "title": "End Joint Name",
+            "type": "string"
+          },
+          "start_joint_name": {
+            "title": "Start Joint Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start_joint_name",
+          "end_joint_name"
+        ],
+        "title": "SkeletonDisplayConnectionView",
+        "type": "object"
+      },
       "StreamView": {
         "properties": {
           "clock_id": {
@@ -1866,6 +2158,13 @@
             "title": "Si Units",
             "type": "array"
           },
+          "skeleton_display_connections": {
+            "items": {
+              "$ref": "#/components/schemas/SkeletonDisplayConnectionView"
+            },
+            "title": "Skeleton Display Connections",
+            "type": "array"
+          },
           "skeleton_id": {
             "anyOf": [
               {
@@ -1876,6 +2175,24 @@
               }
             ],
             "title": "Skeleton Id"
+          },
+          "skeleton_joint_names": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Skeleton Joint Names",
+            "type": "array"
+          },
+          "skeleton_topology": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skeleton Topology"
           },
           "source_unit": {
             "anyOf": [
@@ -2080,7 +2397,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ArtifactRefView"
+                  "$ref": "#/components/schemas/ArtifactDetail"
                 }
               }
             },
@@ -2123,7 +2440,6 @@
             "schema": {
               "anyOf": [
                 {
-                  "minimum": 0,
                   "type": "integer"
                 },
                 {
@@ -2140,7 +2456,6 @@
             "schema": {
               "anyOf": [
                 {
-                  "minimum": 0,
                   "type": "integer"
                 },
                 {
@@ -2182,6 +2497,23 @@
                 }
               ],
               "title": "Max Points"
+            }
+          },
+          {
+            "in": "query",
+            "name": "entity_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Entity Id"
             }
           },
           {
@@ -2614,6 +2946,31 @@
           }
         },
         "summary": "Metrics",
+        "tags": [
+          "metrics"
+        ]
+      }
+    },
+    "/api/metrics/definitions": {
+      "get": {
+        "operationId": "metric_definitions_api_metrics_definitions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MetricCatalogEntry"
+                  },
+                  "title": "Response Metric Definitions Api Metrics Definitions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Metric Definitions",
         "tags": [
           "metrics"
         ]

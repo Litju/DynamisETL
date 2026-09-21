@@ -122,7 +122,7 @@ export function frameIndexAt(frames: readonly TrackingFrame[], tRelNs: bigint): 
   const target = Number(tRelNs);
   let low = 0;
   let high = frames.length - 1;
-  let result = 0;
+  let result = -1;
   while (low <= high) {
     const middle = Math.floor((low + high) / 2);
     if (frames[middle]!.tRelNs <= target) {

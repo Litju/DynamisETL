@@ -14,6 +14,12 @@ export interface DurableRange {
   readonly toNs: bigint;
 }
 
+export interface SubjectSelectionOptions {
+  readonly replace?: boolean;
+  /** Rewind the durable playback position when a user changes identity. */
+  readonly resetTime?: boolean;
+}
+
 export interface AnalysisContextValue {
   readonly datasetId: string;
   readonly sessionId: string;
@@ -29,7 +35,10 @@ export interface AnalysisContextValue {
   /** Commit a brushed range. */
   readonly commitRange: (range: DurableRange | null) => void;
   /** Select an entity (player/joint subject) durably. */
-  readonly selectSubject: (subjectId: string | null) => void;
+  readonly selectSubject: (
+    subjectId: string | null,
+    options?: SubjectSelectionOptions,
+  ) => void;
   /** Select a stream durably (which renderer the laboratory shows). */
   readonly selectStream: (streamId: string | null) => void;
   /** Select the result whose methodology/provenance the inspector follows. */

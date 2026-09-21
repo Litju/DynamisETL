@@ -6,7 +6,7 @@
  */
 
 /// <reference lib="webworker" />
-import { expose } from "comlink";
+import { expose, transfer } from "comlink";
 
 import { decodeWindow, pointsForColumn, type DecodedWindow } from "@/lib/arrow/decode";
 
@@ -21,7 +21,16 @@ export interface ArrowWorkerApi {
 
 const api: ArrowWorkerApi = {
   decode(buffer) {
-    return decodeWindow(buffer);
+    const decoded = decodeWindow(buffer);
+    const transfers = [
+      decoded.timeNs.buffer as ArrayBuffer,
+      ...decoded.columns.flatMap((column) =>
+        column.values instanceof Float64Array
+          ? [column.values.buffer as ArrayBuffer]
+          : [],
+      ),
+    ];
+    return transfer(decoded, transfers);
   },
   points(decoded, columnName, originNs) {
     const interleaved = pointsForColumn(decoded, columnName, BigInt(originNs));
@@ -32,7 +41,7 @@ const api: ArrowWorkerApi = {
       xMs[index] = interleaved[index * 2] ?? Number.NaN;
       values[index] = interleaved[index * 2 + 1] ?? Number.NaN;
     }
-    return { xMs, values };
+    return transfer({ xMs, values }, [xMs.buffer, values.buffer]);
   },
 };
 

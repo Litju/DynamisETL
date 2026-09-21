@@ -152,6 +152,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/metrics/definitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Metric Definitions */
+        get: operations["metric_definitions_api_metrics_definitions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/metrics/methodology/{metric_id}": {
         parameters: {
             query?: never;
@@ -263,6 +280,62 @@ export interface components {
             parameters_hash: string | null;
             /** Version */
             version: string;
+        };
+        /**
+         * ArtifactDetail
+         * @description One artifact plus the canonical time bounds of its samples.
+         *
+         *     The bounds require reading the Parquet footer/column statistics, so they are
+         *     served only for a single requested artifact and never inside a list
+         *     response. A laboratory uses them to choose a deterministic first window
+         *     instead of asking the reader to guess a time range.
+         */
+        ArtifactDetail: {
+            /** Artifact Id */
+            artifact_id: string;
+            /**
+             * Artifact Kind
+             * @enum {string}
+             */
+            artifact_kind: "sample" | "processing";
+            /** Byte Size */
+            byte_size: number | null;
+            /** Canonical Time Max Ns */
+            canonical_time_max_ns?: number | null;
+            /** Canonical Time Min Ns */
+            canonical_time_min_ns?: number | null;
+            /** Checksum Sha256 */
+            checksum_sha256: string;
+            /** Compression */
+            compression: string | null;
+            /** Coordinate Frame Id */
+            coordinate_frame_id: string | null;
+            /** Dataset Id */
+            dataset_id: string;
+            /** Entity Column */
+            entity_column?: string | null;
+            /** Entity Count */
+            entity_count?: number | null;
+            /** Entity Ids */
+            entity_ids?: string[] | null;
+            /** Format */
+            format: string;
+            /** Layer */
+            layer: string;
+            /** Measurement Class */
+            measurement_class: string | null;
+            /** Modality */
+            modality: string | null;
+            /** Relative Path */
+            relative_path: string;
+            /** Row Count */
+            row_count: number;
+            /** Si Units */
+            si_units: string[];
+            /** Stream Id */
+            stream_id: string | null;
+            /** Synchronization Spec Id */
+            synchronization_spec_id: string | null;
         };
         /** ArtifactRefView */
         ArtifactRefView: {
@@ -466,6 +539,35 @@ export interface components {
             share_alike: boolean;
             /** Status */
             status: string;
+        };
+        /**
+         * MetricCatalogEntry
+         * @description One registered metric plus where it is actually served.
+         *
+         *     `dataset_ids` and `value_count` come from the derived rows, so the catalog
+         *     can distinguish a metric the registry defines from one the pipeline has
+         *     genuinely computed; discovery should not offer the former as if it were
+         *     analysable.
+         */
+        MetricCatalogEntry: {
+            /** Algorithm Id */
+            algorithm_id: string | null;
+            /** Dataset Ids */
+            dataset_ids: string[];
+            /** Description */
+            description: string | null;
+            /** Measurement Class */
+            measurement_class: string;
+            /** Metric Id */
+            metric_id: string;
+            /** Name */
+            name: string;
+            /** Si Unit */
+            si_unit: string;
+            /** Value Count */
+            value_count: number;
+            /** Value Kind */
+            value_kind: string;
         };
         /** MetricDefinitionView */
         MetricDefinitionView: {
@@ -785,6 +887,13 @@ export interface components {
             /** Trial Count */
             trial_count: number;
         };
+        /** SkeletonDisplayConnectionView */
+        SkeletonDisplayConnectionView: {
+            /** End Joint Name */
+            end_joint_name: string;
+            /** Start Joint Name */
+            start_joint_name: string;
+        };
         /** StreamView */
         StreamView: {
             /** Clock Id */
@@ -805,8 +914,14 @@ export interface components {
             sample_row_count: number;
             /** Si Units */
             si_units: string[];
+            /** Skeleton Display Connections */
+            skeleton_display_connections?: components["schemas"]["SkeletonDisplayConnectionView"][];
             /** Skeleton Id */
             skeleton_id: string | null;
+            /** Skeleton Joint Names */
+            skeleton_joint_names?: string[];
+            /** Skeleton Topology */
+            skeleton_topology?: string | null;
             /** Source Unit */
             source_unit: string | null;
             /** Stream Id */
@@ -872,7 +987,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ArtifactRefView"];
+                    "application/json": components["schemas"]["ArtifactDetail"];
                 };
             };
             /** @description Validation Error */
@@ -893,6 +1008,7 @@ export interface operations {
                 to_ns?: number | null;
                 columns?: string | null;
                 max_points?: number | null;
+                entity_id?: string | null;
                 format?: string;
             };
             header?: never;
@@ -1123,6 +1239,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    metric_definitions_api_metrics_definitions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetricCatalogEntry"][];
                 };
             };
         };

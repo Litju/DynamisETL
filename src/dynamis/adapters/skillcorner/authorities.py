@@ -31,6 +31,7 @@ from dynamis.contracts import (
     Handedness,
     JointDefinition,
     SkeletonDefinition,
+    SkeletonDisplayConnection,
     SkeletonTopology,
     SynchronizationMethod,
     SynchronizationSpec,
@@ -57,6 +58,7 @@ SYNC_SPEC_ID = "skillcorner-source-provided-match-clock"
 TRACKING_FRAME_ID = "skillcorner-pitch-long-short-m"
 POSE_FRAME_ID = "skillcorner-pose-hybrid-m"
 POSE_SKELETON_ID = "skillcorner-bodypose-29-landmarks"
+SKILLCORNER_SOURCE_REVISION = "4340d274572876239c154c90bc507a9b3250a656"
 
 #: The provider's documented 29-joint order (``data/bodypose/README.md``). The
 #: JSON member order in the archive is alphabetical and is deliberately not used
@@ -91,6 +93,40 @@ POSE_LANDMARKS: tuple[str, ...] = (
     "rBigToe",
     "lSmallToe",
     "rSmallToe",
+)
+
+#: Provider display topology from ``src/data/pose_loading.py:SKELETON`` at the
+#: pinned source revision. These are drawable landmark connections, not an
+#: inferred parent graph or a processor-defined analytical segment list.
+POSE_DISPLAY_CONNECTIONS: tuple[tuple[str, str], ...] = (
+    ("nose", "neck"),
+    ("nose", "lEye"),
+    ("nose", "rEye"),
+    ("lEye", "lEar"),
+    ("rEye", "rEar"),
+    ("neck", "lShoulder"),
+    ("neck", "rShoulder"),
+    ("neck", "midHip"),
+    ("lShoulder", "lElbow"),
+    ("lElbow", "lWrist"),
+    ("rShoulder", "rElbow"),
+    ("rElbow", "rWrist"),
+    ("lWrist", "lThumb"),
+    ("lWrist", "lPinky"),
+    ("rWrist", "rThumb"),
+    ("rWrist", "rPinky"),
+    ("midHip", "lHip"),
+    ("midHip", "rHip"),
+    ("lHip", "lKnee"),
+    ("lKnee", "lAnkle"),
+    ("rHip", "rKnee"),
+    ("rKnee", "rAnkle"),
+    ("lAnkle", "lHeel"),
+    ("lAnkle", "lBigToe"),
+    ("lBigToe", "lSmallToe"),
+    ("rAnkle", "rHeel"),
+    ("rAnkle", "rBigToe"),
+    ("rBigToe", "rSmallToe"),
 )
 
 POSE_ERROR_SOURCE_FIELD = "p90_mae_cm"
@@ -222,7 +258,7 @@ def source_sync_spec() -> SynchronizationSpec:
 
 
 def pose_skeleton() -> SkeletonDefinition:
-    """Source-published 29-landmark list with no parent graph."""
+    """Source-published landmark list plus its separate display topology."""
     return SkeletonDefinition(
         skeleton_id=POSE_SKELETON_ID,
         name="SkillCorner body pose 29-landmark set",
@@ -232,11 +268,16 @@ def pose_skeleton() -> SkeletonDefinition:
             JointDefinition(joint_id=index, joint_name=name, parent_joint_id=None)
             for index, name in enumerate(POSE_LANDMARKS)
         ),
+        display_connections=tuple(
+            SkeletonDisplayConnection(start_joint_name=start, end_joint_name=end)
+            for start, end in POSE_DISPLAY_CONNECTIONS
+        ),
         description=(
             "SkillCorner publishes an ordered landmark list (data/bodypose/README.md at the "
-            "pinned revision) and no anatomical parent graph. Parent ids are deliberately "
-            "absent; the JSON member order in the archive is alphabetical and is not the "
-            "authority."
+            f"pinned revision {SKILLCORNER_SOURCE_REVISION}) and no anatomical parent graph. "
+            "Parent ids are deliberately absent; the JSON member order in the archive is "
+            "alphabetical and is not the authority. The provider's SKELETON display pairs "
+            "are retained separately as drawable connections."
         ),
     )
 

@@ -34,10 +34,15 @@ DEFAULT_DENSE_MAX_SOURCE_ROWS = 5_000_000
 
 TIME_COLUMN = "t_rel_ns"
 TIME_COLUMNS = frozenset({TIME_COLUMN, "timestamp_utc_ns"})
+#: Candidate entity columns, most specific first. A spatial artifact identifies
+#: a tracked object by ``object_id``; a per-subject artifact (pose, IMU, force)
+#: identifies it by ``subject_id``.
+ENTITY_COLUMNS: tuple[str, ...] = ("object_id", "subject_id")
 REDUCTION_METHOD = "min_max_envelope_per_time_bucket"
 REDUCTION_NOTE = (
     "Display-only extrema-preserving reduction. Scientific metric values and processor "
-    "results always come from canonical artifacts, never from this representation."
+    "results always come from canonical artifacts, never from this representation. "
+    "When identity keys are interleaved, the max_points budget is divided across them."
 )
 EXACT_WINDOW_NOTE = (
     "Exact canonical samples in the requested time window; no display reduction was applied."
@@ -124,6 +129,27 @@ def _is_measure(field: pa.Field) -> bool:
     return bool(pa.types.is_integer(field.type) or pa.types.is_floating(field.type))
 
 
+def entity_column(schema: pa.Schema) -> str | None:
+    """The column that identifies one tracked entity in this artifact."""
+    names = set(schema.names)
+    for candidate in ENTITY_COLUMNS:
+        if candidate in names:
+            return candidate
+    return None
+
+
+def _entity_predicate(schema: pa.Schema, entity_id: str | None) -> tuple[str, list[Any]]:
+    """SQL fragment and parameters scoping a window to one entity."""
+    if entity_id is None:
+        return "", []
+    column = entity_column(schema)
+    if column is None:
+        raise DenseWindowError(
+            "this artifact declares no entity column, so it cannot be scoped to an entity"
+        )
+    return f' AND "{column}" = ?', [entity_id]
+
+
 def _validate_columns(schema: pa.Schema, columns: tuple[str, ...]) -> tuple[str, ...]:
     if not columns:
         return tuple(field.name for field in schema)
@@ -143,13 +169,22 @@ def load_artifact_window(
     columns: tuple[str, ...] = (),
     max_points: int | None = None,
     max_source_rows: int | None = None,
+    entity_id: str | None = None,
 ) -> DenseWindowResult:
-    """Read one bounded window and (optionally) reduce it for display."""
+    """Read one bounded window and (optionally) reduce it for display.
+
+    ``entity_id`` scopes the window to one tracked entity. A dense artifact
+    interleaves every entity on the same time axis, so a viewer that renders one
+    player or one subject would otherwise have to request every other entity's
+    rows and discard them — which is exactly what pushes a pose window past the
+    point budget and forces a display reduction the renderer cannot use.
+    """
     path = resolve_artifact_path(settings, ref)
     schema = pq.read_schema(path)
     if TIME_COLUMN not in schema.names:
         raise DenseWindowError(f"artifact {ref.artifact_id!r} has no canonical {TIME_COLUMN} axis")
     selected = _validate_columns(schema, columns)
+    entity_sql, entity_params = _entity_predicate(schema, entity_id)
     units = _schema_units(schema)
     canonical_min, canonical_max = _canonical_time_range(path)
     if canonical_min is None or canonical_max is None:
@@ -178,7 +213,7 @@ def load_artifact_window(
     if cap <= 0:
         raise DenseWindowError("max_source_rows must be positive")
 
-    source_rows = _window_row_count(path, lower, upper)
+    source_rows = _window_row_count(path, lower, upper, entity_sql, entity_params)
     if source_rows > cap:
         raise DenseWindowTooLarge(
             f"dense window holds {source_rows} source rows, above the {cap} row cap; "
@@ -195,6 +230,8 @@ def load_artifact_window(
             selected=selected,
             schema=schema,
             max_points=int(max_points),
+            entity_sql=entity_sql,
+            entity_params=entity_params,
         )
         reduction = ReductionInfo(
             method=REDUCTION_METHOD,
@@ -209,7 +246,14 @@ def load_artifact_window(
             note=REDUCTION_NOTE,
         )
     else:
-        table = _exact_window(path, from_ns=lower, to_ns=upper, selected=selected)
+        table = _exact_window(
+            path,
+            from_ns=lower,
+            to_ns=upper,
+            selected=selected,
+            entity_sql=entity_sql,
+            entity_params=entity_params,
+        )
     meta = DenseWindowMeta(
         artifact=ref,
         from_ns=lower,
@@ -226,6 +270,58 @@ def load_artifact_window(
         display_note=REDUCTION_NOTE if reduction else EXACT_WINDOW_NOTE,
     )
     return DenseWindowResult(table=table, meta=meta)
+
+
+def entity_cardinality(settings: Settings, ref: ArtifactRefView) -> int | None:
+    """Number of distinct entities interleaved in one artifact.
+
+    A dense artifact puts every entity on one time axis, so the rows a viewer
+    receives per second of recording depend on how many entities share it. The
+    laboratory divides by this to size a window that fits its point budget in a
+    single request instead of discovering the overrun after a reduction.
+    ``None`` when the artifact has no entity column.
+    """
+    path = resolve_artifact_path(settings, ref)
+    column = entity_column(pq.read_schema(path))
+    if column is None:
+        return None
+    connection = _connect()
+    try:
+        row = connection.execute(
+            f'SELECT count(DISTINCT "{column}") FROM read_parquet(?)', [path.as_posix()]
+        ).fetchone()
+    finally:
+        connection.close()
+    return int(row[0]) if row and row[0] is not None else None
+
+
+def entity_ids(settings: Settings, ref: ArtifactRefView) -> list[str] | None:
+    """Return the stable distinct entity identities present in an artifact."""
+    path = resolve_artifact_path(settings, ref)
+    column = entity_column(pq.read_schema(path))
+    if column is None:
+        return None
+    connection = _connect()
+    try:
+        rows = connection.execute(
+            f'SELECT DISTINCT CAST("{column}" AS VARCHAR) AS entity_id '
+            "FROM read_parquet(?) WHERE "
+            f'"{column}" IS NOT NULL ORDER BY entity_id',
+            [path.as_posix()],
+        ).fetchall()
+    finally:
+        connection.close()
+    return [str(row[0]) for row in rows if row[0] is not None]
+
+
+def canonical_timespan(settings: Settings, ref: ArtifactRefView) -> tuple[int | None, int | None]:
+    """Canonical ``t_rel_ns`` bounds of one artifact.
+
+    The laboratory needs these before it can choose a first window: a viewer
+    cannot pick a default playhead without knowing where the recording starts.
+    Both bounds are ``None`` for an artifact with no observed samples.
+    """
+    return _canonical_time_range(resolve_artifact_path(settings, ref))
 
 
 def _connect() -> duckdb.DuckDBPyConnection:
@@ -246,12 +342,19 @@ def _canonical_time_range(path: Path) -> tuple[int | None, int | None]:
     return (int(row[0]), int(row[1])) if row[0] is not None else (None, None)
 
 
-def _window_row_count(path: Path, lower: int, upper: int) -> int:
+def _window_row_count(
+    path: Path,
+    lower: int,
+    upper: int,
+    entity_sql: str = "",
+    entity_params: list[Any] | None = None,
+) -> int:
     connection = _connect()
     try:
         row = connection.execute(
-            f"SELECT count(*) FROM read_parquet(?) WHERE {TIME_COLUMN} >= ? AND {TIME_COLUMN} <= ?",
-            [path.as_posix(), lower, upper],
+            f"SELECT count(*) FROM read_parquet(?) "
+            f"WHERE {TIME_COLUMN} >= ? AND {TIME_COLUMN} <= ?{entity_sql}",
+            [path.as_posix(), lower, upper, *(entity_params or [])],
         ).fetchone()
     finally:
         connection.close()
@@ -264,14 +367,17 @@ def _exact_window(
     from_ns: int,
     to_ns: int,
     selected: tuple[str, ...],
+    entity_sql: str = "",
+    entity_params: list[Any] | None = None,
 ) -> pa.Table:
     projection = ", ".join(f'"{name}"' for name in selected)
     connection = _connect()
     try:
         return connection.execute(
             f"SELECT {projection} FROM read_parquet(?) "
-            f"WHERE {TIME_COLUMN} >= ? AND {TIME_COLUMN} <= ? ORDER BY {TIME_COLUMN}",
-            [path.as_posix(), from_ns, to_ns],
+            f"WHERE {TIME_COLUMN} >= ? AND {TIME_COLUMN} <= ?{entity_sql} "
+            f"ORDER BY {TIME_COLUMN}",
+            [path.as_posix(), from_ns, to_ns, *(entity_params or [])],
         ).to_arrow_table()
     finally:
         connection.close()
@@ -286,15 +392,26 @@ def _reduced_window(
     selected: tuple[str, ...],
     schema: pa.Schema,
     max_points: int,
+    entity_sql: str = "",
+    entity_params: list[Any] | None = None,
 ) -> pa.Table:
     if max_points < 1:
         raise DenseWindowError("max_points must be at least 1")
     identity = [field.name for field in schema if _is_identity_key(field)]
     measures = [name for name in selected if _is_measure(schema.field(name))]
-    # One extra nanosecond makes the bucket count a hard bound of max_points even
-    # when the last observed sample sits exactly on a bucket boundary.
+    identity_count = _identity_count(
+        path,
+        from_ns=from_ns,
+        to_ns=to_ns,
+        identity=identity,
+        entity_sql=entity_sql,
+        entity_params=entity_params,
+    )
+    points_per_identity = max(1, max_points // identity_count)
+    # One extra nanosecond makes the bucket count a hard bound of the per-key
+    # budget even when the last observed sample sits exactly on a bucket boundary.
     span_ns = max(1, to_ns - from_ns + 1)
-    bucket_ns = max(1, math.ceil(span_ns / max_points))
+    bucket_ns = max(1, math.ceil(span_ns / points_per_identity))
     key_sql = ", ".join(f'"{name}"' for name in identity)
     select_keys = f"{key_sql}, " if identity else ""
     group_keys = f"{key_sql}, __bucket" if identity else "__bucket"
@@ -312,7 +429,7 @@ def _reduced_window(
     aggregate_sql = ", ".join(aggregates)
     sql = (
         "WITH windowed AS ("
-        f"SELECT * FROM read_parquet(?) WHERE t_rel_ns >= ? AND t_rel_ns <= ?"
+        f"SELECT * FROM read_parquet(?) WHERE t_rel_ns >= ? AND t_rel_ns <= ?{entity_sql}"
         "), bucketed AS ("
         "SELECT *, CAST(floor((t_rel_ns - ?) / ?) AS BIGINT) AS __bucket FROM windowed"
         ")"
@@ -325,10 +442,36 @@ def _reduced_window(
     try:
         return connection.execute(
             sql,
-            [path.as_posix(), from_ns, to_ns, from_ns, bucket_ns],
+            [path.as_posix(), from_ns, to_ns, *(entity_params or []), from_ns, bucket_ns],
         ).to_arrow_table()
     finally:
         connection.close()
+
+
+def _identity_count(
+    path: Path,
+    *,
+    from_ns: int,
+    to_ns: int,
+    identity: list[str],
+    entity_sql: str,
+    entity_params: list[Any] | None,
+) -> int:
+    if not identity:
+        return 1
+    key_sql = ", ".join(f'"{name}"' for name in identity)
+    connection = _connect()
+    try:
+        row = connection.execute(
+            "SELECT count(*) FROM ("
+            f"SELECT DISTINCT {key_sql} FROM read_parquet(?) "
+            f"WHERE t_rel_ns >= ? AND t_rel_ns <= ?{entity_sql}"
+            ")",
+            [path.as_posix(), from_ns, to_ns, *(entity_params or [])],
+        ).fetchone()
+    finally:
+        connection.close()
+    return max(1, int(row[0])) if row and row[0] is not None else 1
 
 
 def arrow_ipc_stream(table: pa.Table) -> bytes:
@@ -346,6 +489,8 @@ def window_etag(
     to_ns: int | None,
     columns: tuple[str, ...],
     max_points: int | None,
+    entity_id: str | None = None,
+    representation: str = "json",
 ) -> str:
     """Strong ETag derived from immutable artifact identity and query parameters."""
     identity = json.dumps(
@@ -355,6 +500,8 @@ def window_etag(
             "to_ns": to_ns,
             "columns": sorted(columns),
             "max_points": max_points,
+            "entity_id": entity_id,
+            "representation": representation,
         },
         sort_keys=True,
         separators=(",", ":"),
@@ -381,12 +528,17 @@ __all__ = [
     "ENV_DENSE_MAX_SOURCE_ROWS",
     "REDUCTION_METHOD",
     "TIME_COLUMN",
+    "ENTITY_COLUMNS",
     "ArtifactPathError",
     "DenseWindowError",
     "DenseWindowResult",
     "DenseWindowTooLarge",
     "arrow_ipc_stream",
+    "canonical_timespan",
     "default_max_source_rows",
+    "entity_cardinality",
+    "entity_column",
+    "entity_ids",
     "load_artifact_window",
     "resolve_artifact_path",
     "table_records",

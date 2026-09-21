@@ -68,6 +68,9 @@ const ARTIFACT = {
   si_units: ["m"],
   coordinate_frame_id: "lab-frame",
   synchronization_spec_id: "source-provided",
+  entity_column: "subject_id",
+  entity_count: 2,
+  entity_ids: ["s1", "s2"],
 };
 
 function windowBody(reduced: boolean) {
@@ -108,6 +111,25 @@ function windowBody(reduced: boolean) {
   };
 }
 
+function windowBodyForSubject(subjectId: string) {
+  const body = windowBody(false);
+  const exactRows = body.rows.filter(
+    (row): row is { t_rel_ns: number; x_m: number } => "x_m" in row,
+  );
+  return {
+    ...body,
+    rows: exactRows.map((row) => ({
+      ...row,
+      subject_id: subjectId,
+      x_m: subjectId === "s2" ? 20 : row.x_m,
+    })),
+    meta: {
+      ...body.meta,
+      columns: ["t_rel_ns", "subject_id", "x_m"],
+    },
+  };
+}
+
 function arrowWindowResponse(): Response {
   const table = tableFromArrays({
     t_rel_ns: BigInt64Array.from([0n, 10_000_000n, 20_000_000n]),
@@ -144,7 +166,13 @@ function installFetch(reduced = false, windowStatus = 200, arrow = false): void 
         if (windowStatus !== 200) {
           return json({ detail: "too large", state: "dense_window_too_large" }, windowStatus);
         }
-        return json(windowBody(reduced));
+        return json(
+          reduced
+            ? windowBody(reduced)
+            : url.searchParams.has("entity_id")
+            ? windowBodyForSubject(url.searchParams.get("entity_id") ?? "")
+            : windowBody(reduced),
+        );
       }
       return json({ detail: `unhandled ${url.pathname}` }, 404);
     }),
@@ -202,10 +230,10 @@ afterEach(() => {
 it("renders an exact window with unit, synchronization and measurement context", async () => {
   installFetch(false);
   renderLab();
-  expect(await screen.findByText("exact samples in this window")).toBeInTheDocument();
-  expect(screen.getByText("3 source rows → 3 returned · full window")).toBeInTheDocument();
-  expect(screen.getByText("sync source-provided")).toBeInTheDocument();
-  expect(screen.getByText("frame lab-frame")).toBeInTheDocument();
+  expect(await screen.findByText("Exact samples")).toBeInTheDocument();
+  expect(screen.getByText("3 source rows → 3 plotted")).toBeInTheDocument();
+  expect(screen.getByText("source-provided")).toBeInTheDocument();
+  expect(screen.getByText("lab-frame")).toBeInTheDocument();
   expect(screen.getByText("raw")).toBeInTheDocument();
   expect(await screen.findByTestId("echart")).toBeInTheDocument();
   expect(init).toHaveBeenCalled();
@@ -215,10 +243,14 @@ it("renders an exact window with unit, synchronization and measurement context",
 it("states display reduction and never hides it", async () => {
   installFetch(true);
   renderLab();
+  // The state is a badge; the full reduction record stays available on it,
+  // and the envelope is named as display reduction rather than uncertainty.
+  expect(await screen.findByText("Display-reduced")).toBeInTheDocument();
   expect(
-    await screen.findByText(/Display-reduced: min_max_envelope_per_time_bucket/),
+    screen.getByTitle(/Display-reduced: min_max_envelope_per_time_bucket/),
   ).toBeInTheDocument();
-  expect(screen.getByText(/metrics never derive from this view/)).toBeInTheDocument();
+  expect(screen.getByText(/not measured uncertainty/)).toBeInTheDocument();
+  expect(screen.getByText(/never derive from it/)).toBeInTheDocument();
 });
 
 it("asks for a narrower range when the dense window is too large", async () => {
@@ -243,7 +275,30 @@ it("refuses a stream that is not part of the open session", async () => {
 it("uses the Arrow dense transport when the API serves it", async () => {
   installFetch(false, 200, true);
   renderLab();
-  expect(await screen.findByText("transport arrow")).toBeInTheDocument();
+  expect(await screen.findByText("arrow transport")).toBeInTheDocument();
   expect(await screen.findByTestId("echart")).toBeInTheDocument();
-  expect(screen.getByText("3 source rows → 3 returned · full window")).toBeInTheDocument();
+  expect(screen.getByText("3 source rows → 3 plotted")).toBeInTheDocument();
+});
+
+it("shows the selected individual and scopes the signal rows to it", async () => {
+  const fetchSpy = vi.fn();
+  installFetch(false);
+  fetchSpy.mockImplementation(globalThis.fetch);
+  vi.stubGlobal("fetch", fetchSpy);
+  renderLab({ subjectId: "s2" });
+
+  expect(await screen.findByDisplayValue("s2")).toBeInTheDocument();
+  expect(screen.getByText("selected identity scopes the dense request and evidence")).toBeInTheDocument();
+  await vi.waitFor(() => {
+    const urls = fetchSpy.mock.calls.map(([input]) =>
+      new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, "http://localhost"),
+    );
+    expect(
+      urls.some(
+        (url) =>
+          url.pathname === "/api/artifacts/sample-1/window" &&
+          url.searchParams.get("entity_id") === "s2",
+      ),
+    ).toBe(true);
+  });
 });

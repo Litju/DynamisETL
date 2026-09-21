@@ -27,7 +27,7 @@ function InstrumentNode({ data, selected }: NodeProps<LineageNode>) {
     >
       <Handle type="target" position={Position.Left} className="!size-1.5 !bg-border-strong" />
       <div className="flex items-center justify-between gap-2">
-        <span className="mono truncate text-[10px] uppercase tracking-wider text-text-muted">
+        <span className="t-section mono truncate text-text-muted">
           {data.kind}
         </span>
         {data.measurementClass ? (
@@ -71,7 +71,6 @@ export default function LineageGraph({ graph }: { graph: ProvenanceGraph }) {
           nodesDraggable={false}
           nodesConnectable={false}
           elementsSelectable
-          proOptions={{ hideAttribution: true }}
           onNodeClick={(_event, node) => setSelectedId(node.id)}
           onPaneClick={() => setSelectedId(null)}
         >

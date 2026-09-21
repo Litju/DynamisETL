@@ -158,28 +158,37 @@ export function CommandPalette() {
             }}
             placeholder="Type a command or search"
             aria-label="Command search"
+            aria-controls="command-list"
+            aria-activedescendant={
+              visible[active]?.id ? `command-option-${visible[active].id}` : undefined
+            }
             className="w-full border-b border-border-subtle bg-transparent px-3 py-2 text-[13px] outline-none placeholder:text-text-muted"
           />
-          <ul role="listbox" aria-label="Commands" className="max-h-80 overflow-y-auto p-1">
+          <ul
+            id="command-list"
+            role="listbox"
+            aria-label="Commands"
+            className="max-h-80 overflow-y-auto p-1"
+          >
             {visible.length === 0 ? (
               <li className="px-2 py-3 text-[12px] text-text-muted">No matching command.</li>
             ) : null}
             {visible.map((command, index) => (
-              <li key={command.id} role="option" aria-selected={index === active}>
-                <button
-                  type="button"
-                  onMouseEnter={() => setActiveIndex(index)}
-                  onClick={() => runCommand(command)}
-                  className={cn(
-                    "flex w-full items-center justify-between rounded-control px-2 py-1.5 text-left text-[12px]",
-                    index === active ? "bg-surface-3 text-text-primary" : "text-text-secondary",
-                  )}
-                >
-                  <span>{command.title}</span>
-                  <span className="text-[10px] uppercase tracking-wider text-text-muted">
-                    {command.group}
-                  </span>
-                </button>
+              <li
+                id={`command-option-${command.id}`}
+                key={command.id}
+                role="option"
+                aria-selected={index === active}
+                tabIndex={-1}
+                onMouseEnter={() => setActiveIndex(index)}
+                onClick={() => runCommand(command)}
+                className={cn(
+                  "flex w-full cursor-pointer items-center justify-between rounded-control px-2 py-1.5 text-left text-[12px]",
+                  index === active ? "bg-surface-3 text-text-primary" : "text-text-secondary",
+                )}
+              >
+                <span>{command.title}</span>
+                <span className="t-section text-text-muted">{command.group}</span>
               </li>
             ))}
           </ul>

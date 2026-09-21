@@ -115,6 +115,23 @@ class JointDefinition(Contract):
     parent_joint_id: int | None = None
 
 
+class SkeletonDisplayConnection(Contract):
+    """A source-published display edge between two named landmarks.
+
+    Display edges are deliberately not parentage: a landmark-set provider may
+    publish drawable connections without asserting an anatomical tree.
+    """
+
+    start_joint_name: str = Field(min_length=1)
+    end_joint_name: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def check_connection(self) -> SkeletonDisplayConnection:
+        if self.start_joint_name == self.end_joint_name:
+            raise ValueError("a display connection must join two distinct landmarks")
+        return self
+
+
 class SkeletonDefinition(Contract):
     """Joint topology authority.
 
@@ -139,6 +156,7 @@ class SkeletonDefinition(Contract):
     topology: SkeletonTopology = SkeletonTopology.TREE
     joint_count: int = Field(gt=0)
     joints: tuple[JointDefinition, ...] = Field(min_length=1)
+    display_connections: tuple[SkeletonDisplayConnection, ...] = ()
     description: str | None = None
 
     @model_validator(mode="after")
@@ -180,6 +198,21 @@ class SkeletonDefinition(Contract):
                 "a landmark_set skeleton has no source parent graph and requires an explicit "
                 "description documenting what the landmark list is"
             )
+        connections: set[frozenset[str]] = set()
+        for connection in self.display_connections:
+            endpoints = {connection.start_joint_name, connection.end_joint_name}
+            missing = endpoints - names
+            if missing:
+                raise ValueError(
+                    f"display connection references unknown landmark(s): {sorted(missing)}"
+                )
+            key = frozenset(endpoints)
+            if key in connections:
+                raise ValueError(
+                    "display connections must not repeat an undirected landmark pair: "
+                    f"{sorted(endpoints)}"
+                )
+            connections.add(key)
         return self
 
 

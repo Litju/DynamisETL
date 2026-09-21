@@ -14,6 +14,7 @@ import pytest
 import synthetic_skillcorner as synthetic
 from dynamis.adapters.skillcorner.adapter import SkillCornerMatchAdapter
 from dynamis.adapters.skillcorner.authorities import (
+    POSE_DISPLAY_CONNECTIONS,
     POSE_LANDMARKS,
     POSE_SKELETON_ID,
     SKILLCORNER_DATASET_ID,
@@ -51,6 +52,11 @@ def test_landmark_authority_is_the_documented_readme_order() -> None:
     assert skeleton.joint_count == 29
     assert tuple(joint.joint_name for joint in skeleton.joints) == POSE_LANDMARKS
     assert all(joint.parent_joint_id is None for joint in skeleton.joints)
+    assert [
+        (connection.start_joint_name, connection.end_joint_name)
+        for connection in skeleton.display_connections
+    ] == list(POSE_DISPLAY_CONNECTIONS)
+    assert len(skeleton.display_connections) == 28
     # The provider JSON mapping order is alphabetical; it must not leak in.
     assert POSE_LANDMARKS[:4] == ("nose", "neck", "lEye", "rEye")
 
@@ -360,6 +366,10 @@ def test_skillcorner_skeleton_and_alignment_provenance_is_idempotent(
                 text("SELECT topology FROM skeleton_definition WHERE skeleton_id = :id"),
                 {"id": POSE_SKELETON_ID},
             ).scalar_one()
+            display_connections = connection.execute(
+                text("SELECT display_connections FROM skeleton_definition WHERE skeleton_id = :id"),
+                {"id": POSE_SKELETON_ID},
+            ).scalar_one()
             joint_count = connection.execute(
                 text("SELECT count(*) FROM skeleton_joint WHERE skeleton_id = :id"),
                 {"id": POSE_SKELETON_ID},
@@ -386,6 +396,7 @@ def test_skillcorner_skeleton_and_alignment_provenance_is_idempotent(
                 {"dataset": SKILLCORNER_DATASET_ID, "id": POSE_SKELETON_ID},
             ).scalar_one()
         assert topology == "landmark_set"
+        assert len(display_connections) == 28
         assert int(joint_count) == 29
         assert int(nullable_parents) == 29
         assert int(pose_streams) == 2

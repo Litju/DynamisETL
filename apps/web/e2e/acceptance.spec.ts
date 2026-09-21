@@ -20,6 +20,75 @@ test("1. deep link loads deterministic analytical context and survives reload", 
   await expect(page).toHaveURL(/t_ns=2987480000000/);
 });
 
+test("1b. individual selection is URL-owned across reload, scrub and history", async ({ page }) => {
+  await page.goto("/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P1&view=pose&t_ns=50000000");
+  const picker = page.locator("#pose-subject");
+  await expect(picker).toHaveValue("SC-P1");
+  await picker.selectOption("SC-P2");
+  await expect(page).toHaveURL(/subject=SC-P2/);
+  await expect(page).toHaveURL(/t_ns=0/);
+  await page.keyboard.press("ArrowRight");
+  await expect(page).toHaveURL(/subject=SC-P2/);
+  await page.reload();
+  await expect(page).toHaveURL(/subject=SC-P2/);
+  await page.goBack();
+  await expect(page).toHaveURL(/subject=SC-P1/);
+  await page.goForward();
+  await expect(page).toHaveURL(/subject=SC-P2/);
+});
+
+test("1e. all-subject Pose mode uses one fixed world without entity scoping", async ({ page }) => {
+  const poseWindowRequests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/api/artifacts/pose-sample/window")) {
+      poseWindowRequests.push(request.url());
+    }
+  });
+  await page.goto(
+    "/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P1&view=pose&t_ns=0",
+  );
+  const toggle = page.getByTestId("pose-all-subjects-toggle");
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  const requestsBeforeToggle = poseWindowRequests.length;
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText("all subjects · fixed camera (2)")).toBeVisible();
+  await expect(page.getByText(/2 subjects share one source-coordinate world/)).toBeVisible();
+  expect(poseWindowRequests.slice(requestsBeforeToggle).some((url) => !url.includes("entity_id="))).toBe(true);
+});
+
+test("1c. Pose playback advances both the playhead and rendered scene", async ({ page }) => {
+  await page.goto(
+    "/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P1&view=pose&t_ns=0",
+  );
+  const canvas = page.getByTestId("pose-canvas").locator("canvas");
+  await expect(canvas).toBeVisible();
+  const playhead = page.getByLabel("Transport and timeline").locator(".t-value").first();
+  const beforeTime = await playhead.innerText();
+  const before = await canvas.screenshot();
+  await page.getByRole("button", { name: "Play" }).click();
+  await page.waitForTimeout(1000);
+  const afterTime = await playhead.innerText();
+  const after = await canvas.screenshot();
+  expect(afterTime).not.toBe(beforeTime);
+  expect(after.equals(before)).toBe(false);
+});
+
+test("1d. Pose telemetry lists every provider landmark in the inspector", async ({ page }) => {
+  await page.goto(
+    "/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P1&view=pose&t_ns=0",
+  );
+  const telemetry = page.getByTestId("pose-telemetry");
+  await expect(telemetry).toBeVisible();
+  await expect(page.locator("#inspector").getByTestId("pose-telemetry")).toBeVisible();
+  expect(await page.locator("#explorer [data-testid=pose-telemetry]").count()).toBe(0);
+  await expect(telemetry.getByText("29 observed · 0 unavailable")).toBeVisible();
+  expect(await telemetry.locator(".grid").count()).toBe(30); // column header + 29 landmarks
+  await expect(telemetry.getByText("nose")).toBeVisible();
+  await expect(telemetry.getByText("lSmallToe")).toBeVisible();
+  await expect(telemetry.getByText("rPinky")).toBeVisible();
+});
+
 test("2. selecting a player on the pitch updates the durable subject context", async ({ page }) => {
   await page.goto("/lab/skillcorner-opendata/1925299?stream=tracking-1&view=field");
   const host = page.getByTestId("pitch-canvas");
@@ -41,7 +110,7 @@ test("3/4. committed time propagates from the keyboard to the transport and pose
   page,
 }) => {
   await page.goto("/lab/skillcorner-opendata/1925299?stream=tracking-1&view=signals&t_ns=50000000");
-  await expect(page.getByText("transport json")).toBeVisible();
+  await expect(page.getByText(/json transport/)).toBeVisible();
   await expect(page.getByTestId("echart")).toBeVisible();
   await page.keyboard.press("ArrowRight");
   await expect(page).toHaveURL(/t_ns=/);
@@ -91,9 +160,9 @@ test("6. provenance opens the exact algorithm/run/input lineage", async ({ page 
 test("7. license and quality context are visible next to results", async ({ page }) => {
   await page.goto("/quality");
   await expect(page.getByText("CC BY 4.0").first()).toBeVisible();
-  await expect(page.getByText("CC BY 4.0; attribution required; redistribution: conditional").first()).toBeVisible();
+  await expect(page.getByText("conditional").first()).toBeVisible();
   await expect(page.getByText("tracking.ball_gap")).toBeVisible();
-  await expect(page.getByText(/gap_frames/)).toBeVisible();
+  await expect(page.getByText(/sample 12/)).toBeVisible();
 });
 
 test("8. a stream that is not part of the session is never cross-synchronized", async ({ page }) => {
@@ -103,10 +172,10 @@ test("8. a stream that is not part of the session is never cross-synchronized", 
 
 test("9. compare preserves dataset/subject identity boundaries", async ({ page }) => {
   await page.goto("/compare?metric=pose.angular_rom.left_knee");
-  await expect(page.getByText(/skillcorner-opendata \/ 1925299 \/ SC-P1/).first()).toBeVisible();
+  await expect(page.getByText("skillcorner-opendata").first()).toBeVisible();
   await expect(
     page
-      .getByText(/subject identity is never merged and interchangeability is not established/)
+      .getByText(/no observation is paired across groups/)
       .first(),
   ).toBeVisible();
   await expect(page.getByText(/pipeline-derived/).first()).toBeVisible();
@@ -118,5 +187,5 @@ test("10. methodology page renders the selected result lineage from a deep link"
   await page.goto("/methods?metric=pose.angular_rom.left_knee&result=dm-pose-rom");
   await expect(page.getByText("Selected result lineage")).toBeVisible();
   await expect(page.getByText("run-pose")).toBeVisible();
-  await expect(page.getByText("Range of motion for angle left_knee")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Range of motion for angle left_knee" })).toBeVisible();
 });

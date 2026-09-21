@@ -27,6 +27,11 @@ export interface PoseFrame {
   readonly observed: boolean;
 }
 
+export interface PoseSubjectFrames {
+  readonly subjectId: string;
+  readonly frames: readonly PoseFrame[];
+}
+
 export interface PoseRow {
   readonly t_rel_ns?: unknown;
   readonly subject_id?: unknown;
@@ -37,6 +42,11 @@ export interface PoseRow {
   readonly y_m?: unknown;
   readonly z_m?: unknown;
   readonly error_m?: unknown;
+}
+
+export interface DisplayConnectionDefinition {
+  readonly startLandmark: string;
+  readonly endLandmark: string;
 }
 
 export interface SegmentDefinition {
@@ -66,22 +76,33 @@ function finite(value: unknown): number | null {
 }
 
 /** Group pose rows into observed frames, dropping unavailable/non-finite joints. */
-export function extractFrames(rows: readonly PoseRow[]): PoseFrame[] {
+export function extractFrames(
+  rows: readonly PoseRow[],
+  subjectId: string | null = null,
+): PoseFrame[] {
   const byTime = new Map<
-    number,
+    string,
     { subjectId: string | null; landmarks: PoseLandmark[]; unavailable: Set<string> }
   >();
   for (const row of rows) {
     const t = row.t_rel_ns;
     if (typeof t !== "number") continue;
+    const rowSubject =
+      typeof row.subject_id === "string"
+        ? row.subject_id
+        : typeof row.subject_id === "number"
+          ? String(row.subject_id)
+          : null;
+    if (subjectId !== null && rowSubject !== subjectId) continue;
     const jointName = row.joint_name;
     if (typeof jointName !== "string" || jointName.length === 0) continue;
     const available = row.is_available === true;
     const x = finite(row.x_m);
     const y = finite(row.y_m);
     const z = finite(row.z_m);
-    const entry = byTime.get(t) ?? {
-      subjectId: typeof row.subject_id === "string" ? row.subject_id : null,
+    const key = `${t}\u0000${rowSubject ?? ""}`;
+    const entry = byTime.get(key) ?? {
+      subjectId: rowSubject,
       landmarks: [],
       unavailable: new Set<string>(),
     };
@@ -96,12 +117,16 @@ export function extractFrames(rows: readonly PoseRow[]): PoseFrame[] {
     } else {
       entry.unavailable.add(jointName);
     }
-    byTime.set(t, entry);
+    byTime.set(key, entry);
   }
   return Array.from(byTime.entries())
-    .sort(([left], [right]) => left - right)
-    .map(([tRelNs, entry]) => ({
-      tRelNs,
+    .sort(([left], [right]) => {
+      const leftTime = Number(left.slice(0, left.indexOf("\u0000")));
+      const rightTime = Number(right.slice(0, right.indexOf("\u0000")));
+      return leftTime - rightTime || left.localeCompare(right);
+    })
+    .map(([key, entry]) => ({
+      tRelNs: Number(key.slice(0, key.indexOf("\u0000"))),
       subjectId: entry.subjectId,
       landmarks: entry.landmarks.sort((left, right) =>
         left.jointName < right.jointName ? -1 : 1,
@@ -115,12 +140,52 @@ export function extractFrames(rows: readonly PoseRow[]): PoseFrame[] {
     }));
 }
 
+/** Group exact frames by their real subject identity for multi-subject display. */
+export function groupFramesBySubject(frames: readonly PoseFrame[]): PoseSubjectFrames[] {
+  const grouped = new Map<string, PoseFrame[]>();
+  for (const frame of frames) {
+    const subjectId = frame.subjectId ?? "unscoped";
+    const subjectFrames = grouped.get(subjectId) ?? [];
+    subjectFrames.push(frame);
+    grouped.set(subjectId, subjectFrames);
+  }
+  return [...grouped.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([subjectId, subjectFrames]) => ({ subjectId, frames: subjectFrames }));
+}
+
+/** Remove display cues that duplicate processor-declared angle geometry. */
+export function withoutDuplicateAngles(
+  displayAngles: readonly AngleDefinition[],
+  processorAngles: readonly AngleDefinition[],
+): AngleDefinition[] {
+  const key = (angle: AngleDefinition) =>
+    `${angle.vertexLandmark}|${[angle.firstLandmark, angle.secondLandmark].sort().join("|")}`;
+  const processorKeys = new Set(processorAngles.map(key));
+  return displayAngles.filter((angle) => !processorKeys.has(key(angle)));
+}
+
+/** Provider display edges whose two endpoints are observed in the frame. */
+export function drawableDisplayConnections(
+  landmarks: readonly PoseLandmark[],
+  connections: readonly DisplayConnectionDefinition[],
+): Array<readonly [PoseLandmark, PoseLandmark]> {
+  const byName = new Map(landmarks.map((landmark) => [landmark.jointName, landmark]));
+  const drawable: Array<readonly [PoseLandmark, PoseLandmark]> = [];
+  for (const connection of connections) {
+    const start = byName.get(connection.startLandmark);
+    const end = byName.get(connection.endLandmark);
+    if (start !== undefined && end !== undefined) drawable.push([start, end]);
+  }
+  return drawable;
+}
+
 export function frameIndexAt(frames: readonly PoseFrame[], tRelNs: bigint): number {
   if (frames.length === 0) return -1;
   const target = Number(tRelNs);
   let low = 0;
   let high = frames.length - 1;
-  let result = 0;
+  let result = -1;
   while (low <= high) {
     const middle = Math.floor((low + high) / 2);
     if (frames[middle]!.tRelNs <= target) {
@@ -143,6 +208,50 @@ export function landmarksAt(
   return index < 0 ? [] : (frames[index]?.landmarks ?? []);
 }
 
+/** A point in the viewer's own frame: [right, up, depth], in metres. */
+export type ViewerPoint = readonly [number, number, number];
+
+/**
+ * Place a source landmark in the viewer's frame.
+ *
+ * The SkillCorner hybrid frame carries X and Y as pitch-plane metres and Z as
+ * a player-centroid-relative vertical. Mapping those axes straight onto the
+ * renderer would put the pitch's lateral axis on screen-up and lay the subject
+ * on its side, so the viewer applies the explicit rigid rotation
+ * R_x(+90°): [source x, source y, source z] → [viewer right, viewer up,
+ * viewer depth] = [x, z, −y]. The negative depth keeps the display frame
+ * right-handed (determinant +1); it is not a scientific coordinate rewrite.
+ *
+ * Landmarks are also expressed relative to `centre`, the observed cloud's own
+ * centre. Both operations are display-only and change nothing scientific: the
+ * processor that produces every served pose metric declares
+ * `translation_invariance: relative_vectors_only` and
+ * `absolute_height_interpretation: none`, so its angles are computed from
+ * relative vectors and carry no absolute position or height to preserve. The
+ * viewer states the active frame on screen rather than implying the subject
+ * stands on a global pitch plane.
+ */
+export function toViewerPoint(
+  landmark: { readonly xM: number; readonly yM: number; readonly zM: number },
+  centre: { readonly xM: number; readonly yM: number },
+): ViewerPoint {
+  return [landmark.xM - centre.xM, landmark.zM, -(landmark.yM - centre.yM)];
+}
+
+/** Pitch-plane centre of the observed landmarks; the viewer's local origin. */
+export function planarCentre(
+  landmarks: readonly PoseLandmark[],
+): { readonly xM: number; readonly yM: number } {
+  if (landmarks.length === 0) return { xM: 0, yM: 0 };
+  let sumX = 0;
+  let sumY = 0;
+  for (const landmark of landmarks) {
+    sumX += landmark.xM;
+    sumY += landmark.yM;
+  }
+  return { xM: sumX / landmarks.length, yM: sumY / landmarks.length };
+}
+
 export interface Bounds {
   readonly min: readonly [number, number, number];
   readonly max: readonly [number, number, number];
@@ -150,11 +259,21 @@ export interface Bounds {
   readonly radius: number;
 }
 
-/** Bounds of the observed landmarks in the local analytical frame. */
-export function boundsOf(landmarks: readonly PoseLandmark[]): Bounds {
+/**
+ * Bounds of observed landmarks, in the viewer's frame.
+ *
+ * The radius is the half-diagonal of the observed cloud with a small floor, so
+ * a single-landmark frame still yields a usable camera distance rather than a
+ * degenerate one.
+ */
+export function boundsOf(
+  landmarks: readonly PoseLandmark[],
+  origin?: { readonly xM: number; readonly yM: number },
+): Bounds {
   if (landmarks.length === 0) {
     return { min: [0, 0, 0], max: [0, 0, 0], center: [0, 0, 0], radius: 1 };
   }
+  const centre = origin ?? planarCentre(landmarks);
   let minX = Number.POSITIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
   let minZ = Number.POSITIVE_INFINITY;
@@ -162,12 +281,13 @@ export function boundsOf(landmarks: readonly PoseLandmark[]): Bounds {
   let maxY = Number.NEGATIVE_INFINITY;
   let maxZ = Number.NEGATIVE_INFINITY;
   for (const landmark of landmarks) {
-    minX = Math.min(minX, landmark.xM);
-    minY = Math.min(minY, landmark.yM);
-    minZ = Math.min(minZ, landmark.zM);
-    maxX = Math.max(maxX, landmark.xM);
-    maxY = Math.max(maxY, landmark.yM);
-    maxZ = Math.max(maxZ, landmark.zM);
+    const [x, y, z] = toViewerPoint(landmark, centre);
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    minZ = Math.min(minZ, z);
+    maxX = Math.max(maxX, x);
+    maxY = Math.max(maxY, y);
+    maxZ = Math.max(maxZ, z);
   }
   const center: [number, number, number] = [
     (minX + maxX) / 2,
@@ -175,7 +295,7 @@ export function boundsOf(landmarks: readonly PoseLandmark[]): Bounds {
     (minZ + maxZ) / 2,
   ];
   const radius = Math.max(
-    1,
+    0.4,
     Math.hypot(maxX - minX, maxY - minY, maxZ - minZ) / 2,
   );
   return { min: [minX, minY, minZ], max: [maxX, maxY, maxZ], center, radius };
@@ -210,7 +330,11 @@ export function cameraFor(
   preset: CameraPreset,
   bounds: Bounds,
 ): { position: [number, number, number]; target: [number, number, number] } {
-  const distance = bounds.radius * 3.2;
+  // Close enough that the observed cloud fills the viewport, far enough that a
+  // limb swinging outside the first frame's bounds does not leave the view.
+  // Leave a measured margin around the cloud: the previous 2.6 factor filled
+  // the 40° frustum exactly and clipped the top/bottom of compact skeletons.
+  const distance = bounds.radius * 3.6;
   const [cx, cy, cz] = bounds.center;
   const offsets: Record<Exclude<CameraPreset, "free" | "reset">, [number, number, number]> = {
     front: [0, 0, distance],
@@ -221,7 +345,12 @@ export function cameraFor(
     body_local: [distance * 0.3, distance * 0.25, distance * 0.9],
   };
   if (preset === "free" || preset === "reset") {
-    return { position: [cx, cy + bounds.radius * 0.4, cz + distance], target: [cx, cy, cz] };
+    // A three-quarter view: a straight-on camera flattens the depth axis, and
+    // depth is where a markerless estimate is least certain.
+    return {
+      position: [cx + distance * 0.5, cy + distance * 0.22, cz + distance * 0.82],
+      target: [cx, cy, cz],
+    };
   }
   const [dx, dy, dz] = offsets[preset];
   return { position: [cx + dx, cy + dy, cz + dz], target: [cx, cy, cz] };

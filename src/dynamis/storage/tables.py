@@ -36,6 +36,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     ForeignKeyConstraint,
+    Index,
     Integer,
     String,
     Text,
@@ -71,6 +72,18 @@ def _ck(table: str, name: str, condition: str) -> CheckConstraint:
 
 JSON_EMPTY_OBJECT = text("'{}'::jsonb")
 JSON_EMPTY_ARRAY = text("'[]'::jsonb")
+
+
+def _serving_index(name: str, *columns: str) -> Index:
+    """Read-path index for the serving plane.
+
+    These indexes exist only so the analytical API can resolve a dataset,
+    session, stream, run or checksum without a sequential scan. They add no
+    column, constraint or semantic claim: the scientific authorities and their
+    uniqueness rules are exactly the same with or without them. Tables whose
+    primary key already leads with the filtered column are deliberately absent.
+    """
+    return Index(name, *columns)
 
 
 class LicensePolicy(Base):
@@ -549,6 +562,9 @@ class SkeletonDefinition(Base):
     #: an ordered landmark list with no parent graph at all).
     topology: Mapped[str] = mapped_column(String(16), nullable=False, server_default=text("'tree'"))
     joint_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    display_connections: Mapped[list[Any]] = mapped_column(
+        JSONB, nullable=False, server_default=JSON_EMPTY_ARRAY
+    )
     description: Mapped[str | None] = mapped_column(Text)
 
     __table_args__ = (
@@ -683,6 +699,9 @@ class SensorStream(Base):
             "pose_requires_skeleton",
             "(modality = 'pose') = (skeleton_id IS NOT NULL)",
         ),
+        # The primary key leads with stream_id, but session detail filters by
+        # session.
+        _serving_index("ix_sensor_stream_dataset_session", "dataset_id", "session_id"),
     )
 
 
@@ -785,6 +804,9 @@ class SampleArtifact(Base):
             "parquet_is_zstd",
             "format <> 'parquet' OR compression = 'zstd'",
         ),
+        _serving_index("ix_sample_artifact_dataset_stream", "dataset_id", "stream_id"),
+        # Provenance resolves an input by its recorded checksum.
+        _serving_index("ix_sample_artifact_checksum", "checksum_sha256"),
     )
 
 
@@ -826,6 +848,9 @@ class ProcessingRun(Base):
             "provenance_requires_inputs",
             "jsonb_array_length(input_checksums) > 0",
         ),
+        _serving_index("ix_processing_run_dataset", "dataset_id"),
+        # The runs surface pages newest-first over the whole table.
+        _serving_index("ix_processing_run_started_at", "started_at"),
     )
 
 
@@ -855,6 +880,8 @@ class ProcessingArtifact(Base):
         _ck("processing_artifact", "layer", LAYER_SQL),
         _ck("processing_artifact", "positive_size", "byte_size IS NULL OR byte_size > 0"),
         _ck("processing_artifact", "nonnegative_rows", "row_count IS NULL OR row_count >= 0"),
+        _serving_index("ix_processing_artifact_run", "run_id"),
+        _serving_index("ix_processing_artifact_checksum", "checksum_sha256"),
     )
 
 
@@ -904,6 +931,7 @@ class QualityIssue(Base):
             "nonnegative_sample_index",
             "sample_index IS NULL OR sample_index >= 0",
         ),
+        _serving_index("ix_quality_issue_dataset_session", "dataset_id", "session_id"),
     )
 
 
@@ -978,6 +1006,15 @@ class DerivedMetric(Base):
             "provenance_requires_inputs",
             "jsonb_array_length(input_checksums) > 0",
         ),
+        # Serving read paths: catalog counts, session metric pages, run metric
+        # counts and metric-wide comparison all filter this table, whose primary
+        # key is the opaque result id alone.
+        _serving_index("ix_derived_metric_dataset_session", "dataset_id", "session_id"),
+        _serving_index("ix_derived_metric_run", "run_id"),
+        # Leading metric_id serves point lookups; the dataset column makes
+        # catalog discovery ("which datasets serve this metric") index-only.
+        _serving_index("ix_derived_metric_metric_dataset", "metric_id", "dataset_id"),
+        _serving_index("ix_derived_metric_stream", "stream_id"),
     )
 
 

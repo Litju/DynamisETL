@@ -24,6 +24,7 @@ from dynamis.serving.models import (
     DatasetSummary,
     DatasetVersionView,
     LicenseView,
+    MetricCatalogEntry,
     MetricDefinitionView,
     MetricMethodology,
     MetricPage,
@@ -38,6 +39,7 @@ from dynamis.serving.models import (
     SessionDetail,
     SessionParticipantView,
     SessionSummary,
+    SkeletonDisplayConnectionView,
     StreamView,
     SubjectView,
     TrialView,
@@ -298,6 +300,65 @@ def list_sessions(connection: Connection, dataset_id: str) -> list[SessionSummar
     ]
 
 
+def _skeleton_authorities(
+    connection: Connection, skeleton_ids: set[str]
+) -> dict[str, tuple[str, list[str], list[SkeletonDisplayConnectionView]]]:
+    """Read persisted skeleton display topology separately from parentage."""
+    authorities: dict[str, tuple[str, list[str], list[SkeletonDisplayConnectionView]]] = {}
+    for skeleton_id in sorted(skeleton_ids):
+        if not skeleton_id:
+            continue
+        definition = (
+            connection.execute(
+                sa.text(
+                    "SELECT topology, display_connections FROM skeleton_definition "
+                    "WHERE skeleton_id = :skeleton_id"
+                ),
+                {"skeleton_id": skeleton_id},
+            )
+            .mappings()
+            .first()
+        )
+        if definition is None:
+            continue
+        joints = (
+            connection.execute(
+                sa.text(
+                    "SELECT joint_id, joint_name FROM skeleton_joint "
+                    "WHERE skeleton_id = :skeleton_id ORDER BY joint_id"
+                ),
+                {"skeleton_id": skeleton_id},
+            )
+            .mappings()
+            .all()
+        )
+        names_by_id = {int(row["joint_id"]): str(row["joint_name"]) for row in joints}
+        connections: list[SkeletonDisplayConnectionView] = []
+        for item in _list(definition["display_connections"]):
+            if not isinstance(item, dict):
+                continue
+            start = item.get("start_joint_name")
+            end = item.get("end_joint_name")
+            if not isinstance(start, str) or not isinstance(end, str):
+                start_id = item.get("start_joint_id")
+                end_id = item.get("end_joint_id")
+                start = names_by_id.get(start_id) if isinstance(start_id, int) else None
+                end = names_by_id.get(end_id) if isinstance(end_id, int) else None
+            if isinstance(start, str) and isinstance(end, str):
+                connections.append(
+                    SkeletonDisplayConnectionView(
+                        start_joint_name=start,
+                        end_joint_name=end,
+                    )
+                )
+        authorities[skeleton_id] = (
+            str(definition["topology"]),
+            [str(row["joint_name"]) for row in joints],
+            connections,
+        )
+    return authorities
+
+
 def session_detail(
     connection: Connection, dataset_id: str, session_id: str
 ) -> SessionDetail | None:
@@ -366,6 +427,10 @@ def session_detail(
         .mappings()
         .all()
     )
+    skeletons = _skeleton_authorities(
+        connection,
+        {str(row["skeleton_id"]) for row in streams if row["skeleton_id"] is not None},
+    )
     return SessionDetail(
         dataset_id=dataset_id,
         session=SessionSummary(
@@ -412,6 +477,21 @@ def session_detail(
                 synchronization_spec_id=row["synchronization_spec_id"],
                 clock_id=row["clock_id"],
                 skeleton_id=row["skeleton_id"],
+                skeleton_topology=(
+                    skeletons.get(str(row["skeleton_id"]), (None, [], []))[0]
+                    if row["skeleton_id"] is not None
+                    else None
+                ),
+                skeleton_joint_names=(
+                    skeletons.get(str(row["skeleton_id"]), (None, [], []))[1]
+                    if row["skeleton_id"] is not None
+                    else []
+                ),
+                skeleton_display_connections=(
+                    skeletons.get(str(row["skeleton_id"]), (None, [], []))[2]
+                    if row["skeleton_id"] is not None
+                    else []
+                ),
                 sample_artifact_ids=[str(item) for item in _list(row["artifact_ids"])],
                 sample_row_count=int(row["sample_row_count"]),
             )
@@ -428,7 +508,9 @@ def gold_published(connection: Connection, gold_schema: str) -> bool:
     return relation is not None
 
 
-def _metric_filters_sql(filters: MetricFilters) -> tuple[str, dict[str, Any]]:
+def _metric_filters_sql(
+    filters: MetricFilters, *, gold: bool = False
+) -> tuple[str, dict[str, Any]]:
     clauses: list[str] = []
     parameters = filters.parameters()
     for name, value in parameters.items():
@@ -436,7 +518,11 @@ def _metric_filters_sql(filters: MetricFilters) -> tuple[str, dict[str, Any]]:
             continue
         column = "entity_id" if name == "entity_id" else name
         if name == "entity_id":
-            clauses.append("COALESCE(provenance ->> 'entity_id', '') = :entity_id")
+            clauses.append(
+                "COALESCE(entity_id, '') = :entity_id"
+                if gold
+                else "COALESCE(provenance ->> 'entity_id', '') = :entity_id"
+            )
         else:
             clauses.append(f"{column} = :{name}")
     where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
@@ -477,8 +563,9 @@ def query_metrics(
     offset: int,
 ) -> MetricPage:
     """Current-revision scalar metrics, from Gold serving when published."""
-    where, parameters = _metric_filters_sql(filters)
-    if gold_published(connection, gold_schema):
+    is_gold = gold_published(connection, gold_schema)
+    where, parameters = _metric_filters_sql(filters, gold=is_gold)
+    if is_gold:
         mart = f'"{gold_schema}"."{TRIAL_METRICS_MART}"'
         total = connection.execute(
             sa.text(f"SELECT count(*) FROM {mart}{where}"), parameters
@@ -579,6 +666,56 @@ def query_metrics(
             for row in rows
         ],
     )
+
+
+def list_metric_definitions(connection: Connection) -> list[MetricCatalogEntry]:
+    """Registered metric definitions with the datasets that actually serve them.
+
+    Discovery needs the vocabulary, not the values: a reader choosing what to
+    compare or inspect should not have to page through 77k derived rows to find
+    out which metric ids exist. The served-dataset list comes from the derived
+    rows so the catalog never offers a metric nothing has computed.
+    """
+    rows = (
+        connection.execute(
+            sa.text(
+                """SELECT d.metric_id, d.name, d.si_unit, d.measurement_class, d.value_kind,
+                    d.description, d.algorithm_id,
+                    coalesce(s.dataset_ids, '[]'::json) AS dataset_ids,
+                    coalesce(c.value_count, 0) AS value_count
+                FROM metric_definition d
+                LEFT JOIN (
+                    -- Distinct pairs first, then aggregate. A DISTINCT inside
+                    -- the aggregate sorts every row of each group; this form is
+                    -- an index-only scan of (metric_id, dataset_id).
+                    SELECT metric_id, json_agg(dataset_id ORDER BY dataset_id) AS dataset_ids
+                    FROM (SELECT DISTINCT metric_id, dataset_id FROM derived_metric) pairs
+                    GROUP BY metric_id
+                ) s ON s.metric_id = d.metric_id
+                LEFT JOIN (
+                    SELECT metric_id, count(*) AS value_count
+                    FROM derived_metric GROUP BY metric_id
+                ) c ON c.metric_id = d.metric_id
+                ORDER BY d.metric_id"""
+            )
+        )
+        .mappings()
+        .all()
+    )
+    return [
+        MetricCatalogEntry(
+            metric_id=row["metric_id"],
+            name=row["name"],
+            si_unit=row["si_unit"],
+            measurement_class=row["measurement_class"],
+            value_kind=row["value_kind"],
+            description=row["description"],
+            algorithm_id=row["algorithm_id"],
+            dataset_ids=[str(item) for item in _list(row["dataset_ids"])],
+            value_count=int(row["value_count"]),
+        )
+        for row in rows
+    ]
 
 
 def metric_methodology(connection: Connection, metric_id: str) -> MetricMethodology | None:

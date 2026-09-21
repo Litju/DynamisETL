@@ -102,4 +102,18 @@ describe("window table from JSON fallback", () => {
       [0.00001, 1, 3],
     ]);
   });
+
+  it("infers numeric columns after leading null gaps", () => {
+    const leadingGap = tableFromJson(
+      windowOf(
+        [
+          { t_rel_ns: 0, x_m: null },
+          { t_rel_ns: 10, x_m: 1.5 },
+        ],
+        ["t_rel_ns", "x_m"],
+      ),
+    );
+    expect(measureColumns(leadingGap)).toEqual(["x_m"]);
+    expect(Array.from(leadingGap.numeric.get("x_m") ?? [])).toEqual([Number.NaN, 1.5]);
+  });
 });
