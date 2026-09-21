@@ -16,6 +16,11 @@ import type { MetricSummary, ZoneSeries } from "@/lib/overview-summaries";
 /** Entities shown before the chart becomes a wall of labels. */
 export const MAX_RANKED_ENTITIES = 18;
 
+function axisLabel(value: unknown): string {
+  const label = String(value);
+  return label.length > 28 ? `${label.slice(0, 27)}…` : label;
+}
+
 function valueFormatter(unit: string) {
   return (value: number): string => {
     if (!Number.isFinite(value)) return "unavailable";
@@ -49,7 +54,7 @@ export function rankedMetricOption(
       enabled: true,
       description: `${summary.metricName} for each entity, ranked, in ${summary.siUnit}.`,
     },
-    grid: { left: 8, right: 64, top: 8, bottom: 26, containLabel: true },
+    grid: { left: 16, right: 64, top: 8, bottom: 26, containLabel: true },
     tooltip: {
       trigger: "item",
       backgroundColor: palette.surface,
@@ -66,14 +71,14 @@ export function rankedMetricOption(
       name: summary.siUnit === "1" ? "" : summary.siUnit,
       nameLocation: "end",
       nameTextStyle: { color: palette.textMuted, fontSize: 10 },
-      axisLabel: { color: palette.axis, fontSize: 10 },
+      axisLabel: { color: palette.axis, fontSize: 10, formatter: axisLabel },
       axisLine: { lineStyle: { color: palette.border } },
       splitLine: { lineStyle: { color: palette.grid } },
     },
     yAxis: {
       type: "category",
       data: entries.map((entry) => entry.entityId),
-      axisLabel: { color: palette.axis, fontSize: 10 },
+      axisLabel: { color: palette.axis, fontSize: 10, formatter: axisLabel },
       axisLine: { lineStyle: { color: palette.border } },
       axisTick: { show: false },
     },

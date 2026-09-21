@@ -264,7 +264,9 @@ export function cameraFor(
 ): { position: [number, number, number]; target: [number, number, number] } {
   // Close enough that the observed cloud fills the viewport, far enough that a
   // limb swinging outside the first frame's bounds does not leave the view.
-  const distance = bounds.radius * 2.6;
+  // Leave a measured margin around the cloud: the previous 2.6 factor filled
+  // the 40° frustum exactly and clipped the top/bottom of compact skeletons.
+  const distance = bounds.radius * 3.6;
   const [cx, cy, cz] = bounds.center;
   const offsets: Record<Exclude<CameraPreset, "free" | "reset">, [number, number, number]> = {
     front: [0, 0, distance],

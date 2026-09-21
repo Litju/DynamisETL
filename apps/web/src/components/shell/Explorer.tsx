@@ -114,7 +114,7 @@ function ExplorerForSession({
       <button
         type="button"
         onClick={() => setTrialsOpen((open) => !open)}
-        className="t-section flex w-full items-center gap-1 py-1 text-text-muted hover:text-text-secondary"
+        className="t-section t-control-compact flex w-full items-center gap-1 py-1 text-text-muted hover:text-text-secondary"
       >
         {trialsOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />} Trials
       </button>
@@ -158,7 +158,7 @@ function ExplorerForSession({
       <button
         type="button"
         onClick={() => setStreamsOpen((open) => !open)}
-        className="t-section flex w-full items-center gap-1 py-1 text-text-muted hover:text-text-secondary"
+        className="t-section t-control-compact flex w-full items-center gap-1 py-1 text-text-muted hover:text-text-secondary"
       >
         {streamsOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />} Streams
       </button>
