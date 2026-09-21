@@ -168,6 +168,7 @@ export function PoseViewer() {
 
   const [preset, setPreset] = useState<CameraPreset>("reset");
   const [showProviderSkeleton, setShowProviderSkeleton] = useState(true);
+  const [showTorsoCue, setShowTorsoCue] = useState(true);
   const [showSegments, setShowSegments] = useState(true);
   const [showAngles, setShowAngles] = useState(true);
   const [showErrorRadii, setShowErrorRadii] = useState(false);
@@ -322,6 +323,7 @@ export function PoseViewer() {
               preset={preset}
               playing={playing}
               showProviderSkeleton={showProviderSkeleton}
+              showTorsoCue={showTorsoCue}
               showSegments={showSegments}
               showAngles={showAngles}
               showErrorRadii={showErrorRadii}
@@ -409,6 +411,15 @@ export function PoseViewer() {
               <input
                 type="checkbox"
                 className="size-6 shrink-0"
+                checked={showTorsoCue}
+                onChange={(event) => setShowTorsoCue(event.target.checked)}
+              />
+              view-only torso cue
+            </label>
+            <label className="flex items-center gap-1 text-text-muted">
+              <input
+                type="checkbox"
+                className="size-6 shrink-0"
                 checked={showAngles}
                 onChange={(event) => setShowAngles(event.target.checked)}
               />
@@ -443,6 +454,9 @@ export function PoseViewer() {
             </span>
             <p className="text-text-muted">
               {providerConnections.length} provider display connection(s) · landmark_set · no parent tree
+            </p>
+            <p className="text-[10px] text-text-muted">
+              Shoulder-to-hip torso cue is display-only and not provider topology or processor anatomy.
             </p>
           </div>
           <div className="mb-2">

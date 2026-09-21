@@ -23,9 +23,18 @@ import { useAnalysisStore } from "@/lib/state/analysis";
 export const JOINT_COLOR = "#7fd1e8";
 export const SELECTED_JOINT_COLOR = "#ffd166";
 export const PROVIDER_SKELETON_COLOR = "#6d9eb4";
+export const TORSO_CUE_COLOR = "#9dc6d4";
 export const SEGMENT_COLOR = "#b48ef0";
 export const ANGLE_COLOR = "#e884b4";
 export const ERROR_RADIUS_COLOR = "#e8a13f";
+
+// Readability cue only. These two shoulder-to-hip spans are not added to the
+// provider authority or processor overlays; they make the torso legible while
+// keeping source display topology and analytical definitions separate.
+const TORSO_CUE_CONNECTIONS: readonly DisplayConnectionDefinition[] = [
+  { startLandmark: "lShoulder", endLandmark: "lHip" },
+  { startLandmark: "rShoulder", endLandmark: "rHip" },
+];
 
 /**
  * R3F pose scene. Joint glyphs update imperatively in `useFrame` from the
@@ -39,6 +48,7 @@ export function PoseScene({
   providerConnections,
   preset,
   showProviderSkeleton,
+  showTorsoCue,
   showSegments,
   showAngles,
   showErrorRadii,
@@ -48,6 +58,7 @@ export function PoseScene({
   providerConnections: readonly DisplayConnectionDefinition[];
   preset: CameraPreset;
   showProviderSkeleton: boolean;
+  showTorsoCue: boolean;
   showSegments: boolean;
   showAngles: boolean;
   showErrorRadii: boolean;
@@ -233,6 +244,22 @@ export function PoseScene({
             />
           ))
         : null}
+      {showTorsoCue
+        ? TORSO_CUE_CONNECTIONS.map((connection) => {
+            const start = byName.get(connection.startLandmark);
+            const end = byName.get(connection.endLandmark);
+            if (!start || !end) return null;
+            return (
+              <DynamicPoseLine
+                key={`torso-cue-${connection.startLandmark}-${connection.endLandmark}`}
+                initialPoints={[toViewerPoint(start, centre), toViewerPoint(end, centre)]}
+                getPoints={() => connectionPoints(landmarksRef.current, connection, centre)}
+                color={TORSO_CUE_COLOR}
+                lineWidth={1.5}
+              />
+            );
+          })
+        : null}
       {showSegments
         ? overlays.segments.map((segment) => {
             const start = byName.get(segment.startLandmark);
@@ -403,6 +430,7 @@ export function PoseCanvas({
   preset,
   playing,
   showProviderSkeleton,
+  showTorsoCue,
   showSegments,
   showAngles,
   showErrorRadii,
@@ -414,6 +442,7 @@ export function PoseCanvas({
   preset: CameraPreset;
   playing: boolean;
   showProviderSkeleton: boolean;
+  showTorsoCue: boolean;
   showSegments: boolean;
   showAngles: boolean;
   showErrorRadii: boolean;
@@ -433,6 +462,7 @@ export function PoseCanvas({
         providerConnections={providerConnections}
         preset={preset}
         showProviderSkeleton={showProviderSkeleton}
+        showTorsoCue={showTorsoCue}
         showSegments={showSegments}
         showAngles={showAngles}
         showErrorRadii={showErrorRadii}
