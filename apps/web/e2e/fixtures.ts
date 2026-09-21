@@ -120,6 +120,8 @@ const TRACKING_ARTIFACT = {
   si_units: ["m"],
   coordinate_frame_id: "skillcorner-pitch-m",
   synchronization_spec_id: "skillcorner-source-provided-match-clock",
+  canonical_time_min_ns: 0,
+  canonical_time_max_ns: 100_000_000,
 };
 
 const POSE_ARTIFACT = {
@@ -213,6 +215,20 @@ export const METRIC = {
   computed_at: "2026-09-18T12:00:00+00:00",
   provenance: { gap_policy: { strategy: "contiguous_segments" } },
 };
+
+const METRIC_DEFINITIONS = [
+  {
+    metric_id: METRIC.metric_id,
+    name: METRIC.metric_name,
+    si_unit: METRIC.si_unit,
+    measurement_class: METRIC.measurement_class,
+    value_kind: METRIC.value_kind,
+    description: METRIC.metric_description,
+    algorithm_id: METRIC.algorithm_id,
+    dataset_ids: [DATASET.dataset_id],
+    value_count: 1,
+  },
+];
 
 export const PROVENANCE = {
   derived_metric_id: "dm-pose-rom",
@@ -354,6 +370,7 @@ function body(pathname: string): unknown | undefined {
   if (pathname === "/api/catalog/datasets/skillcorner-opendata/sessions") return [SESSION.session];
   if (pathname === "/api/catalog/datasets/skillcorner-opendata/sessions/1925299") return SESSION;
   if (pathname === "/api/metrics") return { source: "gold", total: 1, limit: 250, offset: 0, rows: [METRIC] };
+  if (pathname === "/api/metrics/definitions") return METRIC_DEFINITIONS;
   if (pathname.startsWith("/api/metrics/methodology/")) return METHODOLOGY;
   if (pathname === `/api/derived-metrics/${METRIC.derived_metric_id}/provenance`) return PROVENANCE;
   if (pathname === "/api/quality") return QUALITY;

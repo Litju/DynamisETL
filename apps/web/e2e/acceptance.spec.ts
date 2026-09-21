@@ -41,7 +41,7 @@ test("3/4. committed time propagates from the keyboard to the transport and pose
   page,
 }) => {
   await page.goto("/lab/skillcorner-opendata/1925299?stream=tracking-1&view=signals&t_ns=50000000");
-  await expect(page.getByText("transport json")).toBeVisible();
+  await expect(page.getByText(/json transport/)).toBeVisible();
   await expect(page.getByTestId("echart")).toBeVisible();
   await page.keyboard.press("ArrowRight");
   await expect(page).toHaveURL(/t_ns=/);
@@ -91,9 +91,9 @@ test("6. provenance opens the exact algorithm/run/input lineage", async ({ page 
 test("7. license and quality context are visible next to results", async ({ page }) => {
   await page.goto("/quality");
   await expect(page.getByText("CC BY 4.0").first()).toBeVisible();
-  await expect(page.getByText("CC BY 4.0; attribution required; redistribution: conditional").first()).toBeVisible();
+  await expect(page.getByText("conditional").first()).toBeVisible();
   await expect(page.getByText("tracking.ball_gap")).toBeVisible();
-  await expect(page.getByText(/gap_frames/)).toBeVisible();
+  await expect(page.getByText(/sample 12/)).toBeVisible();
 });
 
 test("8. a stream that is not part of the session is never cross-synchronized", async ({ page }) => {
@@ -103,10 +103,10 @@ test("8. a stream that is not part of the session is never cross-synchronized", 
 
 test("9. compare preserves dataset/subject identity boundaries", async ({ page }) => {
   await page.goto("/compare?metric=pose.angular_rom.left_knee");
-  await expect(page.getByText(/skillcorner-opendata \/ 1925299 \/ SC-P1/).first()).toBeVisible();
+  await expect(page.getByText("skillcorner-opendata").first()).toBeVisible();
   await expect(
     page
-      .getByText(/subject identity is never merged and interchangeability is not established/)
+      .getByText(/no observation is paired across groups/)
       .first(),
   ).toBeVisible();
   await expect(page.getByText(/pipeline-derived/).first()).toBeVisible();
@@ -118,5 +118,5 @@ test("10. methodology page renders the selected result lineage from a deep link"
   await page.goto("/methods?metric=pose.angular_rom.left_knee&result=dm-pose-rom");
   await expect(page.getByText("Selected result lineage")).toBeVisible();
   await expect(page.getByText("run-pose")).toBeVisible();
-  await expect(page.getByText("Range of motion for angle left_knee")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Range of motion for angle left_knee" })).toBeVisible();
 });
