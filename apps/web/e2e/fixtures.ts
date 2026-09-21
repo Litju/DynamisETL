@@ -143,6 +143,9 @@ const TRACKING_ARTIFACT = {
   synchronization_spec_id: "skillcorner-source-provided-match-clock",
   canonical_time_min_ns: 0,
   canonical_time_max_ns: 100_000_000,
+  entity_column: "object_id",
+  entity_count: 2,
+  entity_ids: ["p1", "p2"],
 };
 
 const POSE_ARTIFACT = {
@@ -182,6 +185,59 @@ const TRACKING_WINDOW = {
   ],
 };
 
+const POSE_LANDMARKS = [
+  "nose", "neck", "lEye", "rEye", "lEar", "rEar", "lShoulder", "rShoulder",
+  "lElbow", "rElbow", "lWrist", "rWrist", "lThumb", "rThumb", "lPinky", "rPinky",
+  "midHip", "lHip", "rHip", "lKnee", "rKnee", "lAnkle", "rAnkle", "lHeel",
+  "rHeel", "lBigToe", "rBigToe", "lSmallToe", "rSmallToe",
+] as const;
+
+const POSE_LANDMARK_COORDINATES: Record<string, [number, number, number]> = {
+  nose: [0, 0, 0.9],
+  neck: [0, 0, 0.55],
+  lEye: [-0.06, -0.01, 0.94],
+  rEye: [0.06, -0.01, 0.94],
+  lEar: [-0.12, 0, 0.88],
+  rEar: [0.12, 0, 0.88],
+  lShoulder: [-0.25, 0, 0.5],
+  rShoulder: [0.25, 0, 0.5],
+  lElbow: [-0.45, 0, 0.18],
+  rElbow: [0.45, 0, 0.18],
+  lWrist: [-0.58, 0, -0.12],
+  rWrist: [0.58, 0, -0.12],
+  lThumb: [-0.66, -0.03, -0.2],
+  rThumb: [0.66, -0.03, -0.2],
+  lPinky: [-0.66, 0.04, -0.16],
+  rPinky: [0.66, 0.04, -0.16],
+  midHip: [0, 0, -0.35],
+  lHip: [-0.18, 0, -0.4],
+  rHip: [0.18, 0, -0.4],
+  lKnee: [-0.2, 0.01, -0.85],
+  rKnee: [0.2, 0.01, -0.85],
+  lAnkle: [-0.18, 0.02, -1.25],
+  rAnkle: [0.18, 0.02, -1.25],
+  lHeel: [-0.18, -0.08, -1.3],
+  rHeel: [0.18, -0.08, -1.3],
+  lBigToe: [-0.18, 0.12, -1.3],
+  rBigToe: [0.18, 0.12, -1.3],
+  lSmallToe: [-0.28, 0.12, -1.3],
+  rSmallToe: [0.28, 0.12, -1.3],
+};
+
+const POSE_ROWS = POSE_LANDMARKS.map((joint_name) => {
+  const coordinates = POSE_LANDMARK_COORDINATES[joint_name] ?? [0, 0, 0];
+  return {
+    t_rel_ns: 0,
+    subject_id: "SC-P1",
+    joint_name,
+    is_available: true,
+    x_m: coordinates[0],
+    y_m: coordinates[1],
+    z_m: coordinates[2],
+    error_m: joint_name === "lKnee" ? 0.04 : joint_name === "lAnkle" ? 0.05 : 0.03,
+  };
+});
+
 const POSE_WINDOW = {
   meta: {
     artifact: POSE_ARTIFACT,
@@ -197,8 +253,8 @@ const POSE_WINDOW = {
       "z_m",
       "error_m",
     ],
-    source_rows: 4,
-    returned_rows: 4,
+    source_rows: POSE_ROWS.length,
+    returned_rows: POSE_ROWS.length,
     canonical_time_min_ns: 0,
     canonical_time_max_ns: 100_000_000,
     reduction: null,
@@ -207,12 +263,7 @@ const POSE_WINDOW = {
     measurement_class: "MODEL_ESTIMATED",
     display_note: "Exact.",
   },
-  rows: [
-    { t_rel_ns: 0, subject_id: "SC-P1", joint_name: "lHip", is_available: true, x_m: 0, y_m: 0, z_m: -0.4, error_m: 0.03 },
-    { t_rel_ns: 0, subject_id: "SC-P1", joint_name: "lKnee", is_available: true, x_m: 0.05, y_m: 0, z_m: -0.85, error_m: 0.04 },
-    { t_rel_ns: 0, subject_id: "SC-P1", joint_name: "lAnkle", is_available: true, x_m: 0.1, y_m: 0.05, z_m: -1.25, error_m: 0.05 },
-    { t_rel_ns: 0, subject_id: "SC-P1", joint_name: "nose", is_available: false, x_m: null, y_m: null, z_m: null, error_m: null },
-  ],
+  rows: POSE_ROWS,
 };
 
 export const METRIC = {

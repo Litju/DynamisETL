@@ -379,6 +379,7 @@ export function PoseViewer() {
           <label className="mb-2 flex items-center gap-1 text-text-muted">
             <input
               type="checkbox"
+              className="size-6 shrink-0"
               checked={showErrorRadii}
               onChange={(event) => setShowErrorRadii(event.target.checked)}
             />
@@ -389,6 +390,7 @@ export function PoseViewer() {
             <label className="flex items-center gap-1 text-text-muted">
               <input
                 type="checkbox"
+                className="size-6 shrink-0"
                 checked={showProviderSkeleton}
                 onChange={(event) => setShowProviderSkeleton(event.target.checked)}
               />
@@ -397,6 +399,7 @@ export function PoseViewer() {
             <label className="flex items-center gap-1 text-text-muted">
               <input
                 type="checkbox"
+                className="size-6 shrink-0"
                 checked={showSegments}
                 onChange={(event) => setShowSegments(event.target.checked)}
               />
@@ -405,6 +408,7 @@ export function PoseViewer() {
             <label className="flex items-center gap-1 text-text-muted">
               <input
                 type="checkbox"
+                className="size-6 shrink-0"
                 checked={showAngles}
                 onChange={(event) => setShowAngles(event.target.checked)}
               />

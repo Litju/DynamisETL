@@ -340,8 +340,10 @@ def _skeleton_authorities(
             start = item.get("start_joint_name")
             end = item.get("end_joint_name")
             if not isinstance(start, str) or not isinstance(end, str):
-                start = names_by_id.get(item.get("start_joint_id"))
-                end = names_by_id.get(item.get("end_joint_id"))
+                start_id = item.get("start_joint_id")
+                end_id = item.get("end_joint_id")
+                start = names_by_id.get(start_id) if isinstance(start_id, int) else None
+                end = names_by_id.get(end_id) if isinstance(end_id, int) else None
             if isinstance(start, str) and isinstance(end, str):
                 connections.append(
                     SkeletonDisplayConnectionView(
