@@ -1,6 +1,6 @@
 """Persist provider-published skeleton display connections.
 
-Revision ID: 0007_skeleton_display_connections
+Revision ID: 0007_skeleton_display
 Revises: 0006_metric_catalog_index
 Create Date: 2026-09-21 00:00:00.000000
 
@@ -17,7 +17,7 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0007_skeleton_display_connections"
+revision: str = "0007_skeleton_display"
 down_revision: str | None = "0006_metric_catalog_index"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
