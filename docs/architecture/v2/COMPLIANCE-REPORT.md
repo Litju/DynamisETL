@@ -104,7 +104,7 @@ frame authority.
 | Observation authority | Artifact/entity first/last observed canonical time and observed-frame count; bounded range route handles a first observation inside an explicit range |
 | UI semantics | Observed frame, temporary absence, no Pose in period/range, and Switching/loading are distinct; no-frame telemetry never lists every landmark as provider-unavailable |
 | Browser regression matrix | Paused >10 s, playing, BUFFERING, numeric ID, body-local individual, all-subject focus, first observation >0, temporary absence, no Pose, reload/back-forward, and replacement-request survival |
-| Real local SkillCorner switch | `11897` at 17,417,738,000 ns → `50999` at its actual first observed time 32,920,000,000 ns; replacement exact chunk returned 10,817 rows; no page errors |
+| Real local SkillCorner switch | Paused at `11897` / 17,417,738,000 ns → `50999` / first observation 32,920,000,000 ns; exact selected-range response returned 18,763 rows; switching back resolved `11897` to its first exact observation in the active range (23,440,000,000 ns); no page errors |
 
 The real local browser receipt uses the period-1 source Parquet. The bounded
 fixture contains only the selected subject rows and remains outside the repo.
@@ -113,7 +113,7 @@ and [prepare-res109-real-pose.py](../../../apps/web/e2e/prepare-res109-real-pose
 
 - Source artifact: `silver/dataset_id=skillcorner-opendata/modality=pose/session_id=1925299/pose-period-1.parquet`, SHA-256 `0bbe2b182716bda3307b316e3c307ef2470753f9ced05a73fb24effcfe412da4`
 - Bounded fixture: `E:\Data\Temp\DynamisETL-res109-real-pose-fixture.json`, SHA-256 `3FD6EACD800F6A1AF9389FC70215B75A8EB98E536C66E5B6FC59D66D6720F193`
-- Browser receipt: `E:\Data\Temp\DynamisETL-res109-real-subject-switch.json`, SHA-256 `BE3CD921B50A6A26EB732152207585C0FE085F4FFD6285B14CDBD3BDB3649D47`
+- Browser receipt: `E:\Data\Temp\DynamisETL-res109-real-subject-switch.json`, SHA-256 `D7EAFBADAABC3CB98B01524A45EE78C3ADA946DEA533BB68B84FF92BD9AC7A96`
 
 ## 📦 Runtime and deployment readiness
 
