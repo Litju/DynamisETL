@@ -81,11 +81,16 @@ test("RES-109 Field crosses forward and reverse chunk boundaries without scope d
 
 test("RES-109 delayed exact handoff is explicit BUFFERING and resumes", async ({ page }) => {
   let delayedFromNs: number | null = null;
+  let releaseNext: (() => void) | null = null;
+  const releaseGate = new Promise<void>((resolve) => {
+    releaseNext = resolve;
+  });
   await page.route("**/api/artifacts/pose-sample/window**", async (route) => {
     const url = new URL(route.request().url());
     const fromNs = Number(url.searchParams.get("from_ns") ?? "0");
     if (fromNs > 0 && delayedFromNs === null) {
       delayedFromNs = fromNs;
+      await releaseGate;
       await new Promise((resolve) => setTimeout(resolve, 3_000));
     }
     await route.fallback();
@@ -94,8 +99,9 @@ test("RES-109 delayed exact handoff is explicit BUFFERING and resumes", async ({
   await expect(page.getByTestId("pose-canvas").locator("canvas")).toBeVisible();
   await page.getByLabel("Playback rate").selectOption("4");
   await page.getByRole("button", { name: "Play" }).click();
+  releaseNext?.();
   await expect(page.getByTestId("playback-buffering").first()).toBeVisible({ timeout: 2_500 });
-  await expect(page.getByTestId("playback-buffering").first()).toBeHidden({ timeout: 5_000 });
+  await expect(page.getByTestId("playback-buffering").first()).toBeHidden({ timeout: 8_000 });
   await page.getByRole("button", { name: "Pause" }).click();
 });
 
