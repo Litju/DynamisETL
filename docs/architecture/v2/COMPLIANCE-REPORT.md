@@ -53,8 +53,8 @@ Immutable external receipt locators (SHA-256):
 
 | Gate | Evidence | Result |
 | --- | --- | --- |
-| Python synthetic suite | `uv run --no-sync pytest -m "not postgres"` | 562 passed, 16 deselected |
-| PostgreSQL migration suite | Docker PostgreSQL 18.6, Alembic lifecycle and repository tests | 16 passed, 562 deselected |
+| Python synthetic suite | `uv run --no-sync pytest -m "not postgres"` | 566 passed, 16 deselected |
+| PostgreSQL migration suite | Docker PostgreSQL 18.6, Alembic lifecycle and repository tests | 16 passed, 566 deselected on the §12 implementation; hosted CI reruns this gate on final head |
 | Processor profile | Force CMJ, IMU, GNSS/tracking, LPT, Pose, cross-sensor; synthetic + accepted/local samples | No Polars/PyO3/Rust trigger |
 | Registry/rights | `dynamis.registry.main()` | Passed; 8 sources, complete modality coverage |
 | Synthetic artifacts | All 8 deterministic fixtures materialized outside repository | Passed |
@@ -73,10 +73,10 @@ Scientific authorities, measurement classes, coordinate frames, processing prove
 | --- | --- |
 | TypeScript typecheck | Passed |
 | ESLint | 0 errors; 2 pre-existing warnings |
-| Vitest/component tests | 138 passed across 23 files |
+| Vitest/component tests | 141 passed across 24 files |
 | Generated OpenAPI drift | Passed |
 | Production Vite build | Passed; uPlot lazy chunk 51.04 kB |
-| Playwright + axe + visual + responsive + lazy-loading + acceptance + renderer smoke | 57 passed |
+| Playwright + axe + visual + responsive + lazy-loading + acceptance + renderer smoke | 63 passed; optional real-data test skipped without its external fixture and passed separately |
 | Real renderer smoke | uPlot, Pixi, and R3F canvas/context checks passed |
 | WebGPU evaluation | WebGL2 available; WebGPU unavailable in target Chromium; WebGL2 frozen |
 
@@ -104,6 +104,16 @@ frame authority.
 | Observation authority | Artifact/entity first/last observed canonical time and observed-frame count; bounded range route handles a first observation inside an explicit range |
 | UI semantics | Observed frame, temporary absence, no Pose in period/range, and Switching/loading are distinct; no-frame telemetry never lists every landmark as provider-unavailable |
 | Browser regression matrix | Paused >10 s, playing, BUFFERING, numeric ID, body-local individual, all-subject focus, first observation >0, temporary absence, no Pose, reload/back-forward, and replacement-request survival |
+| Real local SkillCorner switch | `11897` at 17,417,738,000 ns → `50999` at its actual first observed time 32,920,000,000 ns; replacement exact chunk returned 10,817 rows; no page errors |
+
+The real local browser receipt uses the period-1 source Parquet. The bounded
+fixture contains only the selected subject rows and remains outside the repo.
+The reproduction harness is [res109-real-data.spec.ts](../../../apps/web/e2e/res109-real-data.spec.ts)
+and [prepare-res109-real-pose.py](../../../apps/web/e2e/prepare-res109-real-pose.py).
+
+- Source artifact: `silver/dataset_id=skillcorner-opendata/modality=pose/session_id=1925299/pose-period-1.parquet`, SHA-256 `0bbe2b182716bda3307b316e3c307ef2470753f9ced05a73fb24effcfe412da4`
+- Bounded fixture: `E:\Data\Temp\DynamisETL-res109-real-pose-fixture.json`, SHA-256 `3FD6EACD800F6A1AF9389FC70215B75A8EB98E536C66E5B6FC59D66D6720F193`
+- Browser receipt: `E:\Data\Temp\DynamisETL-res109-real-subject-switch.json`, SHA-256 `BE3CD921B50A6A26EB732152207585C0FE085F4FFD6285B14CDBD3BDB3649D47`
 
 ## 📦 Runtime and deployment readiness
 
