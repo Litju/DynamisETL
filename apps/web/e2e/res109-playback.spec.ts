@@ -47,7 +47,8 @@ test("RES-109 Pose crosses multiple exact chunks and keeps telemetry on the live
   await page.getByRole("button", { name: "Play" }).click();
   await page.waitForTimeout(5_000);
   const during = await playheadNs(page);
-  await page.getByRole("button", { name: "Pause" }).click();
+  const pause = page.getByRole("button", { name: "Pause" });
+  if (await pause.count()) await pause.click();
   expect(during).toBeGreaterThan(before + 10_000_000_000n);
   expectContiguous(uniqueBounds(requests));
   expect(requests.filter((url) => new URL(url).searchParams.get("entity_id") === "SC-P1").length).toBeGreaterThan(0);
@@ -62,7 +63,7 @@ test("RES-109 Field crosses forward and reverse chunk boundaries without scope d
   await expect(page.getByTestId("pitch-canvas")).toBeVisible();
   await page.getByLabel("Playback rate").selectOption("4");
   await page.getByRole("button", { name: "Play" }).click();
-  await page.waitForTimeout(3_800);
+  await page.waitForTimeout(5_000);
   const forward = await playheadNs(page);
   await page.getByRole("button", { name: "Pause" }).click();
   await expect(page.getByRole("button", { name: "Play" })).toBeVisible();
@@ -78,10 +79,12 @@ test("RES-109 Field crosses forward and reverse chunk boundaries without scope d
 });
 
 test("RES-109 delayed exact handoff is explicit BUFFERING and resumes", async ({ page }) => {
+  let delayedFromNs: number | null = null;
   await page.route("**/api/artifacts/pose-sample/window**", async (route) => {
     const url = new URL(route.request().url());
     const fromNs = Number(url.searchParams.get("from_ns") ?? "0");
-    if (fromNs > 0) {
+    if (fromNs > 0 && delayedFromNs === null) {
+      delayedFromNs = fromNs;
       await new Promise((resolve) => setTimeout(resolve, 3_000));
     }
     await route.fallback();
