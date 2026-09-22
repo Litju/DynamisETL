@@ -8,8 +8,11 @@ import pytest
 from dynamis.storage.object_store import (
     LocalObjectStore,
     ObjectStoreError,
+    S3ObjectStore,
     immutable_object_key,
 )
+from dynamis.storage.control_plane import _positive_int
+from dynamis.config import ConfigurationError
 
 
 def test_local_object_store_is_checksum_bound_and_range_readable(tmp_path: Path) -> None:
@@ -35,3 +38,32 @@ def test_local_object_store_rejects_traversal_and_checksum_drift(tmp_path: Path)
         store.put_file(source, key="../escape", checksum_sha256=checksum)
     with pytest.raises(ObjectStoreError):
         store.put_file(source, key=immutable_object_key(checksum), checksum_sha256="0" * 64)
+
+
+def test_credentialed_s3_requires_https_except_loopback() -> None:
+    with pytest.raises(ObjectStoreError, match="https"):
+        S3ObjectStore(
+            endpoint="http://object-store.example",
+            bucket="private",
+            access_key="access",
+            secret_key="secret",
+        )
+    S3ObjectStore(
+        endpoint="http://127.0.0.1:9000",
+        bucket="private",
+        access_key="access",
+        secret_key="secret",
+    )
+    with pytest.raises(ObjectStoreError, match="absolute URL"):
+        S3ObjectStore(
+            endpoint="https://",
+            bucket="private",
+            access_key="access",
+            secret_key="secret",
+        )
+
+
+def test_invalid_pool_values_use_configuration_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DYNAMIS_DB_POOL_SIZE", "not-a-number")
+    with pytest.raises(ConfigurationError, match="DYNAMIS_DB_POOL_SIZE"):
+        _positive_int("DYNAMIS_DB_POOL_SIZE", 4)

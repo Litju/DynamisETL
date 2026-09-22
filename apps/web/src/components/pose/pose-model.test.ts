@@ -18,6 +18,7 @@ import {
   toViewerPoint,
   withoutDuplicateAngles,
   type PoseRow,
+  type PoseLandmark,
 } from "@/components/pose/pose-model";
 
 const ROWS: PoseRow[] = [
@@ -151,6 +152,16 @@ describe("pose landmark extraction", () => {
       "all_subjects",
       "manual",
     ]);
+  });
+
+  it("clips isolated body-local coordinate outliers without changing small fixtures", () => {
+    const stableLandmarks = Array.from({ length: 20 }, (_value, index) => [
+      { jointName: `left-${index}`, xM: -0.4, yM: 0, zM: -0.8, errorM: null },
+      { jointName: `right-${index}`, xM: 0.4, yM: 0, zM: 0.8, errorM: null },
+    ] satisfies PoseLandmark[]).flat();
+    const withOutlier = [...stableLandmarks, { jointName: "bad", xM: 1000, yM: 1000, zM: 1000, errorM: null }];
+    const bounds = bodyLocalBounds([{ tRelNs: 0, subjectId: "s1", landmarks: withOutlier, unavailableJoints: [], observed: true }]);
+    expect(bounds.radius).toBeLessThan(2);
   });
 
   it("summarizes observed, unavailable and provider error context", () => {

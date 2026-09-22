@@ -80,7 +80,8 @@ test("RES-109 Field crosses forward and reverse chunk boundaries without scope d
 test("RES-109 delayed exact handoff is explicit BUFFERING and resumes", async ({ page }) => {
   await page.route("**/api/artifacts/pose-sample/window**", async (route) => {
     const url = new URL(route.request().url());
-    if (url.searchParams.get("from_ns") === "1999999999") {
+    const fromNs = Number(url.searchParams.get("from_ns") ?? "0");
+    if (fromNs > 0) {
       await new Promise((resolve) => setTimeout(resolve, 3_000));
     }
     await route.fallback();

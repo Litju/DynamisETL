@@ -20,12 +20,12 @@
   },
   "performance_budgets": [
     {"id": "control_api_p95", "metric": "catalog/control request latency", "budget": 250, "unit": "ms p95", "scope": "local representative control reads", "evidence": "RES-109 baseline and acceptance receipt"},
-    {"id": "dense_exact_p95", "metric": "standard exact dense window complete cost", "budget": 250, "unit": "ms p95", "scope": "bounded accepted/local window including Arrow serialization", "evidence": "e315adf benchmark matrix"},
-    {"id": "dense_maximum_p95", "metric": "maximum allowed dense request complete cost", "budget": 1500, "unit": "ms p95", "scope": "accepted/local maximum bounded request", "evidence": "e315adf real maximum p50 907.81 ms"},
+    {"id": "dense_exact_p95", "metric": "standard exact dense window complete cost", "budget": 250, "unit": "ms p95", "scope": "bounded accepted/local window including Arrow serialization", "evidence": "review-seal 20-iteration receipt: real White exact current service 44.52 ms p95"},
+    {"id": "dense_maximum_p95", "metric": "maximum allowed dense request complete cost", "budget": 1500, "unit": "ms p95", "scope": "accepted/local maximum bounded request", "evidence": "review-seal 20-iteration receipt: real maximum current service 959.12 ms p95"},
     {"id": "playback_chunk_p95", "metric": "bounded playback chunk fetch/decode", "budget": 250, "unit": "ms p95", "scope": "one HTTP Arrow chunk", "evidence": "accepted/local dense window budget"},
-    {"id": "signal_first_plot_p95", "metric": "dense Signal first meaningful plot", "budget": 150, "unit": "ms p95", "scope": "100k browser points", "evidence": "e315adf uPlot median 76.1 ms"},
-    {"id": "signal_update_p95", "metric": "dense Signal playhead update", "budget": 2, "unit": "ms p95", "scope": "100k browser points", "evidence": "e315adf browser probe"},
-    {"id": "pose_frame_update_p95", "metric": "23-subject Pose typed-buffer update", "budget": 2, "unit": "ms p95", "scope": "23 subjects × 29 landmarks and all declared layers", "evidence": "e315adf prototype 0.087 ms"},
+    {"id": "signal_first_plot_p95", "metric": "dense Signal first meaningful plot", "budget": 150, "unit": "ms p95", "scope": "100k browser points", "evidence": "review-seal 20-iteration browser receipt: uPlot 144.415 ms p95"},
+    {"id": "signal_update_p95", "metric": "dense Signal playhead update", "budget": 2, "unit": "ms p95", "scope": "100k browser points", "evidence": "review-seal 20-iteration browser receipt: uPlot 0.0655 ms p95"},
+    {"id": "pose_frame_update_p95", "metric": "23-subject Pose typed-buffer update", "budget": 2, "unit": "ms p95", "scope": "23 subjects × 29 landmarks and all declared layers", "evidence": "review-seal 20-iteration Pose receipt: optimized path 0.16 ms p95"},
     {"id": "browser_playback_heap", "metric": "continuous playback browser heap", "budget": 256, "unit": "MB", "scope": "previous/active/next chunk cache", "evidence": "bounded three-chunk contract; RES-109 §11 unit/browser acceptance and local receipt"},
     {"id": "cloud_run_memory", "metric": "API container memory expectation", "budget": 2048, "unit": "MB", "scope": "initial Cloud Run sizing; tune from deployment evidence", "evidence": "accepted/local maximum window profile"},
     {"id": "cloud_run_concurrency", "metric": "API container concurrency expectation", "budget": 4, "unit": "in-flight requests", "scope": "dense maximum request class", "evidence": "e315adf four-request concurrency probe"}

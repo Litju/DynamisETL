@@ -40,7 +40,10 @@ def _positive_int(name: str, default: int) -> int:
     raw = os.environ.get(name, "").strip()
     if not raw:
         return default
-    value = int(raw)
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise ConfigurationError(f"{name}={raw!r} must be an integer") from exc
     if value <= 0:
         raise ConfigurationError(f"{name} must be positive")
     return value

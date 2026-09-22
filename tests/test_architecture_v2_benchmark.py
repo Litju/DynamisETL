@@ -16,3 +16,9 @@ def test_synthetic_benchmark_preserves_reduced_row_budget(tmp_path: Path) -> Non
         == rows["current_dense_service"]
         == 4_000
     )
+    assert set(result["semantic_equivalence"]["validated"]) == {
+        "pyarrow_dataset_reduced",
+        "duckdb_parquet_reduced",
+        "current_dense_service",
+    }
+    assert all("complete_ms_median" in item for item in result["implementations"])

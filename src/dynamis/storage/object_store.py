@@ -95,8 +95,13 @@ class S3ObjectStore:
         self, *, endpoint: str, bucket: str, access_key: str, secret_key: str, region: str = "auto"
     ) -> None:
         parsed = urlparse(endpoint)
-        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-            raise ObjectStoreError("S3 object endpoint must be an absolute HTTP(S) URL")
+        loopback = parsed.hostname in {"localhost", "127.0.0.1", "::1"}
+        if parsed.scheme != "https" and not (parsed.scheme == "http" and loopback):
+            raise ObjectStoreError(
+                "S3 object endpoint must use https (http is allowed only for loopback development)"
+            )
+        if not parsed.netloc:
+            raise ObjectStoreError("S3 object endpoint must be an absolute URL")
         self.endpoint = endpoint.rstrip("/")
         self.bucket = safe_upstream_key(bucket).as_posix()
         self.access_key = access_key

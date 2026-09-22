@@ -41,6 +41,7 @@ export function UPlotSignal({
   const callbacksRef = useRef({ onPointClick, onRangeZoom });
   const cleanupResize = useRef<(() => void) | null>(null);
   const initialPlayheadMs = useRef(playheadMs);
+  const initialRangeMs = useRef(rangeMs);
   const [ready, setReady] = useState(false);
   const plotData = useMemo(() => buildUPlotData(panes, series, bands), [bands, panes, series]);
 
@@ -115,12 +116,16 @@ export function UPlotSignal({
       removeClick = () => plot?.over.removeEventListener("click", handleClick);
       setReady(true);
       updatePlayhead(plot, playhead, initialPlayheadMs.current);
-      if (rangeMs !== null) {
+      const initialRange = initialRangeMs.current;
+      if (initialRange !== null) {
         plot.setSelect(
           {
-            left: plot.valToPos(rangeMs.fromMs, "x"),
+            left: plot.valToPos(initialRange.fromMs, "x"),
             top: 0,
-            width: Math.max(0, plot.valToPos(rangeMs.toMs, "x") - plot.valToPos(rangeMs.fromMs, "x")),
+            width: Math.max(
+              0,
+              plot.valToPos(initialRange.toMs, "x") - plot.valToPos(initialRange.fromMs, "x"),
+            ),
             height: plot.height,
           },
           false,
@@ -143,7 +148,17 @@ export function UPlotSignal({
       playheadRef.current = null;
       setReady(false);
     };
-  }, [bands, panes, plotData, rangeMs, series, timeReference]);
+  }, [panes, plotData, timeReference]);
+
+  const rangeFromMs = rangeMs?.fromMs ?? null;
+  const rangeToMs = rangeMs?.toMs ?? null;
+  useEffect(() => {
+    const plot = plotRef.current;
+    if (!plot || rangeFromMs === null || rangeToMs === null) return;
+    const left = plot.valToPos(rangeFromMs, "x");
+    const right = plot.valToPos(rangeToMs, "x");
+    plot.setSelect({ left, top: 0, width: Math.max(0, right - left), height: plot.height }, false);
+  }, [rangeFromMs, rangeToMs]);
 
   useEffect(() => {
     const update = (timeMs: number | null) => {

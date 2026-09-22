@@ -282,7 +282,28 @@ export function bodyLocalBounds(frames: readonly PoseFrame[]): Bounds {
       });
     }
   }
-  return boundsOf(local, { xM: 0, yM: 0 });
+  if (local.length < 30) return boundsOf(local, { xM: 0, yM: 0 });
+  const [minX, maxX] = robustExtent(local.map((landmark) => landmark.xM));
+  const [minY, maxY] = robustExtent(local.map((landmark) => landmark.yM));
+  const [minZ, maxZ] = robustExtent(local.map((landmark) => landmark.zM));
+  const clipped = local.map((landmark) => ({
+    ...landmark,
+    xM: clampNumber(landmark.xM, minX, maxX),
+    yM: clampNumber(landmark.yM, minY, maxY),
+    zM: clampNumber(landmark.zM, minZ, maxZ),
+  }));
+  return boundsOf(clipped, { xM: 0, yM: 0 });
+}
+
+function robustExtent(values: readonly number[]): readonly [number, number] {
+  const ordered = [...values].sort((left, right) => left - right);
+  const lower = Math.floor((ordered.length - 1) * 0.025);
+  const upper = Math.floor((ordered.length - 1) * 0.975);
+  return [ordered[lower] ?? 0, ordered[upper] ?? ordered[lower] ?? 0];
+}
+
+function clampNumber(value: number, lower: number, upper: number): number {
+  return Math.min(upper, Math.max(lower, value));
 }
 
 export interface Bounds {

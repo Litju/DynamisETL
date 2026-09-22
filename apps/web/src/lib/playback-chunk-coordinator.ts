@@ -3,7 +3,7 @@ import {
   type QueryKey,
   type QueryOptions,
 } from "@tanstack/react-query";
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useEffect, useId, useMemo, useState, useSyncExternalStore } from "react";
 
 import {
   planDenseChunks,
@@ -202,6 +202,56 @@ export class PlaybackChunkCoordinator {
 }
 
 const registered = new Set<PlaybackChunkCoordinator>();
+const sharedCoordinators = new Map<
+  string,
+  { coordinator: PlaybackChunkCoordinator; owners: Set<string>; pendingReleases: Set<string> }
+>();
+
+function acquireSharedCoordinator(
+  key: string,
+  ownerId: string,
+  create: () => PlaybackChunkCoordinator,
+): PlaybackChunkCoordinator {
+  const existing = sharedCoordinators.get(key);
+  if (existing) {
+    existing.owners.add(ownerId);
+    existing.pendingReleases.delete(ownerId);
+    return existing.coordinator;
+  }
+  const entry = {
+    coordinator: create(),
+    owners: new Set([ownerId]),
+    pendingReleases: new Set<string>(),
+  };
+  sharedCoordinators.set(key, entry);
+  return entry.coordinator;
+}
+
+function retainSharedCoordinator(key: string, coordinator: PlaybackChunkCoordinator, ownerId: string): void {
+  const entry = sharedCoordinators.get(key);
+  if (entry?.coordinator === coordinator) entry.pendingReleases.delete(ownerId);
+}
+
+function releaseSharedCoordinator(
+  key: string,
+  coordinator: PlaybackChunkCoordinator,
+  ownerId: string,
+  dispose: () => void,
+): void {
+  const entry = sharedCoordinators.get(key);
+  if (!entry || entry.coordinator !== coordinator) {
+    queueMicrotask(dispose);
+    return;
+  }
+  entry.pendingReleases.add(ownerId);
+  queueMicrotask(() => {
+    if (!entry.pendingReleases.delete(ownerId)) return;
+    entry.owners.delete(ownerId);
+    if (entry.owners.size > 0 || sharedCoordinators.get(key) !== entry) return;
+    sharedCoordinators.delete(key);
+    dispose();
+  });
+}
 
 /** Register the currently mounted dense surface with the global clock. */
 export function registerPlaybackChunkCoordinator(
@@ -225,23 +275,27 @@ export function usePlaybackChunkCoordinator<T>(options: {
   readonly chunkSpanNs: bigint | null;
   readonly anchorNs: bigint | null;
   readonly queryClient: QueryClient;
+  readonly coordinatorKey?: string;
   readonly queryOptionsFor: (chunk: DenseChunkBounds) => PlaybackChunkQueryOptions<T>;
   readonly isReady: (data: T | undefined) => boolean;
   readonly matchesQuery: (queryKey: QueryKey) => boolean;
   readonly chunkIdFromQueryKey: (queryKey: QueryKey) => string | null;
 }): PlaybackChunkSnapshot & { readonly coordinator: PlaybackChunkCoordinator | null } {
+  const ownerId = useId();
+  const [initialAnchorNs] = useState(() => options.anchorNs);
   const {
     enabled,
     canonicalMinNs,
     canonicalMaxNs,
     chunkSpanNs,
-    anchorNs,
     queryClient,
+    coordinatorKey,
     queryOptionsFor,
     isReady,
     matchesQuery,
     chunkIdFromQueryKey,
   } = options;
+  const coordinatorToken = `${coordinatorKey ?? "local"}:${ownerId}`;
   const coordinator = useMemo(() => {
     if (
       !enabled ||
@@ -256,7 +310,10 @@ export function usePlaybackChunkCoordinator<T>(options: {
       },
       prefetch: (chunk) => {
         const query = queryOptionsFor(chunk);
-        void queryClient.prefetchQuery(query);
+        void queryClient.prefetchQuery({
+          ...query,
+          meta: { ...query.meta, playbackCoordinatorId: coordinatorToken },
+        });
       },
       evict: (keep) => {
         queryClient.removeQueries({
@@ -266,19 +323,22 @@ export function usePlaybackChunkCoordinator<T>(options: {
         });
       },
       cancel: () => {
-        void queryClient.cancelQueries({ predicate: (query) => matchesQuery(query.queryKey) });
+        void queryClient.cancelQueries({
+          predicate: (query) => query.meta?.playbackCoordinatorId === coordinatorToken,
+        });
       },
     };
-    return new PlaybackChunkCoordinator({
+    const create = () => new PlaybackChunkCoordinator({
       canonicalMinNs,
       canonicalMaxNs,
       chunkSpanNs,
-      anchorNs,
+      anchorNs: initialAnchorNs,
       port,
       onEnded: () => useAnalysisStore.getState().setPlaying(false),
     });
+    return coordinatorKey ? acquireSharedCoordinator(coordinatorKey, ownerId, create) : create();
   }, [
-    anchorNs,
+    initialAnchorNs,
     canonicalMaxNs,
     canonicalMinNs,
     chunkSpanNs,
@@ -288,6 +348,9 @@ export function usePlaybackChunkCoordinator<T>(options: {
     matchesQuery,
     queryClient,
     queryOptionsFor,
+    coordinatorKey,
+    coordinatorToken,
+    ownerId,
   ]);
 
   const snapshot = useSyncExternalStore(
@@ -298,6 +361,7 @@ export function usePlaybackChunkCoordinator<T>(options: {
 
   useEffect(() => {
     if (!coordinator) return;
+    if (coordinatorKey) retainSharedCoordinator(coordinatorKey, coordinator, ownerId);
     const unregister = registerPlaybackChunkCoordinator(coordinator);
     const unsubscribeStore = useAnalysisStore.subscribe((state, previous) => {
       const next = effectiveTimeNs(state);
@@ -311,11 +375,15 @@ export function usePlaybackChunkCoordinator<T>(options: {
     return () => {
       unsubscribeStore();
       unsubscribeCache();
-      unregister();
-      coordinator.dispose();
-      if (registered.size === 0) useAnalysisStore.getState().setPlaybackStatus("idle");
+      const dispose = () => {
+        unregister();
+        coordinator.dispose();
+        if (registered.size === 0) useAnalysisStore.getState().setPlaybackStatus("idle");
+      };
+      if (coordinatorKey) releaseSharedCoordinator(coordinatorKey, coordinator, ownerId, dispose);
+      else dispose();
     };
-  }, [coordinator, queryClient]);
+  }, [coordinator, coordinatorKey, ownerId, queryClient]);
 
   useEffect(() => {
     useAnalysisStore.getState().setPlaybackStatus(snapshot.status);

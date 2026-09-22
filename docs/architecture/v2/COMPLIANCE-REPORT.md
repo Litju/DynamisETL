@@ -31,15 +31,15 @@ Production resource provisioning and promotion were not performed; that remains 
 
 | Gate | Before freeze/baseline | Final | Frozen budget | Result |
 | --- | ---: | ---: | ---: | --- |
-| Dense Signal 100k first plot | ECharts 589.0 ms | uPlot 91.7 ms | 150 ms p95 target | Pass |
-| Dense Signal 100k playhead | ECharts 41.31 ms | uPlot 0.025 ms | 2 ms p95 target | Pass |
+| Dense Signal 100k first plot | ECharts 1,100.435 ms p95 | uPlot 144.415 ms p95 | 150 ms p95 target | Pass |
+| Dense Signal 100k playhead | ECharts 91.241 ms p95 | uPlot 0.066 ms p95 | 2 ms p95 target | Pass |
 | Dense Signal 100k measured heap delta | ECharts 104.5 MB | uPlot 11.4 MB | 256 MB bounded-playback budget | Pass |
-| Pose 23-subject frame update | 0.445 ms primitive baseline | 0.135 ms optimized path | 2 ms p95 target | Pass |
+| Pose 23-subject frame update | 0.64 ms p95 primitive baseline | 0.16 ms p95 optimized path | 2 ms p95 target | Pass |
 | Pose 23-subject objects/draw calls | 2,875 / 2,875 | 7 / 7 | measured reduction required | Pass |
-| Maximum dense service request | 907.81 ms p50 | 801.34 ms p50 | 1,500 ms p95 target | Pass |
-| Exact White CMJ complete service | 56.76 ms p50 | 55.99 ms p50 | 250 ms p95 target | Pass |
+| Maximum dense service request | 959.12 ms p95 | 959.12 ms p95 current service | 1,500 ms p95 target | Pass |
+| Exact White CMJ complete service | 44.52 ms p95 | 44.52 ms p95 current service | 250 ms p95 target | Pass |
 
-The final acceptance receipt used 5 browser iterations, 20 Pose iterations, and 3 iterations for each real/synthetic backend case. Local p50 values vary with cache and workstation load; the frozen decisions use the workload class and complete-path budget, not a single microbenchmark.
+The review-seal receipt used 20 browser iterations, 20 Pose iterations, 20 processor iterations, and 20 real/synthetic backend iterations. p95 values are inclusive quantiles over raw runs; no p95 claim is emitted for fewer than 20 runs. Backend complete-path values include Arrow serialization.
 
 ## 🧪 Scientific and backend gates
 
@@ -53,6 +53,8 @@ The final acceptance receipt used 5 browser iterations, 20 Pose iterations, and 
 | Package build | `uv build --out-dir <external receipt root>` | Wheel and source distribution built |
 | Dense API | Exact/reduced/entity scope/ETag/Arrow/JSON/path safety/unit metadata tests | Passed |
 | Object store | checksum, immutable repeat, range, traversal tests | 31 focused tests passed |
+
+Benchmark candidates are accepted only after semantic comparison with the current dense service across normalized timestamps, identities, extrema, columns, ordering, and authoritative window metadata. The real maximum case rejected the PyArrow reduced candidate for semantic mismatch; it is not used as evidence for query ownership.
 
 Scientific authorities, measurement classes, coordinate frames, processing provenance, rights gates, and display-reduction boundaries remain intact. No renderer consumes display samples as processor input.
 

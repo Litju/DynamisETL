@@ -11,6 +11,15 @@ const analyticalAngleArcs = 6;
 const articulationArcs = 14;
 const iterations = Number(process.env.RES109_POSE_ITERATIONS ?? 20);
 
+function quantile(values, probability) {
+  const sorted = [...values].sort((left, right) => left - right);
+  const position = (sorted.length - 1) * probability;
+  const lower = Math.floor(position);
+  const upper = Math.ceil(position);
+  if (lower === upper) return sorted[lower];
+  return sorted[lower] + (sorted[upper] - sorted[lower]) * (position - lower);
+}
+
 function coordinates(subjects) {
   const values = new Float32Array(subjects * landmarksPerSubject * 3);
   for (let index = 0; index < values.length; index += 3) {
@@ -102,33 +111,45 @@ function measure(subjects) {
   const currentStartHeap = process.memoryUsage().heapUsed;
   const current = currentScene(subjects);
   const currentBuildHeap = process.memoryUsage().heapUsed;
-  const currentStart = performance.now();
-  for (let index = 0; index < iterations; index += 1) updateCurrent(current.objects, values);
-  const currentUpdateMs = (performance.now() - currentStart) / iterations;
+  const currentDurations = [];
+  for (let index = 0; index < iterations; index += 1) {
+    const started = performance.now();
+    updateCurrent(current.objects, values);
+    currentDurations.push(performance.now() - started);
+  }
   const optimizedStartHeap = process.memoryUsage().heapUsed;
   const optimized = optimizedScene(subjects);
   const optimizedBuildHeap = process.memoryUsage().heapUsed;
-  const optimizedStart = performance.now();
-  for (let index = 0; index < iterations; index += 1) updateOptimized(optimized, values);
-  const optimizedUpdateMs = (performance.now() - optimizedStart) / iterations;
+  const optimizedDurations = [];
+  for (let index = 0; index < iterations; index += 1) {
+    const started = performance.now();
+    updateOptimized(optimized, values);
+    optimizedDurations.push(performance.now() - started);
+  }
   const currentObjects = current.scene.children.length;
   const optimizedObjects = optimized.scene.children.length;
   const currentDrawCalls = currentObjects;
   const optimizedDrawCalls = optimizedObjects;
+  const currentP95 = iterations >= 20 ? quantile(currentDurations, 0.95) : null;
+  const optimizedP95 = iterations >= 20 ? quantile(optimizedDurations, 0.95) : null;
   return {
     subjects,
     landmarks_per_subject: landmarksPerSubject,
     current: {
       objects: currentObjects,
       draw_calls: currentDrawCalls,
-      frame_update_ms: currentUpdateMs,
+      frame_update_ms_median: quantile(currentDurations, 0.5),
+      frame_update_ms_p95: iterations >= 20 ? quantile(currentDurations, 0.95) : null,
+      frame_update_ms_max_observed: Math.max(...currentDurations),
       heap_delta_bytes: currentBuildHeap - currentStartHeap,
       picking_targets: subjects * landmarksPerSubject,
     },
     optimized: {
       objects: optimizedObjects,
       draw_calls: optimizedDrawCalls,
-      frame_update_ms: optimizedUpdateMs,
+      frame_update_ms_median: quantile(optimizedDurations, 0.5),
+      frame_update_ms_p95: iterations >= 20 ? quantile(optimizedDurations, 0.95) : null,
+      frame_update_ms_max_observed: Math.max(...optimizedDurations),
       heap_delta_bytes: optimizedBuildHeap - optimizedStartHeap,
       picking_targets: subjects * landmarksPerSubject,
       typed_buffer_mutation: true,
@@ -136,7 +157,9 @@ function measure(subjects) {
     reduction: {
       object_factor: currentObjects / optimizedObjects,
       draw_call_factor: currentDrawCalls / optimizedDrawCalls,
-      update_factor: currentUpdateMs / Math.max(optimizedUpdateMs, 0.000001),
+      update_factor: currentP95 !== null && optimizedP95 !== null
+        ? currentP95 / Math.max(optimizedP95, 0.000001)
+        : null,
     },
   };
 }

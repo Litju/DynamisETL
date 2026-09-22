@@ -10,10 +10,10 @@ The harness in [`benchmarks/architecture_v2`](../../../benchmarks/architecture_v
 
 The final receipts used for this freeze were:
 
-- browser renderer: 5 iterations at 4,096, 20,000, and 100,000 points;
+- browser renderer: 20 iterations at 4,096, 20,000, and 100,000 points;
 - Pose scene: 20 iterations at one and 23 subjects × 29 landmarks;
-- dense backend: 3 iterations across five synthetic and five accepted/local cases;
-- processor hotspot: 3 synthetic iterations plus one bounded local sample;
+- dense backend: 20 iterations across five synthetic and five accepted/local cases;
+- processor hotspot: 20 synthetic iterations plus one bounded local sample;
 - WebGPU probe: Chromium headless with WebGL2 and WebGPU capability checks.
 
 ## 📊 Signal renderer decision
@@ -24,9 +24,9 @@ The browser harness used identical typed arrays, exact samples, NaN gaps, min/ma
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 4,096 | 37.4 ms | 15.7 ms | 13.1 MB | 1.3 MB | 1,121,883 B | 51,081 B |
 | 20,000 | 134.0 ms | 31.5 ms | 23.1 MB | 3.1 MB | 1,121,883 B | 51,081 B |
-| 100,000 | 589.0 ms | 76.1 ms | 104.5 MB | 11.5 MB | 1,121,883 B | 51,081 B |
+| 100,000 | 1,100.435 ms p95 | 144.415 ms p95 | 104.5 MB | 11.5 MB | 1,121,883 B | 51,081 B |
 
-At 100,000 points, uPlot is 7.7× faster to first plot, uses 0.11× the measured heap delta, and keeps playhead/zoom/resize work below the browser timer resolution or approximately 0.01 ms per probe, versus 41.31/21.12/61.38 ms for ECharts. All candidate probes reported exact samples, gaps, min/max bands, playhead, range interaction, and synchronized-update parity.
+At 100,000 points, the review-seal receipt reports uPlot at 144.415 ms p95 for first plot and 0.066 ms p95 for playhead updates, versus 1,100.435 ms and 91.241 ms p95 for ECharts. All parity fields are derived from observed chart state, including synchronized updates across two charts.
 
 **Decision:** adopt uPlot only for the dense Signal Laboratory renderer. Keep ECharts for Overview, Compare, distributions, bars, ranked summaries, scatter/agreement, and BI-style composition. The V2 adapter still owns unit-aware axes, BigInt-safe conversion at the renderer boundary, reduction metadata, accessible keyboard wrapper, deterministic export, and no scientific recomputation.
 
@@ -49,15 +49,15 @@ The local Chromium probe reported WebGL2 available and WebGPU unavailable under 
 
 ## 💾 Dense read-path decision
 
-The complete backend harness reports p50 wall time for the query plus Arrow serialization. `estimated_row_group_bytes` is derived from compressed Parquet row-group statistics; it is a reproducible read estimate rather than an operating-system disk counter.
+The complete backend harness reports 20-run inclusive p95 for query plus Arrow serialization. `estimated_row_group_bytes` is derived from compressed Parquet row-group statistics; it is a reproducible read estimate rather than an operating-system disk counter. Candidate tables and authoritative metadata are semantically compared before timing acceptance.
 
 | Accepted/local case | Query class | PyArrow | DuckDB | Current service | Returned rows |
 | --- | --- | ---: | ---: | ---: | ---: |
-| White CMJ | exact | 2.50 ms | 20.71 ms | 56.76 ms | 3,740 |
-| GNSS | reduced | 43.71 ms | 87.84 ms | 110.52 ms | 10,000 |
-| DFL tracking | reduced | 10.96 ms | 29.34 ms | 69.02 ms | 4,348 |
-| SkillCorner pose | bounded exact | 57.12 ms | 60.55 ms | 133.21 ms | 8,961 |
-| Maximum allowed | reduced | 2,228.46 ms | 1,161.03 ms | 907.81 ms | 61,306 |
+| White CMJ | exact | 2.92 ms p95 | 22.28 ms p95 | 44.52 ms p95 | 3,740 |
+| GNSS | reduced | 50.02 ms p95 | 95.13 ms p95 | 120.25 ms p95 | 10,000 |
+| DFL tracking | reduced | 11.91 ms p95 | 30.59 ms p95 | 54.50 ms p95 | 4,348 |
+| SkillCorner pose | bounded exact | 61.01 ms p95 | 67.80 ms p95 | 193.19 ms p95 | 8,961 |
+| Maximum allowed | reduced | rejected | 1,357.38 ms p95 | 959.12 ms p95 | 61,306 |
 
 Synthetic CI fixtures preserved exact/reduced row budgets for 4k, 20k, 100k, scoped 23-subject pose, and a 500k bounded maximum equivalent. PyArrow wins exact and ordinary reduced windows; DuckDB wins the maximum allowed reduction class and retains the current min/max SQL semantics.
 
@@ -102,4 +102,3 @@ flowchart LR
 ```
 
 The machine-readable contract and individual ADRs in the next freeze commit are authoritative over this summary. After that commit, an architecture choice may change only through evidence, an ADR, a contract version/update, and its own atomic commit.
-

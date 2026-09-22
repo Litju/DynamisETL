@@ -98,6 +98,7 @@ export function usePosePlaybackWindow(options: PosePlaybackWindowOptions): PoseP
   );
   const playback = usePlaybackChunkCoordinator<DenseWindow>({
     enabled: explicit === null,
+    coordinatorKey: `pose:${queryScope.artifactId}:${queryScope.entityId ?? "*"}:${queryScope.columns}:${queryScope.maxPoints}`,
     canonicalMinNs: options.canonicalMinNs,
     canonicalMaxNs: options.canonicalMaxNs,
     chunkSpanNs: options.chunkSpanNs,

@@ -289,6 +289,7 @@ def _timed(label: str, operation: Callable[[], pa.Table]) -> dict[str, Any]:
         "implementation": label,
         "wall_ms": elapsed_ms,
         "arrow_serialization_ms": arrow_ms,
+        "complete_ms": elapsed_ms + arrow_ms,
         "arrow_bytes": len(payload),
         "rows": table.num_rows,
         "columns": table.num_columns,
@@ -297,15 +298,87 @@ def _timed(label: str, operation: Callable[[], pa.Table]) -> dict[str, Any]:
 
 
 def _summary(runs: list[dict[str, Any]]) -> dict[str, Any]:
-    keys = ("wall_ms", "arrow_serialization_ms", "arrow_bytes", "rows", "peak_python_alloc_bytes")
+    keys = (
+        "wall_ms",
+        "arrow_serialization_ms",
+        "complete_ms",
+        "arrow_bytes",
+        "rows",
+        "peak_python_alloc_bytes",
+    )
     result: dict[str, Any] = {"implementation": runs[0]["implementation"], "runs": len(runs)}
     for key in keys:
         values = [float(run[key]) for run in runs]
         result[key + "_median"] = statistics.median(values)
+        result[key + "_max_observed"] = max(values)
         result[key + "_p95"] = (
-            max(values) if len(values) < 20 else statistics.quantiles(values, n=20)[18]
+            statistics.quantiles(values, n=20, method="inclusive")[18]
+            if len(values) >= 20
+            else None
         )
+    result["percentile_method"] = "inclusive_quantile_p95" if len(runs) >= 20 else "not_claimed_below_20_runs"
     return result
+
+
+def _semantic_value(value: Any) -> Any:
+    if isinstance(value, float):
+        if np.isnan(value):
+            return "NaN"
+        if np.isinf(value):
+            return "Infinity" if value > 0 else "-Infinity"
+        return round(value, 12)
+    if isinstance(value, list):
+        return tuple(_semantic_value(item) for item in value)
+    if isinstance(value, dict):
+        return tuple(sorted((key, _semantic_value(item)) for key, item in value.items()))
+    return value
+
+
+def _semantic_signature(
+    table: pa.Table, expected_columns: tuple[str, ...] | None = None
+) -> tuple[tuple[str, ...], tuple[Any, ...]]:
+    normalized = table.combine_chunks()
+    aliases = {
+        "t_rel_ns_min": "t_start_ns",
+        "t_rel_ns_max": "t_end_ns",
+        "t_rel_ns_count": "bucket_rows",
+    }
+    renamed = normalized.rename_columns([aliases.get(name, name) for name in normalized.column_names])
+    columns = tuple(sorted(expected_columns or renamed.column_names))
+    missing = sorted(set(columns) - set(renamed.column_names))
+    if missing:
+        raise AssertionError(f"benchmark result is missing semantic columns: {missing}")
+    rows = renamed.select(columns).to_pylist()
+    signature = tuple(
+        sorted(
+            tuple((column, _semantic_value(row[column])) for column in columns)
+            for row in rows
+        )
+    )
+    return columns, signature
+
+
+def _validate_reference_metadata(reference: Any, case: Case) -> None:
+    if reference.meta.from_ns != case.from_ns or reference.meta.to_ns != case.to_ns:
+        raise AssertionError("dense reference metadata does not preserve requested bounds")
+    if reference.meta.source_rows < reference.meta.returned_rows:
+        raise AssertionError("dense reference metadata reports more rows than its source")
+    if reference.meta.reduction is not None and case.max_points is None:
+        raise AssertionError("dense reference reduced an unbounded benchmark case")
+    if not isinstance(reference.meta.units, dict) or not reference.meta.display_note:
+        raise AssertionError("dense reference metadata lost units or display semantics")
+
+
+def _assert_semantic_equivalence(
+    label: str, candidate: pa.Table, reference: pa.Table, reference_result: Any, case: Case
+) -> None:
+    _validate_reference_metadata(reference_result, case)
+    reference_signature = _semantic_signature(reference)
+    candidate_signature = _semantic_signature(candidate, reference_signature[0])
+    if candidate_signature != reference_signature:
+        raise AssertionError(
+            f"{label} is not semantically equivalent to current_dense_service for {case.name}"
+        )
 
 
 def _bench_case(root: Path, case: Case, iterations: int) -> dict[str, Any]:
@@ -320,6 +393,17 @@ def _bench_case(root: Path, case: Case, iterations: int) -> dict[str, Any]:
         database_root=root / "databases",
         duckdb_path=root / "databases" / "benchmark.duckdb",
     )
+    current_operation = lambda: load_artifact_window(
+        settings_for_case,
+        ref,
+        from_ns=case.from_ns,
+        to_ns=case.to_ns,
+        columns=case.columns,
+        max_points=case.max_points,
+        entity_id=case.entity_id,
+    )
+    reference_result = current_operation()
+    reference_table = reference_result.table
     operations: list[tuple[str, Callable[[], pa.Table]]] = [
         (
             "pyarrow_dataset_reduced" if case.max_points is not None else "pyarrow_dataset_exact",
@@ -339,37 +423,57 @@ def _bench_case(root: Path, case: Case, iterations: int) -> dict[str, Any]:
         ),
         (
             "current_dense_service",
-            lambda: (
-                load_artifact_window(
-                    settings_for_case,
-                    ref,
-                    from_ns=case.from_ns,
-                    to_ns=case.to_ns,
-                    columns=case.columns,
-                    max_points=case.max_points,
-                    entity_id=case.entity_id,
-                ).table
-            ),
+            lambda: current_operation().table,
         ),
     ]
     implementations: list[dict[str, Any]] = []
+    semantic_checks: list[str] = []
+    rejected: dict[str, str] = {}
     for label, operation in operations:
+        try:
+            _assert_semantic_equivalence(label, operation(), reference_table, reference_result, case)
+        except AssertionError as exc:
+            if label == "current_dense_service":
+                raise
+            rejected[label] = str(exc)
+            implementations.append(
+                {
+                    "implementation": label,
+                    "accepted": False,
+                    "semantic_equivalence": False,
+                    "rejection_reason": str(exc),
+                }
+            )
+            continue
+        semantic_checks.append(label)
         operation()
         implementations.append(_summary([_timed(label, operation) for _ in range(iterations)]))
 
-    def concurrent_call() -> int:
+    def concurrent_call() -> tuple[int, int]:
+        def complete_operation(_unused: int) -> tuple[int, int]:
+            table = current_operation().table
+            return table.num_rows, len(arrow_ipc_stream(table))
+
         with ThreadPoolExecutor(max_workers=4) as pool:
-            return sum(table.num_rows for table in pool.map(lambda _unused: operation(), range(4)))
+            results = list(pool.map(complete_operation, range(4)))
+        return sum(rows for rows, _bytes in results), sum(bytes_ for _rows, bytes_ in results)
 
     concurrent_started = time.perf_counter()
-    concurrent_rows = concurrent_call()
+    concurrent_rows, concurrent_bytes = concurrent_call()
     concurrent_ms = (time.perf_counter() - concurrent_started) * 1000
     return {
         "case": case_meta,
         "implementations": implementations,
+        "semantic_equivalence": {
+            "reference": "current_dense_service",
+            "validated": semantic_checks,
+            "rejected": rejected,
+            "metadata": "reference DenseWindowMeta validated before timing",
+        },
         "four_request_concurrency": {
-            "wall_ms": concurrent_ms,
+            "complete_ms": concurrent_ms,
             "rows": concurrent_rows,
+            "arrow_bytes": concurrent_bytes,
             "requests": 4,
         },
     }
@@ -512,7 +616,7 @@ def _real_cases(root: Path) -> list[Case]:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mode", choices=("synthetic", "real", "both"), default="both")
-    parser.add_argument("--iterations", type=int, default=5)
+    parser.add_argument("--iterations", type=int, default=20)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.iterations < 1:

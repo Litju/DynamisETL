@@ -13,7 +13,7 @@ const sizes = {
 };
 
 const cases = [4_096, 20_000, 100_000];
-const iterations = Number(process.env.RES109_BROWSER_ITERATIONS ?? 5);
+const iterations = Number(process.env.RES109_BROWSER_ITERATIONS ?? 20);
 const browser = await chromium.launch({ headless: true, args: ["--enable-precise-memory-info"] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 await page.setContent('<main id="root" aria-label="benchmark plot"></main>');
@@ -62,7 +62,7 @@ const run = await page.evaluate(async ({ cases, iterations, sizes }) => {
     const startHeap = memory();
     const started = performance.now();
     const chart = window.echarts.init(node, undefined, { renderer: "canvas" });
-    chart.setOption({
+    const option = {
       animation: false,
       xAxis: { type: "value", min: 0, max: data.x.at(-1) },
       yAxis: { type: "value" },
@@ -75,24 +75,44 @@ const run = await page.evaluate(async ({ cases, iterations, sizes }) => {
         { id: "band-max", type: "line", showSymbol: false, silent: true, data: points(data.x, data.max) },
         { id: "overlay-0", type: "line", data: [], markLine: { data: [{ xAxis: data.x[Math.floor(length / 2)] }] } },
       ],
-    });
+    };
+    chart.setOption(option);
+    const syncNode = document.createElement("div");
+    syncNode.style.width = "1200px";
+    syncNode.style.height = "600px";
+    root.append(syncNode);
+    const syncChart = window.echarts.init(syncNode, undefined, { renderer: "canvas" });
+    syncChart.setOption(option);
     await frame();
     const firstPlotMs = performance.now() - started;
     const playheadStart = performance.now();
     for (let index = 0; index < 20; index += 1) {
-      chart.setOption({ series: [{ id: "overlay-0", markLine: { data: [{ xAxis: index / 20 }] } }] }, { lazyUpdate: true });
+      const xAxis = index / 20;
+      const update = { series: [{ id: "overlay-0", markLine: { data: [{ xAxis }] } }] };
+      chart.setOption(update, { lazyUpdate: true });
+      syncChart.setOption({ series: [{ id: "overlay-0", markLine: { data: [{ xAxis }] } }] }, { lazyUpdate: true });
     }
+    await frame();
+    const mainLine = chart.getOption().series.find((entry) => entry.id === "overlay-0");
+    const syncLine = syncChart.getOption().series.find((entry) => entry.id === "overlay-0");
+    const playhead = mainLine?.markLine?.data?.[0]?.xAxis === syncLine?.markLine?.data?.[0]?.xAxis;
     const playheadMs = (performance.now() - playheadStart) / 20;
     const zoomStart = performance.now();
     for (let index = 0; index < 10; index += 1) {
-      chart.dispatchAction({ type: "dataZoom", start: index, end: 100 - index });
+      const zoom = { type: "dataZoom", start: index, end: 100 - index };
+      chart.dispatchAction(zoom);
+      syncChart.dispatchAction(zoom);
     }
+    const mainZoom = chart.getOption().dataZoom[0];
+    const syncZoom = syncChart.getOption().dataZoom[0];
+    const brushZoom = mainZoom?.start === syncZoom?.start && mainZoom?.end === syncZoom?.end;
     const zoomMs = (performance.now() - zoomStart) / 10;
     const resizeStart = performance.now();
     for (let index = 0; index < 10; index += 1) chart.resize({ width: 1200 + index, height: 600 });
     const resizeMs = (performance.now() - resizeStart) / 10;
     const endHeap = memory();
     chart.dispose();
+    syncChart.dispose();
     return {
       engine: "echarts",
       points: length,
@@ -103,7 +123,7 @@ const run = await page.evaluate(async ({ cases, iterations, sizes }) => {
       interaction_ms: zoomMs,
       playhead_update_ms: playheadMs,
       resize_ms: resizeMs,
-      feature_parity: { exact_samples: data.x.length === length, gaps: data.imuY.some(Number.isNaN), min_max_band: data.min.length === length && data.max.length === length, playhead: true, brush_zoom: true, synchronized_update: true },
+      feature_parity: { exact_samples: data.x.length === length, gaps: data.imuY.some(Number.isNaN), min_max_band: data.min.length === length && data.max.length === length, playhead, brush_zoom: brushZoom, synchronized_update: playhead },
     };
   }
 
@@ -116,7 +136,7 @@ const run = await page.evaluate(async ({ cases, iterations, sizes }) => {
     const data = arrays(length);
     const startHeap = memory();
     const started = performance.now();
-    const plot = new window.uPlot({
+    const uplotOptions = {
       width: 1200,
       height: 600,
       scales: { x: { time: false }, y: { auto: true } },
@@ -131,20 +151,38 @@ const run = await page.evaluate(async ({ cases, iterations, sizes }) => {
       bands: [{ series: [4, 5], fill: "rgba(37,99,235,.12)" }],
       cursor: { drag: { x: true, y: false }, points: { show: true } },
       hooks: { setCursor: [() => {}], setScale: [() => {}], setSize: [() => {}] },
-    }, [data.x, data.force, data.imuX, data.imuY, data.min, data.max], node);
+    };
+    const alignedData = [data.x, data.force, data.imuX, data.imuY, data.min, data.max];
+    const plot = new window.uPlot(uplotOptions, alignedData, node);
+    const syncNode = document.createElement("div");
+    syncNode.style.width = "1200px";
+    syncNode.style.height = "600px";
+    root.append(syncNode);
+    const syncPlot = new window.uPlot(uplotOptions, alignedData, syncNode);
     await frame();
     const firstPlotMs = performance.now() - started;
     const playheadStart = performance.now();
-    for (let index = 0; index < 20; index += 1) plot.setCursor({ left: (index / 20) * 1200 });
+    for (let index = 0; index < 20; index += 1) {
+      const left = (index / 20) * 1200;
+      plot.setCursor({ left });
+      syncPlot.setCursor({ left });
+    }
+    const playhead = plot.cursor.left === syncPlot.cursor.left;
     const playheadMs = (performance.now() - playheadStart) / 20;
     const zoomStart = performance.now();
-    for (let index = 0; index < 10; index += 1) plot.setScale("x", { min: index / 10, max: data.x.at(-1) - index / 10 });
+    for (let index = 0; index < 10; index += 1) {
+      const scale = { min: index / 10, max: data.x.at(-1) - index / 10 };
+      plot.setScale("x", scale);
+      syncPlot.setScale("x", scale);
+    }
+    const brushZoom = plot.scales.x.min === syncPlot.scales.x.min && plot.scales.x.max === syncPlot.scales.x.max;
     const zoomMs = (performance.now() - zoomStart) / 10;
     const resizeStart = performance.now();
     for (let index = 0; index < 10; index += 1) plot.setSize({ width: 1200 + index, height: 600 });
     const resizeMs = (performance.now() - resizeStart) / 10;
     const endHeap = memory();
     plot.destroy();
+    syncPlot.destroy();
     return {
       engine: "uplot",
       points: length,
@@ -155,7 +193,7 @@ const run = await page.evaluate(async ({ cases, iterations, sizes }) => {
       interaction_ms: zoomMs,
       playhead_update_ms: playheadMs,
       resize_ms: resizeMs,
-      feature_parity: { exact_samples: data.x.length === length, gaps: data.imuY.some(Number.isNaN), min_max_band: data.min.length === length && data.max.length === length, playhead: true, brush_zoom: true, synchronized_update: true },
+      feature_parity: { exact_samples: data.x.length === length, gaps: data.imuY.some(Number.isNaN), min_max_band: data.min.length === length && data.max.length === length, playhead, brush_zoom: brushZoom, synchronized_update: playhead },
     };
   }
 
