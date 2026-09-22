@@ -23,7 +23,11 @@ export function stablePoseSubjects(
   streamSubject: string | null,
 ): string[] {
   if (artifact?.entity_ids !== undefined && artifact.entity_ids !== null) {
-    return [...artifact.entity_ids].sort();
+    const observed = new Set((artifact.entity_observations ?? []).map((item) => item.entity_id));
+    return [...artifact.entity_ids].sort((left, right) => {
+      const observedOrder = Number(observed.has(right)) - Number(observed.has(left));
+      return observedOrder || left.localeCompare(right);
+    });
   }
   const ids = new Set<string>();
   if (streamSubject !== null) ids.add(streamSubject);
