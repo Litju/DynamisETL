@@ -120,7 +120,11 @@ def _entity_value(path: Path, schema: pa.Schema) -> str | None:
     name = entity_column(schema)
     if name is None:
         return None
-    value = pq.read_table(path, columns=[name]).column(0)[0].as_py()
+    parquet = pq.ParquetFile(path)
+    batch = next(parquet.iter_batches(columns=[name], batch_size=1), None)
+    if batch is None or batch.num_rows == 0:
+        return None
+    value = batch.column(0)[0].as_py()
     return str(value) if value is not None else None
 
 

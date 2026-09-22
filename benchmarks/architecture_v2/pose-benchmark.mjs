@@ -128,8 +128,6 @@ function measure(subjects) {
   }
   const currentObjects = current.scene.children.length;
   const optimizedObjects = optimized.scene.children.length;
-  const currentDrawCalls = currentObjects;
-  const optimizedDrawCalls = optimizedObjects;
   const currentP95 = iterations >= 20 ? quantile(currentDurations, 0.95) : null;
   const optimizedP95 = iterations >= 20 ? quantile(optimizedDurations, 0.95) : null;
   return {
@@ -137,7 +135,6 @@ function measure(subjects) {
     landmarks_per_subject: landmarksPerSubject,
     current: {
       objects: currentObjects,
-      draw_calls: currentDrawCalls,
       frame_update_ms_median: quantile(currentDurations, 0.5),
       frame_update_ms_p95: iterations >= 20 ? quantile(currentDurations, 0.95) : null,
       frame_update_ms_max_observed: Math.max(...currentDurations),
@@ -146,7 +143,6 @@ function measure(subjects) {
     },
     optimized: {
       objects: optimizedObjects,
-      draw_calls: optimizedDrawCalls,
       frame_update_ms_median: quantile(optimizedDurations, 0.5),
       frame_update_ms_p95: iterations >= 20 ? quantile(optimizedDurations, 0.95) : null,
       frame_update_ms_max_observed: Math.max(...optimizedDurations),
@@ -156,7 +152,6 @@ function measure(subjects) {
     },
     reduction: {
       object_factor: currentObjects / optimizedObjects,
-      draw_call_factor: currentDrawCalls / optimizedDrawCalls,
       update_factor: currentP95 !== null && optimizedP95 !== null
         ? currentP95 / Math.max(optimizedP95, 0.000001)
         : null,
@@ -166,7 +161,7 @@ function measure(subjects) {
 
 const output = process.env.RES109_POSE_OUTPUT ?? "benchmarks/architecture_v2/pose-receipt.json";
 const receipt = {
-  schema_version: "architecture-v2-pose-benchmark-1",
+  schema_version: "architecture-v2-pose-benchmark-2",
   workload: "23 subjects x 29 landmarks with provider/display/analytical layers and error radii",
   iterations,
   cases: cases.map(measure),

@@ -1,7 +1,7 @@
 {
   "$schema": "./system-v2.schema.json",
   "contract_id": "dynamisdata-system",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "status": "frozen",
   "authorities": {
     "scientific": "Python processor contracts with NumPy, SciPy, PyArrow, and declared deterministic parameters",
@@ -25,7 +25,7 @@
     {"id": "playback_chunk_p95", "metric": "bounded playback chunk fetch/decode", "budget": 250, "unit": "ms p95", "scope": "one HTTP Arrow chunk", "evidence": "accepted/local dense window budget"},
     {"id": "signal_first_plot_p95", "metric": "dense Signal first meaningful plot", "budget": 150, "unit": "ms p95", "scope": "100k browser points", "evidence": "review-seal 20-iteration isolated browser receipt: uPlot 129.270 ms p95"},
     {"id": "signal_update_p95", "metric": "dense Signal playhead update", "budget": 2, "unit": "ms p95", "scope": "100k browser points", "evidence": "review-seal 20-iteration isolated browser receipt: uPlot 0.065 ms p95"},
-    {"id": "pose_frame_update_p95", "metric": "23-subject Pose typed-buffer update", "budget": 2, "unit": "ms p95", "scope": "23 subjects × 29 landmarks and all declared layers", "evidence": "review-seal 20-iteration Pose receipt: optimized path 0.290 ms p95"},
+    {"id": "pose_frame_update_p95", "metric": "23-subject Pose typed-buffer update", "budget": 2, "unit": "ms p95", "scope": "23 subjects × 29 landmarks and all declared layers", "evidence": "review-seal 20-iteration Pose receipt: optimized path 0.119 ms p95"},
     {"id": "browser_playback_heap", "metric": "continuous playback browser heap", "budget": 256, "unit": "MB", "scope": "previous/active/next chunk cache", "evidence": "bounded three-chunk contract; RES-109 §11 unit/browser acceptance and local receipt"},
     {"id": "cloud_run_memory", "metric": "API container memory expectation", "budget": 2048, "unit": "MB", "scope": "initial Cloud Run sizing; tune from deployment evidence", "evidence": "accepted/local maximum window profile"},
     {"id": "cloud_run_concurrency", "metric": "API container concurrency expectation", "budget": 4, "unit": "in-flight requests", "scope": "dense maximum request class", "evidence": "e315adf four-request concurrency probe"}
@@ -37,7 +37,7 @@
   },
   "decisions": [
     {"id": "signal-renderer", "selection": "uPlot owns dense Signal Laboratory rendering; ECharts remains general analytics", "evidence": "e315adf browser matrix: 100k first plot 76.1 ms vs 589.0 ms with parity probes", "fallback": "ECharts general analytical engine and deterministic renderer wrapper", "status": "frozen"},
-    {"id": "pose-hot-path", "selection": "InstancedMesh plus batched dynamic BufferGeometry and typed-buffer useFrame mutation", "evidence": "e315adf: 23-subject objects/draw calls 2875/2875 to 7/7", "fallback": "WebGL2 Three/R3F primitive compatibility layer during migration", "status": "frozen"},
+    {"id": "pose-hot-path", "selection": "InstancedMesh plus batched dynamic BufferGeometry and typed-buffer useFrame mutation", "evidence": "e315adf headless Three benchmark: 23-subject scene objects 2875 to 7; GPU draw calls were not measured", "fallback": "WebGL2 Three/R3F primitive compatibility layer during migration", "status": "frozen"},
     {"id": "webgpu-default", "selection": "WebGL2 is the V2 default", "evidence": "e315adf target Chromium exposed WebGL2 but not WebGPU", "fallback": "future Three WebGPURenderer seam, never required for V2", "status": "frozen"},
     {"id": "dense-exact-read", "selection": "PyArrow dataset/window path owns exact and ordinary scoped windows", "evidence": "e315adf accepted/local and synthetic complete-path matrix", "fallback": "DuckDB exact path remains available for compatibility tests", "status": "frozen"},
     {"id": "dense-reduced-read", "selection": "DuckDB Parquet SQL owns broad/max display reduction and current min/max semantics", "evidence": "e315adf maximum allowed real class: DuckDB 1161.03 ms vs PyArrow 2228.46 ms direct candidate", "fallback": "bounded PyArrow reduction candidate behind unchanged response contract", "status": "frozen"},

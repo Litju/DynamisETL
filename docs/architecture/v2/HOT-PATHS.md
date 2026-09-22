@@ -13,7 +13,7 @@ _Measured candidates and current high-frequency ownership identified before the 
 | Arrow decode | Worker IPC, `tableFromIPC`, typed-array copies | Window request | Decode time and transferred bytes |
 | Playback clock | `requestAnimationFrame`, BigInt arithmetic, Zustand `setPlayhead` | Every animation frame | Subscriber/render invalidation cost |
 | Field replay | Pixi imperative clear/redraw of shared Graphics | Every frame while playing | CPU frame and selection traversal |
-| Pose single subject | `useFrame`, landmark map, mesh position mutation, dynamic line updates | Every frame while playing | Object count, draw calls, CPU frame, picking |
+| Pose single subject | `useFrame`, landmark map, mesh position mutation, dynamic line updates | Every frame while playing | Scene objects, CPU frame, picking; GPU draw calls require a rendering browser probe |
 | Pose all subjects | Flattened frames, per-subject scene branches, camera framing | Every frame while playing | 23 × 29 landmark scaling and memory |
 
 ## 🖥️ Serving hot paths

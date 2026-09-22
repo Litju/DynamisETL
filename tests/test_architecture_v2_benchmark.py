@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from benchmarks.architecture_v2.benchmark_backend import _bench_case, _synthetic_cases
+import pyarrow as pa
+import pyarrow.parquet as pq
+from benchmarks.architecture_v2.benchmark_backend import (
+    _bench_case,
+    _entity_value,
+    _synthetic_cases,
+)
 
 
 def test_synthetic_benchmark_preserves_reduced_row_budget(tmp_path: Path) -> None:
@@ -22,3 +28,11 @@ def test_synthetic_benchmark_preserves_reduced_row_budget(tmp_path: Path) -> Non
         "current_dense_service",
     }
     assert all("complete_ms_median" in item for item in result["implementations"])
+
+
+def test_benchmark_entity_selection_reads_a_single_row_batch(tmp_path: Path) -> None:
+    path = tmp_path / "pose.parquet"
+    table = pa.table({"subject_id": ["first", "second", "third"], "t_rel_ns": [0, 1, 2]})
+    pq.write_table(table, path, row_group_size=1)
+
+    assert _entity_value(path, table.schema) == "first"

@@ -34,12 +34,14 @@ At 100,000 points, the isolated review-seal receipt reports uPlot at 129.270 ms 
 
 The prototype used shared geometries/materials, one instanced joint/error path, batched line-segment buffers, typed-array mutation, and an instance-to-subject/joint picking map. The baseline emulated the existing independently managed mesh/line objects and per-frame geometry mutation.
 
-| Subjects | Baseline objects/draw calls | V2 prototype objects/draw calls | Baseline frame update | V2 frame update | Picking targets |
+| Subjects | Baseline scene objects | V2 prototype scene objects | Baseline frame update p95 | V2 frame update p95 | Picking targets |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | 125 / 125 | 7 / 7 | 0.036 ms | 0.045 ms | 29 |
-| 23 | 2,875 / 2,875 | 7 / 7 | 0.207 ms | 0.087 ms | 667 |
+| 1 | 125 | 7 | 0.079 ms | 0.103 ms | 29 |
+| 23 | 2,875 | 7 | 1.202 ms | 0.119 ms | 667 |
 
-**Decision:** adopt the instanced/batched hot path. The one-subject CPU mutation is not faster in isolation, but the repeated 23-subject case delivers the required object/draw reduction and lower frame update while retaining all 667 picking identities. The single-subject and all-subject semantic layer distinctions remain unchanged.
+The review-seal receipt uses 20 raw iterations and inclusive p95 quantiles. This headless scene-graph benchmark measures object counts and CPU buffer-update cost; it does not render and does not measure GPU draw calls.
+
+**Decision:** adopt the instanced/batched hot path. The one-subject CPU mutation is not faster in isolation, but the repeated 23-subject case reduces scene objects and frame-update time while retaining all 667 picking identities. The single-subject and all-subject semantic layer distinctions remain unchanged.
 
 ## 🌐 WebGL/WebGPU decision
 

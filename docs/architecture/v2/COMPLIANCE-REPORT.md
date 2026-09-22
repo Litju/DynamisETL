@@ -6,7 +6,7 @@ _RES-109 final acceptance report including the §11 and §12 manual-acceptance a
 
 ## ✅ Outcome
 
-RES-109 is complete only when the §11 and §12 gates below remain green at the final review head. The V2 contract is sealed as version 2.0.2, including atomic observation-aware Pose subject transitions; production resource provisioning and promotion were not performed.
+RES-109 is complete only when the §11 and §12 gates below remain green at the final review head. The V2 contract is sealed as version 2.0.3, including corrected Pose benchmark evidence and atomic observation-aware subject transitions; production resource provisioning and promotion were not performed.
 
 Production resource provisioning and promotion were not performed; that remains RES-107 scope.
 
@@ -35,18 +35,18 @@ Production resource provisioning and promotion were not performed; that remains 
 | Dense Signal 100k first plot | ECharts 1,141.160 ms p95 | uPlot 129.270 ms p95 | 150 ms p95 target | Pass |
 | Dense Signal 100k playhead | ECharts 148.567 ms p95 | uPlot 0.065 ms p95 | 2 ms p95 target | Pass |
 | Dense Signal 100k measured heap delta | ECharts 503.4 MB | uPlot 22.4 MB | 256 MB bounded-playback budget | Pass |
-| Pose 23-subject frame update | 1.072 ms p95 primitive baseline | 0.290 ms p95 optimized path | 2 ms p95 target | Pass |
-| Pose 23-subject objects/draw calls | 2,875 / 2,875 | 7 / 7 | measured reduction required | Pass |
+| Pose 23-subject frame update | 1.202 ms p95 primitive baseline | 0.119 ms p95 optimized path | 2 ms p95 target | Pass |
+| Pose 23-subject scene objects | 2,875 | 7 | measured reduction required | Pass |
 | Maximum dense service request | 1,129.47 ms p95 | 1,129.47 ms p95 current service | 1,500 ms p95 target | Pass |
 | Exact White CMJ complete service | 64.14 ms p95 | 64.14 ms p95 current service | 250 ms p95 target | Pass |
 
-The review-seal receipt used 20 browser iterations, 20 Pose iterations, 20 processor iterations, and 20 real/synthetic backend iterations. p95 values are inclusive quantiles over raw runs; no p95 claim is emitted for fewer than 20 runs. Backend complete-path values include Arrow serialization.
+The review-seal receipt used 20 browser iterations, 20 Pose iterations, 20 processor iterations, and 20 real/synthetic backend iterations. p95 values are inclusive quantiles over raw runs; no p95 claim is emitted for fewer than 20 runs. Backend complete-path values include Arrow serialization. The headless Pose receipt measures scene objects and CPU buffer updates, not GPU draw calls.
 
 Immutable external receipt locators (SHA-256):
 
 - Backend: `E:\Data\Temp\DynamisETL-review-backend-res109-isolated.json` — `FF65C70532DE4D835A6D4C912F07042D0B78F545E089BA6A61AF67BF1EADBE4B`
 - Browser: `E:\Data\Temp\DynamisETL-review-browser-res109-isolated.json` — `EAD94C5FF640FAD0B462703D2E3CABCD3B3EFE3E8FB0A36DEA4D6CD4D75B8891`
-- Pose: `E:\Data\Temp\DynamisETL-review-pose-res109-final.json` — `06348816FA81F8A174CC464692B15BBF37A61460E30E594173A0C9B5627C85F`
+- Pose: `E:\Data\Temp\DynamisETL-review-pose-res109-corrected.json` — `982B7BF7D190044515103D752242FFAD41A0665D80969D52D698DDB20C85C236`
 - Processors: `E:\Data\Temp\DynamisETL-review-processors-res109-final.json` — `E67C732FDF91443DC71B6929DD2624DBED2007FF801F73926F4D8FF64F30890A`
 
 ## 🧪 Scientific and backend gates
@@ -104,7 +104,8 @@ frame authority.
 | Observation authority | Artifact/entity first/last observed canonical time and observed-frame count; bounded range route handles a first observation inside an explicit range |
 | UI semantics | Observed frame, temporary absence, no Pose in period/range, and Switching/loading are distinct; no-frame telemetry never lists every landmark as provider-unavailable |
 | Browser regression matrix | Paused >10 s, playing, BUFFERING, numeric ID, body-local individual, all-subject focus, first observation >0, temporary absence, no Pose, reload/back-forward, and replacement-request survival |
-| Real local SkillCorner switch | Paused at `11897` / 17,417,738,000 ns → `50999` / first observation 32,920,000,000 ns; exact selected-range response returned 18,763 rows; switching back resolved `11897` to its first exact observation in the active range (23,440,000,000 ns); no page errors |
+| Subject request retirement | Old coordinator is disabled and only prior-subject query keys are retired during the switch; no prior-subject request starts after the replacement query begins |
+| Real local SkillCorner switch | Paused at `11897` / 17,417,738,000 ns → `50999` / first observation 32,920,000,000 ns (10,817 exact rows); switching back resolved `11897` to 23,440,000,000 ns (26,477 exact rows); zero stale previous-subject requests and zero page errors |
 
 The real local browser receipt uses the period-1 source Parquet. The bounded
 fixture contains only the selected subject rows and remains outside the repo.
@@ -113,7 +114,7 @@ and [prepare-res109-real-pose.py](../../../apps/web/e2e/prepare-res109-real-pose
 
 - Source artifact: `silver/dataset_id=skillcorner-opendata/modality=pose/session_id=1925299/pose-period-1.parquet`, SHA-256 `0bbe2b182716bda3307b316e3c307ef2470753f9ced05a73fb24effcfe412da4`
 - Bounded fixture: `E:\Data\Temp\DynamisETL-res109-real-pose-fixture.json`, SHA-256 `3FD6EACD800F6A1AF9389FC70215B75A8EB98E536C66E5B6FC59D66D6720F193`
-- Browser receipt: `E:\Data\Temp\DynamisETL-res109-real-subject-switch.json`, SHA-256 `D7EAFBADAABC3CB98B01524A45EE78C3ADA946DEA533BB68B84FF92BD9AC7A96`
+- Browser receipt: `E:\Data\Temp\DynamisETL-res109-real-subject-switch-reviewed.json`, SHA-256 `F3CE2D9929F4041C24726CBCF4EAAD86E27FEC4E04ED140241E708A1BA5974D1`
 
 ## 📦 Runtime and deployment readiness
 
@@ -133,6 +134,6 @@ and [prepare-res109-real-pose.py](../../../apps/web/e2e/prepare-res109-real-pose
 
 ## 🏁 Closure decision
 
-The implementation meets V2.0.2 and the RES-109 §11 + §12 acceptance matrix. RES-107
+The implementation meets V2.0.3 and the RES-109 §11 + §12 acceptance matrix. RES-107
 may proceed with production provisioning/deployment after review and merge of
 the pull request. RES-107 was not started by this mission.

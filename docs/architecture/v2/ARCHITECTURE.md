@@ -6,7 +6,7 @@ _Frozen RES-109 contract summary. Machine-readable authority: [`architecture/sys
 
 ## 🔒 Freeze status
 
-The V2 architecture is frozen at contract version `2.0.2`. The §11 and §12 manual-acceptance amendments record the playhead-driven chunk coordinator, Pose coordinate/camera authority, and atomic observation-aware subject transitions as evidence-backed contract deltas. Routine implementation must conform to it; an architecture change requires evidence, an ADR, a contract version/update, and a dedicated atomic commit.
+The V2 architecture is frozen at contract version `2.0.3`. The §11 and §12 manual-acceptance amendments record the playhead-driven chunk coordinator, Pose coordinate/camera authority, and atomic observation-aware subject transitions as evidence-backed contract deltas. Routine implementation must conform to it; an architecture change requires evidence, an ADR, a contract version/update, and a dedicated atomic commit.
 
 ## 🌐 Runtime topology
 
