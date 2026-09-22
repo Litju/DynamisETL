@@ -19,6 +19,7 @@ _Implementation order after the RES-109 contract-freeze commit._
 | 9 | Private S3-compatible/R2-preferred object adapter | Contracted; not started | checksum/range/rights/reconciliation tests |
 | 10 | Cloud Run API container/runtime readiness | Contracted; not started | build/health/resource receipt |
 | 11 | Full architecture acceptance and compliance report | Contracted; not started | complete matrix and PR |
+| 12 | §11 manual-acceptance amendment: shared playhead coordinator, exact multi-boundary handoff, Pose coordinate/camera authority, and auxiliary-layer synchronization | Required before PR review | ADR-006, unit/browser receipts, updated contract/compliance report |
 
 ## 🔄 Implementation flow
 
@@ -41,4 +42,3 @@ flowchart TB
 ```
 
 WebGPU, native-service, and scientific-compute negative decisions are not implementation units unless their frozen triggers are later met through the amendment rule. RES-107 remains the owner of actual production provisioning and promotion.
-

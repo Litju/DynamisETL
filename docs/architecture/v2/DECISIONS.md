@@ -14,6 +14,8 @@ _Benchmark-gated and negative architecture decisions frozen by RES-109._
 | Dense read ownership | PyArrow exact; DuckDB broad reduction | [ADR-004](./ADR-004-dense-read-ownership.md) |
 | Native dense service | No Rust/DataFusion in V2 | [ADR-005](./ADR-005-native-and-scientific-compute.md) |
 | Scientific compute | Python/NumPy/SciPy/PyArrow | [ADR-005](./ADR-005-native-and-scientific-compute.md) |
+| Continuous dense playback | Shared playhead-driven `PlaybackChunkCoordinator` with explicit `BUFFERING` and exact boundary handoff | [ADR-006](./ADR-006-continuous-playback-and-pose-camera.md) |
+| Pose coordinate/camera authority | Explicit body-local vs match/world display mode and named camera ownership state machine | [ADR-006](./ADR-006-continuous-playback-and-pose-camera.md) |
 
 ## 🚫 Explicitly rejected for V2
 
@@ -29,4 +31,3 @@ _Benchmark-gated and negative architecture decisions frozen by RES-109._
 ## 🔒 Amendment rule
 
 An amendment must include representative evidence, an individual ADR, the updated contract/schema version when needed, and one dedicated atomic commit. A normal implementation commit cannot silently alter any selection above.
-

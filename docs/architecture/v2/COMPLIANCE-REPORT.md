@@ -1,12 +1,12 @@
 # DynamisData V2 architecture compliance report
 
-_RES-109 final acceptance report at the current protected `main` tip. Raw real-data receipts remain in the external evidence cache; this report contains summary evidence only._
+_RES-109 final acceptance report including the §11 manual-acceptance amendment. Raw real-data receipts remain in the external evidence cache; this report contains summary evidence only._
 
 ---
 
 ## ✅ Outcome
 
-RES-109 is complete. The V2 contract was frozen before architecture-changing implementation, all implementation units conform to [`architecture/system-v2.json`](../../../architecture/system-v2.json), and the complete local scientific/backend/frontend/renderer/performance matrix is green. The branch is clean and ready for a pull request against protected `main`.
+RES-109 is complete. The V2 contract was frozen before architecture-changing implementation, the §11 amendment is sealed as contract version 2.0.1, and the complete local scientific/backend/frontend/renderer/performance matrix is green. The branch is clean and ready for PR review against protected `main`.
 
 Production resource provisioning and promotion were not performed; that remains RES-107 scope.
 
@@ -24,6 +24,8 @@ Production resource provisioning and promotion were not performed; that remains 
 | Object plane | `3c7e1f0` | Local + private S3-compatible/R2-ready adapter |
 | Runtime readiness | `132aade` | readiness, healthcheck, pooling, bounded access log, `PORT` |
 | Locked test import gates | `e8183d4`, `509f47b` | repository scripts and pytest path work in CI runtime |
+| §11 playback/camera amendment | `f973282` | shared coordinator, reverse clock, real-browser multi-boundary acceptance |
+| §11 exact-density/transient hardening | `b95028d` | uneven real-subject guard, atomic reverse start, commit-time hydration race fix |
 
 ## 📊 Before/after benchmark evidence
 
@@ -60,12 +62,28 @@ Scientific authorities, measurement classes, coordinate frames, processing prove
 | --- | --- |
 | TypeScript typecheck | Passed |
 | ESLint | 0 errors; 2 pre-existing warnings |
-| Vitest/component tests | 133 passed across 22 files |
+| Vitest/component tests | 138 passed across 23 files |
 | Generated OpenAPI drift | Passed |
 | Production Vite build | Passed; uPlot lazy chunk 51.04 kB |
-| Playwright + axe + visual + responsive + lazy-loading + acceptance + renderer smoke | 53 passed |
+| Playwright + axe + visual + responsive + lazy-loading + acceptance + renderer smoke | 57 passed |
 | Real renderer smoke | uPlot, Pixi, and R3F canvas/context checks passed |
 | WebGPU evaluation | WebGL2 available; WebGPU unavailable in target Chromium; WebGL2 frozen |
+
+## 🧭 §11 continuous-playback acceptance
+
+| Surface/evidence | Result |
+| --- | --- |
+| Coordinator unit matrix | 20 focused state/model tests pass; three forward boundaries, reverse buffering, seek re-plan, reverse departure from canonical maximum, exact readiness, and bounded retention covered |
+| Fixture browser amendment matrix | 4 RES-109 tests pass: Pose multi-boundary exact playback/telemetry, Field forward+reverse handoff, delayed exact `BUFFERING`, and Pose seek/coordinate/camera modes |
+| Real local Pose | Artifact `pose-period-1-0bbe2b182716`, subject `11897`; 440,000,000 ns → 279,437,373,508 ns at 4× over 70 s; 19 contiguous exact chunk requests / 18 boundaries; entity scope preserved; no follow-up page errors |
+| Real local Field | Artifact `tracking-period-1-457d138baddf`; 0 ns → 141,127,600,000 ns at 4× over 35 s; 7 contiguous chunk requests / 6 boundaries; no entity scope; no page errors |
+| Exact uneven-density guard | Pose source window reduced from 21,605 rows to 8,584 rows per real chunk after the 4× density safety guard; reduction metadata remained null |
+
+The real receipts are substantially longer than the former approximately 16-second
+cutoff and show no stale-window stop. Pose body-local and match/world display
+transforms remain presentation-only; all landmark, skeleton, cue, analytical,
+angle, error-radius, selection, and telemetry layers consume the same current
+frame authority.
 
 ## 📦 Runtime and deployment readiness
 
@@ -85,5 +103,6 @@ Scientific authorities, measurement classes, coordinate frames, processing prove
 
 ## 🏁 Closure decision
 
-The implementation meets the frozen V2 contract and the RES-109 acceptance matrix. RES-107 may proceed with production provisioning/deployment after review of the pull request. RES-107 was not started by this mission.
-
+The implementation meets V2.0.1 and the RES-109 §11 acceptance matrix. RES-107
+may proceed with production provisioning/deployment after review and merge of
+the pull request. RES-107 was not started by this mission.

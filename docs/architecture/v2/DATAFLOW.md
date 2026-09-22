@@ -1,6 +1,6 @@
 # DynamisData data flow
 
-_Concrete source-to-renderer flows observed on protected `main` before RES-109 refactoring._
+_Concrete source-to-renderer flows after the RES-109 §11 amendment._
 
 ---
 
@@ -53,23 +53,31 @@ sequenceDiagram
 
 ## 🔄 Playback flow
 
-The current playback path requests a selected window up front and advances a shared BigInt playhead. It is not yet a bounded previous/active/next chunk pipeline; Pose and Signal views consume the same selected context but do not share a canonical chunk cache.
+The shared `PlaybackChunkCoordinator` plans canonical previous/active/next
+chunks from the transient BigInt playhead. Query owns Arrow/JSON data and
+prefetches adjacent chunks; the coordinator changes active identity only at a
+boundary, clamps the clock in explicit `BUFFERING` when an exact next chunk is
+not ready, and evicts outside the three-chunk cache. Pose and Field use exact
+handoff data; dense Signals retain explicit display-reduction metadata.
 
 ```mermaid
 flowchart TB
     accTitle: Current playback flow
     accDescr: The current shared clock advances transient Zustand state while renderers sample the loaded window; URL state changes only at explicit commit boundaries.
 
-    selected[👤 Selected context] --> request[🌐 Query selected window]
-    request --> loaded[📦 Arrow table in query cache]
-    loaded --> clock[⚡ Zustand BigInt playhead]
+    selected[👤 Selected context] --> coordinator[🧭 PlaybackChunkCoordinator]
+    coordinator --> previous[📦 Previous cache]
+    coordinator --> active[▶️ Active exact/display chunk]
+    coordinator --> next[📦 Prefetched next cache]
+    active --> clock[⚡ Zustand BigInt playhead]
     clock --> signal[📊 Signal renderer]
     clock --> field[🎨 Pixi field renderer]
     clock --> pose[🎨 Three pose renderer]
+    next -. not ready .-> buffering[⏸️ BUFFERING]
+    buffering --> coordinator
     clock --> commit[🏷️ Explicit URL commit]
 ```
 
 ## 📦 Artifact identity flow
 
 Artifact identity is carried from external file to serving response. The dense API never accepts an arbitrary path; it resolves a registered relative path beneath the configured dataset root and checks the expected Parquet extension/file boundary. Response metadata carries artifact identity, canonical time bounds, units, coordinate frame, measurement class, source/returned row counts, reduction details, and a display note.
-

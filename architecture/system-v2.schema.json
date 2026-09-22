@@ -20,7 +20,7 @@
   "properties": {
     "$schema": {"type": "string"},
     "contract_id": {"type": "string", "minLength": 1},
-    "version": {"type": "string", "pattern": "^2\\.0\\.0$"},
+    "version": {"type": "string", "pattern": "^2\\.0\\.1$"},
     "status": {"type": "string", "enum": ["frozen"]},
     "modules": {
       "type": "array",
