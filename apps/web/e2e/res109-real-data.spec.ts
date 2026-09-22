@@ -26,6 +26,30 @@ interface LocalPoseFixture {
 
 const fixturePath = process.env.RES109_LOCAL_POSE_FIXTURE;
 
+function observationsInRange(fixture: LocalPoseFixture, fromNs: number, toNs: number) {
+  const timesBySubject = new Map<string, Set<number>>();
+  for (const row of fixture.rows) {
+    const time = Number(row.t_rel_ns);
+    if (
+      time < fromNs || time > toNs || row.is_available !== true ||
+      typeof row.x_m !== "number" || typeof row.y_m !== "number" || typeof row.z_m !== "number"
+    ) continue;
+    const entityId = String(row.subject_id);
+    const times = timesBySubject.get(entityId) ?? new Set<number>();
+    times.add(time);
+    timesBySubject.set(entityId, times);
+  }
+  return [...timesBySubject.entries()].map(([entity_id, times]) => {
+    const ordered = [...times].sort((left, right) => left - right);
+    return {
+      entity_id,
+      first_observed_ns: ordered[0]!,
+      last_observed_ns: ordered.at(-1)!,
+      observation_count: ordered.length,
+    };
+  });
+}
+
 test("RES-109 §12 switches between real local Pose subjects from a >10 s playhead", async ({ page }) => {
   test.skip(!fixturePath, "Set RES109_LOCAL_POSE_FIXTURE from prepare-res109-real-pose.py for the local data receipt.");
   const fixture = JSON.parse(await readFile(fixturePath!, "utf8")) as LocalPoseFixture;
@@ -54,11 +78,10 @@ test("RES-109 §12 switches between real local Pose subjects from a >10 s playhe
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(artifact) });
   });
   await page.route((url) => url.pathname === `${artifactPath}/observations`, async (route) => {
-    const fromNs = url.searchParams.has("from_ns") ? Number(url.searchParams.get("from_ns")) : Number.NEGATIVE_INFINITY;
-    const toNs = url.searchParams.has("to_ns") ? Number(url.searchParams.get("to_ns")) : Number.POSITIVE_INFINITY;
-    const observations = artifact.entity_observations.filter((item) =>
-      item.last_observed_ns >= fromNs && item.first_observed_ns <= toNs,
-    );
+    const requestUrl = new URL(route.request().url());
+    const fromNs = requestUrl.searchParams.has("from_ns") ? Number(requestUrl.searchParams.get("from_ns")) : Number.NEGATIVE_INFINITY;
+    const toNs = requestUrl.searchParams.has("to_ns") ? Number(requestUrl.searchParams.get("to_ns")) : Number.POSITIVE_INFINITY;
+    const observations = observationsInRange(fixture, fromNs, toNs);
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(observations) });
   });
   await page.route((url) => url.pathname === `${artifactPath}/window`, async (route) => {
@@ -101,18 +124,33 @@ test("RES-109 §12 switches between real local Pose subjects from a >10 s playhe
   const target = artifact.entity_observations.find((item) => item.entity_id === targetSubject);
   expect(target).toBeDefined();
   expect(target!.first_observed_ns).toBeGreaterThan(10_000_000_000);
-  await page.goto(`/lab/skillcorner-opendata/1925299?stream=pose-1&subject=${firstSubject}&trial=period_1&view=pose&t_ns=17417738000`);
+  const rangeFromNs = 17_417_738_000;
+  const rangeToNs = 60_000_000_000;
+  await page.goto(`/lab/skillcorner-opendata/1925299?stream=pose-1&subject=${firstSubject}&trial=period_1&view=pose&from_ns=${rangeFromNs}&to_ns=${rangeToNs}&t_ns=${rangeFromNs}`);
   await expect(page.getByTestId("pose-canvas").locator("canvas")).toBeVisible();
-  await expect(page.getByTestId("pose-telemetry")).toContainText(firstSubject);
+  await expect(page.getByTestId("pose-telemetry").getByText(firstSubject, { exact: true })).toBeVisible();
   await page.locator("#pose-subject").selectOption(targetSubject);
   await expect(page).toHaveURL(new RegExp(`subject=${targetSubject}`));
   await expect(page).toHaveURL(new RegExp(`t_ns=${target!.first_observed_ns}`));
+  await expect(page.getByTestId("pose-telemetry").getByText(targetSubject, { exact: true })).toBeVisible();
   await expect(page.getByTestId("pose-telemetry").getByText(/\d+ observed · \d+ unavailable/)).toBeVisible();
   const targetRequest = requests.find((request) =>
     request.entityId === targetSubject && request.fromNs <= target!.first_observed_ns &&
     request.toNs >= target!.first_observed_ns && request.returnedRows > 0,
   );
   expect(targetRequest).toBeDefined();
+
+  const firstInRange = observationsInRange(fixture, rangeFromNs, rangeToNs)
+    .find((item) => item.entity_id === firstSubject);
+  expect(firstInRange).toBeDefined();
+  await page.locator("#pose-subject").selectOption(firstSubject);
+  await expect(page).toHaveURL(new RegExp(`subject=${firstSubject}`));
+  await expect(page).toHaveURL(new RegExp(`t_ns=${firstInRange!.first_observed_ns}`));
+  await expect(page.getByTestId("pose-telemetry").getByText(firstSubject, { exact: true })).toBeVisible();
+  expect(requests.some((request) =>
+    request.entityId === firstSubject && request.fromNs === rangeFromNs &&
+    request.toNs === rangeToNs && request.returnedRows > 0,
+  )).toBe(true);
   expect(errors).toEqual([]);
 
   const resultPath = process.env.RES109_LOCAL_POSE_RESULT;
@@ -126,6 +164,8 @@ test("RES-109 §12 switches between real local Pose subjects from a >10 s playhe
       switched_from_ns: 17_417_738_000,
       switched_to_subject: targetSubject,
       first_observed_ns: target!.first_observed_ns,
+      range_return_to_subject: firstSubject,
+      range_first_observed_ns: firstInRange!.first_observed_ns,
       exact_request: targetRequest,
       page_errors: errors,
     }, null, 2) + "\n", "utf8");
