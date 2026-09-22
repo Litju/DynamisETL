@@ -69,7 +69,9 @@ export async function fetchPoseObservationsInRange(
   artifactId: string,
   fromNs: bigint | null,
   toNs: bigint | null,
+  signal: AbortSignal,
 ): Promise<PoseSubjectObservation[]> {
+  const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(15_000)]);
   const payload = await unwrap(
     await api.GET("/api/artifacts/{artifact_id}/observations", {
       params: {
@@ -79,6 +81,7 @@ export async function fetchPoseObservationsInRange(
           ...(toNs !== null ? { to_ns: Number(toNs) } : {}),
         },
       },
+      signal: requestSignal,
     }),
   );
   return poseSubjectObservations({ entity_observations: payload });

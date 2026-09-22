@@ -1074,6 +1074,13 @@ export interface operations {
                     "application/json": components["schemas"]["EntityObservationView"][];
                 };
             };
+            /** @description Artifact not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {

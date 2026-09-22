@@ -62,6 +62,10 @@ export function PoseViewer() {
   const [rendererReady, setRendererReady] = useState(false);
   const [allSubjects, setAllSubjects] = useState(false);
   const subjectSwitchRequest = useRef(0);
+  const subjectSwitchAbort = useRef<AbortController | null>(null);
+  const [subjectSwitchError, setSubjectSwitchError] = useState<string | null>(null);
+
+  useEffect(() => () => subjectSwitchAbort.current?.abort(), []);
 
   const session = useQuery({
     ...sessionQuery(datasetId ?? "", sessionId ?? ""),
@@ -223,7 +227,11 @@ export function PoseViewer() {
 
   const handleSubjectChange = async (nextSubjectId: string) => {
     if (nextSubjectId === subjectId) return;
+    subjectSwitchAbort.current?.abort();
+    const controller = new AbortController();
+    subjectSwitchAbort.current = controller;
     const requestId = ++subjectSwitchRequest.current;
+    setSubjectSwitchError(null);
     const observation = observed.observations.find((item) => item.entityId === nextSubjectId);
     const fallbackTimeNs = context?.timeNs ?? committedTimeNs ?? canonical?.minNs ?? null;
     if (fallbackTimeNs === null) return;
@@ -240,10 +248,15 @@ export function PoseViewer() {
           artifactId,
           context?.fromNs ?? null,
           context?.toNs ?? null,
+          controller.signal,
         );
         resolvedObservation = rangeObservations.find((item) => item.entityId === nextSubjectId);
       } catch {
-        resolvedObservation = undefined;
+        if (requestId !== subjectSwitchRequest.current) return;
+        useAnalysisStore.getState().finishSubjectSwitch();
+        subjectSwitchAbort.current = null;
+        setSubjectSwitchError("Could not resolve Pose observations. The previous subject is restored; select again to retry.");
+        return;
       }
     }
     if (requestId !== subjectSwitchRequest.current) return;
@@ -255,6 +268,7 @@ export function PoseViewer() {
       ) ?? fallbackTimeNs;
     useAnalysisStore.getState().beginSubjectSwitch(targetTimeNs);
     context?.selectSubject(nextSubjectId, { targetTimeNs });
+    subjectSwitchAbort.current = null;
   };
 
   if (!context) return <StatePanel state="empty" title="Open a laboratory session first." />;
@@ -470,6 +484,11 @@ export function PoseViewer() {
                   </option>
                 ))}
               </select>
+              {subjectSwitchError ? (
+                <p role="alert" className="mt-1 text-[10px] text-quality-warning">
+                  {subjectSwitchError}
+                </p>
+              ) : null}
               <p className="mt-1 text-[10px] text-text-muted">
                 {observed.subjects.length} individuals in the artifact/session authority;
                 landmarks are never merged across subjects.

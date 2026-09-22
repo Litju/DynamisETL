@@ -103,7 +103,7 @@ export const SESSION = {
     label: "Eintracht Frankfurt vs Bayern",
     started_at: null,
     ended_at: null,
-    participant_count: 2,
+    participant_count: 3,
     trial_count: 1,
     stream_count: 2,
   },
@@ -160,12 +160,8 @@ const POSE_ARTIFACT = {
   row_count: 100_000,
   byte_size: 8192,
   entity_column: "subject_id",
-  entity_count: 2,
+  entity_count: 3,
   entity_ids: ["SC-P1", "SC-P2", "560986"],
-  entity_observations: [
-    { entity_id: "SC-P1", first_observed_ns: 0, last_observed_ns: 20_000_000_000, observation_count: 7 },
-    { entity_id: "SC-P2", first_observed_ns: 12_000_000_000, last_observed_ns: 20_000_000_000, observation_count: 3 },
-  ],
 };
 
 const TRACKING_TIMES = [0, 40_000_000, 2_000_000_000, 4_000_000_000, 6_000_000_000, 8_000_000_000, 10_000_000_000, 12_000_000_000, 14_000_000_000, 16_000_000_000, 18_000_000_000, 20_000_000_000] as const;
@@ -265,6 +261,32 @@ const POSE_WINDOW_ROWS = [
   ...poseRowsAt(POSE_ROWS, POSE_TIMES_P1, 0),
   ...poseRowsAt(POSE_ROWS_P2, POSE_TIMES_P2, 0),
 ];
+
+function poseObservationsInRange(fromNs: number, toNs: number) {
+  const timesBySubject = new Map<string, Set<number>>();
+  for (const row of POSE_WINDOW_ROWS) {
+    if (
+      row.t_rel_ns < fromNs ||
+      row.t_rel_ns > toNs ||
+      row.is_available !== true ||
+      typeof row.x_m !== "number" ||
+      typeof row.y_m !== "number" ||
+      typeof row.z_m !== "number"
+    ) continue;
+    const times = timesBySubject.get(row.subject_id) ?? new Set<number>();
+    times.add(row.t_rel_ns);
+    timesBySubject.set(row.subject_id, times);
+  }
+  return [...timesBySubject.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([entity_id, times]) => {
+    const ordered = [...times].sort((left, right) => left - right);
+    return {
+      entity_id,
+      first_observed_ns: ordered[0]!,
+      last_observed_ns: ordered.at(-1)!,
+      observation_count: ordered.length,
+    };
+  });
+}
 
 const POSE_WINDOW = {
   meta: {
@@ -480,8 +502,9 @@ function body(pathname: string): unknown | undefined {
   if (pathname === "/api/rights") return RIGHTS;
   if (pathname === "/api/runs") return RUNS;
   if (pathname === "/api/artifacts/tracking-sample") return TRACKING_ARTIFACT;
-  if (pathname === "/api/artifacts/pose-sample") return POSE_ARTIFACT;
-  if (pathname === "/api/artifacts/pose-sample/observations") return POSE_ARTIFACT.entity_observations;
+  if (pathname === "/api/artifacts/pose-sample") {
+    return { ...POSE_ARTIFACT, entity_observations: poseObservationsInRange(Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY) };
+  }
   if (pathname === "/api/artifacts/tracking-sample/window") return TRACKING_WINDOW;
   if (pathname === "/api/artifacts/pose-sample/window") return POSE_WINDOW;
   return undefined;
@@ -518,13 +541,12 @@ function windowPayload(url: URL): unknown | undefined {
 async function handler(route: Route): Promise<void> {
   const url = new URL(route.request().url());
   if (url.pathname.endsWith("/observations")) {
-    const observations = (body(url.pathname) as Array<Record<string, number | string>> | undefined) ?? [];
     const fromNs = url.searchParams.has("from_ns") ? Number(url.searchParams.get("from_ns")) : Number.NEGATIVE_INFINITY;
     const toNs = url.searchParams.has("to_ns") ? Number(url.searchParams.get("to_ns")) : Number.POSITIVE_INFINITY;
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify(observations.filter((item) => Number(item.last_observed_ns) >= fromNs && Number(item.first_observed_ns) <= toNs)),
+      body: JSON.stringify(poseObservationsInRange(fromNs, toNs)),
     });
     return;
   }

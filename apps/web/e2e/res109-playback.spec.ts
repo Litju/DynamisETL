@@ -45,7 +45,8 @@ test("RES-109 Pose crosses multiple exact chunks and keeps telemetry on the live
   const before = await playheadNs(page);
   await page.getByLabel("Playback rate").selectOption("4");
   await page.getByRole("button", { name: "Play" }).click();
-  await page.waitForTimeout(5_000);
+  await expect.poll(async () => Number(await playheadNs(page)), { timeout: 20_000 })
+    .toBeGreaterThan(Number(before + 10_000_000_000n));
   const during = await playheadNs(page);
   const pause = page.getByRole("button", { name: "Pause" });
   if (await pause.count()) await pause.click();
@@ -63,14 +64,16 @@ test("RES-109 Field crosses forward and reverse chunk boundaries without scope d
   await expect(page.getByTestId("pitch-canvas")).toBeVisible();
   await page.getByLabel("Playback rate").selectOption("4");
   await page.getByRole("button", { name: "Play" }).click();
-  await page.waitForTimeout(5_000);
+  await expect.poll(async () => Number(await playheadNs(page)), { timeout: 20_000 })
+    .toBeGreaterThan(10_000_000_000);
   const forward = await playheadNs(page);
   const pause = page.getByRole("button", { name: "Pause" });
   if (await pause.count()) await pause.click();
   await expect(page.getByRole("button", { name: "Play" })).toBeVisible();
   await page.getByRole("button", { name: "Reverse" }).click();
   await expect(page.getByTestId("playback-direction")).toHaveAttribute("data-direction", "reverse");
-  await page.waitForTimeout(1_800);
+  await expect.poll(async () => Number(await playheadNs(page)), { timeout: 10_000 })
+    .toBeLessThan(Number(forward - 100_000_000n));
   const reverse = await playheadNs(page);
   await page.getByRole("button", { name: "Pause" }).click();
   expect(forward).toBeGreaterThan(10_000_000_000n);
@@ -134,7 +137,8 @@ test("RES-109 §12 playing subject switch stops playback without stale subject d
   await expect(page.getByTestId("pose-canvas").locator("canvas")).toBeVisible();
   await page.getByLabel("Playback rate").selectOption("4");
   await page.getByRole("button", { name: "Play" }).click();
-  await page.waitForTimeout(500);
+  await expect.poll(async () => Number(await playheadNs(page)), { timeout: 5_000 })
+    .toBeGreaterThan(12_100_000_000);
   await page.locator("#pose-subject").selectOption("SC-P2");
   await expect(page.getByRole("button", { name: "Play" })).toBeVisible();
   await expect(page).toHaveURL(/subject=SC-P2/);
@@ -169,6 +173,12 @@ test("RES-109 §12 buffering subject switch retires only the previous subject", 
 test("RES-109 §12 distinguishes temporary absence and no Pose for numeric ids", async ({ page }) => {
   await page.goto("/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P2&view=pose&t_ns=8000000000");
   await expect(page.getByText("Subject SC-P2 is not observed at 00:00:08.000.")).toBeVisible();
+  await page.goto("/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P1&view=pose&from_ns=0&to_ns=8000000000&t_ns=8000000000");
+  await page.locator("#pose-subject").selectOption("SC-P2");
+  await expect(page).toHaveURL(/subject=SC-P2/);
+  await expect(page).toHaveURL(/from_ns=0/);
+  await expect(page).toHaveURL(/to_ns=8000000000/);
+  await expect(page.getByTestId("workbench").getByText("No Pose observations for subject SC-P2 in period-1.")).toBeVisible();
   await page.goto("/lab/skillcorner-opendata/1925299?stream=pose-1&subject=560986&view=pose&t_ns=8000000000");
   await expect(page.getByTestId("workbench").getByText("No Pose observations for subject 560986 in period-1.")).toBeVisible();
   await expect(page.getByTestId("pose-telemetry-status")).toContainText("No Pose observations");

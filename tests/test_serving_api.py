@@ -19,7 +19,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from dynamis.config import Settings
-from dynamis.serving.app import ARROW_MEDIA_TYPE, create_app
+from dynamis.serving.app import ARROW_MEDIA_TYPE, PostgresServingBackend, create_app
 from dynamis.serving.dense import (
     ArtifactPathError,
     DenseWindowTooLarge,
@@ -532,6 +532,10 @@ def test_dense_window_errors_map_to_explicit_states(client: TestClient) -> None:
 def test_openapi_document_covers_the_locked_surface() -> None:
     document = create_app(backend=FakeBackend()).openapi()
     paths = document["paths"]
+    assert set(paths["/api/artifacts/{artifact_id}/observations"]["get"]["responses"]) >= {
+        "200",
+        "404",
+    }
     for path in (
         "/api/health",
         "/api/serving/status",
@@ -720,6 +724,16 @@ def test_artifact_observation_authority_route(client: TestClient) -> None:
     response = client.get("/api/artifacts/sample-1/observations")
     assert response.status_code == 200
     assert response.json() == []
+    assert client.get("/api/artifacts/missing/observations").status_code == 404
+
+
+def test_resolved_artifact_without_pose_observations_returns_empty_list(
+    tmp_settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    backend = PostgresServingBackend(tmp_settings)
+    monkeypatch.setattr(backend, "artifact", lambda _artifact_id: ARTIFACT)
+    monkeypatch.setattr("dynamis.serving.app.entity_observations", lambda *_args, **_kwargs: None)
+    assert backend.artifact_observations("sample-1", from_ns=None, to_ns=None) == []
 
 
 def test_window_endpoint_accepts_negative_bounds_and_entity_scope(client: TestClient) -> None:

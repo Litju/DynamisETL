@@ -244,7 +244,7 @@ class PostgresServingBackend:
         ref = self.artifact(artifact_id)
         if ref is None:
             return None
-        return entity_observations(self.settings, ref, from_ns=from_ns, to_ns=to_ns)
+        return entity_observations(self.settings, ref, from_ns=from_ns, to_ns=to_ns) or []
 
     def window(
         self,
@@ -543,6 +543,7 @@ def create_app(
         "/api/artifacts/{artifact_id}/observations",
         response_model=list[EntityObservationView],
         tags=["dense"],
+        responses={404: {"description": "Artifact not found"}},
     )
     def artifact_observations(
         artifact_id: str,

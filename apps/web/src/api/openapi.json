@@ -2524,6 +2524,9 @@
             },
             "description": "Successful Response"
           },
+          "404": {
+            "description": "Artifact not found"
+          },
           "422": {
             "content": {
               "application/json": {

@@ -66,7 +66,7 @@ test("1c. Pose playback advances both the playhead and rendered scene", async ({
   const beforeTime = await playhead.innerText();
   const before = await page.screenshot();
   await page.getByRole("button", { name: "Play" }).click();
-  await page.waitForTimeout(1000);
+  await expect.poll(() => playhead.innerText()).not.toBe(beforeTime);
   const afterTime = await playhead.innerText();
   await expect(page.getByTestId("pose-canvas")).toBeVisible();
   const after = await page.screenshot();
