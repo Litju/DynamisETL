@@ -45,6 +45,8 @@ export interface AnalysisState {
   interacting: boolean;
   /** A subject identity/time transition is in flight; renderers must not show stale data. */
   subjectSwitching: boolean;
+  /** Previous Pose identity whose queries must stay retired during a switch. */
+  switchingFromSubjectId: string | null;
 
   setPlayhead: (tNs: bigint | null) => void;
   commitTime: (tNs: bigint | null) => void;
@@ -63,7 +65,7 @@ export interface AnalysisState {
   selectJoint: (jointId: string | null) => void;
   focusPanel: (panel: WorkbenchPanel) => void;
   setInteracting: (interacting: boolean) => void;
-  beginSubjectSwitch: (targetTimeNs: bigint) => void;
+  beginSubjectSwitch: (sourceSubjectId: string | null, targetTimeNs?: bigint) => void;
   finishSubjectSwitch: () => void;
   hydrate: (state: {
     committedTimeNs?: bigint | null;
@@ -86,6 +88,7 @@ const TRANSIENT_DEFAULTS = {
   selectedJoint: null,
   interacting: false,
   subjectSwitching: false,
+  switchingFromSubjectId: null,
 } as const;
 
 export const useAnalysisStore = create<AnalysisState>()((set) => ({
@@ -120,10 +123,11 @@ export const useAnalysisStore = create<AnalysisState>()((set) => ({
   selectJoint: (jointId) => set({ selectedJoint: jointId }),
   focusPanel: (panel) => set({ focusedPanel: panel }),
   setInteracting: (interacting) => set({ interacting }),
-  beginSubjectSwitch: (targetTimeNs) =>
+  beginSubjectSwitch: (sourceSubjectId, targetTimeNs) =>
     set({
-      playheadNs: targetTimeNs,
-      committedTimeNs: targetTimeNs,
+      ...(targetTimeNs !== undefined
+        ? { playheadNs: targetTimeNs, committedTimeNs: targetTimeNs }
+        : {}),
       hoverTimeNs: null,
       brushRangeNs: null,
       playing: false,
@@ -133,8 +137,9 @@ export const useAnalysisStore = create<AnalysisState>()((set) => ({
       hoveredJoint: null,
       selectedJoint: null,
       subjectSwitching: true,
+      switchingFromSubjectId: sourceSubjectId,
     }),
-  finishSubjectSwitch: () => set({ subjectSwitching: false }),
+  finishSubjectSwitch: () => set({ subjectSwitching: false, switchingFromSubjectId: null }),
 
   hydrate: (state) =>
     set((current) => ({

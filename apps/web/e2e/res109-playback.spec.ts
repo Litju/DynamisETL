@@ -148,8 +148,14 @@ test("RES-109 §12 playing subject switch stops playback without stale subject d
 
 test("RES-109 §12 buffering subject switch retires only the previous subject", async ({ page }) => {
   const requests: string[] = [];
+  const oldRequestsAfterReplacement: string[] = [];
+  let replacementRequested = false;
   page.on("request", (request) => {
-    if (request.url().includes("/api/artifacts/pose-sample/window")) requests.push(request.url());
+    if (!request.url().includes("/api/artifacts/pose-sample/window")) return;
+    requests.push(request.url());
+    const entityId = new URL(request.url()).searchParams.get("entity_id");
+    if (entityId === "SC-P2") replacementRequested = true;
+    if (replacementRequested && entityId === "SC-P1") oldRequestsAfterReplacement.push(request.url());
   });
   await page.route("**/api/artifacts/pose-sample/window**", async (route) => {
     const url = new URL(route.request().url());
@@ -168,6 +174,7 @@ test("RES-109 §12 buffering subject switch retires only the previous subject", 
   await expect(page).toHaveURL(/t_ns=12000000000/);
   await expect(page.getByTestId("pose-telemetry").getByText("29 observed · 0 unavailable")).toBeVisible({ timeout: 5_000 });
   expect(requests.some((url) => new URL(url).searchParams.get("entity_id") === "SC-P2")).toBe(true);
+  expect(oldRequestsAfterReplacement).toEqual([]);
 });
 
 test("RES-109 §12 distinguishes temporary absence and no Pose for numeric ids", async ({ page }) => {

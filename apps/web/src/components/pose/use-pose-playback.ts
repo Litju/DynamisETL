@@ -21,6 +21,7 @@ export const POSE_COLUMNS = [
 ] as const;
 
 export interface PosePlaybackWindowOptions {
+  readonly enabled?: boolean;
   readonly artifactId: string | null;
   readonly entityId: string | null;
   readonly canonicalMinNs: bigint | null;
@@ -98,6 +99,7 @@ export function usePosePlaybackWindow(options: PosePlaybackWindowOptions): PoseP
         : null,
     [options.explicitFromNs, options.explicitToNs],
   );
+  const enabled = options.enabled ?? true;
   const isReady = useCallback(
     (data: DenseWindow | undefined) => data?.meta.reduction === null,
     [],
@@ -116,7 +118,7 @@ export function usePosePlaybackWindow(options: PosePlaybackWindowOptions): PoseP
     [],
   );
   const playback = usePlaybackChunkCoordinator<DenseWindow>({
-    enabled: explicit === null,
+    enabled: enabled && explicit === null,
     coordinatorKey: `pose:${queryScope.artifactId}:${queryScope.entityId ?? "*"}:${queryScope.columns}:${queryScope.maxPoints}`,
     canonicalMinNs: options.canonicalMinNs,
     canonicalMaxNs: options.canonicalMaxNs,
@@ -147,7 +149,7 @@ export function usePosePlaybackWindow(options: PosePlaybackWindowOptions): PoseP
   const window = useQuery({
     ...activeQuery,
     placeholderData: (previous) => previous,
-    enabled: Boolean(options.artifactId) && (explicit !== null || activeChunk !== null),
+    enabled: enabled && Boolean(options.artifactId) && (explicit !== null || activeChunk !== null),
   });
   return {
     window,

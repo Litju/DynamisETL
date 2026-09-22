@@ -60,6 +60,8 @@ test("RES-109 §12 switches between real local Pose subjects from a >10 s playhe
     toNs: number;
     returnedRows: number;
   }> = [];
+  const retiredSubjectRequests: string[] = [];
+  let replacementSubjectRequested = false;
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await installApiMocks(page);
@@ -93,6 +95,8 @@ test("RES-109 §12 switches between real local Pose subjects from a >10 s playhe
     const fromNs = url.searchParams.has("from_ns") ? Number(url.searchParams.get("from_ns")) : artifact.canonical_time_min_ns;
     const toNs = url.searchParams.has("to_ns") ? Number(url.searchParams.get("to_ns")) : artifact.canonical_time_max_ns;
     const entityId = url.searchParams.get("entity_id");
+    if (entityId === targetSubject) replacementSubjectRequested = true;
+    if (replacementSubjectRequested && entityId === firstSubject) retiredSubjectRequests.push(route.request().url());
     const rows = fixture.rows.filter((row) => {
       const time = Number(row.t_rel_ns);
       return time >= fromNs && time <= toNs && (entityId === null || String(row.subject_id) === entityId);
@@ -139,18 +143,23 @@ test("RES-109 §12 switches between real local Pose subjects from a >10 s playhe
     request.toNs >= target!.first_observed_ns && request.returnedRows > 0,
   );
   expect(targetRequest).toBeDefined();
+  expect(retiredSubjectRequests).toEqual([]);
+  const retiredPreviousSubjectRequests = [...retiredSubjectRequests];
 
   const firstInRange = observationsInRange(fixture, rangeFromNs, rangeToNs)
     .find((item) => item.entity_id === firstSubject);
   expect(firstInRange).toBeDefined();
+  const requestCountBeforeReturn = requests.length;
+  replacementSubjectRequested = false;
   await page.locator("#pose-subject").selectOption(firstSubject);
   await expect(page).toHaveURL(new RegExp(`subject=${firstSubject}`));
   await expect(page).toHaveURL(new RegExp(`t_ns=${firstInRange!.first_observed_ns}`));
   await expect(page.getByTestId("pose-telemetry").getByText(firstSubject, { exact: true })).toBeVisible();
-  expect(requests.some((request) =>
+  const rangeReturnRequest = requests.slice(requestCountBeforeReturn).find((request) =>
     request.entityId === firstSubject && request.fromNs === rangeFromNs &&
     request.toNs === rangeToNs && request.returnedRows > 0,
-  )).toBe(true);
+  );
+  expect(rangeReturnRequest).toBeDefined();
   expect(errors).toEqual([]);
 
   const resultPath = process.env.RES109_LOCAL_POSE_RESULT;
@@ -167,6 +176,8 @@ test("RES-109 §12 switches between real local Pose subjects from a >10 s playhe
       range_return_to_subject: firstSubject,
       range_first_observed_ns: firstInRange!.first_observed_ns,
       exact_request: targetRequest,
+      range_return_request: rangeReturnRequest,
+      retired_previous_subject_requests: retiredPreviousSubjectRequests,
       page_errors: errors,
     }, null, 2) + "\n", "utf8");
   }

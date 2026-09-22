@@ -57,6 +57,7 @@ export function PoseViewer() {
   const playheadNs = useAnalysisStore((state) => state.playheadNs);
   const playing = useAnalysisStore((state) => state.playing);
   const subjectSwitching = useAnalysisStore((state) => state.subjectSwitching);
+  const switchingFromSubjectId = useAnalysisStore((state) => state.switchingFromSubjectId);
   const selectedJoint = useAnalysisStore((state) => state.selectedJoint);
   const hoveredJoint = useAnalysisStore((state) => state.hoveredJoint);
   const [rendererReady, setRendererReady] = useState(false);
@@ -100,6 +101,23 @@ export function PoseViewer() {
     return observedSubjectList[0] ?? streamSubject;
   }, [observedSubjectList, selectedSubject, streamSubject]);
   const subjectObservation = observed.observations.find((item) => item.entityId === subjectId);
+  const subjectPlaybackEnabled =
+    !subjectSwitching ||
+    (switchingFromSubjectId !== null && switchingFromSubjectId !== subjectId);
+  const previousSubject = useRef({ artifactId, subjectId });
+  useEffect(() => {
+    if (subjectSwitching) return;
+    const previous = previousSubject.current;
+    previousSubject.current = { artifactId, subjectId };
+    if (previous.artifactId === artifactId && previous.subjectId !== subjectId) {
+      retirePoseSubjectQueries(queryClient, artifactId, previous.subjectId);
+    }
+  }, [artifactId, queryClient, subjectId, subjectSwitching]);
+  useEffect(() => {
+    if (!subjectSwitching) return;
+    const previous = previousSubject.current;
+    retirePoseSubjectQueries(queryClient, previous.artifactId, previous.subjectId);
+  }, [queryClient, subjectSwitching]);
 
   const explicitFromNs = context?.fromNs ?? null;
   const explicitToNs = context?.toNs ?? null;
@@ -114,6 +132,7 @@ export function PoseViewer() {
     [artifactData, sceneSubjectId],
   );
   const playback = usePosePlaybackWindow({
+    enabled: subjectPlaybackEnabled,
     artifactId,
     entityId: sceneSubjectId,
     canonicalMinNs: canonical?.minNs ?? null,
@@ -126,7 +145,12 @@ export function PoseViewer() {
   });
   const { window, activeWindowBounds, playbackStatus } = playback;
   useEffect(() => {
-    if (!subjectSwitching || context?.subjectId !== subjectId) return;
+    if (
+      !subjectSwitching ||
+      switchingFromSubjectId === null ||
+      subjectId === switchingFromSubjectId ||
+      context?.subjectId !== subjectId
+    ) return;
     if (
       context?.timeNs === null ||
       context?.timeNs !== committedTimeNs ||
@@ -136,7 +160,7 @@ export function PoseViewer() {
       window.data?.meta.reduction !== null
     ) return;
     useAnalysisStore.getState().finishSubjectSwitch();
-  }, [artifact.isPending, committedTimeNs, context, subjectId, subjectSwitching, window.data, window.isPending, window.isPlaceholderData]);
+  }, [artifact.isPending, committedTimeNs, context, subjectId, subjectSwitching, switchingFromSubjectId, window.data, window.isPending, window.isPlaceholderData]);
   const metrics = useQuery({
     ...metricsQuery({
       streamId: streamId ?? undefined,
@@ -235,8 +259,7 @@ export function PoseViewer() {
     const observation = observed.observations.find((item) => item.entityId === nextSubjectId);
     const fallbackTimeNs = context?.timeNs ?? committedTimeNs ?? canonical?.minNs ?? null;
     if (fallbackTimeNs === null) return;
-    retirePoseSubjectQueries(queryClient, artifactId, subjectId);
-    useAnalysisStore.getState().beginSubjectSwitch(fallbackTimeNs);
+    useAnalysisStore.getState().beginSubjectSwitch(subjectId);
     let resolvedObservation = observation;
     if (
       artifactId !== null &&
@@ -266,7 +289,7 @@ export function PoseViewer() {
         context?.fromNs ?? null,
         context?.toNs ?? null,
       ) ?? fallbackTimeNs;
-    useAnalysisStore.getState().beginSubjectSwitch(targetTimeNs);
+    useAnalysisStore.getState().beginSubjectSwitch(subjectId, targetTimeNs);
     context?.selectSubject(nextSubjectId, { targetTimeNs });
     subjectSwitchAbort.current = null;
   };

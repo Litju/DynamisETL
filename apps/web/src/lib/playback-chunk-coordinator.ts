@@ -3,7 +3,7 @@ import {
   type QueryKey,
   type QueryOptions,
 } from "@tanstack/react-query";
-import { useEffect, useId, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useMemo, useSyncExternalStore } from "react";
 
 import {
   planDenseChunks,
@@ -282,12 +282,12 @@ export function usePlaybackChunkCoordinator<T>(options: {
   readonly chunkIdFromQueryKey: (queryKey: QueryKey) => string | null;
 }): PlaybackChunkSnapshot & { readonly coordinator: PlaybackChunkCoordinator | null } {
   const ownerId = useId();
-  const [initialAnchorNs] = useState(() => options.anchorNs);
   const {
     enabled,
     canonicalMinNs,
     canonicalMaxNs,
     chunkSpanNs,
+    anchorNs,
     queryClient,
     coordinatorKey,
     queryOptionsFor,
@@ -332,13 +332,13 @@ export function usePlaybackChunkCoordinator<T>(options: {
       canonicalMinNs,
       canonicalMaxNs,
       chunkSpanNs,
-      anchorNs: initialAnchorNs,
+      anchorNs,
       port,
       onEnded: () => useAnalysisStore.getState().setPlaying(false),
     });
     return coordinatorKey ? acquireSharedCoordinator(coordinatorKey, ownerId, create) : create();
   }, [
-    initialAnchorNs,
+    anchorNs,
     canonicalMaxNs,
     canonicalMinNs,
     chunkSpanNs,

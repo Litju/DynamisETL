@@ -17,6 +17,8 @@ function reset() {
     hoveredJoint: null,
     focusedPanel: "overview",
     interacting: false,
+    subjectSwitching: false,
+    switchingFromSubjectId: null,
   });
 }
 
@@ -85,5 +87,35 @@ describe("transient analysis state spine", () => {
     // Committed identity survives transient resets.
     expect(state.committedTimeNs).toBe(42n);
     expect(state.selectedEntityId).toBe("SC-P1");
+  });
+
+  it("stops and clears a subject switch before applying its resolved target time", () => {
+    const store = useAnalysisStore.getState();
+    store.commitTime(17n);
+    store.setPlayhead(18n);
+    store.setPlaying(true);
+    store.setBrushRange({ fromNs: 1n, toNs: 2n });
+    store.selectEntity("SC-P1");
+    store.hoverEntity("SC-P1");
+    store.selectJoint("nose");
+    store.beginSubjectSwitch("SC-P1");
+
+    let state = useAnalysisStore.getState();
+    expect(state.playing).toBe(false);
+    expect(state.playheadNs).toBe(18n);
+    expect(state.committedTimeNs).toBe(17n);
+    expect(state.brushRangeNs).toBeNull();
+    expect(state.selectedEntityId).toBeNull();
+    expect(state.hoveredEntityId).toBeNull();
+    expect(state.selectedJoint).toBeNull();
+    expect(state.subjectSwitching).toBe(true);
+    expect(state.switchingFromSubjectId).toBe("SC-P1");
+
+    state.beginSubjectSwitch("SC-P1", 32n);
+    state = useAnalysisStore.getState();
+    expect(state.playheadNs).toBe(32n);
+    expect(state.committedTimeNs).toBe(32n);
+    state.finishSubjectSwitch();
+    expect(useAnalysisStore.getState().switchingFromSubjectId).toBeNull();
   });
 });
