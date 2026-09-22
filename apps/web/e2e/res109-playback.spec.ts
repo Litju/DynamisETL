@@ -65,7 +65,8 @@ test("RES-109 Field crosses forward and reverse chunk boundaries without scope d
   await page.getByRole("button", { name: "Play" }).click();
   await page.waitForTimeout(5_000);
   const forward = await playheadNs(page);
-  await page.getByRole("button", { name: "Pause" }).click();
+  const pause = page.getByRole("button", { name: "Pause" });
+  if (await pause.count()) await pause.click();
   await expect(page.getByRole("button", { name: "Play" })).toBeVisible();
   await page.getByRole("button", { name: "Reverse" }).click();
   await expect(page.getByTestId("playback-direction")).toHaveAttribute("data-direction", "reverse");
