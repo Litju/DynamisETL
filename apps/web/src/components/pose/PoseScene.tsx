@@ -19,18 +19,21 @@ import {
 
 import {
   angleAt,
+  bodyLocalBounds,
+  bodyLocalCentre,
   boundsOf,
   cameraFor,
   landmarksAt,
-  planarCentre,
   toViewerPoint,
   type AngleDefinition,
+  type CameraMode,
   type CameraPreset,
   type DisplayConnectionDefinition,
   type PoseFrame,
   type PoseLandmark,
   type PoseSubjectFrames,
   type ProcessorOverlays,
+  type PoseCoordinateMode,
   type ViewerPoint,
   withoutDuplicateAngles,
 } from "@/components/pose/pose-model";
@@ -93,6 +96,9 @@ export interface PoseSceneProps {
   readonly overlays: ProcessorOverlays;
   readonly providerConnections: readonly DisplayConnectionDefinition[];
   readonly preset: CameraPreset;
+  readonly cameraMode: CameraMode;
+  readonly coordinateMode: PoseCoordinateMode;
+  readonly onManualCamera?: () => void;
   readonly showProviderSkeleton: boolean;
   readonly showTorsoCue: boolean;
   readonly showFootContact: boolean;
@@ -110,7 +116,12 @@ interface LandmarkDescriptor {
   readonly jointName: string;
 }
 
-type CurrentLandmarks = readonly ReadonlyMap<string, PoseLandmark>[];
+interface CurrentSubjectFrame {
+  readonly landmarks: ReadonlyMap<string, PoseLandmark>;
+  readonly centre: { readonly xM: number; readonly yM: number };
+}
+
+type CurrentLandmarks = readonly CurrentSubjectFrame[];
 
 export function PoseScene(props: PoseSceneProps) {
   const subjects = useMemo(
@@ -121,22 +132,33 @@ export function PoseScene(props: PoseSceneProps) {
     () => subjects.flatMap((subject) => subject.frames.find((frame) => frame.observed)?.landmarks ?? []),
     [subjects],
   );
-  const centre = useMemo(() => planarCentre(firstLandmarks), [firstLandmarks]);
-  const bounds = useMemo(() => {
-    const input = props.allSubjects ? subjects.flatMap((subject) => subject.frames.flatMap((frame) => frame.landmarks)) : firstLandmarks;
-    return boundsOf(input, centre);
-  }, [centre, firstLandmarks, props.allSubjects, subjects]);
-  return <PoseStage {...props} subjects={subjects} centre={centre} bounds={bounds} />;
+  const coordinateOrigin = { xM: 0, yM: 0 };
+  const calculatedBounds = useMemo(() => {
+    if (props.coordinateMode === "body_local") {
+      return bodyLocalBounds(subjects.flatMap((subject) => subject.frames));
+    }
+    return boundsOf(firstLandmarks, coordinateOrigin);
+  }, [firstLandmarks, props.coordinateMode, subjects]);
+  const sourceKey = `${props.coordinateMode}:${subjects.map((subject) => subject.subjectId).join(",")}`;
+  const stable = useRef<{ readonly key: string; readonly bounds: ReturnType<typeof boundsOf> } | null>(null);
+  if (stable.current === null || stable.current.key !== sourceKey) {
+    stable.current = { key: sourceKey, bounds: calculatedBounds };
+  }
+  return <PoseStage {...props} subjects={subjects} bounds={stable.current.bounds} />;
 }
 
-function PoseStage({ subjects, centre, bounds, ...props }: PoseSceneProps & {
+const WORLD_ORIGIN = { xM: 0, yM: 0 } as const;
+
+function PoseStage({ subjects, bounds, ...props }: PoseSceneProps & {
   readonly subjects: readonly PoseSubjectFrames[];
-  readonly centre: { readonly xM: number; readonly yM: number };
   readonly bounds: ReturnType<typeof boundsOf>;
 }) {
   const { invalidate, setFrameloop } = useThree();
   const playing = useAnalysisStore((state) => state.playing);
+  const selectedJoint = useAnalysisStore((state) => state.selectedJoint);
   const controlsRef = useRef<React.ElementRef<typeof CameraControls> | null>(null);
+  const followTarget = useRef(new Vector3());
+  const hasFollowTarget = useRef(false);
   useEffect(() => useAnalysisStore.subscribe((state, previous) => {
     if (state.playheadNs !== previous.playheadNs || state.playing !== previous.playing) invalidate();
   }), [invalidate]);
@@ -146,11 +168,43 @@ function PoseStage({ subjects, centre, bounds, ...props }: PoseSceneProps & {
   }, [invalidate, playing, setFrameloop]);
   useEffect(() => {
     const controls = controlsRef.current;
-    if (!controls) return;
-    const { position, target } = cameraFor(props.preset, bounds);
+    if (!controls || props.cameraMode === "manual") return;
+    const { position, target } = cameraFor("reset", bounds);
     void controls.setLookAt(position[0], position[1], position[2], target[0], target[1], target[2], false);
     invalidate();
-  }, [bounds, invalidate, props.preset]);
+    hasFollowTarget.current = false;
+  }, [bounds, invalidate, props.cameraMode]);
+  useFrame((_state, delta) => {
+    if (props.cameraMode !== "follow_subject" && props.cameraMode !== "joint_focus") return;
+    const subject = subjects[0];
+    if (!subject) return;
+    const time = useAnalysisStore.getState().playheadNs ?? useAnalysisStore.getState().committedTimeNs;
+    const landmarks = landmarksAt(subject.frames, time);
+    let desired: readonly [number, number, number] | null = null;
+    const centre = props.coordinateMode === "body_local" ? bodyLocalCentre(landmarks) : WORLD_ORIGIN;
+    if (props.cameraMode === "follow_subject") {
+      const root = props.coordinateMode === "body_local" ? WORLD_ORIGIN : bodyLocalCentre(landmarks);
+      desired = [root.xM, 0, -root.yM];
+    } else if (selectedJoint !== null) {
+      const joint = landmarks.find((landmark) => landmark.jointName === selectedJoint);
+      if (joint) desired = toViewerPoint(joint, centre);
+    }
+    if (desired === null) return;
+    const target = followTarget.current;
+    if (!hasFollowTarget.current) {
+      target.set(desired[0], desired[1], desired[2]);
+      hasFollowTarget.current = true;
+    }
+    const desiredVector = new Vector3(desired[0], desired[1], desired[2]);
+    if (target.distanceTo(desiredVector) > Math.max(0.1, bounds.radius * 0.2)) {
+      target.lerp(desiredVector, Math.min(1, Math.max(0, delta) * 6));
+      controlsRef.current?.setTarget(target.x, target.y, target.z, false);
+      invalidate();
+    }
+  });
+  const handleControlStart = useCallback(() => {
+    if (props.cameraMode !== "manual") props.onManualCamera?.();
+  }, [props.cameraMode, props.onManualCamera]);
   return (
     <>
       <color attach="background" args={["#12161c"]} />
@@ -158,15 +212,14 @@ function PoseStage({ subjects, centre, bounds, ...props }: PoseSceneProps & {
       <ambientLight intensity={0.9} />
       <directionalLight position={[2, 4, 3]} intensity={1.1} />
       <Grid args={[bounds.radius * 2.6, bounds.radius * 2.6]} position={[bounds.center[0], bounds.min[1], bounds.center[2]]} cellSize={bounds.radius / 8} cellColor="#242c37" sectionSize={bounds.radius / 2} sectionColor="#33404f" fadeDistance={bounds.radius * 14} fadeStrength={1.5} />
-      <CameraControls ref={controlsRef} makeDefault />
-      <PoseHotPath subjects={subjects} centre={centre} {...props} />
+      <CameraControls ref={controlsRef} makeDefault onStart={handleControlStart} />
+      <PoseHotPath subjects={subjects} {...props} />
     </>
   );
 }
 
-function PoseHotPath({ subjects, centre, overlays, providerConnections, showProviderSkeleton, showTorsoCue, showFootContact, showHandContact, showHeadNeck, showArticulationAngles, showSegments, showAngles, showErrorRadii }: PoseSceneProps & {
+function PoseHotPath({ subjects, overlays, providerConnections, showProviderSkeleton, showTorsoCue, showFootContact, showHandContact, showHeadNeck, showArticulationAngles, showSegments, showAngles, showErrorRadii, coordinateMode }: PoseSceneProps & {
   readonly subjects: readonly PoseSubjectFrames[];
-  readonly centre: { readonly xM: number; readonly yM: number };
 }) {
   const descriptors = useMemo<LandmarkDescriptor[]>(() => subjects.flatMap((subject, subjectIndex) => {
     const names = new Set<string>();
@@ -176,6 +229,7 @@ function PoseHotPath({ subjects, centre, overlays, providerConnections, showProv
   const jointMesh = useInstancedGlyph(descriptors.length, false);
   const errorMesh = useInstancedGlyph(descriptors.length, true);
   const currentRef = useRef<CurrentLandmarks>([]);
+  const centresRef = useRef<Array<{ readonly xM: number; readonly yM: number }>>([]);
   const identity = useMemo(() => new Quaternion(), []);
   const matrix = useMemo(() => new Matrix4(), []);
   const position = useMemo(() => new Vector3(), []);
@@ -185,17 +239,21 @@ function PoseHotPath({ subjects, centre, overlays, providerConnections, showProv
   const articulationAngles = useMemo(() => withoutDuplicateAngles(ARTICULATION_ANGLE_CUES, overlays.angles), [overlays.angles]);
   useFrame(() => {
     const time = useAnalysisStore.getState().playheadNs ?? useAnalysisStore.getState().committedTimeNs;
-    const current = subjects.map((subject) => {
+    const current = subjects.map((subject, subjectIndex) => {
       const byName = new Map<string, PoseLandmark>();
       for (const landmark of landmarksAt(subject.frames, time)) byName.set(landmark.jointName, landmark);
-      return byName;
+      const centre = coordinateMode === "body_local"
+        ? bodyLocalCentre([...byName.values()], centresRef.current[subjectIndex] ?? null)
+        : WORLD_ORIGIN;
+      centresRef.current[subjectIndex] = centre;
+      return { landmarks: byName, centre };
     });
     currentRef.current = current;
     for (let index = 0; index < descriptors.length; index += 1) {
       const descriptor = descriptors[index]!;
-      const landmark = current[descriptor.subjectIndex]?.get(descriptor.jointName);
+      const landmark = current[descriptor.subjectIndex]?.landmarks.get(descriptor.jointName);
       const visible = landmark !== undefined;
-      const point = visible ? toViewerPoint(landmark, centre) : [0, 0, 0] as const;
+      const point = visible ? toViewerPoint(landmark, current[descriptor.subjectIndex]?.centre ?? WORLD_ORIGIN) : [0, 0, 0] as const;
       const selected = descriptor.jointName === selectedJoint && (selectedEntity === null || selectedEntity === descriptor.subjectId);
       position.set(point[0], point[1], point[2]);
       const jointScale = visible ? (selected ? 1.6 : 1) : 0;
@@ -232,14 +290,14 @@ function PoseHotPath({ subjects, centre, overlays, providerConnections, showProv
     <>
       <primitive object={jointMesh} onClick={handleJointClick} onPointerOver={handleJointHover} onPointerOut={() => { useAnalysisStore.getState().hoverJoint(null); useAnalysisStore.getState().hoverEntity(null); }} />
       <primitive object={errorMesh} />
-      {showProviderSkeleton ? <BatchedSegments subjects={subjects} currentRef={currentRef} centre={centre} connections={providerConnections} color={PROVIDER_SKELETON_COLOR} /> : null}
-      {showTorsoCue ? <BatchedSegments subjects={subjects} currentRef={currentRef} centre={centre} connections={TORSO_CUE_CONNECTIONS} color={TORSO_CUE_COLOR} /> : null}
-      {showFootContact ? <BatchedSegments subjects={subjects} currentRef={currentRef} centre={centre} connections={FOOT_CONTACT_CUE_CONNECTIONS} color={FOOT_CONTACT_CUE_COLOR} /> : null}
-      {showHandContact ? <BatchedSegments subjects={subjects} currentRef={currentRef} centre={centre} connections={HAND_CONTACT_CUE_CONNECTIONS} color={FOOT_CONTACT_CUE_COLOR} /> : null}
-      {showHeadNeck ? <BatchedSegments subjects={subjects} currentRef={currentRef} centre={centre} connections={HEAD_NECK_CUE_CONNECTIONS} color={HEAD_NECK_CUE_COLOR} /> : null}
-      {processorSegments.length > 0 ? <BatchedSegments subjects={subjects} currentRef={currentRef} centre={centre} connections={processorSegments} color={SEGMENT_COLOR} /> : null}
-      {showAngles && overlays.angles.length > 0 ? <BatchedAngles subjects={subjects} currentRef={currentRef} centre={centre} definitions={overlays.angles} color={ANGLE_COLOR} /> : null}
-      {showArticulationAngles && articulationAngles.length > 0 ? <BatchedAngles subjects={subjects} currentRef={currentRef} centre={centre} definitions={articulationAngles} color={ARTICULATION_ANGLE_CUE_COLOR} articulation /> : null}
+      {showProviderSkeleton ? <BatchedSegments subjects={subjects} currentRef={currentRef} connections={providerConnections} color={PROVIDER_SKELETON_COLOR} /> : null}
+      {showTorsoCue ? <BatchedSegments subjects={subjects} currentRef={currentRef} connections={TORSO_CUE_CONNECTIONS} color={TORSO_CUE_COLOR} /> : null}
+      {showFootContact ? <BatchedSegments subjects={subjects} currentRef={currentRef} connections={FOOT_CONTACT_CUE_CONNECTIONS} color={FOOT_CONTACT_CUE_COLOR} /> : null}
+      {showHandContact ? <BatchedSegments subjects={subjects} currentRef={currentRef} connections={HAND_CONTACT_CUE_CONNECTIONS} color={FOOT_CONTACT_CUE_COLOR} /> : null}
+      {showHeadNeck ? <BatchedSegments subjects={subjects} currentRef={currentRef} connections={HEAD_NECK_CUE_CONNECTIONS} color={HEAD_NECK_CUE_COLOR} /> : null}
+      {processorSegments.length > 0 ? <BatchedSegments subjects={subjects} currentRef={currentRef} connections={processorSegments} color={SEGMENT_COLOR} /> : null}
+      {showAngles && overlays.angles.length > 0 ? <BatchedAngles subjects={subjects} currentRef={currentRef} definitions={overlays.angles} color={ANGLE_COLOR} /> : null}
+      {showArticulationAngles && articulationAngles.length > 0 ? <BatchedAngles subjects={subjects} currentRef={currentRef} definitions={articulationAngles} color={ARTICULATION_ANGLE_CUE_COLOR} articulation /> : null}
     </>
   );
 }
@@ -264,10 +322,9 @@ function subjectColor(index: number, count: number): string {
   return count <= 1 ? JOINT_COLOR : ALL_SUBJECT_COLORS[index % ALL_SUBJECT_COLORS.length]!;
 }
 
-function BatchedSegments({ subjects, currentRef, centre, connections, color }: {
+function BatchedSegments({ subjects, currentRef, connections, color }: {
   readonly subjects: readonly PoseSubjectFrames[];
   readonly currentRef: React.MutableRefObject<CurrentLandmarks>;
-  readonly centre: { readonly xM: number; readonly yM: number };
   readonly connections: readonly DisplayConnectionDefinition[];
   readonly color: string;
 }) {
@@ -277,9 +334,9 @@ function BatchedSegments({ subjects, currentRef, centre, connections, color }: {
     let offset = 0;
     let visible = false;
     for (let subjectIndex = 0; subjectIndex < subjects.length; subjectIndex += 1) {
-      const landmarks = currentRef.current[subjectIndex];
+      const current = currentRef.current[subjectIndex];
       for (const connection of connections) {
-        const points = connectionPoints(landmarks, connection, centre);
+        const points = connectionPoints(current?.landmarks, connection, current?.centre ?? WORLD_ORIGIN);
         if (points) visible = true;
         writeSegment(record.positions, offset, points);
         offset += 6;
@@ -291,10 +348,9 @@ function BatchedSegments({ subjects, currentRef, centre, connections, color }: {
   return <primitive object={record.object} />;
 }
 
-function BatchedAngles({ subjects, currentRef, centre, definitions, color, articulation = false }: {
+function BatchedAngles({ subjects, currentRef, definitions, color, articulation = false }: {
   readonly subjects: readonly PoseSubjectFrames[];
   readonly currentRef: React.MutableRefObject<CurrentLandmarks>;
-  readonly centre: { readonly xM: number; readonly yM: number };
   readonly definitions: readonly AngleDefinition[];
   readonly color: string;
   readonly articulation?: boolean;
@@ -306,9 +362,11 @@ function BatchedAngles({ subjects, currentRef, centre, definitions, color, artic
     let offset = 0;
     let visible = false;
     for (let subjectIndex = 0; subjectIndex < subjects.length; subjectIndex += 1) {
-      const landmarks = currentRef.current[subjectIndex];
+      const current = currentRef.current[subjectIndex];
       for (const definition of definitions) {
-        const points = articulation ? anglePointsAt(landmarks, definition, centre, 0.075) : anglePath(landmarks, definition, centre);
+        const points = articulation
+          ? anglePointsAt(current?.landmarks, definition, current?.centre ?? WORLD_ORIGIN, 0.075)
+          : anglePath(current?.landmarks, definition, current?.centre ?? WORLD_ORIGIN);
         if (points) visible = true;
         for (let segment = 0; segment < maxPoints - 1; segment += 1) {
           writeSegment(record.positions, offset, points && points[segment] && points[segment + 1] ? [points[segment]!, points[segment + 1]!] : null);
@@ -406,13 +464,16 @@ export function arcPoints(vertex: PoseLandmark, first: PoseLandmark, second: Pos
   return points;
 }
 
-export function PoseCanvas({ frames, subjectFrames, allSubjects, overlays, providerConnections, preset, playing, showProviderSkeleton, showTorsoCue, showFootContact, showHandContact, showHeadNeck, showArticulationAngles, showSegments, showAngles, showErrorRadii, onReady }: {
+export function PoseCanvas({ frames, subjectFrames, allSubjects, overlays, providerConnections, preset, cameraMode, coordinateMode, onManualCamera, playing, showProviderSkeleton, showTorsoCue, showFootContact, showHandContact, showHeadNeck, showArticulationAngles, showSegments, showAngles, showErrorRadii, onReady }: {
   readonly frames: readonly PoseFrame[];
   readonly subjectFrames: readonly PoseSubjectFrames[];
   readonly allSubjects: boolean;
   readonly overlays: ProcessorOverlays;
   readonly providerConnections: readonly DisplayConnectionDefinition[];
   readonly preset: CameraPreset;
+  readonly cameraMode: CameraMode;
+  readonly coordinateMode: PoseCoordinateMode;
+  readonly onManualCamera?: () => void;
   readonly playing: boolean;
   readonly showProviderSkeleton: boolean;
   readonly showTorsoCue: boolean;
@@ -426,7 +487,7 @@ export function PoseCanvas({ frames, subjectFrames, allSubjects, overlays, provi
   readonly onReady?: () => void;
 }) {
   return <Canvas frameloop={playing ? "always" : "demand"} camera={{ fov: 40, near: 0.01, far: 100 }} dpr={[1, 2]} gl={{ antialias: true }} onCreated={() => onReady?.()}>
-    <PoseScene frames={frames} subjectFrames={subjectFrames} allSubjects={allSubjects} overlays={overlays} providerConnections={providerConnections} preset={preset} showProviderSkeleton={showProviderSkeleton} showTorsoCue={showTorsoCue} showFootContact={showFootContact} showHandContact={showHandContact} showHeadNeck={showHeadNeck} showArticulationAngles={showArticulationAngles} showSegments={showSegments} showAngles={showAngles} showErrorRadii={showErrorRadii} />
+    <PoseScene frames={frames} subjectFrames={subjectFrames} allSubjects={allSubjects} overlays={overlays} providerConnections={providerConnections} preset={preset} cameraMode={cameraMode} coordinateMode={coordinateMode} {...(onManualCamera ? { onManualCamera } : {})} showProviderSkeleton={showProviderSkeleton} showTorsoCue={showTorsoCue} showFootContact={showFootContact} showHandContact={showHandContact} showHeadNeck={showHeadNeck} showArticulationAngles={showArticulationAngles} showSegments={showSegments} showAngles={showAngles} showErrorRadii={showErrorRadii} />
   </Canvas>;
 }
 

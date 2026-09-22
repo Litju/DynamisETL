@@ -129,14 +129,18 @@ export function SignalLaboratory() {
       context?.selectStream(stream.stream_id);
     }
   }, [context, currentStream, selectedSubject, stream, subjectId]);
-  const dense = useDenseWindow({
-    artifactId,
-    ...(fromNs !== null ? { fromNs: Number(fromNs) } : {}),
-    ...(toNs !== null ? { toNs: Number(toNs) } : {}),
-    ...(entityId !== undefined ? { entityId } : {}),
-    maxPoints: MAX_WINDOW_POINTS,
-    ...(chunk ? { chunk } : {}),
-  });
+  const denseRequest = useMemo(
+    () => ({
+      artifactId,
+      ...(fromNs !== null ? { fromNs: Number(fromNs) } : {}),
+      ...(toNs !== null ? { toNs: Number(toNs) } : {}),
+      ...(entityId !== undefined ? { entityId } : {}),
+      maxPoints: MAX_WINDOW_POINTS,
+      ...(chunk ? { chunk } : {}),
+    }),
+    [artifactId, chunk, entityId, fromNs, toNs],
+  );
+  const dense = useDenseWindow(denseRequest);
 
   if (!context) {
     return <StatePanel state="empty" title="Open a laboratory session first." />;

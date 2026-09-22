@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
-import { useEffect, useMemo } from "react";
+import { useCallback, useMemo } from "react";
 
 import type { DenseWindowMeta } from "@/api/types";
 import { api, unwrap } from "@/lib/api/client";
@@ -8,8 +8,11 @@ import {
   fetchWindowArrow,
 } from "@/lib/api/arrow-window";
 import { tableFromDecoded, tableFromJson, type WindowTable } from "@/lib/arrow/window-table";
-import { windowQuery, type WindowQuery } from "@/lib/api/queries";
-import { planDenseChunks, type DenseChunkConfig, type DenseChunkPlan } from "@/lib/dense-chunks";
+import { type DenseChunkConfig, type DenseChunkBounds } from "@/lib/dense-chunks";
+import {
+  usePlaybackChunkCoordinator,
+  type PlaybackChunkQueryOptions,
+} from "@/lib/playback-chunk-coordinator";
 
 export interface DenseWindowRequest {
   readonly artifactId: string | null;
@@ -85,17 +88,47 @@ export function denseWindowQueryOptions(request: DenseWindowRequest) {
   };
 }
 
-/**
- * Dense transport with a bounded active/previous/next cache. Chunk identity is
- * canonical and non-overlapping; React Query aborts stale Arrow requests when
- * the analytical context changes.
- */
+/** Dense transport with the shared playhead-driven chunk coordinator. */
 export function useDenseWindow(request: DenseWindowRequest) {
   const queryClient = useQueryClient();
-  const plan = useMemo<DenseChunkPlan | null>(
-    () => (request.chunk ? planDenseChunks(request.chunk) : null),
-    [request.chunk],
+  const queryOptionsFor = useCallback(
+    (chunk: DenseChunkBounds): PlaybackChunkQueryOptions<DenseWindowState> =>
+      denseWindowQueryOptions({
+        ...request,
+        fromNs: Number(chunk.fromNs),
+        toNs: Number(chunk.toNs),
+        cacheScope: "dense-chunk-window",
+        chunkId: chunk.id,
+      }),
+    [request],
   );
+  const queryScope = useMemo(
+    () => ({
+      artifactId: request.artifactId,
+      columns: request.columns?.join(",") ?? null,
+      maxPoints: request.maxPoints ?? null,
+      entityId: request.entityId ?? null,
+    }),
+    [request.artifactId, request.columns, request.entityId, request.maxPoints],
+  );
+  const playback = usePlaybackChunkCoordinator<DenseWindowState>({
+    enabled: request.chunk !== undefined,
+    canonicalMinNs: request.chunk?.canonicalMinNs ?? null,
+    canonicalMaxNs: request.chunk?.canonicalMaxNs ?? null,
+    chunkSpanNs: request.chunk?.chunkSpanNs ?? null,
+    anchorNs: request.chunk?.anchorNs ?? null,
+    queryClient,
+    queryOptionsFor,
+    isReady: (data) => data?.table !== null && data?.table !== undefined,
+    matchesQuery: (key) =>
+      key[0] === "dense-chunk-window" &&
+      key[1] === queryScope.artifactId &&
+      key[6] === queryScope.columns &&
+      key[7] === queryScope.maxPoints &&
+      key[8] === queryScope.entityId,
+    chunkIdFromQueryKey: (key) => (typeof key[3] === "string" ? key[3] : null),
+  });
+  const plan = playback.plan;
   const activeRequest = useMemo<DenseWindowRequest>(() => {
     if (!plan) return request;
     return {
@@ -108,48 +141,8 @@ export function useDenseWindow(request: DenseWindowRequest) {
   }, [plan, request]);
   const query = useQuery({
     ...denseWindowQueryOptions(activeRequest),
-    enabled: Boolean(activeRequest.artifactId),
+    enabled: Boolean(activeRequest.artifactId) && (request.chunk === undefined || plan !== null),
   });
 
-  useEffect(() => {
-    if (!plan) return;
-    const adjacent = [plan.previous, plan.next].filter((chunk): chunk is NonNullable<typeof chunk> => chunk !== null);
-    const allowed = new Set([plan.active.id, ...adjacent.map((chunk) => chunk.id)]);
-    queryClient.removeQueries({
-      queryKey: ["dense-chunk-window"],
-      predicate: (candidate) => !allowed.has(String(candidate.queryKey[3] ?? "")),
-    });
-    void Promise.all(adjacent.map((chunk) => queryClient.prefetchQuery(denseWindowQueryOptions({
-      ...request,
-      fromNs: Number(chunk.fromNs),
-      toNs: Number(chunk.toNs),
-      cacheScope: "dense-chunk-window",
-      chunkId: chunk.id,
-    }))));
-  }, [plan, queryClient, request]);
-
-  return { ...query, chunkPlan: plan };
-}
-
-export function useDenseChunkPrefetch(
-  request: Omit<WindowQuery, "fromNs" | "toNs" | "cacheScope" | "chunkId">,
-  plan: DenseChunkPlan | null,
-) {
-  const queryClient = useQueryClient();
-  useEffect(() => {
-    if (!plan) return;
-    const adjacent = [plan.previous, plan.next].filter((chunk): chunk is NonNullable<typeof chunk> => chunk !== null);
-    const allowed = new Set([plan.active.id, ...adjacent.map((chunk) => chunk.id)]);
-    queryClient.removeQueries({
-      queryKey: ["dense-chunk"],
-      predicate: (candidate) => !allowed.has(String(candidate.queryKey[3] ?? "")),
-    });
-    void Promise.all(adjacent.map((chunk) => queryClient.prefetchQuery(windowQuery({
-      ...request,
-      fromNs: Number(chunk.fromNs),
-      toNs: Number(chunk.toNs),
-      cacheScope: "dense-chunk",
-      chunkId: chunk.id,
-    }))));
-  }, [plan, queryClient, request]);
+  return { ...query, chunkPlan: plan, playbackStatus: playback.status };
 }

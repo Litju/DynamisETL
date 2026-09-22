@@ -57,6 +57,7 @@ export function Transport({ nominalRateHz }: { nominalRateHz: number | null }) {
   const committedTimeNs = useAnalysisStore((state) => state.committedTimeNs);
   const committedRangeNs = useAnalysisStore((state) => state.committedRangeNs);
   const playing = useAnalysisStore((state) => state.playing);
+  const playbackStatus = useAnalysisStore((state) => state.playbackStatus);
   const playbackRate = useAnalysisStore((state) => state.playbackRate);
   const setPlaying = useAnalysisStore((state) => state.setPlaying);
   const setPlaybackRate = useAnalysisStore((state) => state.setPlaybackRate);
@@ -182,6 +183,13 @@ export function Transport({ nominalRateHz }: { nominalRateHz: number | null }) {
             {committedTimeNs !== null ? formatClockNs(committedTimeNs) : "—"}
           </span>
         </div>
+        {playbackStatus === "buffering" ? (
+          <span data-testid="playback-buffering" className="t-label text-quality-warning">
+            BUFFERING · waiting for exact next chunk
+          </span>
+        ) : playbackStatus === "ended" ? (
+          <span data-testid="playback-ended" className="t-label text-text-muted">end of artifact</span>
+        ) : null}
       </div>
 
       <div

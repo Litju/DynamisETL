@@ -252,6 +252,39 @@ export function planarCentre(
   return { xM: sumX / landmarks.length, yM: sumY / landmarks.length };
 }
 
+/**
+ * Deterministic display root: midHip, then the observed hip pair, then the
+ * observed cloud. A prior root is retained when a frame has no usable root.
+ */
+export function bodyLocalCentre(
+  landmarks: readonly PoseLandmark[],
+  fallback: { readonly xM: number; readonly yM: number } | null = null,
+): { readonly xM: number; readonly yM: number } {
+  const root = landmarks.find((landmark) => landmark.jointName === "midHip");
+  if (root) return { xM: root.xM, yM: root.yM };
+  const hips = landmarks.filter((landmark) => landmark.jointName === "lHip" || landmark.jointName === "rHip");
+  if (hips.length > 0) return planarCentre(hips);
+  if (landmarks.length > 0) return planarCentre(landmarks);
+  return fallback ?? { xM: 0, yM: 0 };
+}
+
+/** Bounds over body-local frames; global travel cancels before fitting. */
+export function bodyLocalBounds(frames: readonly PoseFrame[]): Bounds {
+  const local: PoseLandmark[] = [];
+  for (const frame of frames) {
+    if (!frame.observed) continue;
+    const centre = bodyLocalCentre(frame.landmarks);
+    for (const landmark of frame.landmarks) {
+      local.push({
+        ...landmark,
+        xM: landmark.xM - centre.xM,
+        yM: landmark.yM - centre.yM,
+      });
+    }
+  }
+  return boundsOf(local, { xM: 0, yM: 0 });
+}
+
 export interface Bounds {
   readonly min: readonly [number, number, number];
   readonly max: readonly [number, number, number];
@@ -310,6 +343,25 @@ export type CameraPreset =
   | "top"
   | "body_local"
   | "reset";
+
+export type PoseCoordinateMode = "body_local" | "match_world";
+
+export type CameraMode =
+  | "body_local"
+  | "follow_subject"
+  | "joint_focus"
+  | "world_fixed"
+  | "all_subjects"
+  | "manual";
+
+export const CAMERA_MODES: readonly CameraMode[] = [
+  "body_local",
+  "follow_subject",
+  "joint_focus",
+  "world_fixed",
+  "all_subjects",
+  "manual",
+];
 
 export const CAMERA_PRESETS: readonly CameraPreset[] = [
   "free",

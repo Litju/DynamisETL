@@ -4,8 +4,9 @@ import { useMemo } from "react";
 import { extractFrames, frameIndexAt, landmarksAt, summarizeFrame } from "@/components/pose/pose-model";
 import { stablePoseSubjects } from "@/components/pose/use-pose-subjects";
 import { useAnalysisContext } from "@/lib/analysis-context";
-import { artifactQuery, sessionQuery, windowQuery } from "@/lib/api/queries";
-import { windowAround } from "@/lib/dense-window";
+import { artifactQuery, sessionQuery } from "@/lib/api/queries";
+import { affordableSpanNs, canonicalSpan } from "@/lib/dense-window";
+import { usePosePlaybackWindow } from "@/components/pose/use-pose-playback";
 import { formatMetricValue } from "@/lib/measurement";
 import { useAnalysisStore } from "@/lib/state/analysis";
 
@@ -40,35 +41,24 @@ export function PoseTelemetry() {
   );
   const subjectId = context?.subjectId ?? subjects[0] ?? stream?.subject_id ?? null;
   const effective = playheadNs ?? committedTimeNs;
-  const bounds = useMemo(
-    () =>
-      windowAround(artifact.data, {
-        anchorNs: effective,
-        explicit: null,
-        maxPoints: 20_000,
-        entityScoped: subjectId !== null,
-      }),
-    [artifact.data, effective, subjectId],
-  );
-  const window = useQuery({
-    ...windowQuery({
-      artifactId: artifactId ?? "",
-      ...(bounds ? { fromNs: Number(bounds.fromNs), toNs: Number(bounds.toNs) } : {}),
-      ...(subjectId !== null ? { entityId: subjectId } : {}),
-      columns: [
-        "t_rel_ns",
-        "subject_id",
-        "joint_name",
-        "is_available",
-        "x_m",
-        "y_m",
-        "z_m",
-        "error_m",
-      ],
+  const canonical = canonicalSpan(artifact.data);
+  const chunkSpanNs = useMemo(
+    () => affordableSpanNs(artifact.data, {
       maxPoints: 20_000,
+      entityScoped: subjectId !== null,
     }),
-    enabled: Boolean(artifactId) && bounds !== null,
+    [artifact.data, subjectId],
+  );
+  const playback = usePosePlaybackWindow({
+    artifactId,
+    entityId: subjectId,
+    canonicalMinNs: canonical?.minNs ?? null,
+    canonicalMaxNs: canonical?.maxNs ?? null,
+    chunkSpanNs,
+    anchorNs: committedTimeNs,
+    maxPoints: 20_000,
   });
+  const { window } = playback;
   const frames = useMemo(
     () =>
       extractFrames(

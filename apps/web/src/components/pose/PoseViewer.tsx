@@ -4,7 +4,7 @@ import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { MeasurementClassBadge, ModalityBadge } from "@/components/common/Badges";
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
 import {
-  CAMERA_PRESETS,
+  CAMERA_MODES,
   extractFrames,
   frameIndexAt,
   groupFramesBySubject,
@@ -12,19 +12,19 @@ import {
   NO_OVERLAYS,
   overlaysFromParameters,
   summarizeFrame,
-  type CameraPreset,
+  type CameraMode,
   type DisplayConnectionDefinition,
   type PoseSubjectFrames,
+  type PoseCoordinateMode,
   type PoseLandmark,
 } from "@/components/pose/pose-model";
 import type { StreamView } from "@/api/types";
 import { useAnalysisContext } from "@/lib/analysis-context";
 import { ApiError } from "@/lib/api/client";
-import { artifactQuery, methodologyQuery, metricsQuery, sessionQuery, windowQuery } from "@/lib/api/queries";
+import { artifactQuery, methodologyQuery, metricsQuery, sessionQuery } from "@/lib/api/queries";
 import { usePoseSubjects } from "@/components/pose/use-pose-subjects";
-import { canonicalSpan, windowAround } from "@/lib/dense-window";
-import { planDenseChunks } from "@/lib/dense-chunks";
-import { useDenseChunkPrefetch } from "@/components/lab/use-dense-window";
+import { affordableSpanNs, canonicalSpan } from "@/lib/dense-window";
+import { usePosePlaybackWindow } from "@/components/pose/use-pose-playback";
 import { formatMetricValue } from "@/lib/measurement";
 import { useAnalysisStore } from "@/lib/state/analysis";
 import { formatClockNs } from "@/lib/time";
@@ -89,59 +89,26 @@ export function PoseViewer() {
   const explicitToNs = context?.toNs ?? null;
   const artifactData = artifact.data;
   const sceneSubjectId = allSubjects ? null : subjectId;
-  const windowBounds = useMemo(
-    () =>
-      windowAround(artifactData, {
-        anchorNs: committedTimeNs,
-        explicit:
-          explicitFromNs !== null && explicitToNs !== null
-            ? { fromNs: explicitFromNs, toNs: explicitToNs }
-            : null,
-        maxPoints: MAX_POSE_POINTS,
-        entityScoped: sceneSubjectId !== null,
-      }),
-    [artifactData, committedTimeNs, explicitFromNs, explicitToNs, sceneSubjectId],
-  );
-
-  const chunkPlan = useMemo(() => {
-    if (explicitFromNs !== null || explicitToNs !== null || !artifactData || !windowBounds) return null;
-    const span = canonicalSpan(artifactData);
-    if (!span) return null;
-    return planDenseChunks({
-      canonicalMinNs: span.minNs,
-      canonicalMaxNs: span.maxNs,
-      anchorNs: committedTimeNs,
-      chunkSpanNs: windowBounds.toNs - windowBounds.fromNs + 1n,
-    });
-  }, [artifactData, committedTimeNs, explicitFromNs, explicitToNs, windowBounds]);
-  const poseWindowRequest = useMemo(() => ({
-    artifactId: artifactId ?? "",
-    ...(sceneSubjectId !== null ? { entityId: sceneSubjectId } : {}),
-    columns: [
-      "t_rel_ns",
-      "subject_id",
-      "joint_name",
-      "is_available",
-      "x_m",
-      "y_m",
-      "z_m",
-      "error_m",
-    ],
-    maxPoints: MAX_POSE_POINTS,
-  }), [artifactId, sceneSubjectId]);
-  useDenseChunkPrefetch(poseWindowRequest, chunkPlan);
-  const activeWindowBounds = chunkPlan?.active ?? windowBounds;
-
-  const window = useQuery({
-    ...windowQuery({
-      ...poseWindowRequest,
-      ...(activeWindowBounds
-        ? { fromNs: Number(activeWindowBounds.fromNs), toNs: Number(activeWindowBounds.toNs) }
-        : {}),
-      ...(chunkPlan ? { cacheScope: "dense-chunk", chunkId: chunkPlan.active.id } : {}),
+  const canonical = canonicalSpan(artifactData);
+  const chunkSpanNs = useMemo(
+    () => affordableSpanNs(artifactData, {
+      maxPoints: MAX_POSE_POINTS,
+      entityScoped: sceneSubjectId !== null,
     }),
-    enabled: Boolean(artifactId) && activeWindowBounds !== null,
+    [artifactData, sceneSubjectId],
+  );
+  const playback = usePosePlaybackWindow({
+    artifactId,
+    entityId: sceneSubjectId,
+    canonicalMinNs: canonical?.minNs ?? null,
+    canonicalMaxNs: canonical?.maxNs ?? null,
+    chunkSpanNs,
+    anchorNs: committedTimeNs,
+    explicitFromNs,
+    explicitToNs,
+    maxPoints: MAX_POSE_POINTS,
   });
+  const { window, activeWindowBounds, playbackStatus } = playback;
   const metrics = useQuery({
     ...metricsQuery({
       streamId: streamId ?? undefined,
@@ -200,7 +167,8 @@ export function PoseViewer() {
     [methodology.data],
   );
 
-  const [preset, setPreset] = useState<CameraPreset>("reset");
+  const [coordinateMode, setCoordinateMode] = useState<PoseCoordinateMode>("body_local");
+  const [cameraMode, setCameraMode] = useState<CameraMode>("body_local");
   const [showProviderSkeleton, setShowProviderSkeleton] = useState(true);
   const [showTorsoCue, setShowTorsoCue] = useState(true);
   const [showFootContact, setShowFootContact] = useState(true);
@@ -294,7 +262,7 @@ export function PoseViewer() {
       />
     );
   }
-  if (artifact.isPending || windowBounds === null || window.isPending) {
+  if (artifact.isPending || activeWindowBounds === null || window.isPending) {
     return <LoadingPanel label="Loading pose window" />;
   }
   if (window.data.meta.reduction !== null) {
@@ -348,8 +316,13 @@ export function PoseViewer() {
           </span>
         )}
         <span className="text-quality-warning">
-          local analytical frame · Z is player-centroid-relative, not absolute height
+          {coordinateMode === "body_local"
+            ? "local analytical frame · Z is player-centroid-relative, not absolute height · body-root recentered for display"
+            : "match/world frame · source XY placement preserved; Z remains provider-relative, not ground height"}
         </span>
+        {playbackStatus === "buffering" && playing ? (
+          <span data-testid="playback-buffering" className="text-quality-warning">BUFFERING · waiting for exact next chunk</span>
+        ) : null}
         <span className="tabular">
           {summary.observedLandmarks} observed · {summary.unavailableLandmarks} unavailable
         </span>
@@ -374,7 +347,10 @@ export function PoseViewer() {
               allSubjects={allSubjects}
               overlays={overlays}
               providerConnections={providerConnections}
-              preset={preset}
+              preset="reset"
+              cameraMode={cameraMode}
+              coordinateMode={coordinateMode}
+              onManualCamera={() => setCameraMode("manual")}
               playing={playing}
               showProviderSkeleton={showProviderSkeleton}
               showTorsoCue={showTorsoCue}
@@ -423,8 +399,12 @@ export function PoseViewer() {
               data-testid="pose-all-subjects-toggle"
               aria-pressed={allSubjects}
               onClick={() => {
-                setAllSubjects((current) => !current);
-                setPreset("reset");
+                setAllSubjects((current) => {
+                  const next = !current;
+                  setCoordinateMode(next ? "match_world" : "body_local");
+                  setCameraMode(next ? "all_subjects" : "body_local");
+                  return next;
+                });
               }}
               className={
                 allSubjects
@@ -441,23 +421,71 @@ export function PoseViewer() {
             </p>
           </div>
           <div className="mb-2">
-        <span className="t-section text-text-muted">camera</span>
+            <span className="t-section text-text-muted">coordinate authority</span>
+            <div role="group" aria-label="Pose coordinate authority" className="mt-1 flex gap-1">
+              <button
+                type="button"
+                data-testid="pose-body-local-mode"
+                aria-pressed={coordinateMode === "body_local"}
+                disabled={allSubjects}
+                onClick={() => {
+                  setCoordinateMode("body_local");
+                  setCameraMode("body_local");
+                }}
+                className={coordinateMode === "body_local" ? "rounded-control bg-surface-3 px-1.5 py-0.5 text-text-primary" : "rounded-control border border-border-subtle px-1.5 py-0.5 text-text-muted disabled:opacity-40"}
+              >
+                body-local
+              </button>
+              <button
+                type="button"
+                data-testid="pose-match-world-mode"
+                aria-pressed={coordinateMode === "match_world"}
+                onClick={() => setCoordinateMode("match_world")}
+                className={coordinateMode === "match_world" ? "rounded-control bg-surface-3 px-1.5 py-0.5 text-text-primary" : "rounded-control border border-border-subtle px-1.5 py-0.5 text-text-muted"}
+              >
+                match/world
+              </button>
+            </div>
+            <p className="mt-1 text-[10px] text-text-muted">
+              Body-local removes display-only root travel; match/world preserves source XY identity.
+            </p>
+          </div>
+          <div className="mb-2">
+            <span className="t-section text-text-muted">camera ownership</span>
             <div className="mt-1 flex flex-wrap gap-1">
-              {CAMERA_PRESETS.map((candidate) => (
+              {CAMERA_MODES.map((candidate) => (
                 <button
                   key={candidate}
                   type="button"
-                  aria-pressed={preset === candidate}
-                  onClick={() => setPreset(candidate)}
+                  aria-pressed={cameraMode === candidate}
+                  onClick={() => {
+                    if (candidate === "all_subjects") {
+                      setAllSubjects(true);
+                      setCoordinateMode("match_world");
+                    }
+                    if (candidate === "body_local") {
+                      setAllSubjects(false);
+                      setCoordinateMode("body_local");
+                    }
+                    setCameraMode(candidate);
+                  }}
                   className={
-                    preset === candidate
+                    cameraMode === candidate
                       ? "rounded-control bg-surface-3 px-1.5 py-0.5 text-text-primary"
                       : "rounded-control border border-border-subtle px-1.5 py-0.5 text-text-muted hover:text-text-secondary"
                   }
                 >
-                  {candidate.replace("_", "-")}
+                  {candidate.replaceAll("_", "-")}
                 </button>
               ))}
+              <button
+                type="button"
+                data-testid="pose-camera-reset"
+                onClick={() => setCameraMode(allSubjects ? "all_subjects" : "body_local")}
+                className="rounded-control border border-border-subtle px-1.5 py-0.5 text-text-muted hover:text-text-secondary"
+              >
+                reset
+              </button>
             </div>
           </div>
           <label className="mb-2 flex items-center gap-1 text-text-muted">
