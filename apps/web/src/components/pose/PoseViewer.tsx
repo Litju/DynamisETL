@@ -399,12 +399,10 @@ export function PoseViewer() {
               data-testid="pose-all-subjects-toggle"
               aria-pressed={allSubjects}
               onClick={() => {
-                setAllSubjects((current) => {
-                  const next = !current;
-                  setCoordinateMode(next ? "match_world" : "body_local");
-                  setCameraMode(next ? "all_subjects" : "body_local");
-                  return next;
-                });
+                const next = !allSubjects;
+                setAllSubjects(next);
+                setCoordinateMode(next ? "match_world" : "body_local");
+                setCameraMode(next ? "all_subjects" : "body_local");
               }}
               className={
                 allSubjects

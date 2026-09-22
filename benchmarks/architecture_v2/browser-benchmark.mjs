@@ -77,6 +77,8 @@ const run = await page.evaluate(async ({ cases, iterations, sizes }) => {
       ],
     };
     chart.setOption(option);
+    await frame();
+    const firstPlotMs = performance.now() - started;
     const syncNode = document.createElement("div");
     syncNode.style.width = "1200px";
     syncNode.style.height = "600px";
@@ -84,7 +86,6 @@ const run = await page.evaluate(async ({ cases, iterations, sizes }) => {
     const syncChart = window.echarts.init(syncNode, undefined, { renderer: "canvas" });
     syncChart.setOption(option);
     await frame();
-    const firstPlotMs = performance.now() - started;
     const playheadStart = performance.now();
     for (let index = 0; index < 20; index += 1) {
       const xAxis = index / 20;
@@ -154,13 +155,14 @@ const run = await page.evaluate(async ({ cases, iterations, sizes }) => {
     };
     const alignedData = [data.x, data.force, data.imuX, data.imuY, data.min, data.max];
     const plot = new window.uPlot(uplotOptions, alignedData, node);
+    await frame();
+    const firstPlotMs = performance.now() - started;
     const syncNode = document.createElement("div");
     syncNode.style.width = "1200px";
     syncNode.style.height = "600px";
     root.append(syncNode);
     const syncPlot = new window.uPlot(uplotOptions, alignedData, syncNode);
     await frame();
-    const firstPlotMs = performance.now() - started;
     const playheadStart = performance.now();
     for (let index = 0; index < 20; index += 1) {
       const left = (index / 20) * 1200;
