@@ -31,15 +31,22 @@ Production resource provisioning and promotion were not performed; that remains 
 
 | Gate | Before freeze/baseline | Final | Frozen budget | Result |
 | --- | ---: | ---: | ---: | --- |
-| Dense Signal 100k first plot | ECharts 1,100.435 ms p95 | uPlot 144.415 ms p95 | 150 ms p95 target | Pass |
-| Dense Signal 100k playhead | ECharts 91.241 ms p95 | uPlot 0.066 ms p95 | 2 ms p95 target | Pass |
-| Dense Signal 100k measured heap delta | ECharts 104.5 MB | uPlot 11.4 MB | 256 MB bounded-playback budget | Pass |
-| Pose 23-subject frame update | 0.64 ms p95 primitive baseline | 0.16 ms p95 optimized path | 2 ms p95 target | Pass |
+| Dense Signal 100k first plot | ECharts 1,022.425 ms p95 | uPlot 118.855 ms p95 | 150 ms p95 target | Pass |
+| Dense Signal 100k playhead | ECharts 168.753 ms p95 | uPlot 0.065 ms p95 | 2 ms p95 target | Pass |
+| Dense Signal 100k measured heap delta | ECharts 508.9 MB | uPlot 21.6 MB | 256 MB bounded-playback budget | Pass |
+| Pose 23-subject frame update | 1.275 ms p95 primitive baseline | 1.012 ms p95 optimized path | 2 ms p95 target | Pass |
 | Pose 23-subject objects/draw calls | 2,875 / 2,875 | 7 / 7 | measured reduction required | Pass |
-| Maximum dense service request | 959.12 ms p95 | 959.12 ms p95 current service | 1,500 ms p95 target | Pass |
-| Exact White CMJ complete service | 44.52 ms p95 | 44.52 ms p95 current service | 250 ms p95 target | Pass |
+| Maximum dense service request | 1,203.70 ms p95 | 1,203.70 ms p95 current service | 1,500 ms p95 target | Pass |
+| Exact White CMJ complete service | 75.48 ms p95 | 75.48 ms p95 current service | 250 ms p95 target | Pass |
 
 The review-seal receipt used 20 browser iterations, 20 Pose iterations, 20 processor iterations, and 20 real/synthetic backend iterations. p95 values are inclusive quantiles over raw runs; no p95 claim is emitted for fewer than 20 runs. Backend complete-path values include Arrow serialization.
+
+Immutable external receipt locators (SHA-256):
+
+- Backend: `E:\Data\Temp\DynamisETL-review-backend-seal.json` — `74B99F7B868FF4C327054F0EB6918C1D894411C9566B55B9D05A95ADB587B6F5`
+- Browser: `E:\Data\Temp\DynamisETL-review-browser-seal.json` — `044E08BD378F1382449D4A122DA27CF311CF30EB5E7685BDDAD14A7043F2E202`
+- Pose: `E:\Data\Temp\DynamisETL-review-pose-seal.json` — `2514EF184F4CC8265E49745EAC49269C5E6265EA0316587A68D03F8A3A55F728`
+- Processors: `E:\Data\Temp\DynamisETL-review-processors-seal.json` — `3F56B82A03220C0B41E3FBDAEF757CE8F631C34D603552860FB5FAB2B89308B4`
 
 ## 🧪 Scientific and backend gates
 

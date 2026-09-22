@@ -5,14 +5,14 @@ from pathlib import Path
 
 import pytest
 
+from dynamis.config import ConfigurationError
+from dynamis.storage.control_plane import _positive_int
 from dynamis.storage.object_store import (
     LocalObjectStore,
     ObjectStoreError,
     S3ObjectStore,
     immutable_object_key,
 )
-from dynamis.storage.control_plane import _positive_int
-from dynamis.config import ConfigurationError
 
 
 def test_local_object_store_is_checksum_bound_and_range_readable(tmp_path: Path) -> None:

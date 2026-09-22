@@ -24,9 +24,9 @@ The browser harness used identical typed arrays, exact samples, NaN gaps, min/ma
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 4,096 | 37.4 ms | 15.7 ms | 13.1 MB | 1.3 MB | 1,121,883 B | 51,081 B |
 | 20,000 | 134.0 ms | 31.5 ms | 23.1 MB | 3.1 MB | 1,121,883 B | 51,081 B |
-| 100,000 | 1,100.435 ms p95 | 144.415 ms p95 | 104.5 MB | 11.5 MB | 1,121,883 B | 51,081 B |
+| 100,000 | 1,022.425 ms p95 | 118.855 ms p95 | 508.9 MB | 21.6 MB | 1,121,883 B | 51,081 B |
 
-At 100,000 points, the review-seal receipt reports uPlot at 144.415 ms p95 for first plot and 0.066 ms p95 for playhead updates, versus 1,100.435 ms and 91.241 ms p95 for ECharts. All parity fields are derived from observed chart state, including synchronized updates across two charts.
+At 100,000 points, the review-seal receipt reports uPlot at 118.855 ms p95 for first plot and 0.065 ms p95 for playhead updates, versus 1,022.425 ms and 168.753 ms p95 for ECharts. First-plot timing covers one chart; the second chart is created afterward for the observed synchronized-update parity probe. All parity fields are derived from chart state.
 
 **Decision:** adopt uPlot only for the dense Signal Laboratory renderer. Keep ECharts for Overview, Compare, distributions, bars, ranked summaries, scatter/agreement, and BI-style composition. The V2 adapter still owns unit-aware axes, BigInt-safe conversion at the renderer boundary, reduction metadata, accessible keyboard wrapper, deterministic export, and no scientific recomputation.
 
@@ -53,11 +53,11 @@ The complete backend harness reports 20-run inclusive p95 for query plus Arrow s
 
 | Accepted/local case | Query class | PyArrow | DuckDB | Current service | Returned rows |
 | --- | --- | ---: | ---: | ---: | ---: |
-| White CMJ | exact | 2.92 ms p95 | 22.28 ms p95 | 44.52 ms p95 | 3,740 |
-| GNSS | reduced | 50.02 ms p95 | 95.13 ms p95 | 120.25 ms p95 | 10,000 |
-| DFL tracking | reduced | 11.91 ms p95 | 30.59 ms p95 | 54.50 ms p95 | 4,348 |
-| SkillCorner pose | bounded exact | 61.01 ms p95 | 67.80 ms p95 | 193.19 ms p95 | 8,961 |
-| Maximum allowed | reduced | rejected | 1,357.38 ms p95 | 959.12 ms p95 | 61,306 |
+| White CMJ | exact | 4.73 ms p95 | 44.75 ms p95 | 75.48 ms p95 | 3,740 |
+| GNSS | reduced | 68.42 ms p95 | 147.72 ms p95 | 199.94 ms p95 | 10,000 |
+| DFL tracking | reduced | 30.73 ms p95 | 55.24 ms p95 | 76.03 ms p95 | 4,348 |
+| SkillCorner pose | bounded exact | 164.35 ms p95 | 103.50 ms p95 | 237.03 ms p95 | 8,961 |
+| Maximum allowed | reduced | rejected | 1,940.06 ms p95 | 1,203.70 ms p95 | 61,306 |
 
 Synthetic CI fixtures preserved exact/reduced row budgets for 4k, 20k, 100k, scoped 23-subject pose, and a 500k bounded maximum equivalent. PyArrow wins exact and ordinary reduced windows; DuckDB wins the maximum allowed reduction class and retains the current min/max SQL semantics.
 

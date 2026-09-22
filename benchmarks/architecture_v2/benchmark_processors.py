@@ -122,14 +122,20 @@ def _run(
         peaks.append(peak)
         tracemalloc.stop()
     series_rows = sum(series.table.num_rows for series in getattr(result, "series", ()))
-    p95 = statistics.quantiles(durations, n=20, method="inclusive")[18] if len(durations) >= 20 else None
+    p95 = (
+        statistics.quantiles(durations, n=20, method="inclusive")[18]
+        if len(durations) >= 20
+        else None
+    )
     return {
         "processor": name,
         "input_rows": table.num_rows,
         "wall_ms_median": statistics.median(durations),
         "wall_ms_p95": p95,
         "wall_ms_max_observed": max(durations),
-        "percentile_method": "inclusive_quantile_p95" if len(durations) >= 20 else "not_claimed_below_20_runs",
+        "percentile_method": "inclusive_quantile_p95"
+        if len(durations) >= 20
+        else "not_claimed_below_20_runs",
         "peak_python_alloc_bytes_median": statistics.median(peaks),
         "output_metric_count": len(getattr(result, "metrics", ())),
         "output_series_rows": series_rows,

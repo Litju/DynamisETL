@@ -316,7 +316,9 @@ def _summary(runs: list[dict[str, Any]]) -> dict[str, Any]:
             if len(values) >= 20
             else None
         )
-    result["percentile_method"] = "inclusive_quantile_p95" if len(runs) >= 20 else "not_claimed_below_20_runs"
+    result["percentile_method"] = (
+        "inclusive_quantile_p95" if len(runs) >= 20 else "not_claimed_below_20_runs"
+    )
     return result
 
 
@@ -343,17 +345,16 @@ def _semantic_signature(
         "t_rel_ns_max": "t_end_ns",
         "t_rel_ns_count": "bucket_rows",
     }
-    renamed = normalized.rename_columns([aliases.get(name, name) for name in normalized.column_names])
+    renamed = normalized.rename_columns(
+        [aliases.get(name, name) for name in normalized.column_names]
+    )
     columns = tuple(sorted(expected_columns or renamed.column_names))
     missing = sorted(set(columns) - set(renamed.column_names))
     if missing:
         raise AssertionError(f"benchmark result is missing semantic columns: {missing}")
     rows = renamed.select(columns).to_pylist()
     signature = tuple(
-        sorted(
-            tuple((column, _semantic_value(row[column])) for column in columns)
-            for row in rows
-        )
+        sorted(tuple((column, _semantic_value(row[column])) for column in columns) for row in rows)
     )
     return columns, signature
 
@@ -393,15 +394,18 @@ def _bench_case(root: Path, case: Case, iterations: int) -> dict[str, Any]:
         database_root=root / "databases",
         duckdb_path=root / "databases" / "benchmark.duckdb",
     )
-    current_operation = lambda: load_artifact_window(
-        settings_for_case,
-        ref,
-        from_ns=case.from_ns,
-        to_ns=case.to_ns,
-        columns=case.columns,
-        max_points=case.max_points,
-        entity_id=case.entity_id,
-    )
+
+    def current_operation() -> Any:
+        return load_artifact_window(
+            settings_for_case,
+            ref,
+            from_ns=case.from_ns,
+            to_ns=case.to_ns,
+            columns=case.columns,
+            max_points=case.max_points,
+            entity_id=case.entity_id,
+        )
+
     reference_result = current_operation()
     reference_table = reference_result.table
     operations: list[tuple[str, Callable[[], pa.Table]]] = [
@@ -431,7 +435,9 @@ def _bench_case(root: Path, case: Case, iterations: int) -> dict[str, Any]:
     rejected: dict[str, str] = {}
     for label, operation in operations:
         try:
-            _assert_semantic_equivalence(label, operation(), reference_table, reference_result, case)
+            _assert_semantic_equivalence(
+                label, operation(), reference_table, reference_result, case
+            )
         except AssertionError as exc:
             if label == "current_dense_service":
                 raise
