@@ -27,6 +27,7 @@ from dynamis.contracts.schemas import SI_UNIT_KEY
 from dynamis.serving.models import (
     ArtifactRefView,
     DenseWindowMeta,
+    EntityObservationView,
     ReductionInfo,
 )
 
@@ -314,6 +315,61 @@ def entity_ids(settings: Settings, ref: ArtifactRefView) -> list[str] | None:
     return [str(row[0]) for row in rows if row[0] is not None]
 
 
+def entity_observations(
+    settings: Settings,
+    ref: ArtifactRefView,
+    *,
+    from_ns: int | None = None,
+    to_ns: int | None = None,
+) -> list[EntityObservationView] | None:
+    """Return observed Pose-frame bounds without shipping frontend row scans.
+
+    The authority is derived from canonical rows with usable coordinates, not
+    from session roster membership or unavailable landmark rows.
+    """
+    if ref.modality != "pose":
+        return None
+    path = resolve_artifact_path(settings, ref)
+    schema = pq.read_schema(path)
+    column = entity_column(schema)
+    required = {TIME_COLUMN, "is_available", "x_m", "y_m", "z_m"}
+    if column is None or not required.issubset(schema.names):
+        return []
+    bounds: list[Any] = []
+    time_filter = ""
+    if from_ns is not None:
+        time_filter += f' AND "{TIME_COLUMN}" >= ?'
+        bounds.append(from_ns)
+    if to_ns is not None:
+        time_filter += f' AND "{TIME_COLUMN}" <= ?'
+        bounds.append(to_ns)
+    connection = _connect()
+    try:
+        rows = connection.execute(
+            f'SELECT CAST("{column}" AS VARCHAR) AS entity_id, '
+            f'MIN("{TIME_COLUMN}") AS first_observed_ns, '
+            f'MAX("{TIME_COLUMN}") AS last_observed_ns, '
+            f'COUNT(DISTINCT "{TIME_COLUMN}") AS observation_count '
+            "FROM read_parquet(?) "
+            f'WHERE "{column}" IS NOT NULL AND is_available = true '
+            'AND "x_m" IS NOT NULL AND "y_m" IS NOT NULL AND "z_m" IS NOT NULL'
+            f"{time_filter} "
+            f'GROUP BY "{column}" ORDER BY entity_id',
+            [path.as_posix(), *bounds],
+        ).fetchall()
+    finally:
+        connection.close()
+    return [
+        EntityObservationView(
+            entity_id=str(row[0]),
+            first_observed_ns=int(row[1]),
+            last_observed_ns=int(row[2]),
+            observation_count=int(row[3]),
+        )
+        for row in rows
+    ]
+
+
 def canonical_timespan(settings: Settings, ref: ArtifactRefView) -> tuple[int | None, int | None]:
     """Canonical ``t_rel_ns`` bounds of one artifact.
 
@@ -541,6 +597,7 @@ __all__ = [
     "entity_cardinality",
     "entity_column",
     "entity_ids",
+    "entity_observations",
     "load_artifact_window",
     "resolve_artifact_path",
     "table_records",

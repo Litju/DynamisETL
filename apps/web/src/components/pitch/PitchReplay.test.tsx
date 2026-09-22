@@ -160,6 +160,7 @@ function renderPitch(overrides: Partial<AnalysisContextValue> = {}) {
     sessionId: "s1",
     trialId: null,
     subjectId: null,
+    timeNs: null,
     streamId: "tracking-1",
     fromNs: null,
     toNs: null,

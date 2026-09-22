@@ -1,5 +1,6 @@
 ﻿import { useQuery } from "@tanstack/react-query";
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 
 import { MeasurementClassBadge, ModalityBadge } from "@/components/common/Badges";
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
@@ -22,9 +23,16 @@ import type { StreamView } from "@/api/types";
 import { useAnalysisContext } from "@/lib/analysis-context";
 import { ApiError } from "@/lib/api/client";
 import { artifactQuery, methodologyQuery, metricsQuery, sessionQuery } from "@/lib/api/queries";
-import { usePoseSubjects } from "@/components/pose/use-pose-subjects";
+import {
+  firstPoseObservationInRange,
+  fetchPoseObservationsInRange,
+  usePoseSubjects,
+} from "@/components/pose/use-pose-subjects";
 import { affordableSpanNs, canonicalSpan } from "@/lib/dense-window";
-import { usePosePlaybackWindow } from "@/components/pose/use-pose-playback";
+import {
+  retirePoseSubjectQueries,
+  usePosePlaybackWindow,
+} from "@/components/pose/use-pose-playback";
 import { formatMetricValue } from "@/lib/measurement";
 import { useAnalysisStore } from "@/lib/state/analysis";
 import { formatClockNs } from "@/lib/time";
@@ -41,16 +49,19 @@ const MAX_POSE_POINTS = 20_000;
  */
 export function PoseViewer() {
   const context = useAnalysisContext();
+  const queryClient = useQueryClient();
   const datasetId = context?.datasetId ?? null;
   const sessionId = context?.sessionId ?? null;
   const streamId = context?.streamId ?? null;
   const committedTimeNs = useAnalysisStore((state) => state.committedTimeNs);
   const playheadNs = useAnalysisStore((state) => state.playheadNs);
   const playing = useAnalysisStore((state) => state.playing);
+  const subjectSwitching = useAnalysisStore((state) => state.subjectSwitching);
   const selectedJoint = useAnalysisStore((state) => state.selectedJoint);
   const hoveredJoint = useAnalysisStore((state) => state.hoveredJoint);
   const [rendererReady, setRendererReady] = useState(false);
   const [allSubjects, setAllSubjects] = useState(false);
+  const subjectSwitchRequest = useRef(0);
 
   const session = useQuery({
     ...sessionQuery(datasetId ?? "", sessionId ?? ""),
@@ -84,6 +95,7 @@ export function PoseViewer() {
     if (selectedSubject !== null) return selectedSubject;
     return observedSubjectList[0] ?? streamSubject;
   }, [observedSubjectList, selectedSubject, streamSubject]);
+  const subjectObservation = observed.observations.find((item) => item.entityId === subjectId);
 
   const explicitFromNs = context?.fromNs ?? null;
   const explicitToNs = context?.toNs ?? null;
@@ -109,6 +121,18 @@ export function PoseViewer() {
     maxPoints: MAX_POSE_POINTS,
   });
   const { window, activeWindowBounds, playbackStatus } = playback;
+  useEffect(() => {
+    if (!subjectSwitching || context?.subjectId !== subjectId) return;
+    if (
+      context?.timeNs === null ||
+      context?.timeNs !== committedTimeNs ||
+      artifact.isPending ||
+      window.isPending ||
+      window.isPlaceholderData ||
+      window.data?.meta.reduction !== null
+    ) return;
+    useAnalysisStore.getState().finishSubjectSwitch();
+  }, [artifact.isPending, committedTimeNs, context, subjectId, subjectSwitching, window.data, window.isPending, window.isPlaceholderData]);
   const metrics = useQuery({
     ...metricsQuery({
       streamId: streamId ?? undefined,
@@ -197,11 +221,40 @@ export function PoseViewer() {
     }
   }, [selectSubject, selectedSubject, subjectId]);
 
-  const handleSubjectChange = (nextSubjectId: string) => {
+  const handleSubjectChange = async (nextSubjectId: string) => {
     if (nextSubjectId === subjectId) return;
-    useAnalysisStore.getState().setPlaying(false);
-    useAnalysisStore.getState().commitTime(0n);
-    context?.selectSubject(nextSubjectId, { resetTime: true });
+    const requestId = ++subjectSwitchRequest.current;
+    const observation = observed.observations.find((item) => item.entityId === nextSubjectId);
+    const fallbackTimeNs = context?.timeNs ?? committedTimeNs ?? canonical?.minNs ?? null;
+    if (fallbackTimeNs === null) return;
+    retirePoseSubjectQueries(queryClient, artifactId, subjectId);
+    useAnalysisStore.getState().beginSubjectSwitch(fallbackTimeNs);
+    let resolvedObservation = observation;
+    if (
+      artifactId !== null &&
+      observation !== undefined &&
+      firstPoseObservationInRange(observation, context?.fromNs ?? null, context?.toNs ?? null) === null
+    ) {
+      try {
+        const rangeObservations = await fetchPoseObservationsInRange(
+          artifactId,
+          context?.fromNs ?? null,
+          context?.toNs ?? null,
+        );
+        resolvedObservation = rangeObservations.find((item) => item.entityId === nextSubjectId);
+      } catch {
+        resolvedObservation = undefined;
+      }
+    }
+    if (requestId !== subjectSwitchRequest.current) return;
+    const targetTimeNs =
+      firstPoseObservationInRange(
+        resolvedObservation,
+        context?.fromNs ?? null,
+        context?.toNs ?? null,
+      ) ?? fallbackTimeNs;
+    useAnalysisStore.getState().beginSubjectSwitch(targetTimeNs);
+    context?.selectSubject(nextSubjectId, { targetTimeNs });
   };
 
   if (!context) return <StatePanel state="empty" title="Open a laboratory session first." />;
@@ -274,19 +327,44 @@ export function PoseViewer() {
       />
     );
   }
-  const hasObservedFrames = allSubjects
+  if (subjectSwitching) {
+    return (
+      <StatePanel
+        state="loading"
+        title="Switching subject…"
+        detail="Stopping playback, retiring the previous subject and loading an exact replacement frame."
+      />
+    );
+  }
+  const hasSubjectFrames = selectedFrames.length > 0;
+  const hasRenderableScene = allSubjects
     ? subjectFrames.some((candidate) => candidate.frames.some((frame) => frame.observed))
     : frames.some((frame) => frame.observed);
-  if (!hasObservedFrames) {
+  if (!hasSubjectFrames && !hasRenderableScene) {
+    const noObservationInRange =
+      subjectObservation === undefined ||
+      subjectObservation.observationCount === 0 ||
+      (context.fromNs !== null && subjectObservation.lastObservedNs < context.fromNs) ||
+      (context.toNs !== null && subjectObservation.firstObservedNs > context.toNs);
     return (
       <StatePanel
         state="unavailable"
         title={
           subjectId === null
             ? "No observed landmark is available in this window."
-            : `Individual ${subjectId} is not observed at this time/window.`
+            : noObservationInRange
+              ? `No Pose observations for subject ${subjectId} in ${context.trialId ?? "the selected period/range"}.`
+              : `Subject ${subjectId} is not observed at ${context.timeNs ?? committedTimeNs
+                ? formatClockNs((context.timeNs ?? committedTimeNs) as bigint)
+                : "the current time"}.`
         }
-        detail="The selected identity remains unchanged; unavailable joints are never imputed or replaced."
+        detail={
+          noObservationInRange
+            ? "The selected identity remains selected; this subject has no exact Pose observation in the active range."
+            : subjectObservation
+              ? `First observation ${formatClockNs(subjectObservation.firstObservedNs)} · last ${formatClockNs(subjectObservation.lastObservedNs)}.`
+              : "The selected identity remains unchanged; unavailable joints are never imputed or replaced."
+        }
       />
     );
   }
@@ -323,10 +401,16 @@ export function PoseViewer() {
         {playbackStatus === "buffering" && playing ? (
           <span data-testid="playback-buffering" className="text-quality-warning">BUFFERING · waiting for exact next chunk</span>
         ) : null}
-        <span className="tabular">
-          {summary.observedLandmarks} observed · {summary.unavailableLandmarks} unavailable
-        </span>
-        {summary.meanErrorM !== null ? (
+        {hasSubjectFrames ? (
+          <span className="tabular">
+            {summary.observedLandmarks} observed · {summary.unavailableLandmarks} unavailable
+          </span>
+        ) : (
+          <span className="text-quality-warning">
+            Subject {subjectId ?? "not scoped"} not observed at the current frame
+          </span>
+        )}
+        {hasSubjectFrames && summary.meanErrorM !== null ? (
           <span className="tabular">
             mean provider p90 predicted error radius{" "}
             {formatMetricValue(summary.meanErrorM, "m").text}

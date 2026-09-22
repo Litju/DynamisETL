@@ -36,6 +36,7 @@ export function AnalysisContextProvider({ children }: { children: ReactNode }) {
       sessionId,
       trialId: search.trial ?? null,
       subjectId: search.subject ?? null,
+      timeNs: tryParseNs(search.t_ns),
       streamId: search.stream ?? null,
       fromNs: tryParseNs(search.from_ns),
       toNs: tryParseNs(search.to_ns),
@@ -56,7 +57,9 @@ export function AnalysisContextProvider({ children }: { children: ReactNode }) {
           search: (previous: LabSearch) => ({
             ...previous,
             subject: subjectIdValue === null ? undefined : subjectIdValue,
-            ...(options?.resetTime ? { t_ns: "0" } : {}),
+            ...(options?.targetTimeNs !== undefined
+              ? { t_ns: formatNsDecimal(options.targetTimeNs) }
+              : {}),
           }),
           replace: options?.replace ?? false,
         }),

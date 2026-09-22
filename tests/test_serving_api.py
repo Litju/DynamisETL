@@ -28,6 +28,7 @@ from dynamis.serving.dense import (
     entity_cardinality,
     entity_column,
     entity_ids,
+    entity_observations,
     load_artifact_window,
     resolve_artifact_path,
 )
@@ -38,6 +39,7 @@ from dynamis.serving.models import (
     DatasetDetail,
     DatasetSummary,
     DenseWindowMeta,
+    EntityObservationView,
     LicenseView,
     MetricCatalogEntry,
     MetricDefinitionView,
@@ -383,6 +385,13 @@ class FakeBackend:
             entity_ids=["p1", "p2", "p3"],
         )
 
+    def artifact_observations(
+        self, artifact_id: str, *, from_ns: int | None, to_ns: int | None
+    ) -> list[EntityObservationView] | None:
+        if artifact_id != ARTIFACT.artifact_id:
+            return None
+        return []
+
     def window(self, artifact_id: str, **kwargs: Any):
         if self.window_error is not None:
             raise self.window_error
@@ -537,6 +546,7 @@ def test_openapi_document_covers_the_locked_surface() -> None:
         "/api/runs",
         "/api/rights",
         "/api/artifacts/{artifact_id}",
+        "/api/artifacts/{artifact_id}/observations",
         "/api/artifacts/{artifact_id}/window",
     ):
         assert path in paths, path
@@ -633,6 +643,41 @@ def test_dense_window_scopes_to_one_entity(tmp_settings: Settings) -> None:
     assert entity_column(pq.read_schema(resolve_artifact_path(tmp_settings, ref))) == "object_id"
 
 
+def test_pose_entity_observation_authority_excludes_unavailable_rows(
+    tmp_settings: Settings,
+) -> None:
+    table = pa.table(
+        {
+            "subject_id": pa.array(["s1", "s1", "s1", "s2", "s2"], type=pa.string()),
+            "t_rel_ns": pa.array([0, 40, 80, 40, 80], type=pa.int64()),
+            "joint_name": pa.array(["nose"] * 5, type=pa.string()),
+            "is_available": pa.array([True, True, True, True, False], type=pa.bool_()),
+            "x_m": pa.array([1.0, 1.0, 1.0, 2.0, None], type=pa.float64()),
+            "y_m": pa.array([1.0, 1.0, 1.0, 2.0, None], type=pa.float64()),
+            "z_m": pa.array([1.0, 1.0, 1.0, 2.0, None], type=pa.float64()),
+        }
+    )
+    ref = _dense_artifact_ref(tmp_settings, table).model_copy(update={"modality": "pose"})
+
+    observations = entity_observations(tmp_settings, ref)
+
+    assert observations is not None
+    assert [item.model_dump() for item in observations] == [
+        {
+            "entity_id": "s1",
+            "first_observed_ns": 0,
+            "last_observed_ns": 80,
+            "observation_count": 3,
+        },
+        {
+            "entity_id": "s2",
+            "first_observed_ns": 40,
+            "last_observed_ns": 40,
+            "observation_count": 1,
+        },
+    ]
+
+
 def test_dense_window_carries_signed_canonical_time(tmp_settings: Settings) -> None:
     """Event-aligned trials run up to zero from a negative canonical time.
 
@@ -669,6 +714,12 @@ def test_artifact_detail_serves_bounds_for_a_first_window(client: TestClient) ->
     assert body["canonical_time_max_ns"] == 100_000_000
     assert body["entity_column"] == "object_id"
     assert body["entity_count"] == 3
+
+
+def test_artifact_observation_authority_route(client: TestClient) -> None:
+    response = client.get("/api/artifacts/sample-1/observations")
+    assert response.status_code == 200
+    assert response.json() == []
 
 
 def test_window_endpoint_accepts_negative_bounds_and_entity_scope(client: TestClient) -> None:

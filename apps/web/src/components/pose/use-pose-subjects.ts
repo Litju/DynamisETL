@@ -3,6 +3,14 @@
 import { useMemo } from "react";
 
 import type { ArtifactDetail, SessionParticipantView } from "@/api/types";
+import { api, unwrap } from "@/lib/api/client";
+
+export interface PoseSubjectObservation {
+  readonly entityId: string;
+  readonly firstObservedNs: bigint;
+  readonly lastObservedNs: bigint;
+  readonly observationCount: number;
+}
 
 /**
  * Prefer identities proven by the artifact. Session participants and a
@@ -25,6 +33,51 @@ export function stablePoseSubjects(
 
 export interface PoseSubjects {
   readonly subjects: readonly string[];
+  readonly observations: readonly PoseSubjectObservation[];
+}
+
+export function poseSubjectObservations(
+  artifact: Pick<ArtifactDetail, "entity_observations"> | undefined,
+): PoseSubjectObservation[] {
+  return (artifact?.entity_observations ?? []).map((item) => ({
+    entityId: item.entity_id,
+    firstObservedNs: BigInt(item.first_observed_ns),
+    lastObservedNs: BigInt(item.last_observed_ns),
+    observationCount: item.observation_count,
+  }));
+}
+
+/** Choose a real canonical target; the fallback is never an invented t=0. */
+export function firstPoseObservationInRange(
+  observation: PoseSubjectObservation | undefined,
+  fromNs: bigint | null,
+  toNs: bigint | null,
+): bigint | null {
+  if (!observation || observation.observationCount < 1) return null;
+  const lower = fromNs ?? observation.firstObservedNs;
+  const upper = toNs ?? observation.lastObservedNs;
+  if (observation.lastObservedNs < lower || observation.firstObservedNs > upper) return null;
+  if (observation.firstObservedNs >= lower) return observation.firstObservedNs;
+  return null;
+}
+
+export async function fetchPoseObservationsInRange(
+  artifactId: string,
+  fromNs: bigint | null,
+  toNs: bigint | null,
+): Promise<PoseSubjectObservation[]> {
+  const payload = await unwrap(
+    await api.GET("/api/artifacts/{artifact_id}/observations", {
+      params: {
+        path: { artifact_id: artifactId },
+        query: {
+          ...(fromNs !== null ? { from_ns: Number(fromNs) } : {}),
+          ...(toNs !== null ? { to_ns: Number(toNs) } : {}),
+        },
+      },
+    }),
+  );
+  return poseSubjectObservations({ entity_observations: payload });
 }
 
 export function usePoseSubjects(
@@ -36,5 +89,6 @@ export function usePoseSubjects(
     () => stablePoseSubjects(artifact, participants, streamSubject),
     [artifact, participants, streamSubject],
   );
-  return { subjects };
+  const observations = useMemo(() => poseSubjectObservations(artifact), [artifact]);
+  return { subjects, observations };
 }

@@ -211,6 +211,7 @@ function renderLab(overrides: Partial<AnalysisContextValue> = {}) {
     sessionId: "s1",
     trialId: null,
     subjectId: null,
+    timeNs: null,
     streamId: "lpt-1",
     fromNs: null,
     toNs: null,

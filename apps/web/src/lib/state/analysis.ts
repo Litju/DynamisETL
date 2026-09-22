@@ -43,6 +43,8 @@ export interface AnalysisState {
   focusedPanel: WorkbenchPanel;
   /** Renderer interaction flags (camera drag, pitch pan, chart drag). */
   interacting: boolean;
+  /** A subject identity/time transition is in flight; renderers must not show stale data. */
+  subjectSwitching: boolean;
 
   setPlayhead: (tNs: bigint | null) => void;
   commitTime: (tNs: bigint | null) => void;
@@ -61,6 +63,8 @@ export interface AnalysisState {
   selectJoint: (jointId: string | null) => void;
   focusPanel: (panel: WorkbenchPanel) => void;
   setInteracting: (interacting: boolean) => void;
+  beginSubjectSwitch: (targetTimeNs: bigint) => void;
+  finishSubjectSwitch: () => void;
   hydrate: (state: {
     committedTimeNs?: bigint | null;
     committedRangeNs?: TimeRangeNs | null;
@@ -81,6 +85,7 @@ const TRANSIENT_DEFAULTS = {
   hoveredJoint: null,
   selectedJoint: null,
   interacting: false,
+  subjectSwitching: false,
 } as const;
 
 export const useAnalysisStore = create<AnalysisState>()((set) => ({
@@ -115,6 +120,21 @@ export const useAnalysisStore = create<AnalysisState>()((set) => ({
   selectJoint: (jointId) => set({ selectedJoint: jointId }),
   focusPanel: (panel) => set({ focusedPanel: panel }),
   setInteracting: (interacting) => set({ interacting }),
+  beginSubjectSwitch: (targetTimeNs) =>
+    set({
+      playheadNs: targetTimeNs,
+      committedTimeNs: targetTimeNs,
+      hoverTimeNs: null,
+      brushRangeNs: null,
+      playing: false,
+      playbackStatus: "idle",
+      selectedEntityId: null,
+      hoveredEntityId: null,
+      hoveredJoint: null,
+      selectedJoint: null,
+      subjectSwitching: true,
+    }),
+  finishSubjectSwitch: () => set({ subjectSwitching: false }),
 
   hydrate: (state) =>
     set((current) => ({

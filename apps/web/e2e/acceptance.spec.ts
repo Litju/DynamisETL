@@ -26,7 +26,7 @@ test("1b. individual selection is URL-owned across reload, scrub and history", a
   await expect(picker).toHaveValue("SC-P1");
   await picker.selectOption("SC-P2");
   await expect(page).toHaveURL(/subject=SC-P2/);
-  await expect(page).toHaveURL(/t_ns=0/);
+  await expect(page).toHaveURL(/t_ns=12000000000/);
   await page.keyboard.press("ArrowRight");
   await expect(page).toHaveURL(/subject=SC-P2/);
   await page.reload();
@@ -45,7 +45,7 @@ test("1e. all-subject Pose mode uses one fixed world without entity scoping", as
     }
   });
   await page.goto(
-    "/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P1&view=pose&t_ns=0",
+    "/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P1&view=pose&t_ns=12000000000",
   );
   const toggle = page.getByTestId("pose-all-subjects-toggle");
   await expect(toggle).toHaveAttribute("aria-pressed", "false");
@@ -69,7 +69,8 @@ test("1c. Pose playback advances both the playhead and rendered scene", async ({
   await page.getByRole("button", { name: "Play" }).click();
   await page.waitForTimeout(1000);
   const afterTime = await playhead.innerText();
-  const after = await canvas.screenshot();
+  await expect(page.getByTestId("pose-canvas").locator("canvas")).toBeVisible();
+  const after = await page.getByTestId("pose-canvas").locator("canvas").screenshot();
   expect(afterTime).not.toBe(beforeTime);
   expect(after.equals(before)).toBe(false);
 });

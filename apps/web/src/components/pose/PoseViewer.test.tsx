@@ -69,6 +69,10 @@ const ARTIFACT = {
   entity_column: "subject_id",
   entity_count: 1,
   entity_ids: ["s1", "s2"],
+  entity_observations: [
+    { entity_id: "s1", first_observed_ns: 0, last_observed_ns: 100_000_000, observation_count: 3 },
+    { entity_id: "s2", first_observed_ns: 20_000_000, last_observed_ns: 100_000_000, observation_count: 2 },
+  ],
 };
 
 const POSE_ROWS = [
@@ -221,6 +225,7 @@ function renderViewer(overrides: Partial<AnalysisContextValue> = {}) {
     sessionId: "s1",
     trialId: null,
     subjectId: null,
+    timeNs: null,
     streamId: "pose-1",
     fromNs: null,
     toNs: null,
@@ -245,7 +250,12 @@ function renderViewer(overrides: Partial<AnalysisContextValue> = {}) {
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  useAnalysisStore.setState({ playheadNs: null, committedTimeNs: null, selectedJoint: null });
+  useAnalysisStore.setState({
+    playheadNs: null,
+    committedTimeNs: null,
+    selectedJoint: null,
+    subjectSwitching: false,
+  });
 });
 
 it("labels the local analytical frame and exposes provider error radius context", async () => {
@@ -287,23 +297,23 @@ it("requires a pose stream and never renders another modality", async () => {
   expect(await screen.findByText("No stream selected.")).toBeInTheDocument();
 });
 
-it("keeps a durable subject selected when the current window only returns another subject", async () => {
+it("distinguishes a subject with observations from an empty current window", async () => {
   installFetch();
   renderViewer({ subjectId: "s2" });
   expect(
-    await screen.findByText("Individual s2 is not observed at this time/window."),
+    await screen.findByText("Subject s2 is not observed at the current time."),
   ).toBeInTheDocument();
   expect(screen.queryByTestId("pose-scene-stub")).not.toBeInTheDocument();
 });
 
-it("rewinds playback to zero before changing the selected subject", async () => {
+it("switches the subject with one exact target-time navigation transaction", async () => {
   installFetch();
   const selectSubject = vi.fn();
   renderViewer({ subjectId: "s1", selectSubject });
   const picker = await screen.findByLabelText("subject");
   useAnalysisStore.getState().commitTime(50_000_000n);
   fireEvent.change(picker, { target: { value: "s2" } });
-  expect(useAnalysisStore.getState().committedTimeNs).toBe(0n);
+  expect(useAnalysisStore.getState().committedTimeNs).toBe(20_000_000n);
   expect(useAnalysisStore.getState().playing).toBe(false);
-  expect(selectSubject).toHaveBeenCalledWith("s2", { resetTime: true });
+  expect(selectSubject).toHaveBeenCalledWith("s2", { targetTimeNs: 20_000_000n });
 });

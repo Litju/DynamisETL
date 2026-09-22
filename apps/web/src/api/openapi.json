@@ -197,6 +197,20 @@
             ],
             "title": "Entity Ids"
           },
+          "entity_observations": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EntityObservationView"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Observations"
+          },
           "format": {
             "title": "Format",
             "type": "string"
@@ -833,6 +847,35 @@
           "display_note"
         ],
         "title": "DenseWindowMeta",
+        "type": "object"
+      },
+      "EntityObservationView": {
+        "description": "Stable observed-frame bounds for one entity in a dense artifact.",
+        "properties": {
+          "entity_id": {
+            "title": "Entity Id",
+            "type": "string"
+          },
+          "first_observed_ns": {
+            "title": "First Observed Ns",
+            "type": "integer"
+          },
+          "last_observed_ns": {
+            "title": "Last Observed Ns",
+            "type": "integer"
+          },
+          "observation_count": {
+            "title": "Observation Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "entity_id",
+          "first_observed_ns",
+          "last_observed_ns",
+          "observation_count"
+        ],
+        "title": "EntityObservationView",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -2420,6 +2463,84 @@
         ]
       }
     },
+    "/api/artifacts/{artifact_id}/observations": {
+      "get": {
+        "operationId": "artifact_observations_api_artifacts__artifact_id__observations_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "artifact_id",
+            "required": true,
+            "schema": {
+              "title": "Artifact Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from_ns",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From Ns"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to_ns",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To Ns"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EntityObservationView"
+                  },
+                  "title": "Response Artifact Observations Api Artifacts  Artifact Id  Observations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Artifact Observations",
+        "tags": [
+          "dense"
+        ]
+      }
+    },
     "/api/artifacts/{artifact_id}/window": {
       "get": {
         "operationId": "artifact_window_api_artifacts__artifact_id__window_get",
@@ -3120,6 +3241,27 @@
         "summary": "Quality",
         "tags": [
           "quality"
+        ]
+      }
+    },
+    "/api/ready": {
+      "get": {
+        "operationId": "ready_api_ready_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Ready",
+        "tags": [
+          "system"
         ]
       }
     },

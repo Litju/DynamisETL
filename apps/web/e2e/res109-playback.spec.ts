@@ -109,3 +109,84 @@ test("RES-109 Pose seek exposes coordinate and camera ownership modes", async ({
   await expect(page.getByTestId("pose-body-local-mode")).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "body-local" }).nth(1)).toHaveAttribute("aria-pressed", "true");
 });
+
+test("RES-109 §12 paused subject switch rewinds to the first exact observation", async ({ page }) => {
+  await page.goto("/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P1&view=pose&t_ns=16000000000");
+  await expect(page.getByTestId("pose-canvas").locator("canvas")).toBeVisible();
+  await page.locator("#pose-subject").selectOption("SC-P2");
+  await expect(page).toHaveURL(/subject=SC-P2/);
+  await expect(page).toHaveURL(/t_ns=12000000000/);
+  await expect(page.getByTestId("pose-telemetry").getByText("29 observed · 0 unavailable")).toBeVisible();
+});
+
+test("RES-109 §12 playing subject switch stops playback without stale subject data", async ({ page }) => {
+  await page.goto("/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P1&view=pose&t_ns=12000000000");
+  await expect(page.getByTestId("pose-canvas").locator("canvas")).toBeVisible();
+  await page.getByLabel("Playback rate").selectOption("4");
+  await page.getByRole("button", { name: "Play" }).click();
+  await page.waitForTimeout(500);
+  await page.locator("#pose-subject").selectOption("SC-P2");
+  await expect(page.getByRole("button", { name: "Play" })).toBeVisible();
+  await expect(page).toHaveURL(/subject=SC-P2/);
+  await expect(page).toHaveURL(/t_ns=12000000000/);
+  await expect(page.getByTestId("pose-telemetry").getByText("29 observed · 0 unavailable")).toBeVisible();
+});
+
+test("RES-109 §12 buffering subject switch retires only the previous subject", async ({ page }) => {
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/api/artifacts/pose-sample/window")) requests.push(request.url());
+  });
+  await page.route("**/api/artifacts/pose-sample/window**", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.searchParams.get("entity_id") === "SC-P1" && Number(url.searchParams.get("from_ns") ?? "0") > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 2_000));
+    }
+    await route.fallback();
+  });
+  await page.goto("/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P1&view=pose&t_ns=0");
+  await expect(page.getByTestId("pose-canvas").locator("canvas")).toBeVisible();
+  await page.getByLabel("Playback rate").selectOption("4");
+  await page.getByRole("button", { name: "Play" }).click();
+  await expect(page.getByTestId("playback-buffering").first()).toBeVisible({ timeout: 2_500 });
+  await page.locator("#pose-subject").selectOption("SC-P2");
+  await expect(page).toHaveURL(/subject=SC-P2/);
+  await expect(page).toHaveURL(/t_ns=12000000000/);
+  await expect(page.getByTestId("pose-telemetry").getByText("29 observed · 0 unavailable")).toBeVisible({ timeout: 5_000 });
+  expect(requests.some((url) => new URL(url).searchParams.get("entity_id") === "SC-P2")).toBe(true);
+});
+
+test("RES-109 §12 distinguishes temporary absence and no Pose for numeric ids", async ({ page }) => {
+  await page.goto("/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P2&view=pose&t_ns=8000000000");
+  await expect(page.getByText("Subject SC-P2 is not observed at 00:00:08.000.")).toBeVisible();
+  await page.goto("/lab/skillcorner-opendata/1925299?stream=pose-1&subject=560986&view=pose&t_ns=8000000000");
+  await expect(page.getByTestId("workbench").getByText("No Pose observations for subject 560986 in period-1.")).toBeVisible();
+  await expect(page.getByTestId("pose-telemetry-status")).toContainText("No Pose observations");
+  await expect(page.getByText("all landmarks unavailable")).toHaveCount(0);
+});
+
+test("RES-109 §12 all-subject focus keeps the global exact query unscoped", async ({ page }) => {
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/api/artifacts/pose-sample/window")) requests.push(request.url());
+  });
+  await page.goto("/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P1&view=pose&t_ns=12000000000");
+  await expect(page.getByTestId("pose-canvas").locator("canvas")).toBeVisible();
+  await page.getByTestId("pose-all-subjects-toggle").click();
+  await page.locator("#pose-subject").selectOption("SC-P2");
+  await expect(page).toHaveURL(/subject=SC-P2/);
+  await expect(page.getByTestId("pose-all-subjects-toggle")).toHaveText("all subjects · fixed camera");
+  expect(requests.some((url) => !new URL(url).searchParams.has("entity_id"))).toBe(true);
+});
+
+test("RES-109 §12 subject navigation is stable across reload and history", async ({ page }) => {
+  await page.goto("/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P1&view=pose&t_ns=16000000000");
+  await page.locator("#pose-subject").selectOption("SC-P2");
+  await expect(page).toHaveURL(/subject=SC-P2.*t_ns=12000000000/);
+  await page.reload();
+  await expect(page).toHaveURL(/subject=SC-P2.*t_ns=12000000000/);
+  await page.goBack();
+  await expect(page).toHaveURL(/subject=SC-P1/);
+  await page.goForward();
+  await expect(page).toHaveURL(/subject=SC-P2.*t_ns=12000000000/);
+});

@@ -318,6 +318,15 @@ class ArtifactRefView(BaseModel):
     synchronization_spec_id: str | None
 
 
+class EntityObservationView(BaseModel):
+    """Stable observed-frame bounds for one entity in a dense artifact."""
+
+    entity_id: str
+    first_observed_ns: int
+    last_observed_ns: int
+    observation_count: int
+
+
 class ArtifactDetail(ArtifactRefView):
     """One artifact plus the canonical time bounds of its samples.
 
@@ -336,6 +345,8 @@ class ArtifactDetail(ArtifactRefView):
     entity_count: int | None = None
     #: Stable artifact-level identities, when the artifact carries an entity key.
     entity_ids: list[str] | None = None
+    #: Pose-only observed-frame authority; entity roster membership is not enough.
+    entity_observations: list[EntityObservationView] | None = None
 
 
 class DenseWindowMeta(BaseModel):

@@ -31,7 +31,7 @@ export const DATASET = {
   },
   version_count: 1,
   session_count: 1,
-  subject_count: 2,
+  subject_count: 3,
   trial_count: 1,
   stream_count: 2,
   metric_count: 1,
@@ -110,6 +110,7 @@ export const SESSION = {
   participants: [
     { subject_id: "SC-P1", role: "player", group_label: "home" },
     { subject_id: "SC-P2", role: "player", group_label: "away" },
+    { subject_id: "560986", role: "player", group_label: "away" },
   ],
   trials: [
     {
@@ -160,7 +161,11 @@ const POSE_ARTIFACT = {
   byte_size: 8192,
   entity_column: "subject_id",
   entity_count: 2,
-  entity_ids: ["SC-P1", "SC-P2"],
+  entity_ids: ["SC-P1", "SC-P2", "560986"],
+  entity_observations: [
+    { entity_id: "SC-P1", first_observed_ns: 0, last_observed_ns: 20_000_000_000, observation_count: 7 },
+    { entity_id: "SC-P2", first_observed_ns: 12_000_000_000, last_observed_ns: 20_000_000_000, observation_count: 3 },
+  ],
 };
 
 const TRACKING_TIMES = [0, 40_000_000, 2_000_000_000, 4_000_000_000, 6_000_000_000, 8_000_000_000, 10_000_000_000, 12_000_000_000, 14_000_000_000, 16_000_000_000, 18_000_000_000, 20_000_000_000] as const;
@@ -241,21 +246,25 @@ const POSE_ROWS = POSE_LANDMARKS.map((joint_name) => {
     error_m: joint_name === "lKnee" ? 0.04 : joint_name === "lAnkle" ? 0.05 : 0.03,
   };
 });
-const POSE_TIMES = [0, 40_000_000, 4_000_000_000, 8_000_000_000, 12_000_000_000, 16_000_000_000, 20_000_000_000] as const;
+const POSE_TIMES_P1 = [0, 40_000_000, 4_000_000_000, 8_000_000_000, 12_000_000_000, 16_000_000_000, 20_000_000_000] as const;
+const POSE_TIMES_P2 = [12_000_000_000, 16_000_000_000, 20_000_000_000] as const;
 const POSE_ROWS_P2 = POSE_ROWS.map((row) => ({
   ...row,
   subject_id: "SC-P2",
   x_m: row.x_m + 3,
   y_m: row.y_m - 2,
 }));
-const poseRowsAt = (rows: typeof POSE_ROWS, subjectOffset: number) =>
-  POSE_TIMES.flatMap((t_rel_ns, index) => rows.map((row) => ({
+const poseRowsAt = (rows: typeof POSE_ROWS, times: readonly number[], subjectOffset: number) =>
+  times.flatMap((t_rel_ns, index) => rows.map((row) => ({
     ...row,
     t_rel_ns,
     x_m: row.x_m + index * 0.12 + subjectOffset,
     z_m: row.z_m + (row.joint_name === "lKnee" ? index * 0.04 : 0),
   })));
-const POSE_WINDOW_ROWS = [...poseRowsAt(POSE_ROWS, 0), ...poseRowsAt(POSE_ROWS_P2, 0)];
+const POSE_WINDOW_ROWS = [
+  ...poseRowsAt(POSE_ROWS, POSE_TIMES_P1, 0),
+  ...poseRowsAt(POSE_ROWS_P2, POSE_TIMES_P2, 0),
+];
 
 const POSE_WINDOW = {
   meta: {
@@ -472,6 +481,7 @@ function body(pathname: string): unknown | undefined {
   if (pathname === "/api/runs") return RUNS;
   if (pathname === "/api/artifacts/tracking-sample") return TRACKING_ARTIFACT;
   if (pathname === "/api/artifacts/pose-sample") return POSE_ARTIFACT;
+  if (pathname === "/api/artifacts/pose-sample/observations") return POSE_ARTIFACT.entity_observations;
   if (pathname === "/api/artifacts/tracking-sample/window") return TRACKING_WINDOW;
   if (pathname === "/api/artifacts/pose-sample/window") return POSE_WINDOW;
   return undefined;
@@ -507,6 +517,17 @@ function windowPayload(url: URL): unknown | undefined {
 
 async function handler(route: Route): Promise<void> {
   const url = new URL(route.request().url());
+  if (url.pathname.endsWith("/observations")) {
+    const observations = (body(url.pathname) as Array<Record<string, number | string>> | undefined) ?? [];
+    const fromNs = url.searchParams.has("from_ns") ? Number(url.searchParams.get("from_ns")) : Number.NEGATIVE_INFINITY;
+    const toNs = url.searchParams.has("to_ns") ? Number(url.searchParams.get("to_ns")) : Number.POSITIVE_INFINITY;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(observations.filter((item) => Number(item.last_observed_ns) >= fromNs && Number(item.first_observed_ns) <= toNs)),
+    });
+    return;
+  }
   if (url.pathname.endsWith("/window") && url.searchParams.get("format") === "arrow") {
     const payload = windowPayload(url);
     await route.fulfill({

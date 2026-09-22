@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
 
 import type { DenseWindow } from "@/api/types";
@@ -37,6 +37,25 @@ export interface PosePlaybackWindowResult {
   readonly chunkPlan: DenseChunkPlan | null;
   readonly activeWindowBounds: DenseChunkBounds | { readonly fromNs: bigint; readonly toNs: bigint } | null;
   readonly playbackStatus: "idle" | "ready" | "buffering" | "ended";
+}
+
+export function retirePoseSubjectQueries(
+  queryClient: QueryClient,
+  artifactId: string | null,
+  subjectId: string | null,
+  columns: readonly string[] = POSE_COLUMNS,
+  maxPoints = 20_000,
+): void {
+  if (artifactId === null || subjectId === null) return;
+  const columnsKey = columns.join(",");
+  const matches = (queryKey: readonly unknown[]) =>
+    (queryKey[0] === "dense-chunk" || queryKey[0] === "dense-window") &&
+    queryKey[1] === artifactId &&
+    queryKey[6] === columnsKey &&
+    queryKey[7] === maxPoints &&
+    queryKey[8] === subjectId;
+  void queryClient.cancelQueries({ predicate: (query) => matches(query.queryKey) });
+  queryClient.removeQueries({ predicate: (query) => matches(query.queryKey) });
 }
 
 /** Pose and the inspector telemetry share one exact-window query authority. */
@@ -127,6 +146,7 @@ export function usePosePlaybackWindow(options: PosePlaybackWindowOptions): PoseP
   }, [activeChunk, explicit, request]);
   const window = useQuery({
     ...activeQuery,
+    placeholderData: (previous) => previous,
     enabled: Boolean(options.artifactId) && (explicit !== null || activeChunk !== null),
   });
   return {
