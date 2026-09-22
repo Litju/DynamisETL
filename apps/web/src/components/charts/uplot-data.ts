@@ -12,8 +12,8 @@ export interface UPlotData {
   readonly xMax: number | null;
 }
 
-function numberOrNaN(value: number | null): number {
-  return value === null || !Number.isFinite(value) ? Number.NaN : value;
+function finiteOrNull(value: number | null): number | null {
+  return value === null || !Number.isFinite(value) ? null : value;
 }
 
 export function buildUPlotData(
@@ -24,12 +24,12 @@ export function buildUPlotData(
 ): UPlotData {
   const firstPoints = series[0]?.points ?? bands[0]?.points;
   const x = firstPoints?.map(([time]) => time) ?? [];
-  const values: Float64Array[] = [Float64Array.from(x)];
+  const values: Array<number[] | (number | null)[]> = [x];
   const plotSeries: uPlot.Series[] = [{}];
   const plotBands: uPlot.Band[] = [];
 
   for (const [index, entry] of series.entries()) {
-    values.push(Float64Array.from(entry.points.map(([, value]) => numberOrNaN(value))));
+    values.push(entry.points.map(([, value]) => finiteOrNull(value)));
     plotSeries.push({
       label: entry.name,
       scale: `y${entry.paneIndex}`,
@@ -41,7 +41,7 @@ export function buildUPlotData(
 
   for (const [index, band] of bands.entries()) {
     const minIndex = plotSeries.length;
-    values.push(Float64Array.from(band.points.map(([, min]) => numberOrNaN(min))));
+    values.push(band.points.map(([, min]) => finiteOrNull(min)));
     plotSeries.push({
       label: `${band.name} — reduction minimum`,
       scale: `y${band.paneIndex}`,
@@ -50,7 +50,7 @@ export function buildUPlotData(
       points: { show: false },
     });
     const maxIndex = plotSeries.length;
-    values.push(Float64Array.from(band.points.map(([, , max]) => numberOrNaN(max))));
+    values.push(band.points.map(([, , max]) => finiteOrNull(max)));
     plotSeries.push({
       label: `${band.name} — reduction maximum`,
       scale: `y${band.paneIndex}`,
@@ -65,7 +65,7 @@ export function buildUPlotData(
   }
 
   return {
-    data: values,
+    data: values as uPlot.AlignedData,
     series: plotSeries,
     bands: plotBands,
     xMin: x.length > 0 ? x[0]! : null,

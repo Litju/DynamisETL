@@ -40,10 +40,22 @@ export function UPlotSignal({
   const plotRef = useRef<uPlot | null>(null);
   const callbacksRef = useRef({ onPointClick, onRangeZoom });
   const cleanupResize = useRef<(() => void) | null>(null);
-  const initialPlayheadMs = useRef(playheadMs);
-  const initialRangeMs = useRef(rangeMs);
+  const playbackRef = useRef({ playheadMs, rangeMs });
+  const keyboardRangeAnchor = useRef<number | null>(null);
   const [ready, setReady] = useState(false);
   const plotData = useMemo(() => buildUPlotData(panes, series, bands), [bands, panes, series]);
+  const rangeFromMs = rangeMs?.fromMs ?? null;
+  const rangeToMs = rangeMs?.toMs ?? null;
+
+  useEffect(() => {
+    playbackRef.current = {
+      playheadMs,
+      rangeMs:
+        rangeFromMs === null || rangeToMs === null
+          ? null
+          : { fromMs: rangeFromMs, toMs: rangeToMs },
+    };
+  }, [playheadMs, rangeFromMs, rangeToMs]);
 
   useEffect(() => {
     callbacksRef.current = { onPointClick, onRangeZoom };
@@ -114,29 +126,17 @@ export function UPlotSignal({
       };
       plot.over.addEventListener("click", handleClick);
       removeClick = () => plot?.over.removeEventListener("click", handleClick);
-      setReady(true);
-      updatePlayhead(plot, playhead, initialPlayheadMs.current);
-      const initialRange = initialRangeMs.current;
-      if (initialRange !== null) {
-        plot.setSelect(
-          {
-            left: plot.valToPos(initialRange.fromMs, "x"),
-            top: 0,
-            width: Math.max(
-              0,
-              plot.valToPos(initialRange.toMs, "x") - plot.valToPos(initialRange.fromMs, "x"),
-            ),
-            height: plot.height,
-          },
-          false,
-        );
-      }
+      syncPlayhead(plot, playhead, originNs, playbackRef.current.playheadMs);
+      applyRange(plot, playbackRef.current.rangeMs);
       const observer = new ResizeObserver(() => {
         if (!plot) return;
         plot.setSize({ width: Math.max(320, target.clientWidth), height: Math.max(180, target.clientHeight) });
+        syncPlayhead(plot, playhead, originNs, playbackRef.current.playheadMs);
+        applyRange(plot, playbackRef.current.rangeMs);
       });
       observer.observe(target);
       cleanupResize.current = () => observer.disconnect();
+      setReady(true);
     });
     return () => {
       disposed = true;
@@ -148,16 +148,15 @@ export function UPlotSignal({
       playheadRef.current = null;
       setReady(false);
     };
-  }, [panes, plotData, timeReference]);
+  }, [originNs, panes, plotData, timeReference]);
 
-  const rangeFromMs = rangeMs?.fromMs ?? null;
-  const rangeToMs = rangeMs?.toMs ?? null;
   useEffect(() => {
-    const plot = plotRef.current;
-    if (!plot || rangeFromMs === null || rangeToMs === null) return;
-    const left = plot.valToPos(rangeFromMs, "x");
-    const right = plot.valToPos(rangeToMs, "x");
-    plot.setSelect({ left, top: 0, width: Math.max(0, right - left), height: plot.height }, false);
+    applyRange(
+      plotRef.current,
+      rangeFromMs === null || rangeToMs === null
+        ? null
+        : { fromMs: rangeFromMs, toMs: rangeToMs },
+    );
   }, [rangeFromMs, rangeToMs]);
 
   useEffect(() => {
@@ -168,7 +167,7 @@ export function UPlotSignal({
       updatePlayhead(plot, playhead, timeMs);
     };
     const current = useAnalysisStore.getState().playheadNs ?? useAnalysisStore.getState().committedTimeNs;
-    update(current === null ? null : rendererTimeMs(originNs, current));
+    update(current === null ? playheadMs : rendererTimeMs(originNs, current));
     return useAnalysisStore.subscribe((state, previous) => {
       const next = state.playheadNs ?? state.committedTimeNs;
       const before = previous.playheadNs ?? previous.committedTimeNs;
@@ -179,9 +178,9 @@ export function UPlotSignal({
   return (
     <div
       ref={containerRef}
-      role="img"
+      role="group"
       aria-label={ariaLabel}
-      aria-description="Exact canonical samples or explicitly labeled display-reduced samples with keyboard range selection."
+      aria-description="Exact canonical samples or explicitly labeled display-reduced samples. Use Left and Right Arrow to move; hold Shift with an arrow key to select a range."
       tabIndex={0}
       data-testid="uplot"
       data-renderer="uplot"
@@ -195,10 +194,48 @@ export function UPlotSignal({
         const current = plot.cursor.left === undefined ? plotData.xMin : plot.posToVal(plot.cursor.left, "x");
         const step = Math.max(1, (plotData.xMax - plotData.xMin) / 1000);
         const next = Math.min(plotData.xMax, Math.max(plotData.xMin, current + (event.key === "ArrowRight" ? step : -step)));
-        callbacksRef.current.onPointClick?.({ xMs: next });
+        if (event.shiftKey) {
+          const anchor = keyboardRangeAnchor.current ?? current;
+          keyboardRangeAnchor.current = anchor;
+          callbacksRef.current.onRangeZoom?.({ fromMs: Math.min(anchor, next), toMs: Math.max(anchor, next) });
+        } else {
+          keyboardRangeAnchor.current = null;
+          callbacksRef.current.onPointClick?.({ xMs: next });
+        }
+      }}
+      onKeyUp={(event) => {
+        if (event.key === "Shift") keyboardRangeAnchor.current = null;
+      }}
+      onBlur={() => {
+        keyboardRangeAnchor.current = null;
       }}
     />
   );
+}
+
+function syncPlayhead(
+  plot: uPlot,
+  element: HTMLDivElement,
+  originNs: bigint,
+  fallbackMs: number | null,
+) {
+  const state = useAnalysisStore.getState();
+  const timeNs = state.playheadNs ?? state.committedTimeNs;
+  updatePlayhead(plot, element, timeNs === null ? fallbackMs : rendererTimeMs(originNs, timeNs));
+}
+
+function applyRange(
+  plot: uPlot | null,
+  range: { readonly fromMs: number; readonly toMs: number } | null,
+) {
+  if (!plot) return;
+  if (range === null) {
+    plot.setSelect({ left: 0, top: 0, width: 0, height: plot.height }, false);
+    return;
+  }
+  const left = plot.valToPos(range.fromMs, "x");
+  const right = plot.valToPos(range.toMs, "x");
+  plot.setSelect({ left, top: 0, width: Math.max(0, right - left), height: plot.height }, false);
 }
 
 function updatePlayhead(plot: uPlot, element: HTMLDivElement, timeMs: number | null) {
