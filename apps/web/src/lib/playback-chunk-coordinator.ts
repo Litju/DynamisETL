@@ -271,11 +271,8 @@ export function usePlaybackChunkCoordinator<T>(options: {
     options.canonicalMinNs,
     options.chunkSpanNs,
     options.enabled,
-    options.isReady,
-    options.matchesQuery,
     options.queryClient,
     options.queryOptionsFor,
-    options.chunkIdFromQueryKey,
   ]);
 
   const snapshot = useSyncExternalStore(

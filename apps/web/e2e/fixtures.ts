@@ -53,7 +53,7 @@ const TRACKING_STREAM = {
   clock_id: "skillcorner-match-clock",
   skeleton_id: null,
   sample_artifact_ids: ["tracking-sample"],
-  sample_row_count: 3,
+  sample_row_count: 100_000,
 };
 
 const POSE_DISPLAY_CONNECTIONS = [
@@ -92,7 +92,7 @@ const POSE_STREAM = {
   ],
   skeleton_display_connections: POSE_DISPLAY_CONNECTIONS,
   sample_artifact_ids: ["pose-sample"],
-  sample_row_count: 3,
+  sample_row_count: 100_000,
 };
 
 export const SESSION = {
@@ -133,7 +133,7 @@ const TRACKING_ARTIFACT = {
   format: "parquet",
   compression: "zstd",
   checksum_sha256: "a".repeat(64),
-  row_count: 4,
+  row_count: 100_000,
   byte_size: 4096,
   artifact_kind: "sample",
   modality: "tracking",
@@ -142,7 +142,7 @@ const TRACKING_ARTIFACT = {
   coordinate_frame_id: "skillcorner-pitch-m",
   synchronization_spec_id: "skillcorner-source-provided-match-clock",
   canonical_time_min_ns: 0,
-  canonical_time_max_ns: 100_000_000,
+  canonical_time_max_ns: 20_000_000_000,
   entity_column: "object_id",
   entity_count: 2,
   entity_ids: ["p1", "p2"],
@@ -156,35 +156,37 @@ const POSE_ARTIFACT = {
   coordinate_frame_id: "skillcorner-pose-hybrid-m",
   artifact_kind: "sample",
   modality: "pose",
-  row_count: 116,
+  row_count: 100_000,
   byte_size: 8192,
   entity_column: "subject_id",
   entity_count: 2,
   entity_ids: ["SC-P1", "SC-P2"],
 };
 
+const TRACKING_TIMES = [0, 40_000_000, 2_000_000_000, 4_000_000_000, 6_000_000_000, 8_000_000_000, 10_000_000_000, 12_000_000_000, 14_000_000_000, 16_000_000_000, 18_000_000_000, 20_000_000_000] as const;
+const TRACKING_WINDOW_ROWS = TRACKING_TIMES.flatMap((t_rel_ns, index) => [
+  { t_rel_ns, object_id: "p1", object_type: "player", group_id: "home", x_m: -5 + index * 0.2, y_m: 2 + index * 0.1, is_detected: true },
+  { t_rel_ns, object_id: "p2", object_type: "player", group_id: "away", x_m: 5 - index * 0.2, y_m: -2 - index * 0.1, is_detected: index % 3 !== 0 },
+  { t_rel_ns, object_id: "ball", object_type: "ball", group_id: null, x_m: 0.2 + index * 0.05, y_m: 0.1, is_detected: true },
+]);
+
 const TRACKING_WINDOW = {
   meta: {
     artifact: TRACKING_ARTIFACT,
     from_ns: 0,
-    to_ns: 100_000_000,
+    to_ns: 20_000_000_000,
     columns: ["t_rel_ns", "object_id", "object_type", "group_id", "x_m", "y_m", "is_detected"],
-    source_rows: 4,
-    returned_rows: 4,
+    source_rows: TRACKING_WINDOW_ROWS.length,
+    returned_rows: TRACKING_WINDOW_ROWS.length,
     canonical_time_min_ns: 0,
-    canonical_time_max_ns: 100_000_000,
+    canonical_time_max_ns: 20_000_000_000,
     reduction: null,
     units: { x_m: "m", y_m: "m" },
     coordinate_frame_id: "skillcorner-pitch-m",
     measurement_class: "MODEL_ESTIMATED",
     display_note: "Exact.",
   },
-  rows: [
-    { t_rel_ns: 0, object_id: "p1", object_type: "player", group_id: "home", x_m: -5, y_m: 2, is_detected: true },
-    { t_rel_ns: 0, object_id: "p2", object_type: "player", group_id: "away", x_m: 5, y_m: -2, is_detected: false },
-    { t_rel_ns: 0, object_id: "ball", object_type: "ball", x_m: 0.2, y_m: 0.1, is_detected: true },
-    { t_rel_ns: 100_000_000, object_id: "p1", object_type: "player", group_id: "home", x_m: -4, y_m: 3, is_detected: true },
-  ],
+  rows: TRACKING_WINDOW_ROWS,
 };
 
 const POSE_LANDMARKS = [
@@ -239,29 +241,27 @@ const POSE_ROWS = POSE_LANDMARKS.map((joint_name) => {
     error_m: joint_name === "lKnee" ? 0.04 : joint_name === "lAnkle" ? 0.05 : 0.03,
   };
 });
-const POSE_ROWS_LATER = POSE_ROWS.map((row) => ({
-  ...row,
-  t_rel_ns: 40_000_000,
-  x_m: row.x_m + 0.12,
-}));
+const POSE_TIMES = [0, 40_000_000, 4_000_000_000, 8_000_000_000, 12_000_000_000, 16_000_000_000, 20_000_000_000] as const;
 const POSE_ROWS_P2 = POSE_ROWS.map((row) => ({
   ...row,
   subject_id: "SC-P2",
   x_m: row.x_m + 3,
   y_m: row.y_m - 2,
 }));
-const POSE_ROWS_P2_LATER = POSE_ROWS_P2.map((row) => ({
-  ...row,
-  t_rel_ns: 40_000_000,
-  x_m: row.x_m + 0.12,
-}));
-const POSE_WINDOW_ROWS = [...POSE_ROWS, ...POSE_ROWS_LATER, ...POSE_ROWS_P2, ...POSE_ROWS_P2_LATER];
+const poseRowsAt = (rows: typeof POSE_ROWS, subjectOffset: number) =>
+  POSE_TIMES.flatMap((t_rel_ns, index) => rows.map((row) => ({
+    ...row,
+    t_rel_ns,
+    x_m: row.x_m + index * 0.12 + subjectOffset,
+    z_m: row.z_m + (row.joint_name === "lKnee" ? index * 0.04 : 0),
+  })));
+const POSE_WINDOW_ROWS = [...poseRowsAt(POSE_ROWS, 0), ...poseRowsAt(POSE_ROWS_P2, 0)];
 
 const POSE_WINDOW = {
   meta: {
     artifact: POSE_ARTIFACT,
     from_ns: 0,
-    to_ns: 100_000_000,
+    to_ns: 20_000_000_000,
     columns: [
       "t_rel_ns",
       "subject_id",
@@ -275,7 +275,7 @@ const POSE_WINDOW = {
     source_rows: POSE_WINDOW_ROWS.length,
     returned_rows: POSE_WINDOW_ROWS.length,
     canonical_time_min_ns: 0,
-    canonical_time_max_ns: 100_000_000,
+    canonical_time_max_ns: 20_000_000_000,
     reduction: null,
     units: { x_m: "m", y_m: "m", z_m: "m", error_m: "m" },
     coordinate_frame_id: "skillcorner-pose-hybrid-m",
@@ -477,10 +477,38 @@ function body(pathname: string): unknown | undefined {
   return undefined;
 }
 
+function windowPayload(url: URL): unknown | undefined {
+  const payload = body(url.pathname);
+  if (typeof payload !== "object" || payload === null || !Array.isArray((payload as { rows?: unknown }).rows)) {
+    return payload;
+  }
+  const fromNs = url.searchParams.has("from_ns") ? Number(url.searchParams.get("from_ns")) : Number.NEGATIVE_INFINITY;
+  const toNs = url.searchParams.has("to_ns") ? Number(url.searchParams.get("to_ns")) : Number.POSITIVE_INFINITY;
+  const entityId = url.searchParams.get("entity_id");
+  const rows = ((payload as { rows: Array<Record<string, unknown>> }).rows).filter((row) => {
+    const time = row.t_rel_ns;
+    const rowEntity = row.subject_id ?? row.object_id;
+    return typeof time === "number" && time >= fromNs && time <= toNs &&
+      (entityId === null || String(rowEntity) === entityId);
+  });
+  const source = payload as { meta: Record<string, unknown>; rows: Array<Record<string, unknown>> };
+  return {
+    ...source,
+    meta: {
+      ...source.meta,
+      from_ns: Number.isFinite(fromNs) ? fromNs : source.meta.from_ns,
+      to_ns: Number.isFinite(toNs) ? toNs : source.meta.to_ns,
+      source_rows: rows.length,
+      returned_rows: rows.length,
+    },
+    rows,
+  };
+}
+
 async function handler(route: Route): Promise<void> {
   const url = new URL(route.request().url());
   if (url.pathname.endsWith("/window") && url.searchParams.get("format") === "arrow") {
-    const payload = body(url.pathname);
+    const payload = windowPayload(url);
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -488,7 +516,7 @@ async function handler(route: Route): Promise<void> {
     });
     return;
   }
-  const payload = body(url.pathname);
+  const payload = url.pathname.endsWith("/window") ? windowPayload(url) : body(url.pathname);
   if (payload === undefined) {
     await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ detail: `unhandled ${url.pathname}` }) });
     return;

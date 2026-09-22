@@ -17,6 +17,7 @@ export interface TimeRangeNs {
 }
 
 export type PlaybackStatus = "idle" | "ready" | "buffering" | "ended";
+export type PlaybackDirection = -1 | 1;
 
 export interface AnalysisState {
   /** Live playback/scrub time; high-frequency and never URL-serialized directly. */
@@ -30,6 +31,7 @@ export interface AnalysisState {
   committedRangeNs: TimeRangeNs | null;
   playing: boolean;
   playbackRate: number;
+  playbackDirection: PlaybackDirection;
   /** Dense playback status; BUFFERING is explicit and blocks clock advance. */
   playbackStatus: PlaybackStatus;
   /** Nominal rate of the currently selected stream, for frame stepping. */
@@ -49,6 +51,7 @@ export interface AnalysisState {
   commitRange: (range: TimeRangeNs | null) => void;
   setPlaying: (playing: boolean) => void;
   setPlaybackRate: (rate: number) => void;
+  setPlaybackDirection: (direction: PlaybackDirection) => void;
   setPlaybackStatus: (status: PlaybackStatus) => void;
   setNominalRate: (rateHz: number | null) => void;
   selectEntity: (entityId: string | null) => void;
@@ -84,6 +87,7 @@ export const useAnalysisStore = create<AnalysisState>()((set) => ({
   committedTimeNs: null,
   committedRangeNs: null,
   playbackRate: 1,
+  playbackDirection: 1,
   nominalRateHz: null,
   selectedEntityId: null,
   hoveredEntityId: null,
@@ -99,6 +103,7 @@ export const useAnalysisStore = create<AnalysisState>()((set) => ({
   setPlaying: (playing) => set({ playing }),
   setPlaybackRate: (rate) =>
     set({ playbackRate: Number.isFinite(rate) && rate > 0 ? rate : 1 }),
+  setPlaybackDirection: (playbackDirection) => set({ playbackDirection }),
   setPlaybackStatus: (playbackStatus) => set({ playbackStatus }),
   setNominalRate: (rateHz) =>
     set({ nominalRateHz: rateHz !== null && Number.isFinite(rateHz) && rateHz > 0 ? rateHz : null }),

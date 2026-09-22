@@ -481,7 +481,10 @@ export function PoseViewer() {
               <button
                 type="button"
                 data-testid="pose-camera-reset"
-                onClick={() => setCameraMode(allSubjects ? "all_subjects" : "body_local")}
+                onClick={() => {
+                  setCoordinateMode(allSubjects ? "match_world" : "body_local");
+                  setCameraMode(allSubjects ? "all_subjects" : "body_local");
+                }}
                 className="rounded-control border border-border-subtle px-1.5 py-0.5 text-text-muted hover:text-text-secondary"
               >
                 reset

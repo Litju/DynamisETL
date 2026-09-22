@@ -66,6 +66,17 @@ describe("PlaybackChunkCoordinator", () => {
     expect(coordinator.getSnapshot().status).toBe("ready");
   });
 
+  it("allows reverse playback to leave the canonical maximum", () => {
+    const { coordinator, ready } = harness();
+    ready.add(id(0, 19));
+    ready.add(id(20, 39));
+    ready.add(id(40, 59));
+    ready.add(id(60, 79));
+    ready.add(id(80, 99));
+    coordinator.observePlayhead(99n, false);
+    expect(coordinator.allowAdvance(99n, 98n)).toBe(98n);
+  });
+
   it("prefetches and retains only previous/active/next", () => {
     const { prefetched, evicted } = harness();
     expect(prefetched).toContain(id(0, 19));

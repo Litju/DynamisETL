@@ -53,6 +53,8 @@ describe("transient analysis state spine", () => {
     expect(useAnalysisStore.getState().nominalRateHz).toBeNull();
     store.setNominalRate(25);
     expect(useAnalysisStore.getState().nominalRateHz).toBe(25);
+    store.setPlaybackDirection(-1);
+    expect(useAnalysisStore.getState().playbackDirection).toBe(-1);
   });
 
   it("hydrates durable context from a deep link and resets transients", () => {
