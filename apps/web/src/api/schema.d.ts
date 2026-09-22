@@ -16,6 +16,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/artifacts/{artifact_id}/observations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Artifact Observations */
+        get: operations["artifact_observations_api_artifacts__artifact_id__observations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/artifacts/{artifact_id}/window": {
         parameters: {
             query?: never;
@@ -203,6 +220,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ready */
+        get: operations["ready_api_ready_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/rights": {
         parameters: {
             query?: never;
@@ -318,6 +352,8 @@ export interface components {
             entity_count?: number | null;
             /** Entity Ids */
             entity_ids?: string[] | null;
+            /** Entity Observations */
+            entity_observations?: components["schemas"]["EntityObservationView"][] | null;
             /** Format */
             format: string;
             /** Layer */
@@ -498,6 +534,20 @@ export interface components {
             units: {
                 [key: string]: string;
             };
+        };
+        /**
+         * EntityObservationView
+         * @description Stable observed-frame bounds for one entity in a dense artifact.
+         */
+        EntityObservationView: {
+            /** Entity Id */
+            entity_id: string;
+            /** First Observed Ns */
+            first_observed_ns: number;
+            /** Last Observed Ns */
+            last_observed_ns: number;
+            /** Observation Count */
+            observation_count: number;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1001,6 +1051,47 @@ export interface operations {
             };
         };
     };
+    artifact_observations_api_artifacts__artifact_id__observations_get: {
+        parameters: {
+            query?: {
+                from_ns?: number | null;
+                to_ns?: number | null;
+            };
+            header?: never;
+            path: {
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntityObservationView"][];
+                };
+            };
+            /** @description Artifact not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     artifact_window_api_artifacts__artifact_id__window_get: {
         parameters: {
             query?: {
@@ -1325,6 +1416,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ready_api_ready_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthStatus"];
                 };
             };
         };

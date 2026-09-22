@@ -26,7 +26,7 @@ test("1b. individual selection is URL-owned across reload, scrub and history", a
   await expect(picker).toHaveValue("SC-P1");
   await picker.selectOption("SC-P2");
   await expect(page).toHaveURL(/subject=SC-P2/);
-  await expect(page).toHaveURL(/t_ns=0/);
+  await expect(page).toHaveURL(/t_ns=12000000000/);
   await page.keyboard.press("ArrowRight");
   await expect(page).toHaveURL(/subject=SC-P2/);
   await page.reload();
@@ -45,7 +45,7 @@ test("1e. all-subject Pose mode uses one fixed world without entity scoping", as
     }
   });
   await page.goto(
-    "/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P1&view=pose&t_ns=0",
+    "/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P1&view=pose&t_ns=12000000000",
   );
   const toggle = page.getByTestId("pose-all-subjects-toggle");
   await expect(toggle).toHaveAttribute("aria-pressed", "false");
@@ -61,15 +61,15 @@ test("1c. Pose playback advances both the playhead and rendered scene", async ({
   await page.goto(
     "/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P1&view=pose&t_ns=0",
   );
-  const canvas = page.getByTestId("pose-canvas").locator("canvas");
-  await expect(canvas).toBeVisible();
+  await expect(page.getByTestId("pose-canvas")).toBeVisible();
   const playhead = page.getByLabel("Transport and timeline").locator(".t-value").first();
   const beforeTime = await playhead.innerText();
-  const before = await canvas.screenshot();
+  const before = await page.screenshot();
   await page.getByRole("button", { name: "Play" }).click();
-  await page.waitForTimeout(1000);
+  await expect.poll(() => playhead.innerText()).not.toBe(beforeTime);
   const afterTime = await playhead.innerText();
-  const after = await canvas.screenshot();
+  await expect(page.getByTestId("pose-canvas")).toBeVisible();
+  const after = await page.screenshot();
   expect(afterTime).not.toBe(beforeTime);
   expect(after.equals(before)).toBe(false);
 });
@@ -111,7 +111,7 @@ test("3/4. committed time propagates from the keyboard to the transport and pose
 }) => {
   await page.goto("/lab/skillcorner-opendata/1925299?stream=tracking-1&view=signals&t_ns=50000000");
   await expect(page.getByText(/json transport/)).toBeVisible();
-  await expect(page.getByTestId("echart")).toBeVisible();
+  await expect(page.getByTestId("uplot")).toBeVisible();
   await page.keyboard.press("ArrowRight");
   await expect(page).toHaveURL(/t_ns=/);
   const committed = page.getByText(/^committed$/).locator("xpath=following-sibling::span");

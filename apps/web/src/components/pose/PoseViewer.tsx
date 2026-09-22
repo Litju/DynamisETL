@@ -1,10 +1,11 @@
 ﻿import { useQuery } from "@tanstack/react-query";
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 
 import { MeasurementClassBadge, ModalityBadge } from "@/components/common/Badges";
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
 import {
-  CAMERA_PRESETS,
+  CAMERA_MODES,
   extractFrames,
   frameIndexAt,
   groupFramesBySubject,
@@ -12,17 +13,26 @@ import {
   NO_OVERLAYS,
   overlaysFromParameters,
   summarizeFrame,
-  type CameraPreset,
+  type CameraMode,
   type DisplayConnectionDefinition,
   type PoseSubjectFrames,
+  type PoseCoordinateMode,
   type PoseLandmark,
 } from "@/components/pose/pose-model";
 import type { StreamView } from "@/api/types";
 import { useAnalysisContext } from "@/lib/analysis-context";
 import { ApiError } from "@/lib/api/client";
-import { artifactQuery, methodologyQuery, metricsQuery, sessionQuery, windowQuery } from "@/lib/api/queries";
-import { usePoseSubjects } from "@/components/pose/use-pose-subjects";
-import { windowAround } from "@/lib/dense-window";
+import { artifactQuery, methodologyQuery, metricsQuery, sessionQuery } from "@/lib/api/queries";
+import {
+  firstPoseObservationInRange,
+  fetchPoseObservationsInRange,
+  usePoseSubjects,
+} from "@/components/pose/use-pose-subjects";
+import { affordableSpanNs, canonicalSpan } from "@/lib/dense-window";
+import {
+  retirePoseSubjectQueries,
+  usePosePlaybackWindow,
+} from "@/components/pose/use-pose-playback";
 import { formatMetricValue } from "@/lib/measurement";
 import { useAnalysisStore } from "@/lib/state/analysis";
 import { formatClockNs } from "@/lib/time";
@@ -39,16 +49,24 @@ const MAX_POSE_POINTS = 20_000;
  */
 export function PoseViewer() {
   const context = useAnalysisContext();
+  const queryClient = useQueryClient();
   const datasetId = context?.datasetId ?? null;
   const sessionId = context?.sessionId ?? null;
   const streamId = context?.streamId ?? null;
   const committedTimeNs = useAnalysisStore((state) => state.committedTimeNs);
   const playheadNs = useAnalysisStore((state) => state.playheadNs);
   const playing = useAnalysisStore((state) => state.playing);
+  const subjectSwitching = useAnalysisStore((state) => state.subjectSwitching);
+  const switchingFromSubjectId = useAnalysisStore((state) => state.switchingFromSubjectId);
   const selectedJoint = useAnalysisStore((state) => state.selectedJoint);
   const hoveredJoint = useAnalysisStore((state) => state.hoveredJoint);
   const [rendererReady, setRendererReady] = useState(false);
   const [allSubjects, setAllSubjects] = useState(false);
+  const subjectSwitchRequest = useRef(0);
+  const subjectSwitchAbort = useRef<AbortController | null>(null);
+  const [subjectSwitchError, setSubjectSwitchError] = useState<string | null>(null);
+
+  useEffect(() => () => subjectSwitchAbort.current?.abort(), []);
 
   const session = useQuery({
     ...sessionQuery(datasetId ?? "", sessionId ?? ""),
@@ -82,46 +100,67 @@ export function PoseViewer() {
     if (selectedSubject !== null) return selectedSubject;
     return observedSubjectList[0] ?? streamSubject;
   }, [observedSubjectList, selectedSubject, streamSubject]);
+  const subjectObservation = observed.observations.find((item) => item.entityId === subjectId);
+  const subjectPlaybackEnabled =
+    !subjectSwitching ||
+    (switchingFromSubjectId !== null && switchingFromSubjectId !== subjectId);
+  const previousSubject = useRef({ artifactId, subjectId });
+  useEffect(() => {
+    if (subjectSwitching) return;
+    const previous = previousSubject.current;
+    previousSubject.current = { artifactId, subjectId };
+    if (previous.artifactId === artifactId && previous.subjectId !== subjectId) {
+      retirePoseSubjectQueries(queryClient, artifactId, previous.subjectId);
+    }
+  }, [artifactId, queryClient, subjectId, subjectSwitching]);
+  useEffect(() => {
+    if (!subjectSwitching) return;
+    const previous = previousSubject.current;
+    retirePoseSubjectQueries(queryClient, previous.artifactId, previous.subjectId);
+  }, [queryClient, subjectSwitching]);
 
   const explicitFromNs = context?.fromNs ?? null;
   const explicitToNs = context?.toNs ?? null;
   const artifactData = artifact.data;
   const sceneSubjectId = allSubjects ? null : subjectId;
-  const windowBounds = useMemo(
-    () =>
-      windowAround(artifactData, {
-        anchorNs: committedTimeNs,
-        explicit:
-          explicitFromNs !== null && explicitToNs !== null
-            ? { fromNs: explicitFromNs, toNs: explicitToNs }
-            : null,
-        maxPoints: MAX_POSE_POINTS,
-        entityScoped: sceneSubjectId !== null,
-      }),
-    [artifactData, committedTimeNs, explicitFromNs, explicitToNs, sceneSubjectId],
-  );
-
-  const window = useQuery({
-    ...windowQuery({
-      artifactId: artifactId ?? "",
-      ...(windowBounds
-        ? { fromNs: Number(windowBounds.fromNs), toNs: Number(windowBounds.toNs) }
-        : {}),
-      ...(sceneSubjectId !== null ? { entityId: sceneSubjectId } : {}),
-      columns: [
-        "t_rel_ns",
-        "subject_id",
-        "joint_name",
-        "is_available",
-        "x_m",
-        "y_m",
-        "z_m",
-        "error_m",
-      ],
+  const canonical = canonicalSpan(artifactData);
+  const chunkSpanNs = useMemo(
+    () => affordableSpanNs(artifactData, {
       maxPoints: MAX_POSE_POINTS,
+      entityScoped: sceneSubjectId !== null,
     }),
-    enabled: Boolean(artifactId) && windowBounds !== null,
+    [artifactData, sceneSubjectId],
+  );
+  const playback = usePosePlaybackWindow({
+    enabled: subjectPlaybackEnabled,
+    artifactId,
+    entityId: sceneSubjectId,
+    canonicalMinNs: canonical?.minNs ?? null,
+    canonicalMaxNs: canonical?.maxNs ?? null,
+    chunkSpanNs,
+    anchorNs: committedTimeNs,
+    explicitFromNs,
+    explicitToNs,
+    maxPoints: MAX_POSE_POINTS,
   });
+  const { window, activeWindowBounds, playbackStatus } = playback;
+  useEffect(() => {
+    if (
+      !subjectSwitching ||
+      switchingFromSubjectId === null ||
+      subjectId === switchingFromSubjectId ||
+      context?.subjectId !== subjectId
+    ) return;
+    if (
+      context?.timeNs === null ||
+      context?.timeNs !== committedTimeNs ||
+      artifact.isPending ||
+      window.isPending ||
+      window.isPlaceholderData ||
+      window.data?.meta.reduction !== null
+    ) return;
+    useAnalysisStore.getState().finishSubjectSwitch();
+  }, [artifact.isPending, committedTimeNs, context, subjectId, subjectSwitching, switchingFromSubjectId, window.data, window.isPending, window.isPlaceholderData]);
   const metrics = useQuery({
     ...metricsQuery({
       streamId: streamId ?? undefined,
@@ -180,7 +219,8 @@ export function PoseViewer() {
     [methodology.data],
   );
 
-  const [preset, setPreset] = useState<CameraPreset>("reset");
+  const [coordinateMode, setCoordinateMode] = useState<PoseCoordinateMode>("body_local");
+  const [cameraMode, setCameraMode] = useState<CameraMode>("body_local");
   const [showProviderSkeleton, setShowProviderSkeleton] = useState(true);
   const [showTorsoCue, setShowTorsoCue] = useState(true);
   const [showFootContact, setShowFootContact] = useState(true);
@@ -209,11 +249,49 @@ export function PoseViewer() {
     }
   }, [selectSubject, selectedSubject, subjectId]);
 
-  const handleSubjectChange = (nextSubjectId: string) => {
+  const handleSubjectChange = async (nextSubjectId: string) => {
     if (nextSubjectId === subjectId) return;
-    useAnalysisStore.getState().setPlaying(false);
-    useAnalysisStore.getState().commitTime(0n);
-    context?.selectSubject(nextSubjectId, { resetTime: true });
+    subjectSwitchAbort.current?.abort();
+    const controller = new AbortController();
+    subjectSwitchAbort.current = controller;
+    const requestId = ++subjectSwitchRequest.current;
+    setSubjectSwitchError(null);
+    const observation = observed.observations.find((item) => item.entityId === nextSubjectId);
+    const fallbackTimeNs = context?.timeNs ?? committedTimeNs ?? canonical?.minNs ?? null;
+    if (fallbackTimeNs === null) return;
+    useAnalysisStore.getState().beginSubjectSwitch(subjectId);
+    let resolvedObservation = observation;
+    if (
+      artifactId !== null &&
+      observation !== undefined &&
+      firstPoseObservationInRange(observation, context?.fromNs ?? null, context?.toNs ?? null) === null
+    ) {
+      try {
+        const rangeObservations = await fetchPoseObservationsInRange(
+          artifactId,
+          context?.fromNs ?? null,
+          context?.toNs ?? null,
+          controller.signal,
+        );
+        resolvedObservation = rangeObservations.find((item) => item.entityId === nextSubjectId);
+      } catch {
+        if (requestId !== subjectSwitchRequest.current) return;
+        useAnalysisStore.getState().finishSubjectSwitch();
+        subjectSwitchAbort.current = null;
+        setSubjectSwitchError("Could not resolve Pose observations. The previous subject is restored; select again to retry.");
+        return;
+      }
+    }
+    if (requestId !== subjectSwitchRequest.current) return;
+    const targetTimeNs =
+      firstPoseObservationInRange(
+        resolvedObservation,
+        context?.fromNs ?? null,
+        context?.toNs ?? null,
+      ) ?? fallbackTimeNs;
+    useAnalysisStore.getState().beginSubjectSwitch(subjectId, targetTimeNs);
+    context?.selectSubject(nextSubjectId, { targetTimeNs });
+    subjectSwitchAbort.current = null;
   };
 
   if (!context) return <StatePanel state="empty" title="Open a laboratory session first." />;
@@ -274,7 +352,7 @@ export function PoseViewer() {
       />
     );
   }
-  if (artifact.isPending || windowBounds === null || window.isPending) {
+  if (artifact.isPending || activeWindowBounds === null || window.isPending) {
     return <LoadingPanel label="Loading pose window" />;
   }
   if (window.data.meta.reduction !== null) {
@@ -286,19 +364,44 @@ export function PoseViewer() {
       />
     );
   }
-  const hasObservedFrames = allSubjects
+  if (subjectSwitching) {
+    return (
+      <StatePanel
+        state="loading"
+        title="Switching subject…"
+        detail="Stopping playback, retiring the previous subject and loading an exact replacement frame."
+      />
+    );
+  }
+  const hasSubjectFrames = selectedFrames.length > 0;
+  const hasRenderableScene = allSubjects
     ? subjectFrames.some((candidate) => candidate.frames.some((frame) => frame.observed))
     : frames.some((frame) => frame.observed);
-  if (!hasObservedFrames) {
+  if (!hasSubjectFrames && !hasRenderableScene) {
+    const noObservationInRange =
+      subjectObservation === undefined ||
+      subjectObservation.observationCount === 0 ||
+      (context.fromNs !== null && subjectObservation.lastObservedNs < context.fromNs) ||
+      (context.toNs !== null && subjectObservation.firstObservedNs > context.toNs);
     return (
       <StatePanel
         state="unavailable"
         title={
           subjectId === null
             ? "No observed landmark is available in this window."
-            : `Individual ${subjectId} is not observed at this time/window.`
+            : noObservationInRange
+              ? `No Pose observations for subject ${subjectId} in ${context.trialId ?? "the selected period/range"}.`
+              : `Subject ${subjectId} is not observed at ${context.timeNs ?? committedTimeNs
+                ? formatClockNs((context.timeNs ?? committedTimeNs) as bigint)
+                : "the current time"}.`
         }
-        detail="The selected identity remains unchanged; unavailable joints are never imputed or replaced."
+        detail={
+          noObservationInRange
+            ? "The selected identity remains selected; this subject has no exact Pose observation in the active range."
+            : subjectObservation
+              ? `First observation ${formatClockNs(subjectObservation.firstObservedNs)} · last ${formatClockNs(subjectObservation.lastObservedNs)}.`
+              : "The selected identity remains unchanged; unavailable joints are never imputed or replaced."
+        }
       />
     );
   }
@@ -328,12 +431,23 @@ export function PoseViewer() {
           </span>
         )}
         <span className="text-quality-warning">
-          local analytical frame · Z is player-centroid-relative, not absolute height
+          {coordinateMode === "body_local"
+            ? "local analytical frame · Z is player-centroid-relative, not absolute height · body-root recentered for display"
+            : "match/world frame · source XY placement preserved; Z remains provider-relative, not ground height"}
         </span>
-        <span className="tabular">
-          {summary.observedLandmarks} observed · {summary.unavailableLandmarks} unavailable
-        </span>
-        {summary.meanErrorM !== null ? (
+        {playbackStatus === "buffering" && playing ? (
+          <span data-testid="playback-buffering" className="text-quality-warning">BUFFERING · waiting for exact next chunk</span>
+        ) : null}
+        {hasSubjectFrames ? (
+          <span className="tabular">
+            {summary.observedLandmarks} observed · {summary.unavailableLandmarks} unavailable
+          </span>
+        ) : (
+          <span className="text-quality-warning">
+            Subject {subjectId ?? "not scoped"} not observed at the current frame
+          </span>
+        )}
+        {hasSubjectFrames && summary.meanErrorM !== null ? (
           <span className="tabular">
             mean provider p90 predicted error radius{" "}
             {formatMetricValue(summary.meanErrorM, "m").text}
@@ -354,7 +468,10 @@ export function PoseViewer() {
               allSubjects={allSubjects}
               overlays={overlays}
               providerConnections={providerConnections}
-              preset={preset}
+              preset="reset"
+              cameraMode={cameraMode}
+              coordinateMode={coordinateMode}
+              onManualCamera={() => setCameraMode("manual")}
               playing={playing}
               showProviderSkeleton={showProviderSkeleton}
               showTorsoCue={showTorsoCue}
@@ -390,6 +507,11 @@ export function PoseViewer() {
                   </option>
                 ))}
               </select>
+              {subjectSwitchError ? (
+                <p role="alert" className="mt-1 text-[10px] text-quality-warning">
+                  {subjectSwitchError}
+                </p>
+              ) : null}
               <p className="mt-1 text-[10px] text-text-muted">
                 {observed.subjects.length} individuals in the artifact/session authority;
                 landmarks are never merged across subjects.
@@ -403,8 +525,10 @@ export function PoseViewer() {
               data-testid="pose-all-subjects-toggle"
               aria-pressed={allSubjects}
               onClick={() => {
-                setAllSubjects((current) => !current);
-                setPreset("reset");
+                const next = !allSubjects;
+                setAllSubjects(next);
+                setCoordinateMode(next ? "match_world" : "body_local");
+                setCameraMode(next ? "all_subjects" : "body_local");
               }}
               className={
                 allSubjects
@@ -421,23 +545,74 @@ export function PoseViewer() {
             </p>
           </div>
           <div className="mb-2">
-        <span className="t-section text-text-muted">camera</span>
+            <span className="t-section text-text-muted">coordinate authority</span>
+            <div role="group" aria-label="Pose coordinate authority" className="mt-1 flex gap-1">
+              <button
+                type="button"
+                data-testid="pose-body-local-mode"
+                aria-pressed={coordinateMode === "body_local"}
+                disabled={allSubjects}
+                onClick={() => {
+                  setCoordinateMode("body_local");
+                  setCameraMode("body_local");
+                }}
+                className={coordinateMode === "body_local" ? "rounded-control bg-surface-3 px-1.5 py-0.5 text-text-primary" : "rounded-control border border-border-subtle px-1.5 py-0.5 text-text-muted disabled:opacity-40"}
+              >
+                body-local
+              </button>
+              <button
+                type="button"
+                data-testid="pose-match-world-mode"
+                aria-pressed={coordinateMode === "match_world"}
+                onClick={() => setCoordinateMode("match_world")}
+                className={coordinateMode === "match_world" ? "rounded-control bg-surface-3 px-1.5 py-0.5 text-text-primary" : "rounded-control border border-border-subtle px-1.5 py-0.5 text-text-muted"}
+              >
+                match/world
+              </button>
+            </div>
+            <p className="mt-1 text-[10px] text-text-muted">
+              Body-local removes display-only root travel; match/world preserves source XY identity.
+            </p>
+          </div>
+          <div className="mb-2">
+            <span className="t-section text-text-muted">camera ownership</span>
             <div className="mt-1 flex flex-wrap gap-1">
-              {CAMERA_PRESETS.map((candidate) => (
+              {CAMERA_MODES.map((candidate) => (
                 <button
                   key={candidate}
                   type="button"
-                  aria-pressed={preset === candidate}
-                  onClick={() => setPreset(candidate)}
+                  aria-pressed={cameraMode === candidate}
+                  onClick={() => {
+                    if (candidate === "all_subjects") {
+                      setAllSubjects(true);
+                      setCoordinateMode("match_world");
+                    }
+                    if (candidate === "body_local") {
+                      setAllSubjects(false);
+                      setCoordinateMode("body_local");
+                    }
+                    setCameraMode(candidate);
+                  }}
                   className={
-                    preset === candidate
+                    cameraMode === candidate
                       ? "rounded-control bg-surface-3 px-1.5 py-0.5 text-text-primary"
                       : "rounded-control border border-border-subtle px-1.5 py-0.5 text-text-muted hover:text-text-secondary"
                   }
                 >
-                  {candidate.replace("_", "-")}
+                  {candidate.replaceAll("_", "-")}
                 </button>
               ))}
+              <button
+                type="button"
+                data-testid="pose-camera-reset"
+                onClick={() => {
+                  setCoordinateMode(allSubjects ? "match_world" : "body_local");
+                  setCameraMode(allSubjects ? "all_subjects" : "body_local");
+                }}
+                className="rounded-control border border-border-subtle px-1.5 py-0.5 text-text-muted hover:text-text-secondary"
+              >
+                reset
+              </button>
             </div>
           </div>
           <label className="mb-2 flex items-center gap-1 text-text-muted">

@@ -57,9 +57,12 @@ export function Transport({ nominalRateHz }: { nominalRateHz: number | null }) {
   const committedTimeNs = useAnalysisStore((state) => state.committedTimeNs);
   const committedRangeNs = useAnalysisStore((state) => state.committedRangeNs);
   const playing = useAnalysisStore((state) => state.playing);
+  const playbackStatus = useAnalysisStore((state) => state.playbackStatus);
   const playbackRate = useAnalysisStore((state) => state.playbackRate);
+  const playbackDirection = useAnalysisStore((state) => state.playbackDirection);
   const setPlaying = useAnalysisStore((state) => state.setPlaying);
   const setPlaybackRate = useAnalysisStore((state) => state.setPlaybackRate);
+  const setPlaybackDirectionAndPlay = useAnalysisStore((state) => state.setPlaybackDirectionAndPlay);
   const setPlayhead = useAnalysisStore((state) => state.setPlayhead);
 
   const effective = useAnalysisStore(effectiveTimeNs);
@@ -124,6 +127,20 @@ export function Transport({ nominalRateHz }: { nominalRateHz: number | null }) {
         </button>
         <button
           type="button"
+          data-testid="playback-direction"
+          data-direction={playbackDirection === -1 ? "reverse" : "forward"}
+          aria-label={playbackDirection === -1 ? "Forward" : "Reverse"}
+          title={playbackDirection === -1 ? "Play forward" : "Play in reverse"}
+          disabled={disabled}
+          onClick={() => {
+            setPlaybackDirectionAndPlay(playbackDirection === -1 ? 1 : -1);
+          }}
+          className="flex h-7 items-center justify-center rounded-control border border-border-subtle px-1.5 text-[10px] text-text-secondary hover:bg-surface-2 disabled:opacity-40"
+        >
+          {playbackDirection === -1 ? "forward" : "reverse"}
+        </button>
+        <button
+          type="button"
           aria-label="Step forward one frame"
           title="Step forward one frame (→)"
           disabled={disabled}
@@ -162,7 +179,7 @@ export function Transport({ nominalRateHz }: { nominalRateHz: number | null }) {
           <span className="t-value mono tabular">
             {effective !== null ? formatClockNs(effective) : "—"}
           </span>
-          <span className="mono ml-2 text-[10px] text-text-muted">
+          <span data-testid="playhead-ns" className="mono ml-2 text-[10px] text-text-muted">
             {effective !== null ? `${effective} ns` : "unavailable"}
           </span>
         </div>
@@ -182,6 +199,13 @@ export function Transport({ nominalRateHz }: { nominalRateHz: number | null }) {
             {committedTimeNs !== null ? formatClockNs(committedTimeNs) : "—"}
           </span>
         </div>
+        {playbackStatus === "buffering" ? (
+          <span data-testid="playback-buffering" className="t-label text-quality-warning">
+            BUFFERING · waiting for exact next chunk
+          </span>
+        ) : playbackStatus === "ended" ? (
+          <span data-testid="playback-ended" className="t-label text-text-muted">end of artifact</span>
+        ) : null}
       </div>
 
       <div

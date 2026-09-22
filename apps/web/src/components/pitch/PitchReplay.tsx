@@ -1,4 +1,5 @@
 ﻿import { useQuery } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 
 import { MeasurementClassBadge, ModalityBadge } from "@/components/common/Badges";
@@ -21,12 +22,17 @@ import {
   type PitchRendererHandle,
 } from "@/components/pitch/pitch-renderer";
 import { eventStreams } from "@/lib/capabilities";
-import type { StreamView } from "@/api/types";
+import type { DenseWindow, StreamView } from "@/api/types";
 import { useAnalysisContext } from "@/lib/analysis-context";
 import { ApiError } from "@/lib/api/client";
-import { artifactQuery, sessionQuery, windowQuery } from "@/lib/api/queries";
+import { artifactQuery, sessionQuery, windowQuery, type WindowQuery } from "@/lib/api/queries";
 import { readPalette } from "@/lib/chart-palette";
-import { windowAround } from "@/lib/dense-window";
+import { affordableSpanNs, canonicalSpan } from "@/lib/dense-window";
+import type { DenseChunkBounds } from "@/lib/dense-chunks";
+import {
+  usePlaybackChunkCoordinator,
+  type PlaybackChunkQueryOptions,
+} from "@/lib/playback-chunk-coordinator";
 import { useAnalysisStore } from "@/lib/state/analysis";
 import { formatClockNs, formatDurationNs } from "@/lib/time";
 
@@ -68,6 +74,7 @@ export function PitchReplay() {
   const datasetId = context?.datasetId ?? null;
   const sessionId = context?.sessionId ?? null;
   const streamId = context?.streamId ?? null;
+  const queryClient = useQueryClient();
 
   const session = useQuery({
     ...sessionQuery(datasetId ?? "", sessionId ?? ""),
@@ -88,19 +95,101 @@ export function PitchReplay() {
     enabled: Boolean(artifactId),
   });
 
-  // Replay needs exact entity frames, so the window is sized from the
-  // artifact's own measured density rather than a fixed duration that happens
-  // to suit one source: SkillCorner runs 182 rows/s and DFL 575 rows/s over
-  // the same nominal match.
-  const windowBounds = useMemo(
-    () =>
-      windowAround(artifact.data, {
-        anchorNs: committedTimeNs,
-        explicit: fromNs !== null && toNs !== null ? { fromNs, toNs } : null,
-        maxPoints: MAX_REPLAY_POINTS,
-      }),
-    [artifact.data, committedTimeNs, fromNs, toNs],
+  // Replay needs exact entity frames, so the chunk span comes from the
+  // artifact's measured density rather than a fixed duration that suits one
+  // source. The coordinator changes the active query only at boundaries.
+  const canonical = canonicalSpan(artifact.data);
+  const chunkSpanNs = useMemo(
+    () => affordableSpanNs(artifact.data, { maxPoints: MAX_REPLAY_POINTS }),
+    [artifact.data],
   );
+  const trackingRequest = useMemo<WindowQuery>(
+    () => ({
+      artifactId: artifactId ?? "",
+      columns: [
+        "t_rel_ns",
+        "object_id",
+        "object_type",
+        "group_id",
+        "x_m",
+        "y_m",
+        "is_detected",
+      ],
+      maxPoints: MAX_REPLAY_POINTS,
+    }),
+    [artifactId],
+  );
+  const queryOptionsFor = useCallback(
+    (chunk: DenseChunkBounds): PlaybackChunkQueryOptions<DenseWindow> =>
+      windowQuery({
+        ...trackingRequest,
+        fromNs: Number(chunk.fromNs),
+        toNs: Number(chunk.toNs),
+        cacheScope: "dense-chunk",
+        chunkId: chunk.id,
+      }) as unknown as PlaybackChunkQueryOptions<DenseWindow>,
+    [trackingRequest],
+  );
+  const queryScope = useMemo(
+    () => ({
+      artifactId: trackingRequest.artifactId,
+      columns: trackingRequest.columns?.join(",") ?? null,
+      maxPoints: trackingRequest.maxPoints ?? null,
+    }),
+    [trackingRequest],
+  );
+  const explicitBounds = useMemo(
+    () => (fromNs !== null && toNs !== null ? { fromNs, toNs } : null),
+    [fromNs, toNs],
+  );
+  const isReady = useCallback(
+    (data: DenseWindow | undefined) => data?.meta.reduction === null,
+    [],
+  );
+  const matchesQuery = useCallback(
+    (key: readonly unknown[]) =>
+      key[0] === "dense-chunk" &&
+      key[1] === queryScope.artifactId &&
+      key[6] === queryScope.columns &&
+      key[7] === queryScope.maxPoints &&
+      key[8] === null,
+    [queryScope],
+  );
+  const chunkIdFromQueryKey = useCallback(
+    (key: readonly unknown[]) => (typeof key[3] === "string" ? key[3] : null),
+    [],
+  );
+  const playback = usePlaybackChunkCoordinator<DenseWindow>({
+    enabled: explicitBounds === null,
+    canonicalMinNs: canonical?.minNs ?? null,
+    canonicalMaxNs: canonical?.maxNs ?? null,
+    chunkSpanNs,
+    anchorNs: committedTimeNs,
+    queryClient,
+    queryOptionsFor,
+    isReady,
+    matchesQuery,
+    chunkIdFromQueryKey,
+  });
+  const activeChunk = playback.plan?.active ?? null;
+  const activeWindowBounds = activeChunk ?? explicitBounds;
+  const activeQuery = useMemo(() => {
+    if (activeChunk !== null) {
+      return windowQuery({
+        ...trackingRequest,
+        fromNs: Number(activeChunk.fromNs),
+        toNs: Number(activeChunk.toNs),
+        cacheScope: "dense-chunk",
+        chunkId: activeChunk.id,
+      });
+    }
+    return windowQuery({
+      ...trackingRequest,
+      ...(explicitBounds !== null
+        ? { fromNs: Number(explicitBounds.fromNs), toNs: Number(explicitBounds.toNs) }
+        : {}),
+    });
+  }, [activeChunk, explicitBounds, trackingRequest]);
   // Discrete source events inside the same window. They are context for the
   // tracked frame, so an absent event stream simply means no marks, never an
   // error: SkillCorner publishes no event artifact for this session.
@@ -112,13 +201,13 @@ export function PitchReplay() {
   const eventWindow = useQuery({
     ...windowQuery({
       artifactId: eventArtifactId ?? "",
-      ...(windowBounds
-        ? { fromNs: Number(windowBounds.fromNs), toNs: Number(windowBounds.toNs) }
+      ...(activeWindowBounds
+        ? { fromNs: Number(activeWindowBounds.fromNs), toNs: Number(activeWindowBounds.toNs) }
         : {}),
       columns: ["t_rel_ns", "event_id", "event_type", "event_subtype", "x_m", "y_m"],
       maxPoints: MAX_EVENT_POINTS,
     }),
-    enabled: Boolean(eventArtifactId) && windowBounds !== null,
+    enabled: Boolean(eventArtifactId) && activeWindowBounds !== null,
   });
   const events = useMemo(
     () => toPitchEvents(eventWindow.data?.rows ?? []),
@@ -133,25 +222,10 @@ export function PitchReplay() {
     [context],
   );
   const window = useQuery({
-    ...windowQuery({
-      artifactId: artifactId ?? "",
-      ...(windowBounds
-        ? { fromNs: Number(windowBounds.fromNs), toNs: Number(windowBounds.toNs) }
-        : {}),
-      columns: [
-        "t_rel_ns",
-        "object_id",
-        "object_type",
-        "group_id",
-        "x_m",
-        "y_m",
-        "is_detected",
-      ],
-      maxPoints: MAX_REPLAY_POINTS,
-    }),
+    ...activeQuery,
     // The bounds come from the artifact, so the window waits for it rather
     // than firing an unbounded request for the whole recording first.
-    enabled: Boolean(artifactId) && windowBounds !== null,
+    enabled: Boolean(artifactId) && (explicitBounds !== null || activeChunk !== null),
   });
 
   if (!context) {
@@ -218,7 +292,7 @@ export function PitchReplay() {
       />
     );
   }
-  if (artifact.isPending || windowBounds === null || window.isPending) {
+  if (artifact.isPending || activeWindowBounds === null || window.isPending) {
     return <LoadingPanel label="Loading tracking window" />;
   }
   if (window.data.meta.reduction !== null) {
@@ -235,8 +309,9 @@ export function PitchReplay() {
       stream={stream}
       rows={window.data.rows}
       events={events}
-      explicitRange={windowBounds.explicit}
-      windowLabel={`${formatDurationNs(windowBounds.toNs - windowBounds.fromNs)} window`}
+      explicitRange={explicitBounds !== null}
+      windowLabel={`${formatDurationNs(activeWindowBounds.toNs - activeWindowBounds.fromNs)} window`}
+      playbackStatus={playback.status}
       onSelectEntity={handleSelectEntity}
     />
   );
@@ -274,6 +349,7 @@ function PitchView({
   events,
   explicitRange,
   windowLabel,
+  playbackStatus,
   onSelectEntity,
 }: {
   stream: StreamView;
@@ -281,6 +357,7 @@ function PitchView({
   events: readonly PitchEvent[];
   explicitRange: boolean;
   windowLabel: string;
+  playbackStatus: "idle" | "ready" | "buffering" | "ended";
   onSelectEntity: (objectId: string) => void;
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -450,6 +527,9 @@ function PitchView({
                 ? `${stream.nominal_sampling_rate_hz} Hz`
                 : "rate unknown"}
             </span>
+            {playbackStatus === "buffering" ? (
+              <span data-testid="playback-buffering" className="text-quality-warning">BUFFERING</span>
+            ) : null}
           </div>
         </div>
         <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-text-muted">

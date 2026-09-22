@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dynamisdata.local/architecture/system-v2.schema.json",
+  "title": "DynamisData V2 system contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "contract_id",
+    "version",
+    "status",
+    "modules",
+    "authorities",
+    "deployment",
+    "performance_budgets",
+    "dependency_policy",
+    "decisions",
+    "amendment_policy"
+  ],
+  "properties": {
+    "$schema": {"type": "string"},
+    "contract_id": {"type": "string", "minLength": 1},
+        "version": {"type": "string", "pattern": "^2\\.0\\.(1|2|3)$"},
+    "status": {"type": "string", "enum": ["frozen"]},
+    "modules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/module"}
+    },
+    "authorities": {
+      "type": "object",
+      "additionalProperties": {"type": "string"},
+      "minProperties": 5
+    },
+    "deployment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["frontend", "api", "postgres", "object_store", "local_adapters", "streaming"],
+      "properties": {
+        "frontend": {"type": "string"},
+        "api": {"type": "string"},
+        "postgres": {"type": "string"},
+        "object_store": {"type": "string"},
+        "local_adapters": {"type": "array", "items": {"type": "string"}},
+        "streaming": {"type": "boolean"}
+      }
+    },
+    "performance_budgets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/budget"}
+    },
+    "dependency_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["approved_core", "conditional", "denied_without_adr"],
+      "properties": {
+        "approved_core": {"type": "array", "items": {"type": "string"}},
+        "conditional": {"type": "array", "items": {"type": "string"}},
+        "denied_without_adr": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/decision"}
+    },
+    "amendment_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence", "adr", "contract_version", "atomic_commit"],
+      "properties": {
+        "evidence": {"type": "string"},
+        "adr": {"type": "string"},
+        "contract_version": {"type": "string"},
+        "atomic_commit": {"type": "string"}
+      }
+    }
+  },
+  "$defs": {
+    "module": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "runtime_owner",
+        "state_owner",
+        "permitted_dependencies",
+        "forbidden_dependencies",
+        "transport",
+        "storage_authority",
+        "input_contract",
+        "output_contract",
+        "hot_path_ownership",
+        "scientific_authority",
+        "deployment_target",
+        "benchmark_selected_implementation",
+        "fallbacks",
+        "resource_performance_budgets",
+        "feature_flags",
+        "migration_status"
+      ],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "runtime_owner": {"type": "string", "minLength": 1},
+        "state_owner": {"type": "string", "minLength": 1},
+        "permitted_dependencies": {"type": "array", "items": {"type": "string"}},
+        "forbidden_dependencies": {"type": "array", "items": {"type": "string"}},
+        "transport": {"$ref": "#/$defs/transport"},
+        "storage_authority": {"type": "string", "minLength": 1},
+        "input_contract": {"$ref": "#/$defs/contract_side"},
+        "output_contract": {"$ref": "#/$defs/contract_side"},
+        "hot_path_ownership": {"type": "string", "minLength": 1},
+        "scientific_authority": {"type": "string", "minLength": 1},
+        "deployment_target": {"type": "string", "minLength": 1},
+        "benchmark_selected_implementation": {"type": "string", "minLength": 1},
+        "fallbacks": {"type": "array", "items": {"type": "string"}},
+        "resource_performance_budgets": {"type": "array", "items": {"type": "string"}},
+        "feature_flags": {"type": "array", "items": {"type": "string"}},
+        "migration_status": {"type": "string", "enum": ["existing", "contracted", "contracted_pending_implementation"]}
+      }
+    },
+    "transport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "formats"],
+      "properties": {
+        "kind": {"type": "string", "minLength": 1},
+        "formats": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "contract_side": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "authority", "invariants"],
+      "properties": {
+        "description": {"type": "string", "minLength": 1},
+        "authority": {"type": "string", "minLength": 1},
+        "invariants": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "metric", "budget", "unit", "scope", "evidence"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "metric": {"type": "string", "minLength": 1},
+        "budget": {"type": "number", "exclusiveMinimum": 0},
+        "unit": {"type": "string", "minLength": 1},
+        "scope": {"type": "string", "minLength": 1},
+        "evidence": {"type": "string", "minLength": 1}
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "selection", "evidence", "fallback", "status"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "selection": {"type": "string", "minLength": 1},
+        "evidence": {"type": "string", "minLength": 1},
+        "fallback": {"type": "string", "minLength": 1},
+        "status": {"type": "string", "enum": ["frozen"]}
+      }
+    }
+  }
+}

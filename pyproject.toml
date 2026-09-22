@@ -43,6 +43,7 @@ module-name = "dynamis"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 addopts = "-ra --strict-markers"
 markers = [
     "postgres: requires a live PostgreSQL instance (DYNAMIS_TEST_POSTGRES_URL)",

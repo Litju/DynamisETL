@@ -25,6 +25,12 @@ ENV_DUCKDB_PATH = "DYNAMIS_DUCKDB_PATH"
 ENV_DB_SCHEMA = "DYNAMIS_DB_SCHEMA"
 ENV_POSTGRES_URL = "POSTGRES_URL"
 ENV_TEST_POSTGRES_URL = "DYNAMIS_TEST_POSTGRES_URL"
+ENV_OBJECT_STORE_PROVIDER = "DYNAMIS_OBJECT_STORE_PROVIDER"
+ENV_OBJECT_STORE_ENDPOINT = "DYNAMIS_OBJECT_STORE_ENDPOINT"
+ENV_OBJECT_STORE_BUCKET = "DYNAMIS_OBJECT_STORE_BUCKET"
+ENV_OBJECT_STORE_ACCESS_KEY = "DYNAMIS_OBJECT_STORE_ACCESS_KEY"
+ENV_OBJECT_STORE_SECRET_KEY = "DYNAMIS_OBJECT_STORE_SECRET_KEY"
+ENV_OBJECT_STORE_REGION = "DYNAMIS_OBJECT_STORE_REGION"
 
 DEFAULT_DB_SCHEMA = "dynamis"
 DUCKDB_SUBDIR = "duckdb"
@@ -107,6 +113,12 @@ class Settings(BaseModel):
     db_schema: str = Field(default=DEFAULT_DB_SCHEMA, pattern=r"^[a-z][a-z0-9_]*$")
     postgres_url: str | None = None
     test_postgres_url: str | None = None
+    object_store_provider: str = "local"
+    object_store_endpoint: str | None = None
+    object_store_bucket: str | None = None
+    object_store_access_key: str | None = None
+    object_store_secret_key: str | None = None
+    object_store_region: str = "auto"
 
     def require_postgres_url(self) -> str:
         if not self.postgres_url:
@@ -152,6 +164,12 @@ class Settings(BaseModel):
             db_schema=schema,
             postgres_url=values.get(ENV_POSTGRES_URL) or None,
             test_postgres_url=values.get(ENV_TEST_POSTGRES_URL) or None,
+            object_store_provider=values.get(ENV_OBJECT_STORE_PROVIDER, "local").strip() or "local",
+            object_store_endpoint=values.get(ENV_OBJECT_STORE_ENDPOINT) or None,
+            object_store_bucket=values.get(ENV_OBJECT_STORE_BUCKET) or None,
+            object_store_access_key=values.get(ENV_OBJECT_STORE_ACCESS_KEY) or None,
+            object_store_secret_key=values.get(ENV_OBJECT_STORE_SECRET_KEY) or None,
+            object_store_region=values.get(ENV_OBJECT_STORE_REGION, "auto").strip() or "auto",
         )
 
 

@@ -60,10 +60,26 @@ services:
       DYNAMIS_GOLD_SCHEMA: ${DYNAMIS_GOLD_SCHEMA:-gold}
       DYNAMIS_DATASET_ROOT: /datasets
       DYNAMIS_DATABASE_ROOT: /databases
+      DYNAMIS_OBJECT_STORE_PROVIDER: ${DYNAMIS_OBJECT_STORE_PROVIDER:-local}
+      DYNAMIS_OBJECT_STORE_ENDPOINT: ${DYNAMIS_OBJECT_STORE_ENDPOINT:-}
+      DYNAMIS_OBJECT_STORE_BUCKET: ${DYNAMIS_OBJECT_STORE_BUCKET:-}
+      DYNAMIS_OBJECT_STORE_ACCESS_KEY: ${DYNAMIS_OBJECT_STORE_ACCESS_KEY:-}
+      DYNAMIS_OBJECT_STORE_SECRET_KEY: ${DYNAMIS_OBJECT_STORE_SECRET_KEY:-}
+      DYNAMIS_OBJECT_STORE_REGION: ${DYNAMIS_OBJECT_STORE_REGION:-auto}
+      DYNAMIS_DB_POOL_SIZE: ${DYNAMIS_DB_POOL_SIZE:-4}
+      DYNAMIS_DB_MAX_OVERFLOW: ${DYNAMIS_DB_MAX_OVERFLOW:-4}
+      DYNAMIS_DB_POOL_TIMEOUT: ${DYNAMIS_DB_POOL_TIMEOUT:-30}
+      DYNAMIS_ACCESS_LOG: ${DYNAMIS_ACCESS_LOG:-0}
     volumes:
       - ${DYNAMIS_DATASET_ROOT:-./data}:/datasets:ro
     ports:
       - "${API_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.environ.get('PORT', '8000') + '/api/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
   web:
     profiles: ["product"]

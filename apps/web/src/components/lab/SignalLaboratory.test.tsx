@@ -1,19 +1,38 @@
 ﻿import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { tableFromArrays, tableToIPC } from "apache-arrow";
 import { render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 
 import { SignalLaboratory } from "@/components/lab/SignalLaboratory";
 import { AnalysisContext, type AnalysisContextValue } from "@/lib/analysis-context";
 
-const setOption = vi.fn();
-const dispose = vi.fn();
-const resize = vi.fn();
-const on = vi.fn();
-const init = vi.fn(() => ({ setOption, dispose, resize, on, getOption: () => ({}) }));
+vi.mock("uplot", () => ({
+  default: class MockUPlot {
+    readonly over: HTMLDivElement;
+    readonly cursor = { left: 0 };
+    readonly select = { left: 0, top: 0, width: 0, height: 0 };
+    readonly height = 320;
 
-vi.mock("echarts", () => ({
-  init: (...args: unknown[]) => init(...(args as [])),
+    constructor(_options: unknown, _data: unknown, target: HTMLElement) {
+      this.over = document.createElement("div");
+      target.append(this.over);
+    }
+
+    destroy() {
+      this.over.remove();
+    }
+
+    setSize() {}
+    setCursor() {}
+    setScale() {}
+    setSelect() {}
+    posToVal(position: number) {
+      return position;
+    }
+    valToPos(value: number) {
+      return value;
+    }
+  },
 }));
 
 const SESSION = {
@@ -192,6 +211,7 @@ function renderLab(overrides: Partial<AnalysisContextValue> = {}) {
     sessionId: "s1",
     trialId: null,
     subjectId: null,
+    timeNs: null,
     streamId: "lpt-1",
     fromNs: null,
     toNs: null,
@@ -215,14 +235,6 @@ function renderLab(overrides: Partial<AnalysisContextValue> = {}) {
   return context;
 }
 
-beforeEach(() => {
-  setOption.mockClear();
-  dispose.mockClear();
-  resize.mockClear();
-  on.mockClear();
-  init.mockClear();
-});
-
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -235,9 +247,7 @@ it("renders an exact window with unit, synchronization and measurement context",
   expect(screen.getByText("source-provided")).toBeInTheDocument();
   expect(screen.getByText("lab-frame")).toBeInTheDocument();
   expect(screen.getByText("raw")).toBeInTheDocument();
-  expect(await screen.findByTestId("echart")).toBeInTheDocument();
-  expect(init).toHaveBeenCalled();
-  expect(setOption).toHaveBeenCalled();
+  expect(await screen.findByTestId("uplot")).toBeInTheDocument();
 });
 
 it("states display reduction and never hides it", async () => {
@@ -276,7 +286,7 @@ it("uses the Arrow dense transport when the API serves it", async () => {
   installFetch(false, 200, true);
   renderLab();
   expect(await screen.findByText("arrow transport")).toBeInTheDocument();
-  expect(await screen.findByTestId("echart")).toBeInTheDocument();
+  expect(await screen.findByTestId("uplot")).toBeInTheDocument();
   expect(screen.getByText("3 source rows → 3 plotted")).toBeInTheDocument();
 });
 

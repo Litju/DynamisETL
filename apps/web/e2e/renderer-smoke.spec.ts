@@ -11,10 +11,10 @@ type RendererCase = {
 
 const CASES: readonly RendererCase[] = [
   {
-    name: "ECharts signal trace",
+    name: "uPlot signal trace",
     route: "/lab/skillcorner-opendata/1925299?stream=tracking-1&view=signals&t_ns=50000000",
-    host: "echart",
-    renderer: "echarts",
+    host: "uplot",
+    renderer: "uplot",
   },
   {
     name: "Pixi field replay",

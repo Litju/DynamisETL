@@ -16,8 +16,8 @@ export interface DurableRange {
 
 export interface SubjectSelectionOptions {
   readonly replace?: boolean;
-  /** Rewind the durable playback position when a user changes identity. */
-  readonly resetTime?: boolean;
+  /** Commit the subject and its exact canonical target in one URL transaction. */
+  readonly targetTimeNs?: bigint;
 }
 
 export interface AnalysisContextValue {
@@ -25,6 +25,7 @@ export interface AnalysisContextValue {
   readonly sessionId: string;
   readonly trialId: string | null;
   readonly subjectId: string | null;
+  readonly timeNs: bigint | null;
   readonly streamId: string | null;
   readonly fromNs: bigint | null;
   readonly toNs: bigint | null;

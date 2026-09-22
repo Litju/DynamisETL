@@ -9,6 +9,7 @@ the SQL repository.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -19,7 +20,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from dynamis.config import Settings
-from dynamis.serving.app import ARROW_MEDIA_TYPE, create_app
+from dynamis.serving.app import ARROW_MEDIA_TYPE, PostgresServingBackend, create_app
 from dynamis.serving.dense import (
     ArtifactPathError,
     DenseWindowTooLarge,
@@ -28,6 +29,7 @@ from dynamis.serving.dense import (
     entity_cardinality,
     entity_column,
     entity_ids,
+    entity_observations,
     load_artifact_window,
     resolve_artifact_path,
 )
@@ -38,6 +40,7 @@ from dynamis.serving.models import (
     DatasetDetail,
     DatasetSummary,
     DenseWindowMeta,
+    EntityObservationView,
     LicenseView,
     MetricCatalogEntry,
     MetricDefinitionView,
@@ -59,6 +62,7 @@ from dynamis.serving.models import (
     TrialView,
 )
 from dynamis.serving.repository import MetricFilters
+from dynamis.storage.object_store import ObjectMetadata, S3ObjectStore
 
 LICENSE = LicenseView(
     policy_id="skillcorner-opendata",
@@ -383,6 +387,13 @@ class FakeBackend:
             entity_ids=["p1", "p2", "p3"],
         )
 
+    def artifact_observations(
+        self, artifact_id: str, *, from_ns: int | None, to_ns: int | None
+    ) -> list[EntityObservationView] | None:
+        if artifact_id != ARTIFACT.artifact_id:
+            return None
+        return []
+
     def window(self, artifact_id: str, **kwargs: Any):
         if self.window_error is not None:
             raise self.window_error
@@ -402,6 +413,9 @@ def test_health_and_serving_status(client: TestClient) -> None:
     health = client.get("/api/health")
     assert health.status_code == 200
     assert health.json()["status"] == "ok"
+    ready = client.get("/api/ready")
+    assert ready.status_code == 200
+    assert ready.json()["status"] == "ok"
     status = client.get("/api/serving/status")
     assert status.status_code == 200
     body = status.json()
@@ -520,6 +534,10 @@ def test_dense_window_errors_map_to_explicit_states(client: TestClient) -> None:
 def test_openapi_document_covers_the_locked_surface() -> None:
     document = create_app(backend=FakeBackend()).openapi()
     paths = document["paths"]
+    assert set(paths["/api/artifacts/{artifact_id}/observations"]["get"]["responses"]) >= {
+        "200",
+        "404",
+    }
     for path in (
         "/api/health",
         "/api/serving/status",
@@ -534,6 +552,7 @@ def test_openapi_document_covers_the_locked_surface() -> None:
         "/api/runs",
         "/api/rights",
         "/api/artifacts/{artifact_id}",
+        "/api/artifacts/{artifact_id}/observations",
         "/api/artifacts/{artifact_id}/window",
     ):
         assert path in paths, path
@@ -630,6 +649,99 @@ def test_dense_window_scopes_to_one_entity(tmp_settings: Settings) -> None:
     assert entity_column(pq.read_schema(resolve_artifact_path(tmp_settings, ref))) == "object_id"
 
 
+def test_pose_entity_observation_authority_excludes_unavailable_rows(
+    tmp_settings: Settings,
+) -> None:
+    table = pa.table(
+        {
+            "subject_id": pa.array(["s1", "s1", "s1", "s2", "s2"], type=pa.string()),
+            "t_rel_ns": pa.array([0, 40, 80, 40, 80], type=pa.int64()),
+            "joint_name": pa.array(["nose"] * 5, type=pa.string()),
+            "is_available": pa.array([True, True, True, True, False], type=pa.bool_()),
+            "x_m": pa.array([1.0, 1.0, 1.0, 2.0, None], type=pa.float64()),
+            "y_m": pa.array([1.0, 1.0, 1.0, 2.0, None], type=pa.float64()),
+            "z_m": pa.array([1.0, 1.0, 1.0, 2.0, None], type=pa.float64()),
+        }
+    )
+    ref = _dense_artifact_ref(tmp_settings, table).model_copy(update={"modality": "pose"})
+
+    observations = entity_observations(tmp_settings, ref)
+
+    assert observations is not None
+    assert [item.model_dump() for item in observations] == [
+        {
+            "entity_id": "s1",
+            "first_observed_ns": 0,
+            "last_observed_ns": 80,
+            "observation_count": 3,
+        },
+        {
+            "entity_id": "s2",
+            "first_observed_ns": 40,
+            "last_observed_ns": 40,
+            "observation_count": 1,
+        },
+    ]
+
+
+def test_pose_observation_summary_is_cached_by_immutable_artifact(
+    tmp_settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from dynamis.serving import dense
+
+    table = pa.table(
+        {
+            "subject_id": pa.array(["s1", "s1"], type=pa.string()),
+            "t_rel_ns": pa.array([0, 40], type=pa.int64()),
+            "is_available": pa.array([True, True], type=pa.bool_()),
+            "x_m": pa.array([1.0, 1.0], type=pa.float64()),
+            "y_m": pa.array([1.0, 1.0], type=pa.float64()),
+            "z_m": pa.array([1.0, 1.0], type=pa.float64()),
+        }
+    )
+    ref = _dense_artifact_ref(tmp_settings, table).model_copy(update={"modality": "pose"})
+    dense._cached_entity_observation_rows.cache_clear()
+    original = dense._query_entity_observation_rows
+    calls = 0
+
+    def counted(path: Path, column: str, from_ns: int | None, to_ns: int | None):
+        nonlocal calls
+        calls += 1
+        return original(path, column, from_ns, to_ns)
+
+    monkeypatch.setattr(dense, "_query_entity_observation_rows", counted)
+    assert entity_observations(tmp_settings, ref) == entity_observations(tmp_settings, ref)
+    assert calls == 1
+
+
+def test_registered_s3_artifact_is_materialized_for_dense_serving(
+    tmp_path: Path, tmp_settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from dynamis.serving import dense
+
+    table = pa.table({"object_id": ["p1", "p1"], "t_rel_ns": [0, 10], "speed": [2.0, 3.0]})
+    ref = _dense_artifact_ref(tmp_settings, table)
+    source = resolve_artifact_path(tmp_settings, ref)
+    data = source.read_bytes()
+    checksum = hashlib.sha256(data).hexdigest()
+    ref = ref.model_copy(update={"checksum_sha256": checksum, "byte_size": len(data)})
+    settings = tmp_settings.model_copy(update={"object_store_provider": "s3"})
+    store = S3ObjectStore(
+        endpoint="https://objects.example",
+        bucket="private",
+        access_key="access",
+        secret_key="secret",
+    )
+    monkeypatch.setattr(store, "head", lambda key: ObjectMetadata(key, len(data), checksum))
+    monkeypatch.setattr(store, "get_range", lambda _key, start, end: data[start : end + 1])
+    monkeypatch.setattr(dense, "object_store", lambda _settings: store)
+    monkeypatch.setattr(dense, "_OBJECT_CACHE_ROOT", tmp_path / "object-cache")
+
+    result = load_artifact_window(settings, ref, from_ns=0, to_ns=10)
+    assert result.meta.returned_rows == 2
+    assert set(result.table.column("object_id").to_pylist()) == {"p1"}
+
+
 def test_dense_window_carries_signed_canonical_time(tmp_settings: Settings) -> None:
     """Event-aligned trials run up to zero from a negative canonical time.
 
@@ -666,6 +778,22 @@ def test_artifact_detail_serves_bounds_for_a_first_window(client: TestClient) ->
     assert body["canonical_time_max_ns"] == 100_000_000
     assert body["entity_column"] == "object_id"
     assert body["entity_count"] == 3
+
+
+def test_artifact_observation_authority_route(client: TestClient) -> None:
+    response = client.get("/api/artifacts/sample-1/observations")
+    assert response.status_code == 200
+    assert response.json() == []
+    assert client.get("/api/artifacts/missing/observations").status_code == 404
+
+
+def test_resolved_artifact_without_pose_observations_returns_empty_list(
+    tmp_settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    backend = PostgresServingBackend(tmp_settings)
+    monkeypatch.setattr(backend, "artifact", lambda _artifact_id: ARTIFACT)
+    monkeypatch.setattr("dynamis.serving.app.entity_observations", lambda *_args, **_kwargs: None)
+    assert backend.artifact_observations("sample-1", from_ns=None, to_ns=None) == []
 
 
 def test_window_endpoint_accepts_negative_bounds_and_entity_scope(client: TestClient) -> None:

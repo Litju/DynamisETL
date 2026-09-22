@@ -2,7 +2,10 @@
 
 import {
   angleAt,
+  bodyLocalBounds,
+  bodyLocalCentre,
   boundsOf,
+  CAMERA_MODES,
   cameraFor,
   drawableDisplayConnections,
   extractFrames,
@@ -15,6 +18,7 @@ import {
   toViewerPoint,
   withoutDuplicateAngles,
   type PoseRow,
+  type PoseLandmark,
 } from "@/components/pose/pose-model";
 
 const ROWS: PoseRow[] = [
@@ -128,6 +132,36 @@ describe("pose landmark extraction", () => {
     const top = cameraFor("top", bounds);
     expect(top.position[1]).toBeGreaterThan(bounds.center[1]!);
     expect(cameraFor("reset", bounds).position).toEqual(cameraFor("free", bounds).position);
+  });
+
+  it("separates body-local roots from world placement and keeps camera modes explicit", () => {
+    const moved = extractFrames(
+      ROWS.map((row) => ({ ...row, x_m: typeof row.x_m === "number" ? row.x_m + 100 : row.x_m })),
+    );
+    expect(bodyLocalCentre([
+      { jointName: "midHip", xM: 4, yM: 7, zM: 0, errorM: null },
+      { jointName: "nose", xM: 40, yM: 70, zM: 1, errorM: null },
+    ])).toEqual({ xM: 4, yM: 7 });
+    expect(bodyLocalCentre([], { xM: 4, yM: 7 })).toEqual({ xM: 4, yM: 7 });
+    expect(bodyLocalBounds(moved).radius).toBeCloseTo(bodyLocalBounds(frames).radius, 9);
+    expect(CAMERA_MODES).toEqual([
+      "body_local",
+      "follow_subject",
+      "joint_focus",
+      "world_fixed",
+      "all_subjects",
+      "manual",
+    ]);
+  });
+
+  it("clips isolated body-local coordinate outliers without changing small fixtures", () => {
+    const stableLandmarks = Array.from({ length: 20 }, (_value, index) => [
+      { jointName: `left-${index}`, xM: -0.4, yM: 0, zM: -0.8, errorM: null },
+      { jointName: `right-${index}`, xM: 0.4, yM: 0, zM: 0.8, errorM: null },
+    ] satisfies PoseLandmark[]).flat();
+    const withOutlier = [...stableLandmarks, { jointName: "bad", xM: 1000, yM: 1000, zM: 1000, errorM: null }];
+    const bounds = bodyLocalBounds([{ tRelNs: 0, subjectId: "s1", landmarks: withOutlier, unavailableJoints: [], observed: true }]);
+    expect(bounds.radius).toBeLessThan(2);
   });
 
   it("summarizes observed, unavailable and provider error context", () => {

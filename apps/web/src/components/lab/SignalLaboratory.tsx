@@ -1,22 +1,20 @@
 import { useQuery } from "@tanstack/react-query";
-import type { ECharts } from "echarts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { MeasurementClassBadge, ModalityBadge } from "@/components/common/Badges";
 import { CopyableId } from "@/components/common/CopyableId";
-import { EChart } from "@/components/charts/EChart";
+import { UPlotSignal } from "@/components/charts/UPlotSignal";
 import {
   defaultGroupId,
   groupChannels,
   type ChannelGroup,
 } from "@/components/charts/signal-channels";
 import {
-  buildSignalOption,
   reductionNote,
   type SignalBand,
   type SignalPane,
   type SignalSeries,
-} from "@/components/charts/signal-options";
+} from "@/components/charts/signal-model";
 import { useDenseWindow } from "@/components/lab/use-dense-window";
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
 import type { MetricValue, StreamView } from "@/api/types";
@@ -32,8 +30,8 @@ import {
   populatedMeasures,
   type WindowTable,
 } from "@/lib/arrow/window-table";
-import { readPalette } from "@/lib/chart-palette";
 import { formatMetricValue } from "@/lib/measurement";
+import { affordableSpanNs, canonicalSpan } from "@/lib/dense-window";
 import {
   resolveSignalStream,
   stableIndividualIds,
@@ -99,6 +97,22 @@ export function SignalLaboratory() {
   const entityId = artifact.data?.entity_column
     ? subjectId ?? undefined
     : undefined;
+  const committedTimeNs = useAnalysisStore((state) => state.committedTimeNs);
+  const chunk = useMemo(() => {
+    if (fromNs !== null || toNs !== null || !artifact.data) return undefined;
+    const span = canonicalSpan(artifact.data);
+    const chunkSpanNs = affordableSpanNs(artifact.data, {
+      maxPoints: MAX_WINDOW_POINTS,
+      entityScoped: entityId !== undefined,
+    });
+    if (!span || chunkSpanNs === null) return undefined;
+    return {
+      canonicalMinNs: span.minNs,
+      canonicalMaxNs: span.maxNs,
+      anchorNs: committedTimeNs,
+      chunkSpanNs,
+    } as const;
+  }, [artifact.data, committedTimeNs, entityId, fromNs, toNs]);
 
   // Selecting a subject on a per-subject stream resolves to the compatible
   // real stream/trial and makes that resolution durable for reloads.
@@ -115,13 +129,18 @@ export function SignalLaboratory() {
       context?.selectStream(stream.stream_id);
     }
   }, [context, currentStream, selectedSubject, stream, subjectId]);
-  const dense = useDenseWindow({
-    artifactId,
-    ...(fromNs !== null ? { fromNs: Number(fromNs) } : {}),
-    ...(toNs !== null ? { toNs: Number(toNs) } : {}),
-    ...(entityId !== undefined ? { entityId } : {}),
-    maxPoints: MAX_WINDOW_POINTS,
-  });
+  const denseRequest = useMemo(
+    () => ({
+      artifactId,
+      ...(fromNs !== null ? { fromNs: Number(fromNs) } : {}),
+      ...(toNs !== null ? { toNs: Number(toNs) } : {}),
+      ...(entityId !== undefined ? { entityId } : {}),
+      maxPoints: MAX_WINDOW_POINTS,
+      ...(chunk ? { chunk } : {}),
+    }),
+    [artifactId, chunk, entityId, fromNs, toNs],
+  );
+  const dense = useDenseWindow(denseRequest);
 
   if (!context) {
     return <StatePanel state="empty" title="Open a laboratory session first." />;
@@ -213,7 +232,6 @@ function SignalView({
   toNs: bigint | null;
 }) {
   const context = useAnalysisContext();
-  const chartRef = useRef<ECharts | null>(null);
   const commitTimer = useRef<number | null>(null);
   const measurementClass = table.meta.artifact.measurement_class ?? stream.measurement_class;
   const origin = useMemo(() => originNs(table), [table]);
@@ -269,10 +287,11 @@ function SignalView({
   const bandSeries = useMemo<SignalBand[]>(() => {
     if (activeGroup === null) return [];
     const wanted = new Set(activeGroup.channels.map((channel) => channel.id));
-    return bands
+      return bands
       .filter((band) => wanted.has(band.base))
       .map((band) => ({
         name: activeGroup.channels.find((channel) => channel.id === band.base)?.label ?? band.base,
+        base: band.base,
         unit: unitMap[band.base] ?? unitMap[band.minKey] ?? "1",
         measurementClass,
         paneIndex: 0,
@@ -286,57 +305,10 @@ function SignalView({
     committedTimeNs === null ? null : rendererTimeMs(origin, committedTimeNs);
   const timeReference = CLOCK_REFERENCE[stream.clock_id];
 
-  const option = useMemo(
-    () =>
-      buildSignalOption({
-        panes,
-        series,
-        bands: bandSeries,
-        playheadMs: committedPlayheadMs,
-        rangeMs:
-          rangeNs === null
-            ? null
-            : {
-                fromMs: rendererTimeMs(origin, rangeNs.fromNs),
-                toMs: rendererTimeMs(origin, rangeNs.toNs),
-              },
-        palette: readPalette(),
-        originNs: origin,
-        ...(timeReference !== undefined ? { timeReference } : {}),
-      }),
-    [panes, series, bandSeries, rangeNs, origin, committedPlayheadMs, timeReference],
-  );
-
-  useEffect(() => {
-    const applyPlayhead = (tNs: bigint | null) => {
-      const chart = chartRef.current;
-      if (!chart) return;
-      const ms = tNs === null ? null : rendererTimeMs(origin, tNs);
-      chart.setOption(
-        {
-          series: [
-            { id: "overlay-0", markLine: { data: ms === null ? [] : [{ xAxis: ms }] } },
-          ],
-        },
-        { lazyUpdate: true },
-      );
-    };
-    return useAnalysisStore.subscribe((state, previous) => {
-      const next = state.playheadNs ?? state.committedTimeNs;
-      const before = previous.playheadNs ?? previous.committedTimeNs;
-      if (next === before) return;
-      applyPlayhead(next);
-    });
-  }, [origin]);
-
   useEffect(() => {
     return () => {
       if (commitTimer.current !== null) window.clearTimeout(commitTimer.current);
     };
-  }, []);
-
-  const handleReady = useCallback((chart: ECharts) => {
-    chartRef.current = chart;
   }, []);
 
   const handlePointClick = useCallback(
@@ -379,10 +351,22 @@ function SignalView({
         />
         <div className="min-h-0 flex-1">
           {hasTrace ? (
-            <EChart
+            <UPlotSignal
               ariaLabel={`${activeGroup?.label ?? "Signal"} for ${stream.stream_id}`}
-              option={option}
-              onReady={handleReady}
+              panes={panes}
+              series={series}
+              bands={bandSeries}
+              originNs={origin}
+              {...(timeReference !== undefined ? { timeReference } : {})}
+              playheadMs={committedPlayheadMs}
+              rangeMs={
+                rangeNs === null
+                  ? null
+                  : {
+                      fromMs: rendererTimeMs(origin, rangeNs.fromNs),
+                      toMs: rendererTimeMs(origin, rangeNs.toNs),
+                    }
+              }
               onPointClick={handlePointClick}
               onRangeZoom={handleRangeZoom}
             />

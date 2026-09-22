@@ -43,7 +43,13 @@ for (const viewport of VIEWPORTS) {
         dimensions.viewportHeight + 1,
       );
 
-      if (route.includes("view=signals") || route.startsWith("/compare") || route.includes("view=overview")) {
+      if (route.includes("view=signals")) {
+        await expect(page.getByTestId("uplot").first()).toBeVisible();
+        const chart = await page.getByTestId("uplot").first().boundingBox();
+        expect(chart?.width ?? 0).toBeGreaterThanOrEqual(320);
+        expect(chart?.height ?? 0).toBeGreaterThanOrEqual(180);
+      }
+      if (route.startsWith("/compare") || route.includes("view=overview")) {
         await expect(page.getByTestId("echart").first()).toBeVisible();
         const chart = await page.getByTestId("echart").first().boundingBox();
         expect(chart?.width ?? 0).toBeGreaterThanOrEqual(320);

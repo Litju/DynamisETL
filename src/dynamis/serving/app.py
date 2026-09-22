@@ -8,6 +8,10 @@ never recomputes a scientific value.
 
 from __future__ import annotations
 
+import json
+import logging
+import os
+import time
 from typing import Annotated, Any, Protocol
 
 import pyarrow.parquet as pq
@@ -30,6 +34,7 @@ from dynamis.serving.dense import (
     entity_cardinality,
     entity_column,
     entity_ids,
+    entity_observations,
     load_artifact_window,
     resolve_artifact_path,
     table_records,
@@ -42,6 +47,7 @@ from dynamis.serving.models import (
     DatasetDetail,
     DatasetSummary,
     DenseWindow,
+    EntityObservationView,
     HealthStatus,
     MetricCatalogEntry,
     MetricMethodology,
@@ -59,6 +65,7 @@ from dynamis.serving.models import (
 from dynamis.storage.control_plane import control_plane_engine
 
 API_VERSION = "0.1.0"
+ACCESS_LOG = logging.getLogger("dynamis.access")
 DEFAULT_PAGE_LIMIT = 100
 MAX_PAGE_LIMIT = 1000
 
@@ -104,6 +111,10 @@ class ServingBackend(Protocol):
     def artifact(self, artifact_id: str) -> ArtifactRefView | None: ...
 
     def artifact_detail(self, artifact_id: str) -> ArtifactDetail | None: ...
+
+    def artifact_observations(
+        self, artifact_id: str, *, from_ns: int | None, to_ns: int | None
+    ) -> list[EntityObservationView] | None: ...
 
     def window(
         self,
@@ -224,7 +235,16 @@ class PostgresServingBackend:
             entity_column=entity_column(pq.read_schema(path)),
             entity_count=entity_cardinality(self.settings, ref),
             entity_ids=entity_ids(self.settings, ref),
+            entity_observations=entity_observations(self.settings, ref),
         )
+
+    def artifact_observations(
+        self, artifact_id: str, *, from_ns: int | None, to_ns: int | None
+    ) -> list[EntityObservationView] | None:
+        ref = self.artifact(artifact_id)
+        if ref is None:
+            return None
+        return entity_observations(self.settings, ref, from_ns=from_ns, to_ns=to_ns) or []
 
     def window(
         self,
@@ -317,6 +337,25 @@ def create_app(
 
         app.state.backend = _LazyBackend()
 
+    @app.middleware("http")
+    async def bounded_access_log(request: Request, call_next):
+        started = time.perf_counter()
+        response = await call_next(request)
+        if os.environ.get("DYNAMIS_ACCESS_LOG", "0") == "1":
+            ACCESS_LOG.info(
+                json.dumps(
+                    {
+                        "event": "http_request",
+                        "method": request.method,
+                        "path": request.url.path,
+                        "status": response.status_code,
+                        "duration_ms": round((time.perf_counter() - started) * 1000, 3),
+                    },
+                    separators=(",", ":"),
+                )
+            )
+        return response
+
     @app.exception_handler(SQLAlchemyError)
     async def _database_error(_request, exc: SQLAlchemyError) -> JSONResponse:
         return JSONResponse(
@@ -353,6 +392,11 @@ def create_app(
 
     @app.get("/api/health", response_model=HealthStatus, tags=["system"])
     def health() -> HealthStatus:
+        return HealthStatus(status="ok", version=API_VERSION)
+
+    @app.get("/api/ready", response_model=HealthStatus, tags=["system"])
+    def ready(service: BackendDependency) -> HealthStatus:
+        service.status()
         return HealthStatus(status="ok", version=API_VERSION)
 
     @app.get("/api/serving/status", response_model=ServingStatus, tags=["system"])
@@ -489,6 +533,25 @@ def create_app(
     )
     def artifact(artifact_id: str, service: BackendDependency) -> ArtifactDetail:
         found = service.artifact_detail(artifact_id)
+        if found is None:
+            raise HTTPException(
+                status_code=404, detail=f"artifact {artifact_id!r} is not registered"
+            )
+        return found
+
+    @app.get(
+        "/api/artifacts/{artifact_id}/observations",
+        response_model=list[EntityObservationView],
+        tags=["dense"],
+        responses={404: {"description": "Artifact not found"}},
+    )
+    def artifact_observations(
+        artifact_id: str,
+        service: BackendDependency,
+        from_ns: int | None = Query(default=None),
+        to_ns: int | None = Query(default=None),
+    ) -> list[EntityObservationView]:
+        found = service.artifact_observations(artifact_id, from_ns=from_ns, to_ns=to_ns)
         if found is None:
             raise HTTPException(
                 status_code=404, detail=f"artifact {artifact_id!r} is not registered"

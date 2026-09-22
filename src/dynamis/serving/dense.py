@@ -13,12 +13,15 @@ import hashlib
 import json
 import math
 import os
+import tempfile
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 import duckdb
 import pyarrow as pa
+import pyarrow.dataset as ds
 import pyarrow.parquet as pq
 
 from dynamis.config import Settings
@@ -26,7 +29,14 @@ from dynamis.contracts.schemas import SI_UNIT_KEY
 from dynamis.serving.models import (
     ArtifactRefView,
     DenseWindowMeta,
+    EntityObservationView,
     ReductionInfo,
+)
+from dynamis.storage.object_store import (
+    ObjectStoreError,
+    S3ObjectStore,
+    immutable_object_key,
+    object_store,
 )
 
 ENV_DENSE_MAX_SOURCE_ROWS = "DYNAMIS_DENSE_MAX_SOURCE_ROWS"
@@ -47,6 +57,7 @@ REDUCTION_NOTE = (
 EXACT_WINDOW_NOTE = (
     "Exact canonical samples in the requested time window; no display reduction was applied."
 )
+_OBJECT_CACHE_ROOT = Path(tempfile.gettempdir()) / "dynamis-artifact-cache"
 
 
 class DenseWindowError(RuntimeError):
@@ -81,7 +92,7 @@ def default_max_source_rows() -> int:
 
 
 def resolve_artifact_path(settings: Settings, ref: ArtifactRefView) -> Path:
-    """Resolve a registered artifact under the dataset root; reject traversal."""
+    """Resolve a registered local artifact or a verified cached S3 artifact."""
     root = settings.dataset_root.resolve()
     relative = Path(ref.relative_path)
     if relative.is_absolute():
@@ -93,13 +104,37 @@ def resolve_artifact_path(settings: Settings, ref: ArtifactRefView) -> Path:
         raise ArtifactPathError(
             f"artifact {ref.artifact_id!r} resolves outside the dataset root; refusing to read"
         )
-    if not candidate.is_file():
-        raise ArtifactPathError(f"artifact {ref.artifact_id!r} is missing at its registered path")
     if candidate.suffix.lower() != ".parquet":
         raise ArtifactPathError(
             f"artifact {ref.artifact_id!r} is not a Parquet artifact; dense windows require Parquet"
         )
-    return candidate
+    if settings.object_store_provider == "local":
+        if not candidate.is_file():
+            raise ArtifactPathError(
+                f"artifact {ref.artifact_id!r} is missing at its registered path"
+            )
+        return candidate
+    try:
+        checksum = ref.checksum_sha256.lower()
+        key = immutable_object_key(checksum)
+        # ponytail: cold reads cache the full Parquet file via 8 MiB ranges;
+        # use seekable Arrow I/O if cold-cache latency or disk use matters.
+        cached = _OBJECT_CACHE_ROOT / checksum[:2] / f"{checksum}.parquet"
+        store = object_store(settings)
+        if not isinstance(store, S3ObjectStore):
+            raise ObjectStoreError("non-local artifact reads require the S3 object store")
+        if ref.byte_size is None:
+            raise ObjectStoreError("S3 artifact serving requires the registered byte size")
+        return store.materialize(
+            key,
+            destination=cached,
+            checksum_sha256=checksum,
+            expected_size=ref.byte_size,
+        )
+    except ObjectStoreError as exc:
+        raise ArtifactPathError(
+            f"artifact {ref.artifact_id!r} could not be read from object storage"
+        ) from exc
 
 
 def _schema_units(schema: pa.Schema) -> dict[str, str]:
@@ -251,8 +286,7 @@ def load_artifact_window(
             from_ns=lower,
             to_ns=upper,
             selected=selected,
-            entity_sql=entity_sql,
-            entity_params=entity_params,
+            entity_id=entity_id,
         )
     meta = DenseWindowMeta(
         artifact=ref,
@@ -314,6 +348,95 @@ def entity_ids(settings: Settings, ref: ArtifactRefView) -> list[str] | None:
     return [str(row[0]) for row in rows if row[0] is not None]
 
 
+def entity_observations(
+    settings: Settings,
+    ref: ArtifactRefView,
+    *,
+    from_ns: int | None = None,
+    to_ns: int | None = None,
+) -> list[EntityObservationView] | None:
+    """Return observed Pose-frame bounds without shipping frontend row scans.
+
+    The authority is derived from canonical rows with usable coordinates, not
+    from session roster membership or unavailable landmark rows.
+    """
+    if ref.modality != "pose":
+        return None
+    path = resolve_artifact_path(settings, ref)
+    schema = pq.read_schema(path)
+    column = entity_column(schema)
+    required = {TIME_COLUMN, "is_available", "x_m", "y_m", "z_m"}
+    if column is None or not required.issubset(schema.names):
+        return []
+    if from_ns is None and to_ns is None:
+        return [
+            EntityObservationView(
+                entity_id=entity_id,
+                first_observed_ns=first_ns,
+                last_observed_ns=last_ns,
+                observation_count=count,
+            )
+            for entity_id, first_ns, last_ns, count in _cached_entity_observation_rows(
+                str(path), ref.checksum_sha256
+            )
+        ]
+    return _query_entity_observation_rows(path, column, from_ns, to_ns)
+
+
+@lru_cache(maxsize=128)
+def _cached_entity_observation_rows(
+    path: str, checksum_sha256: str
+) -> tuple[tuple[str, int, int, int], ...]:
+    schema = pq.read_schema(path)
+    column = entity_column(schema)
+    required = {TIME_COLUMN, "is_available", "x_m", "y_m", "z_m"}
+    if column is None or not required.issubset(schema.names):
+        return ()
+    rows = _query_entity_observation_rows(Path(path), column, None, None)
+    return tuple(
+        (item.entity_id, item.first_observed_ns, item.last_observed_ns, item.observation_count)
+        for item in rows
+    )
+
+
+def _query_entity_observation_rows(
+    path: Path, column: str, from_ns: int | None, to_ns: int | None
+) -> list[EntityObservationView]:
+    bounds: list[Any] = []
+    time_filter = ""
+    if from_ns is not None:
+        time_filter += f' AND "{TIME_COLUMN}" >= ?'
+        bounds.append(from_ns)
+    if to_ns is not None:
+        time_filter += f' AND "{TIME_COLUMN}" <= ?'
+        bounds.append(to_ns)
+    connection = _connect()
+    try:
+        rows = connection.execute(
+            f'SELECT CAST("{column}" AS VARCHAR) AS entity_id, '
+            f'MIN("{TIME_COLUMN}") AS first_observed_ns, '
+            f'MAX("{TIME_COLUMN}") AS last_observed_ns, '
+            f'COUNT(DISTINCT "{TIME_COLUMN}") AS observation_count '
+            "FROM read_parquet(?) "
+            f'WHERE "{column}" IS NOT NULL AND is_available = true '
+            'AND "x_m" IS NOT NULL AND "y_m" IS NOT NULL AND "z_m" IS NOT NULL'
+            f"{time_filter} "
+            f'GROUP BY "{column}" ORDER BY entity_id',
+            [path.as_posix(), *bounds],
+        ).fetchall()
+    finally:
+        connection.close()
+    return [
+        EntityObservationView(
+            entity_id=str(row[0]),
+            first_observed_ns=int(row[1]),
+            last_observed_ns=int(row[2]),
+            observation_count=int(row[3]),
+        )
+        for row in rows
+    ]
+
+
 def canonical_timespan(settings: Settings, ref: ArtifactRefView) -> tuple[int | None, int | None]:
     """Canonical ``t_rel_ns`` bounds of one artifact.
 
@@ -367,20 +490,22 @@ def _exact_window(
     from_ns: int,
     to_ns: int,
     selected: tuple[str, ...],
-    entity_sql: str = "",
-    entity_params: list[Any] | None = None,
+    entity_id: str | None = None,
 ) -> pa.Table:
-    projection = ", ".join(f'"{name}"' for name in selected)
-    connection = _connect()
-    try:
-        return connection.execute(
-            f"SELECT {projection} FROM read_parquet(?) "
-            f"WHERE {TIME_COLUMN} >= ? AND {TIME_COLUMN} <= ?{entity_sql} "
-            f"ORDER BY {TIME_COLUMN}",
-            [path.as_posix(), from_ns, to_ns, *(entity_params or [])],
-        ).to_arrow_table()
-    finally:
-        connection.close()
+    predicate = (ds.field(TIME_COLUMN) >= from_ns) & (ds.field(TIME_COLUMN) <= to_ns)
+    schema = pq.read_schema(path)
+    column = entity_column(schema)
+    if entity_id is not None:
+        if column is None:
+            raise DenseWindowError(
+                "this artifact declares no entity column, so it cannot be scoped to an entity"
+            )
+        predicate = predicate & (ds.field(column) == entity_id)
+    read_columns = list(selected) if TIME_COLUMN in selected else [*selected, TIME_COLUMN]
+    table = ds.dataset(path, format="parquet").to_table(columns=read_columns, filter=predicate)
+    if table.num_rows > 1:
+        table = table.sort_by([(TIME_COLUMN, "ascending")])
+    return table if TIME_COLUMN in selected else table.select(list(selected))
 
 
 def _reduced_window(
@@ -539,6 +664,7 @@ __all__ = [
     "entity_cardinality",
     "entity_column",
     "entity_ids",
+    "entity_observations",
     "load_artifact_window",
     "resolve_artifact_path",
     "table_records",

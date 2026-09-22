@@ -16,6 +16,9 @@ export interface TimeRangeNs {
   readonly toNs: bigint;
 }
 
+export type PlaybackStatus = "idle" | "ready" | "buffering" | "ended";
+export type PlaybackDirection = -1 | 1;
+
 export interface AnalysisState {
   /** Live playback/scrub time; high-frequency and never URL-serialized directly. */
   playheadNs: bigint | null;
@@ -28,6 +31,9 @@ export interface AnalysisState {
   committedRangeNs: TimeRangeNs | null;
   playing: boolean;
   playbackRate: number;
+  playbackDirection: PlaybackDirection;
+  /** Dense playback status; BUFFERING is explicit and blocks clock advance. */
+  playbackStatus: PlaybackStatus;
   /** Nominal rate of the currently selected stream, for frame stepping. */
   nominalRateHz: number | null;
   selectedEntityId: string | null;
@@ -37,6 +43,10 @@ export interface AnalysisState {
   focusedPanel: WorkbenchPanel;
   /** Renderer interaction flags (camera drag, pitch pan, chart drag). */
   interacting: boolean;
+  /** A subject identity/time transition is in flight; renderers must not show stale data. */
+  subjectSwitching: boolean;
+  /** Previous Pose identity whose queries must stay retired during a switch. */
+  switchingFromSubjectId: string | null;
 
   setPlayhead: (tNs: bigint | null) => void;
   commitTime: (tNs: bigint | null) => void;
@@ -45,6 +55,9 @@ export interface AnalysisState {
   commitRange: (range: TimeRangeNs | null) => void;
   setPlaying: (playing: boolean) => void;
   setPlaybackRate: (rate: number) => void;
+  setPlaybackDirection: (direction: PlaybackDirection) => void;
+  setPlaybackDirectionAndPlay: (direction: PlaybackDirection) => void;
+  setPlaybackStatus: (status: PlaybackStatus) => void;
   setNominalRate: (rateHz: number | null) => void;
   selectEntity: (entityId: string | null) => void;
   hoverEntity: (entityId: string | null) => void;
@@ -52,6 +65,8 @@ export interface AnalysisState {
   selectJoint: (jointId: string | null) => void;
   focusPanel: (panel: WorkbenchPanel) => void;
   setInteracting: (interacting: boolean) => void;
+  beginSubjectSwitch: (sourceSubjectId: string | null, targetTimeNs?: bigint) => void;
+  finishSubjectSwitch: () => void;
   hydrate: (state: {
     committedTimeNs?: bigint | null;
     committedRangeNs?: TimeRangeNs | null;
@@ -66,11 +81,14 @@ const TRANSIENT_DEFAULTS = {
   hoverTimeNs: null,
   brushRangeNs: null,
   playing: false,
+  playbackStatus: "idle",
   nominalRateHz: null,
   hoveredEntityId: null,
   hoveredJoint: null,
   selectedJoint: null,
   interacting: false,
+  subjectSwitching: false,
+  switchingFromSubjectId: null,
 } as const;
 
 export const useAnalysisStore = create<AnalysisState>()((set) => ({
@@ -78,6 +96,7 @@ export const useAnalysisStore = create<AnalysisState>()((set) => ({
   committedTimeNs: null,
   committedRangeNs: null,
   playbackRate: 1,
+  playbackDirection: 1,
   nominalRateHz: null,
   selectedEntityId: null,
   hoveredEntityId: null,
@@ -93,6 +112,9 @@ export const useAnalysisStore = create<AnalysisState>()((set) => ({
   setPlaying: (playing) => set({ playing }),
   setPlaybackRate: (rate) =>
     set({ playbackRate: Number.isFinite(rate) && rate > 0 ? rate : 1 }),
+  setPlaybackDirection: (playbackDirection) => set({ playbackDirection }),
+  setPlaybackDirectionAndPlay: (playbackDirection) => set({ playbackDirection, playing: true }),
+  setPlaybackStatus: (playbackStatus) => set({ playbackStatus }),
   setNominalRate: (rateHz) =>
     set({ nominalRateHz: rateHz !== null && Number.isFinite(rateHz) && rateHz > 0 ? rateHz : null }),
   selectEntity: (entityId) => set({ selectedEntityId: entityId }),
@@ -101,6 +123,23 @@ export const useAnalysisStore = create<AnalysisState>()((set) => ({
   selectJoint: (jointId) => set({ selectedJoint: jointId }),
   focusPanel: (panel) => set({ focusedPanel: panel }),
   setInteracting: (interacting) => set({ interacting }),
+  beginSubjectSwitch: (sourceSubjectId, targetTimeNs) =>
+    set({
+      ...(targetTimeNs !== undefined
+        ? { playheadNs: targetTimeNs, committedTimeNs: targetTimeNs }
+        : {}),
+      hoverTimeNs: null,
+      brushRangeNs: null,
+      playing: false,
+      playbackStatus: "idle",
+      selectedEntityId: null,
+      hoveredEntityId: null,
+      hoveredJoint: null,
+      selectedJoint: null,
+      subjectSwitching: true,
+      switchingFromSubjectId: sourceSubjectId,
+    }),
+  finishSubjectSwitch: () => set({ subjectSwitching: false, switchingFromSubjectId: null }),
 
   hydrate: (state) =>
     set((current) => ({

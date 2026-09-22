@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 
 import { useAnalysisStore } from "@/lib/state/analysis";
+import { constrainPlaybackAdvance } from "@/lib/playback-chunk-coordinator";
 
 /**
  * Wall-clock-driven playback for the shared playhead.
@@ -12,6 +13,7 @@ export function usePlaybackClock(): void {
   const frame = useRef<number | null>(null);
   const last = useRef<number | null>(null);
   const playing = useAnalysisStore((state) => state.playing);
+  const playbackDirection = useAnalysisStore((state) => state.playbackDirection);
 
   useEffect(() => {
     if (!playing) return;
@@ -21,10 +23,14 @@ export function usePlaybackClock(): void {
       const previous = last.current ?? now;
       last.current = now;
       const elapsedMs = Math.max(0, now - previous);
-      const elapsedNs = BigInt(Math.round(elapsedMs * 1e6 * current.playbackRate));
-      if (elapsedNs > 0n) {
+      const elapsedNs = BigInt(
+        Math.round(elapsedMs * 1e6 * current.playbackRate * current.playbackDirection),
+      );
+      if (elapsedNs !== 0n) {
         const base = current.playheadNs ?? current.committedTimeNs ?? 0n;
-        current.setPlayhead(base + elapsedNs);
+        const requested = base + elapsedNs;
+        const next = constrainPlaybackAdvance(base, requested);
+        if (next !== base) current.setPlayhead(next);
       }
       frame.current = requestAnimationFrame(tick);
     };
@@ -34,5 +40,5 @@ export function usePlaybackClock(): void {
       frame.current = null;
       last.current = null;
     };
-  }, [playing]);
+  }, [playing, playbackDirection]);
 }
