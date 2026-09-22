@@ -52,6 +52,7 @@ export interface AnalysisState {
   setPlaying: (playing: boolean) => void;
   setPlaybackRate: (rate: number) => void;
   setPlaybackDirection: (direction: PlaybackDirection) => void;
+  setPlaybackDirectionAndPlay: (direction: PlaybackDirection) => void;
   setPlaybackStatus: (status: PlaybackStatus) => void;
   setNominalRate: (rateHz: number | null) => void;
   selectEntity: (entityId: string | null) => void;
@@ -104,6 +105,7 @@ export const useAnalysisStore = create<AnalysisState>()((set) => ({
   setPlaybackRate: (rate) =>
     set({ playbackRate: Number.isFinite(rate) && rate > 0 ? rate : 1 }),
   setPlaybackDirection: (playbackDirection) => set({ playbackDirection }),
+  setPlaybackDirectionAndPlay: (playbackDirection) => set({ playbackDirection, playing: true }),
   setPlaybackStatus: (playbackStatus) => set({ playbackStatus }),
   setNominalRate: (rateHz) =>
     set({ nominalRateHz: rateHz !== null && Number.isFinite(rateHz) && rateHz > 0 ? rateHz : null }),

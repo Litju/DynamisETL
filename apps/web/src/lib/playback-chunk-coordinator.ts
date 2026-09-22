@@ -230,49 +230,64 @@ export function usePlaybackChunkCoordinator<T>(options: {
   readonly matchesQuery: (queryKey: QueryKey) => boolean;
   readonly chunkIdFromQueryKey: (queryKey: QueryKey) => string | null;
 }): PlaybackChunkSnapshot & { readonly coordinator: PlaybackChunkCoordinator | null } {
+  const {
+    enabled,
+    canonicalMinNs,
+    canonicalMaxNs,
+    chunkSpanNs,
+    anchorNs,
+    queryClient,
+    queryOptionsFor,
+    isReady,
+    matchesQuery,
+    chunkIdFromQueryKey,
+  } = options;
   const coordinator = useMemo(() => {
     if (
-      !options.enabled ||
-      options.canonicalMinNs === null ||
-      options.canonicalMaxNs === null ||
-      options.chunkSpanNs === null
+      !enabled ||
+      canonicalMinNs === null ||
+      canonicalMaxNs === null ||
+      chunkSpanNs === null
     ) return null;
     const port: PlaybackChunkCoordinatorPort = {
       isReady: (chunk) => {
-        const query = options.queryOptionsFor(chunk);
-        return options.isReady(options.queryClient.getQueryData<T>(query.queryKey));
+        const query = queryOptionsFor(chunk);
+        return isReady(queryClient.getQueryData<T>(query.queryKey));
       },
       prefetch: (chunk) => {
-        const query = options.queryOptionsFor(chunk);
-        void options.queryClient.prefetchQuery(query);
+        const query = queryOptionsFor(chunk);
+        void queryClient.prefetchQuery(query);
       },
       evict: (keep) => {
-        options.queryClient.removeQueries({
+        queryClient.removeQueries({
           predicate: (query) =>
-            options.matchesQuery(query.queryKey) &&
-            !keep.has(options.chunkIdFromQueryKey(query.queryKey) ?? ""),
+            matchesQuery(query.queryKey) &&
+            !keep.has(chunkIdFromQueryKey(query.queryKey) ?? ""),
         });
       },
       cancel: () => {
-        void options.queryClient.cancelQueries({ predicate: (query) => options.matchesQuery(query.queryKey) });
+        void queryClient.cancelQueries({ predicate: (query) => matchesQuery(query.queryKey) });
       },
     };
     return new PlaybackChunkCoordinator({
-      canonicalMinNs: options.canonicalMinNs,
-      canonicalMaxNs: options.canonicalMaxNs,
-      chunkSpanNs: options.chunkSpanNs,
-      anchorNs: options.anchorNs,
+      canonicalMinNs,
+      canonicalMaxNs,
+      chunkSpanNs,
+      anchorNs,
       port,
       onEnded: () => useAnalysisStore.getState().setPlaying(false),
     });
   }, [
-    options.anchorNs,
-    options.canonicalMaxNs,
-    options.canonicalMinNs,
-    options.chunkSpanNs,
-    options.enabled,
-    options.queryClient,
-    options.queryOptionsFor,
+    anchorNs,
+    canonicalMaxNs,
+    canonicalMinNs,
+    chunkSpanNs,
+    enabled,
+    chunkIdFromQueryKey,
+    isReady,
+    matchesQuery,
+    queryClient,
+    queryOptionsFor,
   ]);
 
   const snapshot = useSyncExternalStore(
@@ -291,7 +306,7 @@ export function usePlaybackChunkCoordinator<T>(options: {
         coordinator.observePlayhead(next, state.playing);
       }
     });
-    const unsubscribeCache = options.queryClient.getQueryCache().subscribe(() => coordinator.refresh());
+    const unsubscribeCache = queryClient.getQueryCache().subscribe(() => coordinator.refresh());
     coordinator.observePlayhead(effectiveTimeNs(useAnalysisStore.getState()), useAnalysisStore.getState().playing);
     return () => {
       unsubscribeStore();
@@ -300,7 +315,7 @@ export function usePlaybackChunkCoordinator<T>(options: {
       coordinator.dispose();
       if (registered.size === 0) useAnalysisStore.getState().setPlaybackStatus("idle");
     };
-  }, [coordinator, options.queryClient]);
+  }, [coordinator, queryClient]);
 
   useEffect(() => {
     useAnalysisStore.getState().setPlaybackStatus(snapshot.status);

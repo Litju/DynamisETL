@@ -111,6 +111,23 @@ export function useDenseWindow(request: DenseWindowRequest) {
     }),
     [request.artifactId, request.columns, request.entityId, request.maxPoints],
   );
+  const isReady = useCallback(
+    (data: DenseWindowState | undefined) => data?.table !== null && data?.table !== undefined,
+    [],
+  );
+  const matchesQuery = useCallback(
+    (key: QueryKey) =>
+      key[0] === "dense-chunk-window" &&
+      key[1] === queryScope.artifactId &&
+      key[6] === queryScope.columns &&
+      key[7] === queryScope.maxPoints &&
+      key[8] === queryScope.entityId,
+    [queryScope],
+  );
+  const chunkIdFromQueryKey = useCallback(
+    (key: QueryKey) => (typeof key[3] === "string" ? key[3] : null),
+    [],
+  );
   const playback = usePlaybackChunkCoordinator<DenseWindowState>({
     enabled: request.chunk !== undefined,
     canonicalMinNs: request.chunk?.canonicalMinNs ?? null,
@@ -119,14 +136,9 @@ export function useDenseWindow(request: DenseWindowRequest) {
     anchorNs: request.chunk?.anchorNs ?? null,
     queryClient,
     queryOptionsFor,
-    isReady: (data) => data?.table !== null && data?.table !== undefined,
-    matchesQuery: (key) =>
-      key[0] === "dense-chunk-window" &&
-      key[1] === queryScope.artifactId &&
-      key[6] === queryScope.columns &&
-      key[7] === queryScope.maxPoints &&
-      key[8] === queryScope.entityId,
-    chunkIdFromQueryKey: (key) => (typeof key[3] === "string" ? key[3] : null),
+    isReady,
+    matchesQuery,
+    chunkIdFromQueryKey,
   });
   const plan = playback.plan;
   const activeRequest = useMemo<DenseWindowRequest>(() => {

@@ -71,11 +71,31 @@ export function usePosePlaybackWindow(options: PosePlaybackWindowOptions): PoseP
     }),
     [request],
   );
-  const explicit =
-    options.explicitFromNs !== null && options.explicitFromNs !== undefined &&
-    options.explicitToNs !== null && options.explicitToNs !== undefined
-      ? { fromNs: options.explicitFromNs, toNs: options.explicitToNs }
-      : null;
+  const explicit = useMemo(
+    () =>
+      options.explicitFromNs !== null && options.explicitFromNs !== undefined &&
+      options.explicitToNs !== null && options.explicitToNs !== undefined
+        ? { fromNs: options.explicitFromNs, toNs: options.explicitToNs }
+        : null,
+    [options.explicitFromNs, options.explicitToNs],
+  );
+  const isReady = useCallback(
+    (data: DenseWindow | undefined) => data?.meta.reduction === null,
+    [],
+  );
+  const matchesQuery = useCallback(
+    (key: readonly unknown[]) =>
+      key[0] === "dense-chunk" &&
+      key[1] === queryScope.artifactId &&
+      key[6] === queryScope.columns &&
+      key[7] === queryScope.maxPoints &&
+      key[8] === queryScope.entityId,
+    [queryScope],
+  );
+  const chunkIdFromQueryKey = useCallback(
+    (key: readonly unknown[]) => (typeof key[3] === "string" ? key[3] : null),
+    [],
+  );
   const playback = usePlaybackChunkCoordinator<DenseWindow>({
     enabled: explicit === null,
     canonicalMinNs: options.canonicalMinNs,
@@ -84,14 +104,9 @@ export function usePosePlaybackWindow(options: PosePlaybackWindowOptions): PoseP
     anchorNs: options.anchorNs,
     queryClient,
     queryOptionsFor,
-    isReady: (data) => data?.meta.reduction === null,
-    matchesQuery: (key) =>
-      key[0] === "dense-chunk" &&
-      key[1] === queryScope.artifactId &&
-      key[6] === queryScope.columns &&
-      key[7] === queryScope.maxPoints &&
-      key[8] === queryScope.entityId,
-    chunkIdFromQueryKey: (key) => (typeof key[3] === "string" ? key[3] : null),
+    isReady,
+    matchesQuery,
+    chunkIdFromQueryKey,
   });
   const activeChunk = playback.plan?.active ?? null;
   const activeQuery = useMemo(() => {

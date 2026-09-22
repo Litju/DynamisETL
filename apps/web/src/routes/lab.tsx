@@ -51,10 +51,10 @@ export function LabPage() {
       selectedEntityId: durableSubject,
       focusedPanel: durableView,
     });
-    return () => {
-      useAnalysisStore.getState().resetTransient();
-    };
   }, [hydrate, durableSubject, durableTimeNs, durableView]);
+  useEffect(() => () => {
+    useAnalysisStore.getState().resetTransient();
+  }, [datasetId, sessionId]);
 
   const selectedStream = useMemo(() => {
     const streams = session.data?.streams ?? [];

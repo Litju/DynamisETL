@@ -65,6 +65,7 @@ test("RES-109 Field crosses forward and reverse chunk boundaries without scope d
   await page.waitForTimeout(3_800);
   const forward = await playheadNs(page);
   await page.getByRole("button", { name: "Pause" }).click();
+  await expect(page.getByRole("button", { name: "Play" })).toBeVisible();
   await page.getByRole("button", { name: "Reverse" }).click();
   await expect(page.getByTestId("playback-direction")).toHaveAttribute("data-direction", "reverse");
   await page.waitForTimeout(1_800);
@@ -79,7 +80,7 @@ test("RES-109 Field crosses forward and reverse chunk boundaries without scope d
 test("RES-109 delayed exact handoff is explicit BUFFERING and resumes", async ({ page }) => {
   await page.route("**/api/artifacts/pose-sample/window**", async (route) => {
     const url = new URL(route.request().url());
-    if (url.searchParams.get("from_ns") === "3999999999") {
+    if (url.searchParams.get("from_ns") === "1999999999") {
       await new Promise((resolve) => setTimeout(resolve, 3_000));
     }
     await route.fallback();

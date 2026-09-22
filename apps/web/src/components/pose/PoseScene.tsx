@@ -132,19 +132,18 @@ export function PoseScene(props: PoseSceneProps) {
     () => subjects.flatMap((subject) => subject.frames.find((frame) => frame.observed)?.landmarks ?? []),
     [subjects],
   );
-  const coordinateOrigin = { xM: 0, yM: 0 };
   const calculatedBounds = useMemo(() => {
     if (props.coordinateMode === "body_local") {
       return bodyLocalBounds(subjects.flatMap((subject) => subject.frames));
     }
-    return boundsOf(firstLandmarks, coordinateOrigin);
+    return boundsOf(firstLandmarks, WORLD_ORIGIN);
   }, [firstLandmarks, props.coordinateMode, subjects]);
   const sourceKey = `${props.coordinateMode}:${subjects.map((subject) => subject.subjectId).join(",")}`;
-  const stable = useRef<{ readonly key: string; readonly bounds: ReturnType<typeof boundsOf> } | null>(null);
-  if (stable.current === null || stable.current.key !== sourceKey) {
-    stable.current = { key: sourceKey, bounds: calculatedBounds };
-  }
-  return <PoseStage {...props} subjects={subjects} bounds={stable.current.bounds} />;
+  // Deliberately retain the first bounds for one coordinate/subject context;
+  // chunk handoff must not refit a trajectory-derived camera.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const stableBounds = useMemo(() => calculatedBounds, [sourceKey]);
+  return <PoseStage {...props} subjects={subjects} bounds={stableBounds} />;
 }
 
 const WORLD_ORIGIN = { xM: 0, yM: 0 } as const;
@@ -156,6 +155,7 @@ function PoseStage({ subjects, bounds, ...props }: PoseSceneProps & {
   const { invalidate, setFrameloop } = useThree();
   const playing = useAnalysisStore((state) => state.playing);
   const selectedJoint = useAnalysisStore((state) => state.selectedJoint);
+  const { cameraMode, onManualCamera } = props;
   const controlsRef = useRef<React.ElementRef<typeof CameraControls> | null>(null);
   const followTarget = useRef(new Vector3());
   const hasFollowTarget = useRef(false);
@@ -168,21 +168,21 @@ function PoseStage({ subjects, bounds, ...props }: PoseSceneProps & {
   }, [invalidate, playing, setFrameloop]);
   useEffect(() => {
     const controls = controlsRef.current;
-    if (!controls || props.cameraMode === "manual") return;
+    if (!controls || cameraMode === "manual") return;
     const { position, target } = cameraFor("reset", bounds);
     void controls.setLookAt(position[0], position[1], position[2], target[0], target[1], target[2], false);
     invalidate();
     hasFollowTarget.current = false;
-  }, [bounds, invalidate, props.cameraMode]);
+  }, [bounds, cameraMode, invalidate]);
   useFrame((_state, delta) => {
-    if (props.cameraMode !== "follow_subject" && props.cameraMode !== "joint_focus") return;
+    if (cameraMode !== "follow_subject" && cameraMode !== "joint_focus") return;
     const subject = subjects[0];
     if (!subject) return;
     const time = useAnalysisStore.getState().playheadNs ?? useAnalysisStore.getState().committedTimeNs;
     const landmarks = landmarksAt(subject.frames, time);
     let desired: readonly [number, number, number] | null = null;
     const centre = props.coordinateMode === "body_local" ? bodyLocalCentre(landmarks) : WORLD_ORIGIN;
-    if (props.cameraMode === "follow_subject") {
+    if (cameraMode === "follow_subject") {
       const root = props.coordinateMode === "body_local" ? WORLD_ORIGIN : bodyLocalCentre(landmarks);
       desired = [root.xM, 0, -root.yM];
     } else if (selectedJoint !== null) {
@@ -203,8 +203,8 @@ function PoseStage({ subjects, bounds, ...props }: PoseSceneProps & {
     }
   });
   const handleControlStart = useCallback(() => {
-    if (props.cameraMode !== "manual") props.onManualCamera?.();
-  }, [props.cameraMode, props.onManualCamera]);
+    if (cameraMode !== "manual") onManualCamera?.();
+  }, [cameraMode, onManualCamera]);
   return (
     <>
       <color attach="background" args={["#12161c"]} />

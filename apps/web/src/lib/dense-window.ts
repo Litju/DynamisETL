@@ -17,11 +17,11 @@ import type { ArtifactDetail } from "@/api/types";
 
 /**
  * Average density understates a continuously observed entity, because an
- * artifact's rows are spread over entities that appear and disappear. Halving
- * the derived span keeps the first request inside the budget for the real
- * V1 sources rather than relying on a correction round trip.
+ * artifact's rows are spread over entities that appear and disappear. A
+ * quarter-span guard keeps exact entity windows below the source-row budget on
+ * uneven real streams rather than relying on a reduction/retry round trip.
  */
-const DENSITY_SAFETY_FACTOR = 2;
+const DENSITY_SAFETY_FACTOR = 4;
 
 export interface WindowBounds {
   readonly fromNs: bigint;

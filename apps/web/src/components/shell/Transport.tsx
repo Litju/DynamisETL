@@ -62,7 +62,7 @@ export function Transport({ nominalRateHz }: { nominalRateHz: number | null }) {
   const playbackDirection = useAnalysisStore((state) => state.playbackDirection);
   const setPlaying = useAnalysisStore((state) => state.setPlaying);
   const setPlaybackRate = useAnalysisStore((state) => state.setPlaybackRate);
-  const setPlaybackDirection = useAnalysisStore((state) => state.setPlaybackDirection);
+  const setPlaybackDirectionAndPlay = useAnalysisStore((state) => state.setPlaybackDirectionAndPlay);
   const setPlayhead = useAnalysisStore((state) => state.setPlayhead);
 
   const effective = useAnalysisStore(effectiveTimeNs);
@@ -133,8 +133,7 @@ export function Transport({ nominalRateHz }: { nominalRateHz: number | null }) {
           title={playbackDirection === -1 ? "Play forward" : "Play in reverse"}
           disabled={disabled}
           onClick={() => {
-            setPlaybackDirection(playbackDirection === -1 ? 1 : -1);
-            setPlaying(true);
+            setPlaybackDirectionAndPlay(playbackDirection === -1 ? 1 : -1);
           }}
           className="flex h-7 items-center justify-center rounded-control border border-border-subtle px-1.5 text-[10px] text-text-secondary hover:bg-surface-2 disabled:opacity-40"
         >

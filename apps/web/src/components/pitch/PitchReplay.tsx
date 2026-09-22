@@ -138,7 +138,27 @@ export function PitchReplay() {
     }),
     [trackingRequest],
   );
-  const explicitBounds = fromNs !== null && toNs !== null ? { fromNs, toNs } : null;
+  const explicitBounds = useMemo(
+    () => (fromNs !== null && toNs !== null ? { fromNs, toNs } : null),
+    [fromNs, toNs],
+  );
+  const isReady = useCallback(
+    (data: DenseWindow | undefined) => data?.meta.reduction === null,
+    [],
+  );
+  const matchesQuery = useCallback(
+    (key: readonly unknown[]) =>
+      key[0] === "dense-chunk" &&
+      key[1] === queryScope.artifactId &&
+      key[6] === queryScope.columns &&
+      key[7] === queryScope.maxPoints &&
+      key[8] === null,
+    [queryScope],
+  );
+  const chunkIdFromQueryKey = useCallback(
+    (key: readonly unknown[]) => (typeof key[3] === "string" ? key[3] : null),
+    [],
+  );
   const playback = usePlaybackChunkCoordinator<DenseWindow>({
     enabled: explicitBounds === null,
     canonicalMinNs: canonical?.minNs ?? null,
@@ -147,14 +167,9 @@ export function PitchReplay() {
     anchorNs: committedTimeNs,
     queryClient,
     queryOptionsFor,
-    isReady: (data) => data?.meta.reduction === null,
-    matchesQuery: (key) =>
-      key[0] === "dense-chunk" &&
-      key[1] === queryScope.artifactId &&
-      key[6] === queryScope.columns &&
-      key[7] === queryScope.maxPoints &&
-      key[8] === null,
-    chunkIdFromQueryKey: (key) => (typeof key[3] === "string" ? key[3] : null),
+    isReady,
+    matchesQuery,
+    chunkIdFromQueryKey,
   });
   const activeChunk = playback.plan?.active ?? null;
   const activeWindowBounds = activeChunk ?? explicitBounds;
