@@ -13,7 +13,9 @@ import hashlib
 import json
 import math
 import os
+import tempfile
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +31,12 @@ from dynamis.serving.models import (
     DenseWindowMeta,
     EntityObservationView,
     ReductionInfo,
+)
+from dynamis.storage.object_store import (
+    ObjectStoreError,
+    S3ObjectStore,
+    immutable_object_key,
+    object_store,
 )
 
 ENV_DENSE_MAX_SOURCE_ROWS = "DYNAMIS_DENSE_MAX_SOURCE_ROWS"
@@ -49,6 +57,7 @@ REDUCTION_NOTE = (
 EXACT_WINDOW_NOTE = (
     "Exact canonical samples in the requested time window; no display reduction was applied."
 )
+_OBJECT_CACHE_ROOT = Path(tempfile.gettempdir()) / "dynamis-artifact-cache"
 
 
 class DenseWindowError(RuntimeError):
@@ -83,7 +92,7 @@ def default_max_source_rows() -> int:
 
 
 def resolve_artifact_path(settings: Settings, ref: ArtifactRefView) -> Path:
-    """Resolve a registered artifact under the dataset root; reject traversal."""
+    """Resolve a registered local artifact or a verified cached S3 artifact."""
     root = settings.dataset_root.resolve()
     relative = Path(ref.relative_path)
     if relative.is_absolute():
@@ -95,13 +104,37 @@ def resolve_artifact_path(settings: Settings, ref: ArtifactRefView) -> Path:
         raise ArtifactPathError(
             f"artifact {ref.artifact_id!r} resolves outside the dataset root; refusing to read"
         )
-    if not candidate.is_file():
-        raise ArtifactPathError(f"artifact {ref.artifact_id!r} is missing at its registered path")
     if candidate.suffix.lower() != ".parquet":
         raise ArtifactPathError(
             f"artifact {ref.artifact_id!r} is not a Parquet artifact; dense windows require Parquet"
         )
-    return candidate
+    if settings.object_store_provider == "local":
+        if not candidate.is_file():
+            raise ArtifactPathError(
+                f"artifact {ref.artifact_id!r} is missing at its registered path"
+            )
+        return candidate
+    try:
+        checksum = ref.checksum_sha256.lower()
+        key = immutable_object_key(checksum)
+        # ponytail: cold reads cache the full Parquet file via 8 MiB ranges;
+        # use seekable Arrow I/O if cold-cache latency or disk use matters.
+        cached = _OBJECT_CACHE_ROOT / checksum[:2] / f"{checksum}.parquet"
+        store = object_store(settings)
+        if not isinstance(store, S3ObjectStore):
+            raise ObjectStoreError("non-local artifact reads require the S3 object store")
+        if ref.byte_size is None:
+            raise ObjectStoreError("S3 artifact serving requires the registered byte size")
+        return store.materialize(
+            key,
+            destination=cached,
+            checksum_sha256=checksum,
+            expected_size=ref.byte_size,
+        )
+    except ObjectStoreError as exc:
+        raise ArtifactPathError(
+            f"artifact {ref.artifact_id!r} could not be read from object storage"
+        ) from exc
 
 
 def _schema_units(schema: pa.Schema) -> dict[str, str]:
@@ -335,6 +368,40 @@ def entity_observations(
     required = {TIME_COLUMN, "is_available", "x_m", "y_m", "z_m"}
     if column is None or not required.issubset(schema.names):
         return []
+    if from_ns is None and to_ns is None:
+        return [
+            EntityObservationView(
+                entity_id=entity_id,
+                first_observed_ns=first_ns,
+                last_observed_ns=last_ns,
+                observation_count=count,
+            )
+            for entity_id, first_ns, last_ns, count in _cached_entity_observation_rows(
+                str(path), ref.checksum_sha256
+            )
+        ]
+    return _query_entity_observation_rows(path, column, from_ns, to_ns)
+
+
+@lru_cache(maxsize=128)
+def _cached_entity_observation_rows(
+    path: str, checksum_sha256: str
+) -> tuple[tuple[str, int, int, int], ...]:
+    schema = pq.read_schema(path)
+    column = entity_column(schema)
+    required = {TIME_COLUMN, "is_available", "x_m", "y_m", "z_m"}
+    if column is None or not required.issubset(schema.names):
+        return ()
+    rows = _query_entity_observation_rows(Path(path), column, None, None)
+    return tuple(
+        (item.entity_id, item.first_observed_ns, item.last_observed_ns, item.observation_count)
+        for item in rows
+    )
+
+
+def _query_entity_observation_rows(
+    path: Path, column: str, from_ns: int | None, to_ns: int | None
+) -> list[EntityObservationView]:
     bounds: list[Any] = []
     time_filter = ""
     if from_ns is not None:

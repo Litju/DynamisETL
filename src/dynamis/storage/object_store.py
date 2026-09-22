@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import os
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -17,7 +19,7 @@ from urllib.parse import quote, urlparse
 import requests
 
 from dynamis.config import Settings
-from dynamis.storage.atomic import sha256_file
+from dynamis.storage.atomic import atomic_write_path, sha256_file
 from dynamis.storage.paths import safe_upstream_key
 
 
@@ -90,6 +92,7 @@ class S3ObjectStore:
     """Private S3-compatible adapter for R2 and equivalent object planes."""
 
     service = "s3"
+    range_chunk_bytes = 8 * 1024 * 1024
 
     def __init__(
         self, *, endpoint: str, bucket: str, access_key: str, secret_key: str, region: str = "auto"
@@ -116,9 +119,9 @@ class S3ObjectStore:
             raise ObjectStoreError(f"source checksum mismatch for {key}")
         existing = self.head(key)
         if existing is not None:
-            if existing.sha256 not in {checksum_sha256, ""}:
+            if existing.sha256 != checksum_sha256:
                 raise ObjectStoreError(
-                    f"immutable object already exists with different bytes: {key}"
+                    f"immutable object already exists without the expected checksum: {key}"
                 )
             return existing
         response = self._request(
@@ -154,7 +157,62 @@ class S3ObjectStore:
         response = self._request("GET", key, headers={"range": range_value})
         if response is None:
             raise ObjectStoreError(f"S3 GET {key} returned no response")
+        content_range = re.fullmatch(
+            r"bytes (\d+)-(\d+)/(\d+|\*)",
+            response.headers.get("Content-Range", ""),
+        )
+        if response.status_code != 206 or content_range is None:
+            raise ObjectStoreError(f"S3 GET {key} did not honor the requested byte range")
+        actual_start, actual_end = int(content_range[1]), int(content_range[2])
+        total = None if content_range[3] == "*" else int(content_range[3])
+        expected_end = min(end, total - 1) if end is not None and total is not None else end
+        if end is None and total is not None:
+            expected_end = total - 1
+        if (
+            actual_start != start
+            or actual_end < actual_start
+            or (expected_end is not None and actual_end != expected_end)
+            or len(response.content) != actual_end - actual_start + 1
+        ):
+            raise ObjectStoreError(f"S3 GET {key} returned an invalid Content-Range")
         return response.content
+
+    def materialize(
+        self,
+        key: str,
+        *,
+        destination: Path,
+        checksum_sha256: str,
+        expected_size: int,
+    ) -> Path:
+        """Populate a verified local cache file using bounded S3 range reads."""
+        if destination.is_file() and destination.stat().st_size == expected_size:
+            return destination
+        metadata = self.head(key)
+        if metadata is None:
+            raise ObjectStoreError(f"S3 object is missing: {key}")
+        if metadata.sha256 != checksum_sha256 or metadata.size_bytes != expected_size:
+            raise ObjectStoreError(
+                f"S3 object metadata does not match the registered artifact: {key}"
+            )
+
+        digest = hashlib.sha256()
+        with atomic_write_path(destination) as temporary:
+            with temporary.open("wb") as output:
+                for start in range(0, expected_size, self.range_chunk_bytes):
+                    end = min(start + self.range_chunk_bytes, expected_size) - 1
+                    chunk = self.get_range(key, start, end)
+                    if len(chunk) != end - start + 1:
+                        raise ObjectStoreError(f"S3 returned an incomplete byte range for {key}")
+                    digest.update(chunk)
+                    output.write(chunk)
+                output.flush()
+                os.fsync(output.fileno())
+            if digest.hexdigest() != checksum_sha256:
+                raise ObjectStoreError(
+                    f"S3 object bytes do not match the registered checksum: {key}"
+                )
+        return destination
 
     def _request(
         self,
@@ -199,10 +257,17 @@ class S3ObjectStore:
             f"Signature={signature}"
         )
         response = self.session.request(
-            method, url, data=body if method == "PUT" else None, headers=request_headers, timeout=30
+            method,
+            url,
+            data=body if method == "PUT" else None,
+            headers=request_headers,
+            timeout=30,
+            allow_redirects=False,
         )
         if allow_not_found and response.status_code == 404:
             return None
+        if 300 <= response.status_code < 400:
+            raise ObjectStoreError(f"S3 {method} {key} redirect refused")
         if not response.ok:
             raise ObjectStoreError(f"S3 {method} {key} failed with HTTP {response.status_code}")
         return response

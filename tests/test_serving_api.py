@@ -9,6 +9,7 @@ the SQL repository.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -61,6 +62,7 @@ from dynamis.serving.models import (
     TrialView,
 )
 from dynamis.serving.repository import MetricFilters
+from dynamis.storage.object_store import ObjectMetadata, S3ObjectStore
 
 LICENSE = LicenseView(
     policy_id="skillcorner-opendata",
@@ -680,6 +682,64 @@ def test_pose_entity_observation_authority_excludes_unavailable_rows(
             "observation_count": 1,
         },
     ]
+
+
+def test_pose_observation_summary_is_cached_by_immutable_artifact(
+    tmp_settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from dynamis.serving import dense
+
+    table = pa.table(
+        {
+            "subject_id": pa.array(["s1", "s1"], type=pa.string()),
+            "t_rel_ns": pa.array([0, 40], type=pa.int64()),
+            "is_available": pa.array([True, True], type=pa.bool_()),
+            "x_m": pa.array([1.0, 1.0], type=pa.float64()),
+            "y_m": pa.array([1.0, 1.0], type=pa.float64()),
+            "z_m": pa.array([1.0, 1.0], type=pa.float64()),
+        }
+    )
+    ref = _dense_artifact_ref(tmp_settings, table).model_copy(update={"modality": "pose"})
+    dense._cached_entity_observation_rows.cache_clear()
+    original = dense._query_entity_observation_rows
+    calls = 0
+
+    def counted(path: Path, column: str, from_ns: int | None, to_ns: int | None):
+        nonlocal calls
+        calls += 1
+        return original(path, column, from_ns, to_ns)
+
+    monkeypatch.setattr(dense, "_query_entity_observation_rows", counted)
+    assert entity_observations(tmp_settings, ref) == entity_observations(tmp_settings, ref)
+    assert calls == 1
+
+
+def test_registered_s3_artifact_is_materialized_for_dense_serving(
+    tmp_path: Path, tmp_settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from dynamis.serving import dense
+
+    table = pa.table({"object_id": ["p1", "p1"], "t_rel_ns": [0, 10], "speed": [2.0, 3.0]})
+    ref = _dense_artifact_ref(tmp_settings, table)
+    source = resolve_artifact_path(tmp_settings, ref)
+    data = source.read_bytes()
+    checksum = hashlib.sha256(data).hexdigest()
+    ref = ref.model_copy(update={"checksum_sha256": checksum, "byte_size": len(data)})
+    settings = tmp_settings.model_copy(update={"object_store_provider": "s3"})
+    store = S3ObjectStore(
+        endpoint="https://objects.example",
+        bucket="private",
+        access_key="access",
+        secret_key="secret",
+    )
+    monkeypatch.setattr(store, "head", lambda key: ObjectMetadata(key, len(data), checksum))
+    monkeypatch.setattr(store, "get_range", lambda _key, start, end: data[start : end + 1])
+    monkeypatch.setattr(dense, "object_store", lambda _settings: store)
+    monkeypatch.setattr(dense, "_OBJECT_CACHE_ROOT", tmp_path / "object-cache")
+
+    result = load_artifact_window(settings, ref, from_ns=0, to_ns=10)
+    assert result.meta.returned_rows == 2
+    assert set(result.table.column("object_id").to_pylist()) == {"p1"}
 
 
 def test_dense_window_carries_signed_canonical_time(tmp_settings: Settings) -> None:

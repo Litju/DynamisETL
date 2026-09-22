@@ -63,6 +63,8 @@ services:
       DYNAMIS_OBJECT_STORE_PROVIDER: ${DYNAMIS_OBJECT_STORE_PROVIDER:-local}
       DYNAMIS_OBJECT_STORE_ENDPOINT: ${DYNAMIS_OBJECT_STORE_ENDPOINT:-}
       DYNAMIS_OBJECT_STORE_BUCKET: ${DYNAMIS_OBJECT_STORE_BUCKET:-}
+      DYNAMIS_OBJECT_STORE_ACCESS_KEY: ${DYNAMIS_OBJECT_STORE_ACCESS_KEY:-}
+      DYNAMIS_OBJECT_STORE_SECRET_KEY: ${DYNAMIS_OBJECT_STORE_SECRET_KEY:-}
       DYNAMIS_OBJECT_STORE_REGION: ${DYNAMIS_OBJECT_STORE_REGION:-auto}
       DYNAMIS_DB_POOL_SIZE: ${DYNAMIS_DB_POOL_SIZE:-4}
       DYNAMIS_DB_MAX_OVERFLOW: ${DYNAMIS_DB_MAX_OVERFLOW:-4}
@@ -73,7 +75,7 @@ services:
     ports:
       - "${API_PORT:-8000}:8000"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
+      test: ["CMD", "python", "-c", "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.environ.get('PORT', '8000') + '/api/health', timeout=3)"]
       interval: 30s
       timeout: 5s
       retries: 3
