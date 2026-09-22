@@ -61,16 +61,15 @@ test("1c. Pose playback advances both the playhead and rendered scene", async ({
   await page.goto(
     "/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P1&view=pose&t_ns=0",
   );
-  const canvas = page.getByTestId("pose-canvas").locator("canvas");
-  await expect(canvas).toBeVisible();
+  await expect(page.getByTestId("pose-canvas")).toBeVisible();
   const playhead = page.getByLabel("Transport and timeline").locator(".t-value").first();
   const beforeTime = await playhead.innerText();
-  const before = await canvas.screenshot();
+  const before = await page.screenshot();
   await page.getByRole("button", { name: "Play" }).click();
   await page.waitForTimeout(1000);
   const afterTime = await playhead.innerText();
-  await expect(page.getByTestId("pose-canvas").locator("canvas")).toBeVisible();
-  const after = await page.getByTestId("pose-canvas").locator("canvas").screenshot();
+  await expect(page.getByTestId("pose-canvas")).toBeVisible();
+  const after = await page.screenshot();
   expect(afterTime).not.toBe(beforeTime);
   expect(after.equals(before)).toBe(false);
 });

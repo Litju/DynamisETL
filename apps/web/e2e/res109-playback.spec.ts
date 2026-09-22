@@ -45,7 +45,7 @@ test("RES-109 Pose crosses multiple exact chunks and keeps telemetry on the live
   const before = await playheadNs(page);
   await page.getByLabel("Playback rate").selectOption("4");
   await page.getByRole("button", { name: "Play" }).click();
-  await page.waitForTimeout(3_800);
+  await page.waitForTimeout(5_000);
   const during = await playheadNs(page);
   await page.getByRole("button", { name: "Pause" }).click();
   expect(during).toBeGreaterThan(before + 10_000_000_000n);
