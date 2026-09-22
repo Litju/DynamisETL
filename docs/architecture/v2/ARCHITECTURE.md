@@ -6,7 +6,7 @@ _Frozen RES-109 contract summary. Machine-readable authority: [`architecture/sys
 
 ## 🔒 Freeze status
 
-The V2 architecture is frozen at contract version `2.0.1`. The §11 manual-acceptance amendment records the playhead-driven chunk coordinator and Pose coordinate/camera authority as an evidence-backed contract delta. Routine implementation must conform to it; an architecture change requires evidence, an ADR, a contract version/update, and a dedicated atomic commit.
+The V2 architecture is frozen at contract version `2.0.2`. The §11 and §12 manual-acceptance amendments record the playhead-driven chunk coordinator, Pose coordinate/camera authority, and atomic observation-aware subject transitions as evidence-backed contract deltas. Routine implementation must conform to it; an architecture change requires evidence, an ADR, a contract version/update, and a dedicated atomic commit.
 
 ## 🌐 Runtime topology
 
@@ -42,6 +42,7 @@ Vercel is frontend-only. Cloud Run owns the FastAPI/PyArrow/DuckDB process and i
 | Object plane | Private R2-preferred S3-compatible | Local filesystem | Rights/provenance contract |
 | Continuous playback | Shared playhead-driven coordinator for Signal/Field/Pose | Explicit `BUFFERING` and JSON compatibility path | ADR-006 / §11 browser acceptance |
 | Pose display authority | Body-local or match/world plus named camera ownership modes | Stable fixed-world framing | ADR-006 / §11 browser acceptance |
+| Pose subject transition | Artifact/entity observation authority plus atomic subject/time navigation | Explicit switching/no-observation/temporary-absence states | ADR-007 / §12 browser acceptance |
 
 ## 🧭 Ownership rules
 

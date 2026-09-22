@@ -1,12 +1,12 @@
 # DynamisData V2 architecture compliance report
 
-_RES-109 final acceptance report including the §11 manual-acceptance amendment. Raw real-data receipts remain in the external evidence cache; this report contains summary evidence only._
+_RES-109 final acceptance report including the §11 and §12 manual-acceptance amendments. Raw real-data receipts remain in the external evidence cache; this report contains summary evidence only._
 
 ---
 
 ## ✅ Outcome
 
-RES-109 is complete. The V2 contract was frozen before architecture-changing implementation, the §11 amendment is sealed as contract version 2.0.1, and the complete local scientific/backend/frontend/renderer/performance matrix is green. The branch is clean and ready for PR review against protected `main`.
+RES-109 is complete only when the §11 and §12 gates below remain green at the final review head. The V2 contract is sealed as version 2.0.2, including atomic observation-aware Pose subject transitions; production resource provisioning and promotion were not performed.
 
 Production resource provisioning and promotion were not performed; that remains RES-107 scope.
 
@@ -26,6 +26,7 @@ Production resource provisioning and promotion were not performed; that remains 
 | Locked test import gates | `e8183d4`, `509f47b` | repository scripts and pytest path work in CI runtime |
 | §11 playback/camera amendment | `f973282` | shared coordinator, reverse clock, real-browser multi-boundary acceptance |
 | §11 exact-density/transient hardening | `b95028d` | uneven real-subject guard, atomic reverse start, commit-time hydration race fix |
+| §12 atomic Pose subject switching | `5ccd9cd` | observation authority, exact target-time navigation, scoped retirement, switching/absence states |
 
 ## 📊 Before/after benchmark evidence
 
@@ -59,6 +60,7 @@ Immutable external receipt locators (SHA-256):
 | Synthetic artifacts | All 8 deterministic fixtures materialized outside repository | Passed |
 | Package build | `uv build --out-dir <external receipt root>` | Wheel and source distribution built |
 | Dense API | Exact/reduced/entity scope/ETag/Arrow/JSON/path safety/unit metadata tests | Passed |
+| Pose observation authority | Artifact/entity first/last/count, bounded exact-range observation route, unavailable-row exclusion | Passed |
 | Object store | checksum, immutable repeat, range, traversal tests | 31 focused tests passed |
 
 Benchmark candidates are accepted only after semantic comparison with the current dense service across normalized timestamps, identities, extrema, columns, ordering, and authoritative window metadata. The real maximum case rejected the PyArrow reduced candidate for semantic mismatch; it is not used as evidence for query ownership.
@@ -94,6 +96,15 @@ transforms remain presentation-only; all landmark, skeleton, cue, analytical,
 angle, error-radius, selection, and telemetry layers consume the same current
 frame authority.
 
+## 🧭 §12 atomic subject-switch acceptance
+
+| Surface/evidence | Result |
+| --- | --- |
+| Atomic transition | Stop playback → clear subject/joint/hover transient state → retire only prior subject scope → resolve exact target → navigate subject + `t_ns` together → replace coordinator → render after exact readiness |
+| Observation authority | Artifact/entity first/last observed canonical time and observed-frame count; bounded range route handles a first observation inside an explicit range |
+| UI semantics | Observed frame, temporary absence, no Pose in period/range, and Switching/loading are distinct; no-frame telemetry never lists every landmark as provider-unavailable |
+| Browser regression matrix | Paused >10 s, playing, BUFFERING, numeric ID, body-local individual, all-subject focus, first observation >0, temporary absence, no Pose, reload/back-forward, and replacement-request survival |
+
 ## 📦 Runtime and deployment readiness
 
 - API container remains non-root, healthchecked, `PORT`-aware, and Cloud Run-oriented.
@@ -112,6 +123,6 @@ frame authority.
 
 ## 🏁 Closure decision
 
-The implementation meets V2.0.1 and the RES-109 §11 acceptance matrix. RES-107
+The implementation meets V2.0.2 and the RES-109 §11 + §12 acceptance matrix. RES-107
 may proceed with production provisioning/deployment after review and merge of
 the pull request. RES-107 was not started by this mission.

@@ -16,6 +16,7 @@ _Benchmark-gated and negative architecture decisions frozen by RES-109._
 | Scientific compute | Python/NumPy/SciPy/PyArrow | [ADR-005](./ADR-005-native-and-scientific-compute.md) |
 | Continuous dense playback | Shared playhead-driven `PlaybackChunkCoordinator` with explicit `BUFFERING` and exact boundary handoff | [ADR-006](./ADR-006-continuous-playback-and-pose-camera.md) |
 | Pose coordinate/camera authority | Explicit body-local vs match/world display mode and named camera ownership state machine | [ADR-006](./ADR-006-continuous-playback-and-pose-camera.md) |
+| Pose subject transitions | Atomic subject + exact canonical time navigation, stable observation authority, scoped retirement, and explicit absence states | [ADR-007](./ADR-007-pose-subject-transition-and-observation-authority.md) |
 
 ## 🚫 Explicitly rejected for V2
 

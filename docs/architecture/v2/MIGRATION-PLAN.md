@@ -20,6 +20,7 @@ _Implementation order after the RES-109 contract-freeze commit._
 | 10 | Cloud Run API container/runtime readiness | Contracted; not started | build/health/resource receipt |
 | 11 | Full architecture acceptance and compliance report | Contracted; not started | complete matrix and PR |
 | 12 | §11 manual-acceptance amendment: shared playhead coordinator, exact multi-boundary handoff, Pose coordinate/camera authority, and auxiliary-layer synchronization | Required before PR review | ADR-006, unit/browser receipts, updated contract/compliance report |
+| 13 | §12 manual-acceptance amendment: atomic Pose subject switching and observation-aware seek | Required before merge | ADR-007, observation authority, subject-switch/browser receipts, updated contract/compliance report |
 
 ## 🔄 Implementation flow
 
