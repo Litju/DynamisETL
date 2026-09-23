@@ -19,6 +19,7 @@ This module intentionally avoids ``from __future__ import annotations``:
 Dagster resolves annotations at decoration time.
 """
 
+import pyarrow as pa
 import pyarrow.compute as pc
 from dagster import (
     AssetCheckResult,
@@ -232,7 +233,9 @@ def dfl_tactical_event_processing() -> dict:
         for tracking_ref in tracking_refs:
             tracking_table, tracking_input = load_silver(resolved, tracking_ref)
             period_events = event_table.filter(
-                pc.equal(event_table["trial_id"], tracking_ref.trial_id)
+                pc.call_function(
+                    "equal", [event_table["trial_id"], pa.scalar(tracking_ref.trial_id)]
+                )
             )
             if period_events.num_rows == 0:
                 continue

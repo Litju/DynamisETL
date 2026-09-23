@@ -12,7 +12,7 @@ import json
 import logging
 import os
 import time
-from typing import Annotated, Any, Protocol
+from typing import Annotated, Any, Literal, Protocol, cast
 
 import pyarrow.parquet as pq
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
@@ -342,7 +342,7 @@ def _parse_columns(columns: str | None) -> tuple[str, ...]:
 def create_app(
     *,
     settings: Settings | None = None,
-    backend: ServingBackend | None = None,
+    backend: Any | None = None,
 ) -> FastAPI:
     """Build the API application.
 
@@ -658,11 +658,12 @@ def create_app(
             max_points=max_points,
         )
         metadata = ref.artifact_metadata
-        level = str(metadata.get("tactical_level") or "A")
-        if level not in {"A", "B", "C", "D", "E"}:
+        level_value = str(metadata.get("tactical_level") or "A")
+        if level_value not in {"A", "B", "C", "D", "E"}:
             raise HTTPException(
                 status_code=500, detail="tactical artifact has invalid level metadata"
             )
+        level = cast(Literal["A", "B", "C", "D", "E"], level_value)
         tactical_meta = TacticalSeriesMeta(
             artifact=ref,
             series_name=str(metadata.get("series_name") or "unknown"),

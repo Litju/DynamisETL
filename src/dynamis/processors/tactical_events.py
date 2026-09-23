@@ -46,10 +46,7 @@ REQUIRED_TRACKING_COLUMNS = {
 
 
 def _finite(value: object) -> bool:
-    try:
-        return math.isfinite(float(value))
-    except (TypeError, ValueError):
-        return False
+    return isinstance(value, (int, float)) and math.isfinite(value)
 
 
 def _tracking_frames(table: pa.Table) -> tuple[list[int], dict[int, list[dict[str, Any]]]]:

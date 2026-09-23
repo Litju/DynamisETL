@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import math
 from collections import defaultdict
-from typing import Any
+from typing import Any, cast
 
 import pyarrow as pa
 
@@ -33,10 +33,7 @@ INFLUENCE_PARAMETERS: dict[str, Any] = {
 
 
 def _finite(value: object) -> bool:
-    try:
-        return math.isfinite(float(value))
-    except (TypeError, ValueError):
-        return False
+    return isinstance(value, (int, float)) and math.isfinite(value)
 
 
 def _velocity_map(
@@ -59,14 +56,20 @@ def _velocity_map(
             timestamp = int(row["t_rel_ns"])
             vx, vy = row.get("vx_m_s"), row.get("vy_m_s")
             if _finite(vx) and _finite(vy):
-                result[(timestamp, entity_id)] = (float(vx), float(vy), "provider")
+                result[(timestamp, entity_id)] = (
+                    float(cast(float, vx)),
+                    float(cast(float, vy)),
+                    "provider",
+                )
                 counts["provided"] += 1
             elif previous is not None:
                 delta_s = (timestamp - int(previous["t_rel_ns"])) / 1_000_000_000
                 if 0 < delta_s <= max_gap_s:
                     result[(timestamp, entity_id)] = (
-                        (float(row["x_m"]) - float(previous["x_m"])) / delta_s,
-                        (float(row["y_m"]) - float(previous["y_m"])) / delta_s,
+                        (float(cast(float, row["x_m"])) - float(cast(float, previous["x_m"])))
+                        / delta_s,
+                        (float(cast(float, row["y_m"])) - float(cast(float, previous["y_m"])))
+                        / delta_s,
                         "position_first_difference",
                     )
                     counts["derived"] += 1
