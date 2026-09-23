@@ -111,7 +111,7 @@
         "input_artifacts": [
           {
             "role": "tracking",
-            "sha256": "48528be40ad82fa3e2b232e1af8d311705f7d6d119925ef199d2b59ea36fd3c"
+            "sha256": "48528be40ad82fa3e2b232e1af8d311705f7d6d119925ef199d2b59ea36fd3c9"
           },
           {
             "role": "match_metadata",
@@ -215,7 +215,12 @@
         "level_b_territory": "unavailable",
         "level_c_influence": "unavailable",
         "level_d_event_linked": "unavailable",
-        "level_e_shape_phase": "unavailable"
+        "level_e_shape_phase": "unavailable",
+        "matchlab_v3_functional_units": "unavailable",
+        "matchlab_v3_shape_graph": "unavailable",
+        "matchlab_v3_triangles": "unavailable",
+        "matchlab_v3_interactions": "unavailable",
+        "possession_context": "unavailable"
       },
       "quality_evidence": {
         "sheet_count": 19,
