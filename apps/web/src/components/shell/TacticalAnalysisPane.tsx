@@ -167,7 +167,7 @@ function TeamTable({
           <tr key={metric.key} className="border-b border-border-subtle/50 last:border-b-0">
             <th scope="row" className="py-1.5 text-left text-[11px] font-normal text-text-muted">
               {metric.label}
-              {metric.unit ? <span className="ml-1 text-text-muted/70">{metric.unit}</span> : null}
+              {metric.unit ? <span className="ml-1 text-text-muted">{metric.unit}</span> : null}
             </th>
             {rows.map(({ groupId, row }) => (
               <td key={groupId} className="mono py-1.5 pl-2 text-right tabular text-text-primary">
@@ -713,7 +713,7 @@ function ReportTab({ payload, datasetId, sessionId }: { payload: Record<string, 
       <button type="button" onClick={download} className="t-control mt-3 rounded-control border border-border-strong px-2 text-[11px] text-text-secondary hover:bg-surface-3">
         Download JSON report
       </button>
-      <pre data-testid="tactical-report" className="mono mt-3 max-h-[28rem] overflow-auto rounded-control border border-border-subtle bg-surface-0 p-2 text-[10px] text-text-muted">{text}</pre>
+      <pre data-testid="tactical-report" tabIndex={0} aria-label="Tactical report JSON" className="mono mt-3 max-h-[28rem] overflow-auto rounded-control border border-border-subtle bg-surface-0 p-2 text-[10px] text-text-muted">{text}</pre>
     </div>
   );
 }

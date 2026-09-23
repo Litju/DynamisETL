@@ -479,6 +479,12 @@ export function PoseViewer() {
           data-testid="pose-canvas"
           data-renderer="r3f"
           data-renderer-ready={rendererReady ? "true" : "false"}
+          role="img"
+          aria-label={
+            allSubjects
+              ? `Pose world: ${subjectFrames.length} subjects in the match/world frame, subject ${subjectId ?? "none"} highlighted${currentTime !== null ? ` at ${formatClockNs(currentTime)}` : ""}`
+              : `Pose skeleton of subject ${subjectId ?? "none"} in the ${coordinateMode === "body_local" ? "body-local" : "match/world"} frame${currentTime !== null ? ` at ${formatClockNs(currentTime)}` : ""}: ${summary.observedLandmarks} landmarks observed, ${summary.unavailableLandmarks} unavailable`
+          }
         >
           <Suspense fallback={<LoadingPanel label="Loading 3D renderer" />}>
             <PoseCanvas
