@@ -51,6 +51,21 @@ The accepted DFL slice supports deterministic source-event snapshots: source eve
 
 No Level E processor is frozen for this run. Formation, lines, block height, phase, press and transition labels need a versioned temporal model, stable-window rule, attack direction, and a capability gate that the accepted slices do not currently satisfy. UI and API return unavailable rather than labels.
 
+## MatchLab Tactical V3 baseline
+
+RES-113 consumes the additional role, direction, possession, functional-unit,
+Delaunay, triangle, and interaction contracts in [`METHODS.md`](METHODS.md).
+They do not reopen Level E: the accepted sources still lack the evidence needed
+to claim formation, phase, pressing, or transition labels. Source positions
+classify players; source direction is required for attack-normalized coordinates;
+source possession is contextual and is never reconstructed from distance.
+
+The V3 processor is `tactical.matchlab_shape` v1. Its detailed output fields and
+fixed renderer domains live in `architecture/tactical-metrics.json`. V3 geometry
+is `PIPELINE_DERIVED`; provider possession, role, direction, event, and phase
+fields remain `SOURCE_DERIVED`. SkillCorner tracking remains `MODEL_ESTIMATED`
+input, and its quality class is retained on every result.
+
 ## Algorithm identities
 
 The implementation identities are reserved and versioned as follows:
@@ -60,5 +75,6 @@ The implementation identities are reserved and versioned as follows:
 - `tactical.spatial_territory` v1
 - `tactical.arrival_time` v1
 - `tactical.source_event_snapshot` v1
+- `tactical.matchlab_shape` v1
 
 They all consume canonical Arrow tables and publish dense tactical series as external Parquet. They do not read raw provider payloads or recompute in React.

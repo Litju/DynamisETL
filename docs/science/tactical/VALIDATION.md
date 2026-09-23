@@ -1,40 +1,42 @@
-# Tactical validation plan
+# MatchLab Tactical V3 validation
 
-The tests in `tests/test_tactical_geometry.py`, `tests/test_tactical_territory.py`, `tests/test_tactical_influence.py`, and `tests/test_tactical_events.py` are the CI known-answer gate. The real-data receipts are local, external-data evidence and never contain raw rows.
+## Synthetic known answers
 
-## Level A known answers
+The processor tests use analytic coordinates and explicit source-context maps.
+They cover:
 
-- Four symmetric points around the origin: centroid `(0,0)`, length `2 m`, width `2 m`, hull area `4 m²`, pairwise mean `2 + sqrt(2) / 2` m.
-- A two-player line: nearest and pairwise distances equal the analytic separation; width is zero and length:width is unavailable.
-- Collocated points: stable identity order is deterministic and no NaN is emitted.
-- Player dropout: valid-player count and quality evidence change; no imputed player is introduced.
-- A side swap changes frame-axis x sign but does not change scalar distances or area. Attack-normalized output remains unavailable without a direction authority.
-- Rates are exact finite differences in SI units and do not cross a stream boundary.
+- one-player goalkeeper and symmetric DEF/MID/ATT centroids, line heights,
+  widths/depths, covariance orientation/dispersion, inter-line gaps, and block
+  depth;
+- direction normalization for both sides while preserving pair distances and
+  raw source coordinates;
+- square Delaunay triangulation, deterministic cocircular output, duplicate
+  positions, collinear points, stable-edge persistence, and a time-gap reset;
+- triangle area/aspect/orientation, ball distance, zone, opponent inclusion,
+  nearest-team context, and persistence bounds;
+- nearest/second-nearest defender, 10 m overload, mutual-nearest tie-up, and
+  free-attacker rules;
+- missing roles, possession, ball, and direction failing closed without
+  synthesized labels; source possession remains `SOURCE_DERIVED`.
 
-## Level B known answers
+## Accepted local source checks
 
-- Four points at the corners of a 10 m × 10 m pitch produce four 25 m² cells and 100 m² total control.
-- A symmetric two-player split produces equal areas and a 50/50 team split.
-- A coincident pair produces one deterministic owner and one zero-area cell.
-- A point outside the pitch is clamped only for territory, flagged, and the returned cells remain bounded by the pitch.
-- Missing or single-player frames fail the declared minimum gate without a fake full-pitch cell.
+The bounded DFL and SkillCorner acceptance receipts record the accepted raw
+metadata/tracking checksums, canonical tracking input checksum, role and
+direction availability, possession coverage, row counts, output checksums, and
+identical rerun checksums. Only receipts and aggregate counts are stored outside
+the repository; source rows are not committed.
 
-## Level C known answers
+DFL possession is checked against the home/away match-information IDs and its
+active/inactive status. SkillCorner possession group/player is checked against
+match metadata. Normalized direction is checked for each team and half when the
+source field is valid. The tests do not claim that roster positions equal
+time-varying tactical positions or that source possession is event-ground truth.
 
-- Zero velocity is distance/speed plus reaction time.
-- Equal-distance defenders tie by stable object id and produce bounded influence percentages.
-- Increasing reaction time increases arrival time monotonically.
-- Increasing distance never decreases arrival time under the frozen model.
-- Influence percentages are within `[0,100]`; selected influence area is within `[0,pitch_area]`.
-- Parameter changes produce different parameter hashes and a sensitivity receipt.
+## Regression gates
 
-## Level D known answers
-
-- An event and tracking sample on the same timestamp join exactly.
-- A one-frame offset joins only when within the declared tolerance.
-- An out-of-tolerance event remains unsynchronized instead of being invented into a snapshot.
-- Provider event type/subtype/player/team/context are preserved; the processor does not emit a fabricated `line_break`, `possession`, `pressure`, or phase label.
-
-## Real-data acceptance
-
-The DFL acceptance run must prove non-empty A/B/C series, source-event snapshot rows, full input checksums, code SHA, method/version, coordinate frame and quality diagnostics. SkillCorner acceptance must prove A/B and the partial C gate while retaining `MODEL_ESTIMATED`/extrapolation disclosure. Women’s/GNSS must prove the tactical capability response is unavailable and that no tactical processor is run. Real DFL receipts live under the configured external cache root.
+Run the targeted tactical authority/geometry/shape tests, the full Python suite,
+Python format/lint/type checks, web type/lint/unit/API/build checks, repository
+and rights guards, RES-112 browser acceptance, and the real-browser RES-110 and
+RES-112 acceptance paths. A deterministic receipt requires both its run identity
+and every materialized Parquet checksum to match on rerun.

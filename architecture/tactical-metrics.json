@@ -15,15 +15,33 @@
       "max_velocity_gap_s": 0.25
     },
     "velocity_authority": "provider vx/vy first; otherwise same-entity first difference only within max_velocity_gap_s; zero fallback is explicit",
-    "tie_break": ["group_id", "entity_id"],
+    "tie_break": [
+      "group_id",
+      "entity_id"
+    ],
     "pressure_on_ball": "unavailable_without_source_resolved_ball_carrier"
   },
   "levels": {
-    "A": {"measurement_class": "PIPELINE_DERIVED", "input_contract": "canonical tracking positions"},
-    "B": {"measurement_class": "PIPELINE_DERIVED", "input_contract": "canonical tracking positions plus declared pitch boundary"},
-    "C": {"measurement_class": "MODEL_ESTIMATED", "input_contract": "canonical positions plus versioned kinematic assumptions"},
-    "D": {"measurement_class": "PIPELINE_DERIVED", "input_contract": "source event rows plus explicitly synchronized tracking"},
-    "E": {"measurement_class": "MODEL_ESTIMATED", "input_contract": "temporally stable team tracking and a versioned shape/phase model"}
+    "A": {
+      "measurement_class": "PIPELINE_DERIVED",
+      "input_contract": "canonical tracking positions"
+    },
+    "B": {
+      "measurement_class": "PIPELINE_DERIVED",
+      "input_contract": "canonical tracking positions plus declared pitch boundary"
+    },
+    "C": {
+      "measurement_class": "MODEL_ESTIMATED",
+      "input_contract": "canonical positions plus versioned kinematic assumptions"
+    },
+    "D": {
+      "measurement_class": "PIPELINE_DERIVED",
+      "input_contract": "source event rows plus explicitly synchronized tracking"
+    },
+    "E": {
+      "measurement_class": "MODEL_ESTIMATED",
+      "input_contract": "temporally stable team tracking and a versioned shape/phase model"
+    }
   },
   "global_method_contract": {
     "coordinate_frame": "Every output cites the input coordinate_frame_id; no implicit axis swap or origin conversion is allowed.",
@@ -33,35 +51,498 @@
     "missing_policy": "Missing coordinates are absent from the frame calculation and quality records state the missing count. Extrapolated/source-model rows are retained with input quality provenance unless a processor parameter explicitly excludes them.",
     "minimum_players": 2,
     "units": "SI units; ratios and proportions use unit 1.",
-    "provenance": ["metric_definition", "algorithm_id", "algorithm_version", "parameters_hash", "code_git_sha", "input_checksums", "coordinate_frame_id", "measurement_class", "quality"]
+    "provenance": [
+      "metric_definition",
+      "algorithm_id",
+      "algorithm_version",
+      "parameters_hash",
+      "code_git_sha",
+      "input_checksums",
+      "coordinate_frame_id",
+      "measurement_class",
+      "quality"
+    ]
   },
   "metrics": [
-    {"id": "tactical.team.centroid_x", "level": "A", "name": "Team centroid X", "unit": "m", "kind": "series", "definition": "Arithmetic mean of finite included player x_m at one canonical timestamp."},
-    {"id": "tactical.team.centroid_y", "level": "A", "name": "Team centroid Y", "unit": "m", "kind": "series", "definition": "Arithmetic mean of finite included player y_m at one canonical timestamp."},
-    {"id": "tactical.team.length", "level": "A", "name": "Team length", "unit": "m", "kind": "series", "definition": "max(x_m) - min(x_m) in the declared frame; not attack-normalized unless direction is declared."},
-    {"id": "tactical.team.width", "level": "A", "name": "Team width", "unit": "m", "kind": "series", "definition": "max(y_m) - min(y_m) in the declared frame."},
-    {"id": "tactical.team.length_width_ratio", "level": "A", "name": "Team length:width ratio", "unit": "1", "kind": "series", "definition": "length / width; unavailable when width is zero."},
-    {"id": "tactical.team.hull_area", "level": "A", "name": "Team convex-hull occupied area", "unit": "m**2", "kind": "series", "definition": "Area of the convex hull of included player positions; fewer than three non-collinear points produce zero area."},
-    {"id": "tactical.team.stretch_index", "level": "A", "name": "Team stretch index", "unit": "1", "kind": "series", "definition": "Root-mean-square player distance from the team centroid divided by pitch diagonal; pitch dimensions are parameters."},
-    {"id": "tactical.team.pairwise_distance_mean", "level": "A", "name": "Mean pairwise teammate distance", "unit": "m", "kind": "series", "definition": "Mean of all unordered included-player pair distances."},
-    {"id": "tactical.team.pairwise_distance_min", "level": "A", "name": "Minimum pairwise teammate distance", "unit": "m", "kind": "series", "definition": "Minimum unordered included-player pair distance."},
-    {"id": "tactical.team.pairwise_distance_max", "level": "A", "name": "Maximum pairwise teammate distance", "unit": "m", "kind": "series", "definition": "Maximum unordered included-player pair distance."},
-    {"id": "tactical.player.nearest_teammate_distance", "level": "A", "name": "Nearest teammate distance", "unit": "m", "kind": "series", "definition": "Minimum Euclidean distance to another included player in the same declared group."},
-    {"id": "tactical.player.nearest_opponent_distance", "level": "A", "name": "Nearest opponent distance", "unit": "m", "kind": "series", "definition": "Minimum Euclidean distance to an included player in another declared group."},
-    {"id": "tactical.team.inter_centroid_distance", "level": "A", "name": "Inter-team centroid distance", "unit": "m", "kind": "series", "definition": "Euclidean distance between two declared team centroids."},
-    {"id": "tactical.player.distance_to_team_centroid", "level": "A", "name": "Distance to team centroid", "unit": "m", "kind": "series", "definition": "Euclidean distance from one player to its declared team centroid."},
-    {"id": "tactical.ball.distance_to_team_centroid", "level": "A", "name": "Ball-to-team-centroid distance", "unit": "m", "kind": "series", "definition": "Euclidean distance from the finite ball row to each team centroid; no possession is inferred."},
-    {"id": "tactical.team.expansion_rate_x", "level": "A", "name": "Longitudinal expansion rate", "unit": "m/s", "kind": "series", "definition": "First finite difference of frame-axis team length over adjacent canonical timestamps within one continuous stream."},
-    {"id": "tactical.team.expansion_rate_y", "level": "A", "name": "Lateral expansion rate", "unit": "m/s", "kind": "series", "definition": "First finite difference of frame-axis team width over adjacent canonical timestamps within one continuous stream."},
-    {"id": "tactical.player.voronoi_area", "level": "B", "name": "Clipped player Voronoi area", "unit": "m**2", "kind": "series", "definition": "Player nearest-point cell clipped to the declared rectangular pitch boundary."},
-    {"id": "tactical.team.voronoi_controlled_area", "level": "B", "name": "Team Voronoi-controlled area", "unit": "m**2", "kind": "series", "definition": "Sum of clipped player cells for one declared team."},
-    {"id": "tactical.team.voronoi_control_percentage", "level": "B", "name": "Team Voronoi control percentage", "unit": "%", "kind": "series", "definition": "Team controlled area / pitch area * 100; this is geometric territory, not possession probability."},
-    {"id": "tactical.team.frame_third_controlled_area", "level": "B", "name": "Team frame-third controlled area", "unit": "m**2", "kind": "series", "definition": "Clipped player-cell area intersected with one equal-width frame-axis x third; not attacking thirds."},
-    {"id": "tactical.player.arrival_time", "level": "C", "name": "Player time-to-arrival field", "unit": "s", "kind": "series", "definition": "Declared kinematic travel-time estimate from current position to a bounded grid cell."},
-    {"id": "tactical.team.influence_percentage", "level": "C", "name": "Team dominant influence percentage", "unit": "%", "kind": "series", "definition": "Percentage of bounded grid cells whose minimum declared arrival time belongs to the team."},
-    {"id": "tactical.player.influence_area", "level": "C", "name": "Selected-player influence area", "unit": "m**2", "kind": "series", "definition": "Area of bounded cells for which the selected player has the minimum declared arrival time."},
-    {"id": "tactical.player.opponent_min_arrival_time", "level": "C", "name": "Opponent minimum arrival time", "unit": "s", "kind": "series", "definition": "Minimum declared arrival time from an opponent to a selected location."},
-    {"id": "tactical.source_event.snapshot", "level": "D", "name": "Source event tracking snapshot", "unit": "1", "kind": "series", "definition": "Chronological source event identity/context joined to the nearest synchronized tracking frame; never relabelled as a new event class."},
-    {"id": "tactical.shape.team_window", "level": "E", "name": "Team shape window", "unit": "1", "kind": "series", "definition": "Reserved until a temporal shape model, stable-window rule and source capability gate pass."}
-  ]
+    {
+      "id": "tactical.team.centroid_x",
+      "level": "A",
+      "name": "Team centroid X",
+      "unit": "m",
+      "kind": "series",
+      "definition": "Arithmetic mean of finite included player x_m at one canonical timestamp."
+    },
+    {
+      "id": "tactical.team.centroid_y",
+      "level": "A",
+      "name": "Team centroid Y",
+      "unit": "m",
+      "kind": "series",
+      "definition": "Arithmetic mean of finite included player y_m at one canonical timestamp."
+    },
+    {
+      "id": "tactical.team.length",
+      "level": "A",
+      "name": "Team length",
+      "unit": "m",
+      "kind": "series",
+      "definition": "max(x_m) - min(x_m) in the declared frame; not attack-normalized unless direction is declared."
+    },
+    {
+      "id": "tactical.team.width",
+      "level": "A",
+      "name": "Team width",
+      "unit": "m",
+      "kind": "series",
+      "definition": "max(y_m) - min(y_m) in the declared frame."
+    },
+    {
+      "id": "tactical.team.length_width_ratio",
+      "level": "A",
+      "name": "Team length:width ratio",
+      "unit": "1",
+      "kind": "series",
+      "definition": "length / width; unavailable when width is zero."
+    },
+    {
+      "id": "tactical.team.hull_area",
+      "level": "A",
+      "name": "Team convex-hull occupied area",
+      "unit": "m**2",
+      "kind": "series",
+      "definition": "Area of the convex hull of included player positions; fewer than three non-collinear points produce zero area."
+    },
+    {
+      "id": "tactical.team.stretch_index",
+      "level": "A",
+      "name": "Team stretch index",
+      "unit": "1",
+      "kind": "series",
+      "definition": "Root-mean-square player distance from the team centroid divided by pitch diagonal; pitch dimensions are parameters."
+    },
+    {
+      "id": "tactical.team.pairwise_distance_mean",
+      "level": "A",
+      "name": "Mean pairwise teammate distance",
+      "unit": "m",
+      "kind": "series",
+      "definition": "Mean of all unordered included-player pair distances."
+    },
+    {
+      "id": "tactical.team.pairwise_distance_min",
+      "level": "A",
+      "name": "Minimum pairwise teammate distance",
+      "unit": "m",
+      "kind": "series",
+      "definition": "Minimum unordered included-player pair distance."
+    },
+    {
+      "id": "tactical.team.pairwise_distance_max",
+      "level": "A",
+      "name": "Maximum pairwise teammate distance",
+      "unit": "m",
+      "kind": "series",
+      "definition": "Maximum unordered included-player pair distance."
+    },
+    {
+      "id": "tactical.player.nearest_teammate_distance",
+      "level": "A",
+      "name": "Nearest teammate distance",
+      "unit": "m",
+      "kind": "series",
+      "definition": "Minimum Euclidean distance to another included player in the same declared group."
+    },
+    {
+      "id": "tactical.player.nearest_opponent_distance",
+      "level": "A",
+      "name": "Nearest opponent distance",
+      "unit": "m",
+      "kind": "series",
+      "definition": "Minimum Euclidean distance to an included player in another declared group."
+    },
+    {
+      "id": "tactical.team.inter_centroid_distance",
+      "level": "A",
+      "name": "Inter-team centroid distance",
+      "unit": "m",
+      "kind": "series",
+      "definition": "Euclidean distance between two declared team centroids."
+    },
+    {
+      "id": "tactical.player.distance_to_team_centroid",
+      "level": "A",
+      "name": "Distance to team centroid",
+      "unit": "m",
+      "kind": "series",
+      "definition": "Euclidean distance from one player to its declared team centroid."
+    },
+    {
+      "id": "tactical.ball.distance_to_team_centroid",
+      "level": "A",
+      "name": "Ball-to-team-centroid distance",
+      "unit": "m",
+      "kind": "series",
+      "definition": "Euclidean distance from the finite ball row to each team centroid; no possession is inferred."
+    },
+    {
+      "id": "tactical.team.expansion_rate_x",
+      "level": "A",
+      "name": "Longitudinal expansion rate",
+      "unit": "m/s",
+      "kind": "series",
+      "definition": "First finite difference of frame-axis team length over adjacent canonical timestamps within one continuous stream."
+    },
+    {
+      "id": "tactical.team.expansion_rate_y",
+      "level": "A",
+      "name": "Lateral expansion rate",
+      "unit": "m/s",
+      "kind": "series",
+      "definition": "First finite difference of frame-axis team width over adjacent canonical timestamps within one continuous stream."
+    },
+    {
+      "id": "tactical.player.voronoi_area",
+      "level": "B",
+      "name": "Clipped player Voronoi area",
+      "unit": "m**2",
+      "kind": "series",
+      "definition": "Player nearest-point cell clipped to the declared rectangular pitch boundary."
+    },
+    {
+      "id": "tactical.team.voronoi_controlled_area",
+      "level": "B",
+      "name": "Team Voronoi-controlled area",
+      "unit": "m**2",
+      "kind": "series",
+      "definition": "Sum of clipped player cells for one declared team."
+    },
+    {
+      "id": "tactical.team.voronoi_control_percentage",
+      "level": "B",
+      "name": "Team Voronoi control percentage",
+      "unit": "%",
+      "kind": "series",
+      "definition": "Team controlled area / pitch area * 100; this is geometric territory, not possession probability."
+    },
+    {
+      "id": "tactical.team.frame_third_controlled_area",
+      "level": "B",
+      "name": "Team frame-third controlled area",
+      "unit": "m**2",
+      "kind": "series",
+      "definition": "Clipped player-cell area intersected with one equal-width frame-axis x third; not attacking thirds."
+    },
+    {
+      "id": "tactical.player.arrival_time",
+      "level": "C",
+      "name": "Player time-to-arrival field",
+      "unit": "s",
+      "kind": "series",
+      "definition": "Declared kinematic travel-time estimate from current position to a bounded grid cell."
+    },
+    {
+      "id": "tactical.team.influence_percentage",
+      "level": "C",
+      "name": "Team dominant influence percentage",
+      "unit": "%",
+      "kind": "series",
+      "definition": "Percentage of bounded grid cells whose minimum declared arrival time belongs to the team."
+    },
+    {
+      "id": "tactical.player.influence_area",
+      "level": "C",
+      "name": "Selected-player influence area",
+      "unit": "m**2",
+      "kind": "series",
+      "definition": "Area of bounded cells for which the selected player has the minimum declared arrival time."
+    },
+    {
+      "id": "tactical.player.opponent_min_arrival_time",
+      "level": "C",
+      "name": "Opponent minimum arrival time",
+      "unit": "s",
+      "kind": "series",
+      "definition": "Minimum declared arrival time from an opponent to a selected location."
+    },
+    {
+      "id": "tactical.source_event.snapshot",
+      "level": "D",
+      "name": "Source event tracking snapshot",
+      "unit": "1",
+      "kind": "series",
+      "definition": "Chronological source event identity/context joined to the nearest synchronized tracking frame; never relabelled as a new event class."
+    },
+    {
+      "id": "tactical.shape.team_window",
+      "level": "E",
+      "name": "Team shape window",
+      "unit": "1",
+      "kind": "series",
+      "definition": "Reserved until a temporal shape model, stable-window rule and source capability gate pass."
+    },
+    {
+      "id": "tactical.functional_unit.centroid_x",
+      "level": "V3",
+      "name": "Functional-unit centroid X",
+      "unit": "m",
+      "kind": "series",
+      "definition": "Arithmetic mean X of finite players with the source-declared GK/DEF/MID/ATT role; team-normalized X only when period direction is source-declared."
+    },
+    {
+      "id": "tactical.functional_unit.centroid_y",
+      "level": "V3",
+      "name": "Functional-unit centroid Y",
+      "unit": "m",
+      "kind": "series",
+      "definition": "Arithmetic mean Y in the same declared output frame as centroid X."
+    },
+    {
+      "id": "tactical.functional_unit.line_height_x",
+      "level": "V3",
+      "name": "Functional-unit line height X",
+      "unit": "m",
+      "kind": "series",
+      "definition": "Mean X of the source-declared role group; frame-axis unless direction is available."
+    },
+    {
+      "id": "tactical.functional_unit.depth",
+      "level": "V3",
+      "name": "Functional-unit frame-axis depth",
+      "unit": "m",
+      "kind": "series",
+      "definition": "Maximum minus minimum X for the source-declared role group."
+    },
+    {
+      "id": "tactical.functional_unit.width",
+      "level": "V3",
+      "name": "Functional-unit frame-axis width",
+      "unit": "m",
+      "kind": "series",
+      "definition": "Maximum minus minimum Y for the source-declared role group."
+    },
+    {
+      "id": "tactical.functional_unit.dispersion",
+      "level": "V3",
+      "name": "Functional-unit RMS dispersion",
+      "unit": "m",
+      "kind": "series",
+      "definition": "Root-mean-square Euclidean distance from role-group positions to their centroid."
+    },
+    {
+      "id": "tactical.functional_unit.orientation",
+      "level": "V3",
+      "name": "Functional-unit principal orientation",
+      "unit": "deg",
+      "kind": "series",
+      "definition": "Undirected principal covariance axis in [0,180); unavailable for a singleton or isotropic point cloud."
+    },
+    {
+      "id": "tactical.functional_unit.line_gap",
+      "level": "V3",
+      "name": "Functional-unit line gap",
+      "unit": "m",
+      "kind": "series",
+      "definition": "Absolute difference between source-role mean X values for DEF-MID or MID-ATT."
+    },
+    {
+      "id": "tactical.functional_unit.block_depth",
+      "level": "V3",
+      "name": "Outfield block depth",
+      "unit": "m",
+      "kind": "series",
+      "definition": "X range over source-classified DEF/MID/ATT players; excludes GK and unknown roles."
+    },
+    {
+      "id": "tactical.shape_graph.edge_persistence",
+      "level": "V3",
+      "name": "Delaunay edge persistence",
+      "unit": "1",
+      "kind": "series",
+      "definition": "Fraction of valid Delaunay frames containing the same unordered player-ID edge in the trailing 1 s window."
+    },
+    {
+      "id": "tactical.triangle.area",
+      "level": "V3",
+      "name": "Delaunay triangle area",
+      "unit": "m**2",
+      "kind": "series",
+      "definition": "Absolute shoelace area of a raw Delaunay triangle."
+    },
+    {
+      "id": "tactical.triangle.aspect_ratio",
+      "level": "V3",
+      "name": "Delaunay triangle aspect ratio",
+      "unit": "1",
+      "kind": "series",
+      "definition": "Longest triangle edge divided by shortest triangle edge."
+    },
+    {
+      "id": "tactical.triangle.ball_distance",
+      "level": "V3",
+      "name": "Triangle centroid to ball distance",
+      "unit": "m",
+      "kind": "series",
+      "definition": "Euclidean distance from triangle centroid to the finite same-frame ball point."
+    },
+    {
+      "id": "tactical.triangle.opponent_count",
+      "level": "V3",
+      "name": "Opponents inside triangle",
+      "unit": "players",
+      "kind": "series",
+      "definition": "Count of finite opposing-team player points inside or on the raw triangle boundary."
+    },
+    {
+      "id": "tactical.interaction.nearest_defender_distance",
+      "level": "V3",
+      "name": "Nearest defender distance",
+      "unit": "m",
+      "kind": "series",
+      "definition": "Minimum Euclidean distance from a source-classified attacker to a source-classified defender."
+    },
+    {
+      "id": "tactical.interaction.local_overload_margin",
+      "level": "V3",
+      "name": "Local overload margin",
+      "unit": "players",
+      "kind": "series",
+      "definition": "ATT-minus-DEF player count within the closed 10 m neighborhood of a focal attacker, including that attacker."
+    }
+  ],
+  "matchlab_tactical_v3": {
+    "algorithm_id": "tactical.matchlab_shape",
+    "algorithm_version": "1",
+    "measurement_class": "PIPELINE_DERIVED",
+    "source_context_class": "SOURCE_DERIVED",
+    "role_domains": [
+      "GK",
+      "DEF",
+      "MID",
+      "ATT",
+      "unknown"
+    ],
+    "role_mappings": {
+      "dfl_sportec_playing_position": {
+        "TW": "GK",
+        "LV": "DEF",
+        "RV": "DEF",
+        "IVL": "DEF",
+        "IVR": "DEF",
+        "DML": "MID",
+        "DMR": "MID",
+        "DMZ": "MID",
+        "OLM": "MID",
+        "ORM": "MID",
+        "ZO": "MID",
+        "STL": "ATT",
+        "STR": "ATT",
+        "STZ": "ATT"
+      },
+      "skillcorner_position_group": {
+        "Goalkeeper": "GK",
+        "Central Defender": "DEF",
+        "Full Back": "DEF",
+        "Midfield": "MID",
+        "Center Forward": "ATT",
+        "Wide Attacker": "ATT"
+      },
+      "skillcorner_position_acronym_overrides": {
+        "GK": "GK"
+      },
+      "unknown_policy": "unknown"
+    },
+    "direction": {
+      "source_values": [
+        "left_to_right",
+        "right_to_left"
+      ],
+      "normalization": "rotate_x_and_y_180_degrees_only_for_right_to_left",
+      "raw_coordinates_preserved": true,
+      "missing_policy": "frame_axis_only; attack-normalized zones unavailable",
+      "scope": "team_and_period"
+    },
+    "stable_graph": {
+      "window_ns": 1000000000,
+      "minimum_coverage_ns": 800000000,
+      "minimum_edge_persistence_fraction": 0.8,
+      "maximum_gap_ns": 200000000,
+      "coincident_point_owner": "lexicographically_smallest_player_id"
+    },
+    "local_overload": {
+      "radius_m": 10.0,
+      "definition": "ATT count minus DEF count within the closed Euclidean radius centred on the focal attacker; focal attacker included"
+    },
+    "geometric_tie_up": "attacker/defender are mutual nearest opponents; a free attacker has no mutual-nearest defender",
+    "scalar_field_domains": {
+      "voronoi_player_area_m2": {
+        "min": 0,
+        "max": 7140,
+        "display_overflow": "saturate_color_only",
+        "meaning": "clipped geometric cell area"
+      },
+      "voronoi_team_area_m2": {
+        "min": 0,
+        "max": 7140,
+        "display_overflow": "saturate_color_only",
+        "meaning": "sum of clipped team cells"
+      },
+      "voronoi_team_fraction_pct": {
+        "min": 0,
+        "max": 100,
+        "display_overflow": "impossible_for_valid_pitch",
+        "meaning": "geometric territory fraction, not possession probability"
+      },
+      "arrival_time_s": {
+        "min": 0,
+        "max": 5,
+        "display_overflow": "saturate_color_only",
+        "meaning": "model-estimated time-to-arrival; raw values retained"
+      },
+      "dominant_region": {
+        "domain": "declared team ids",
+        "tie_break": "stable player id",
+        "meaning": "winner-take-all minimum arrival-time owner; not probability"
+      },
+      "pressure_on_ball_s": {
+        "min": 0,
+        "max": 5,
+        "display_overflow": "saturate_color_only",
+        "availability": "requires explicit source carrier identity and declared arrival model"
+      },
+      "triangle_area_m2": {
+        "min": 0,
+        "max": 3570,
+        "display_overflow": "saturate_color_only",
+        "meaning": "raw triangle area; maximum applies to in-pitch vertices"
+      },
+      "triangle_aspect_ratio": {
+        "min": 1,
+        "max": 25,
+        "display_overflow": "saturate_color_only",
+        "meaning": "longest edge divided by shortest edge"
+      },
+      "triangle_persistence": {
+        "min": 0,
+        "max": 1,
+        "meaning": "fraction of valid triangulated frames in trailing window"
+      },
+      "shape_orientation_deg": {
+        "min": 0,
+        "max_exclusive": 180,
+        "meaning": "undirected principal axis relative to declared output frame"
+      },
+      "interaction_distance_m": {
+        "min": 0,
+        "max": 125.11,
+        "display_overflow": "saturate_color_only",
+        "meaning": "Euclidean pitch-frame distance; bound is pitch diagonal"
+      },
+      "local_overload_margin_players": {
+        "min": -22,
+        "max": 22,
+        "meaning": "nearby ATT count minus nearby DEF count"
+      }
+    },
+    "source_label_rule": "provider event/phase labels remain SOURCE_DERIVED; DynamisData phases are separate versioned MODEL_ESTIMATED outputs"
+  }
 }

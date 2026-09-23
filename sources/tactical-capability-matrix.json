@@ -1,7 +1,7 @@
 {
-  "schema_version": "1",
+  "schema_version": "2",
   "authority": "docs/science/tactical/TACTICAL-METRICS.md",
-  "investigated_at": "2026-09-22",
+  "investigated_at": "2026-09-23",
   "datasets": {
     "dfl-sportec-idsse": {
       "accepted_slice": {
@@ -29,20 +29,33 @@
         "ball": "tracking object with provider BallPossession/BallStatus retained in Bronze; canonical ball row is available",
         "clock": "provider UTC kickoff-origin clock; tracking and events share the declared source clock",
         "coordinate_frame": "pitch-centred metres, 105 x 68, x long axis and y short axis",
-        "attacking_direction": "unavailable; provider authority explicitly does not declare which x direction is toward either goal",
-        "event_semantics": "source events include passes/crosses/shots/tackles/ball claims and provider player/team/context attributes; event source order is not chronological and is canonically sorted",
-        "unmapped_fields": ["D", "A", "M"],
+        "attacking_direction": "unavailable; no team direction by period is declared",
+        "event_semantics": "source events include provider event identity/type/subtype/team/player/context; provider event order is not chronological and is canonically sorted",
+        "unmapped_fields": [
+          "D",
+          "A",
+          "M"
+        ],
         "measurement_classes": {
           "tracking": "RAW_MEASURED",
           "events": "SOURCE_DERIVED"
-        }
+        },
+        "possession": "source BallPossession=1 maps to match-information home TeamId; 2 maps to away TeamId; BallStatus=0 inactive, 1 active; team-level only, no carrier id",
+        "player_role": "match-information Player.PlayingPosition; exact V3 grouping: TW=GK; LV/RV/IVL/IVR=DEF; DML/DMR/DMZ/OLM/ORM/ZO=MID; STL/STR/STZ=ATT; absent/other codes=unknown",
+        "provider_phases": "unavailable; kick-off/final-whistle source events delimit periods only",
+        "normalized_frame": "unavailable; preserve source pitch-centred X/Y and frame-axis descriptors"
       },
       "capabilities": {
         "level_a_geometry": "supported",
         "level_b_territory": "supported",
         "level_c_influence": "supported_partial",
         "level_d_event_linked": "supported_source_snapshots_only",
-        "level_e_shape_phase": "unavailable"
+        "level_e_shape_phase": "unavailable",
+        "matchlab_v3_functional_units": "supported_from_declared_roster_roles; unknown_codes_retained",
+        "matchlab_v3_shape_graph": "supported_from_tracking",
+        "matchlab_v3_triangles": "supported_with_frame_axis_zones_and_ball_distance",
+        "matchlab_v3_interactions": "supported_for_mapped_ATT_DEF_roles",
+        "possession_context": "supported_source_team_only"
       },
       "quality_evidence": {
         "tracking_distinct_frames": 146211,
@@ -53,12 +66,40 @@
         "canonical_source_events": 1444,
         "source_events_before_delete_exclusion": 1504,
         "coordinate_bearing_source_events": 1392,
-        "event_tracking_sync": "same provider UTC clock; no residual uncertainty asserted"
+        "event_tracking_sync": "same provider UTC clock; no residual uncertainty asserted",
+        "ball_possession_values": {
+          "1": 79194,
+          "2": 67017
+        },
+        "ball_status_values": {
+          "0": 64751,
+          "1": 81460
+        },
+        "roster_playing_position_codes": {
+          "DML": 1,
+          "DMR": 1,
+          "DMZ": 2,
+          "HL": 1,
+          "IVL": 2,
+          "IVR": 2,
+          "LV": 3,
+          "OLM": 3,
+          "ORM": 3,
+          "RV": 3,
+          "STL": 1,
+          "STR": 2,
+          "STZ": 2,
+          "TW": 2,
+          "ZO": 3,
+          "unknown_or_absent": 9
+        },
+        "possession_player_identity": "not present in accepted DFL ball tracking fields"
       },
       "unavailable_reasons": [
         "attacking-direction normalized thirds and line-break direction cannot be asserted",
-        "current ball-carrier identity is not a canonical tracking field",
-        "formation/phase labels require a temporal model and direction authority not present in this slice"
+        "DFL BallPossession is team-level and does not resolve a carrier player",
+        "provider phase labels are absent; period-boundary events are not phases",
+        "formation/phase labels require a separate temporal model and source direction"
       ]
     },
     "skillcorner-opendata": {
@@ -88,19 +129,28 @@
         "ball": "tracking ball_data exists when coordinates are present",
         "clock": "provider match clock; 10 Hz tracking and 25 Hz pose share the declared match clock",
         "coordinate_frame": "pitch-centred X/Y metres, 105 x 68; body-pose Z is player-centroid-relative and not pitch-registered",
-        "attacking_direction": "unavailable in the accepted metadata/tracking authority",
-        "event_semantics": "unavailable in the accepted local artifact; manifest entries for dynamic events/phases are not fetched",
+        "attacking_direction": "accepted match metadata home_team_side has period-1 and period-2 directions; away direction is the inverse",
+        "event_semantics": "unavailable in accepted local artifacts; upstream dynamic-event file exists but is absent from this manifest",
         "measurement_classes": {
           "tracking": "MODEL_ESTIMATED",
           "pose": "MODEL_ESTIMATED"
-        }
+        },
+        "possession": "accepted tracking frame possession object declares group (home team/away team) and optional player_id; missing/null is unknown",
+        "player_role": "match metadata player_role.position_group/name/acronym; GK acronym is goalkeeper authority; unknown role is retained as unknown",
+        "provider_phases": "unavailable in accepted local artifacts; upstream phase file exists but is absent from this manifest",
+        "normalized_frame": "per-team, per-period source direction; right_to_left rotates raw X/Y by 180 degrees, left_to_right is unchanged; raw coordinates remain preserved"
       },
       "capabilities": {
         "level_a_geometry": "supported_with_model_input_quality",
         "level_b_territory": "supported_with_model_input_quality",
         "level_c_influence": "supported_partial_with_model_input_quality",
         "level_d_event_linked": "unavailable",
-        "level_e_shape_phase": "unavailable"
+        "level_e_shape_phase": "unavailable",
+        "matchlab_v3_functional_units": "supported_from_declared_role_groups_with_model_input_quality",
+        "matchlab_v3_shape_graph": "supported_with_model_input_quality",
+        "matchlab_v3_triangles": "supported_with_direction_possession_and_model_input_quality",
+        "matchlab_v3_interactions": "supported_for_source_classified_ATT_DEF_roles_with_model_input_quality",
+        "possession_context": "supported_source_team_and_player"
       },
       "quality_evidence": {
         "declared_players": 36,
@@ -109,12 +159,30 @@
         "tracking_measurement_class": "MODEL_ESTIMATED",
         "tracking_detection_flag": "true detected / false provider extrapolated / null unavailable",
         "local_event_files": false,
-        "local_phase_files": false
+        "local_phase_files": false,
+        "possession_group_values": {
+          "home team": "observed",
+          "away team": "observed",
+          "null": "unknown"
+        },
+        "possession_player_identity": "optional provider player_id",
+        "home_team_side": [
+          "right_to_left",
+          "left_to_right"
+        ],
+        "position_group_counts": {
+          "Center Forward": 5,
+          "Central Defender": 5,
+          "Full Back": 5,
+          "Midfield": 6,
+          "Other": 6,
+          "Wide Attacker": 9
+        },
+        "goalkeeper_role_authority": "player_role.acronym=GK (2 players); broad group may be Other"
       },
       "unavailable_reasons": [
-        "no accepted local event or phase artifact",
-        "attacking-direction semantics are not declared",
-        "tracking/pose are broadcast model estimates and pose Z cannot be used as pitch height"
+        "no accepted local dynamic-event or phase artifact",
+        "provider body-pose Z is relative to player centroid and is not pitch-registered"
       ]
     },
     "womens-soccer-positioning": {
@@ -153,8 +221,16 @@
         "sheet_count": 19,
         "total_data_rows": 858542,
         "nominal_rate_hz": 10,
-        "columns": ["local_time", "latitude", "longitude", "speed(km/h)", "hr(bpm)"],
-        "unmapped_columns": ["hr(bpm)"],
+        "columns": [
+          "local_time",
+          "latitude",
+          "longitude",
+          "speed(km/h)",
+          "hr(bpm)"
+        ],
+        "unmapped_columns": [
+          "hr(bpm)"
+        ],
         "datum_quality": "source datum not declared; WGS 84 is an inferred canonical interpretation"
       },
       "unavailable_reasons": [
