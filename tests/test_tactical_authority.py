@@ -11,6 +11,8 @@ def test_tactical_authority_files_are_consistent() -> None:
     )
 
     assert metrics["schema_version"] == "1"
+    assert metrics["level_c_model"]["algorithm_id"] == "tactical.arrival_time"
+    assert metrics["level_c_model"]["parameters"]["grid_interval_ns"] == 1_000_000_000
     assert {item["level"] for item in metrics["metrics"]} == {"A", "B", "C", "D", "E"}
     assert all(item["id"].startswith("tactical.") for item in metrics["metrics"])
     assert all(len(item["id"]) > 9 and item["unit"] for item in metrics["metrics"])

@@ -1,6 +1,23 @@
 {
   "schema_version": "1",
   "authority": "RES-110 tactical metric/method contract",
+  "level_c_model": {
+    "algorithm_id": "tactical.arrival_time",
+    "version": "1",
+    "measurement_class": "MODEL_ESTIMATED",
+    "parameters": {
+      "reaction_time_s": 0.25,
+      "max_speed_m_s": 7.0,
+      "max_acceleration_m_s2": 3.0,
+      "grid_x": 21,
+      "grid_y": 14,
+      "grid_interval_ns": 1000000000,
+      "max_velocity_gap_s": 0.25
+    },
+    "velocity_authority": "provider vx/vy first; otherwise same-entity first difference only within max_velocity_gap_s; zero fallback is explicit",
+    "tie_break": ["group_id", "entity_id"],
+    "pressure_on_ball": "unavailable_without_source_resolved_ball_carrier"
+  },
   "levels": {
     "A": {"measurement_class": "PIPELINE_DERIVED", "input_contract": "canonical tracking positions"},
     "B": {"measurement_class": "PIPELINE_DERIVED", "input_contract": "canonical tracking positions plus declared pitch boundary"},

@@ -16,7 +16,7 @@ Voronoi cells are built by clipping the pitch rectangle against each pairwise pe
 
 ## Arrival/influence
 
-Level C uses the frozen bounded grid and parameter set in the metric authority. Position-derived velocity is a declared processor input only when consecutive finite rows for the same object are available in the same stream; otherwise velocity is zero and the quality envelope says `velocity_fallback=zero`. The result is never called measured territory. Grid resolution is bounded and included in the parameter hash.
+Level C uses the frozen bounded grid and parameter set in [`LEVEL-C-CONTRACT.md`](LEVEL-C-CONTRACT.md). Provider velocity takes precedence; a position-derived first difference is used only inside the declared same-entity gap bound. Otherwise velocity is zero and the quality envelope says `velocity_fallback=zero`. The result is never called measured territory. Exact-frame influence summaries are retained while bounded grids are sampled at the declared interval without crossing gaps.
 
 ## Event snapshots
 
