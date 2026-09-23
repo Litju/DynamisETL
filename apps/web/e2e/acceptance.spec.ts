@@ -9,6 +9,11 @@ test.beforeEach(async ({ page }) => {
   await installApiMocks(page);
 });
 
+test("0. root opens the catalog instead of the not-found surface", async ({ page }) => {
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/catalog$/);
+});
+
 test("1. deep link loads deterministic analytical context and survives reload", async ({ page }) => {
   await page.goto(DEEP_LINK);
   await expect(page.getByText("skillcorner-opendata").first()).toBeVisible();
