@@ -226,6 +226,11 @@ export function TacticalAnalysisPane({ onCollapse }: { onCollapse?: () => void }
           />
         ) : null}
       </div>
+      <div className="flex shrink-0 flex-wrap gap-3 border-t border-border-subtle bg-surface-1 px-3 py-2 text-[11px]">
+        <Link to="/methods" className="text-accent hover:underline">Method authority</Link>
+        <Link to="/runs" className="text-accent hover:underline">Runs / provenance</Link>
+        <Link to="/quality" className="text-accent hover:underline">Quality / rights</Link>
+      </div>
     </Panel>
   );
 }
