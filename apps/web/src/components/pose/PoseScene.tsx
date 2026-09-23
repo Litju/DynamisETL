@@ -10,9 +10,10 @@ import {
   LineBasicMaterial,
   LineSegments,
   Matrix4,
+  Mesh,
   MeshBasicMaterial,
-  MeshStandardMaterial,
   Quaternion,
+  RingGeometry,
   SphereGeometry,
   Vector3,
 } from "three";
@@ -39,9 +40,11 @@ import {
 } from "@/components/pose/pose-model";
 import { useAnalysisStore } from "@/lib/state/analysis";
 
-export const JOINT_COLOR = "#7fd1e8";
+export const JOINT_COLOR = "#9fe3f2";
+/** Non-focus subjects in the all-subject world: present, but subordinate. */
+export const CONTEXT_SUBJECT_COLOR = "#56616d";
 export const SELECTED_JOINT_COLOR = "#ffd166";
-export const PROVIDER_SKELETON_COLOR = "#6d9eb4";
+export const PROVIDER_SKELETON_COLOR = "#86b7cc";
 export const TORSO_CUE_COLOR = "#9dc6d4";
 export const FOOT_CONTACT_CUE_COLOR = "#b9dbe5";
 export const HEAD_NECK_CUE_COLOR = "#b9dbe5";
@@ -87,7 +90,6 @@ const ARTICULATION_ANGLE_CUES: readonly AngleDefinition[] = [
   { name: "left_ankle", vertexLandmark: "lAnkle", firstLandmark: "lKnee", secondLandmark: "lBigToe" },
   { name: "right_ankle", vertexLandmark: "rAnkle", firstLandmark: "rKnee", secondLandmark: "rBigToe" },
 ];
-const ALL_SUBJECT_COLORS = ["#7fd1e8", "#f2a65a", "#c39bea", "#8bd17c", "#f48fb1", "#ffd166"] as const;
 
 export interface PoseSceneProps {
   readonly frames: readonly PoseFrame[];
@@ -108,6 +110,10 @@ export interface PoseSceneProps {
   readonly showSegments: boolean;
   readonly showAngles: boolean;
   readonly showErrorRadii: boolean;
+  /** The Pose subject (URL authority); the focus of the all-subject world. */
+  readonly selectedSubjectId?: string | null;
+  /** Clicking a subject in the all-subject world selects it as the subject. */
+  readonly onSelectSubject?: (subjectId: string) => void;
 }
 
 interface LandmarkDescriptor {
@@ -166,6 +172,16 @@ function PoseStage({ subjects, bounds, ...props }: PoseSceneProps & {
     setFrameloop(playing ? "always" : "demand");
     invalidate();
   }, [invalidate, playing, setFrameloop]);
+  // Clip planes follow the scene scale: a body-local skeleton is ~1 m, the
+  // all-subject world spans the pitch; a fixed 100 m far plane clipped it.
+  const camera = useThree((state) => state.camera);
+  useEffect(() => {
+    if (!("isPerspectiveCamera" in camera)) return;
+    camera.near = Math.max(0.005, bounds.radius / 400);
+    camera.far = Math.max(50, bounds.radius * 40);
+    camera.updateProjectionMatrix();
+    invalidate();
+  }, [bounds.radius, camera, invalidate]);
   useEffect(() => {
     const controls = controlsRef.current;
     if (!controls || cameraMode === "manual") return;
@@ -208,19 +224,26 @@ function PoseStage({ subjects, bounds, ...props }: PoseSceneProps & {
   return (
     <>
       <color attach="background" args={["#12161c"]} />
-      <fog attach="fog" args={["#12161c", bounds.radius * 3, bounds.radius * 9]} />
+      {/* The camera sits ~3.6 radii from the subject; fog begins beyond the
+          observed cloud so it only recedes the far grid, never the skeleton. */}
+      <fog attach="fog" args={["#12161c", bounds.radius * 6, bounds.radius * 18]} />
       <ambientLight intensity={0.9} />
       <directionalLight position={[2, 4, 3]} intensity={1.1} />
       <Grid args={[bounds.radius * 2.6, bounds.radius * 2.6]} position={[bounds.center[0], bounds.min[1], bounds.center[2]]} cellSize={bounds.radius / 8} cellColor="#242c37" sectionSize={bounds.radius / 2} sectionColor="#33404f" fadeDistance={bounds.radius * 14} fadeStrength={1.5} />
       <CameraControls ref={controlsRef} makeDefault onStart={handleControlStart} />
-      <PoseHotPath subjects={subjects} {...props} />
+      <PoseHotPath subjects={subjects} sceneRadius={bounds.radius} {...props} />
     </>
   );
 }
 
-function PoseHotPath({ subjects, overlays, providerConnections, showProviderSkeleton, showTorsoCue, showFootContact, showHandContact, showHeadNeck, showArticulationAngles, showSegments, showAngles, showErrorRadii, coordinateMode }: PoseSceneProps & {
+function PoseHotPath({ subjects, overlays, providerConnections, showProviderSkeleton, showTorsoCue, showFootContact, showHandContact, showHeadNeck, showArticulationAngles, showSegments, showAngles, showErrorRadii, coordinateMode, selectedSubjectId = null, onSelectSubject, sceneRadius }: PoseSceneProps & {
   readonly subjects: readonly PoseSubjectFrames[];
+  readonly sceneRadius: number;
 }) {
+  // In the all-subject world the camera frames the whole group, so a 3 cm
+  // glyph is sub-pixel; joints scale with the scene so every figure stays
+  // readable. A single subject keeps its true glyph size.
+  const glyphScale = subjects.length > 1 ? Math.min(4, Math.max(1, sceneRadius / 6)) : 1;
   const descriptors = useMemo<LandmarkDescriptor[]>(() => subjects.flatMap((subject, subjectIndex) => {
     const names = new Set<string>();
     for (const frame of subject.frames.slice(0, 200)) for (const landmark of frame.landmarks) names.add(landmark.jointName);
@@ -235,7 +258,35 @@ function PoseHotPath({ subjects, overlays, providerConnections, showProviderSkel
   const position = useMemo(() => new Vector3(), []);
   const scale = useMemo(() => new Vector3(), []);
   const selectedJoint = useAnalysisStore((state) => state.selectedJoint);
-  const selectedEntity = useAnalysisStore((state) => state.selectedEntityId);
+  // The focus subject: the only one in single-subject scope; otherwise the
+  // URL-selected Pose subject (never the Field entity selection).
+  const focusIndex = subjects.length <= 1
+    ? 0
+    : Math.max(0, subjects.findIndex((subject) => subject.subjectId === selectedSubjectId));
+  const focusIndices = useMemo(() => [focusIndex], [focusIndex]);
+  const contextIndices = useMemo(
+    () => subjects.map((_subject, index) => index).filter((index) => index !== focusIndex),
+    [focusIndex, subjects],
+  );
+  const palette = useMemo(() => ({
+    joint: new Color(JOINT_COLOR),
+    selected: new Color(SELECTED_JOINT_COLOR),
+    context: new Color(CONTEXT_SUBJECT_COLOR),
+    error: new Color(ERROR_RADIUS_COLOR),
+  }), []);
+  const focusRing = useMemo(() => {
+    const ring = new Mesh(
+      new RingGeometry(0.75, 1, 48),
+      new MeshBasicMaterial({ color: SELECTED_JOINT_COLOR, transparent: true, opacity: 0.85, depthWrite: false }),
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.visible = false;
+    return ring;
+  }, []);
+  useEffect(() => () => {
+    focusRing.geometry.dispose();
+    (focusRing.material as MeshBasicMaterial).dispose();
+  }, [focusRing]);
   const articulationAngles = useMemo(() => withoutDuplicateAngles(ARTICULATION_ANGLE_CUES, overlays.angles), [overlays.angles]);
   useFrame(() => {
     const time = useAnalysisStore.getState().playheadNs ?? useAnalysisStore.getState().committedTimeNs;
@@ -254,18 +305,34 @@ function PoseHotPath({ subjects, overlays, providerConnections, showProviderSkel
       const landmark = current[descriptor.subjectIndex]?.landmarks.get(descriptor.jointName);
       const visible = landmark !== undefined;
       const point = visible ? toViewerPoint(landmark, current[descriptor.subjectIndex]?.centre ?? WORLD_ORIGIN) : [0, 0, 0] as const;
-      const selected = descriptor.jointName === selectedJoint && (selectedEntity === null || selectedEntity === descriptor.subjectId);
+      const focus = descriptor.subjectIndex === focusIndex;
+      const selected = focus && descriptor.jointName === selectedJoint;
       position.set(point[0], point[1], point[2]);
-      const jointScale = visible ? (selected ? 1.6 : 1) : 0;
+      const jointScale = visible ? glyphScale * (selected ? 1.8 : focus ? 1.25 : 0.8) : 0;
       scale.set(jointScale, jointScale, jointScale);
       matrix.compose(position, identity, scale);
       jointMesh.setMatrixAt(index, matrix);
-      jointMesh.setColorAt(index, new Color(selected ? SELECTED_JOINT_COLOR : subjectColor(descriptor.subjectIndex, subjects.length)));
-      const errorScale = showErrorRadii && visible && landmark.errorM !== null && landmark.errorM > 0 ? landmark.errorM : 0;
+      jointMesh.setColorAt(index, selected ? palette.selected : focus ? palette.joint : palette.context);
+      // Error radii belong to the focus subject only; in the all-subject world
+      // they would bury every neighbour under translucent spheres.
+      const errorScale = focus && showErrorRadii && visible && landmark.errorM !== null && landmark.errorM > 0 ? landmark.errorM : 0;
       scale.set(errorScale, errorScale, errorScale);
       matrix.compose(position, identity, scale);
       errorMesh.setMatrixAt(index, matrix);
-      errorMesh.setColorAt(index, new Color(ERROR_RADIUS_COLOR));
+      errorMesh.setColorAt(index, palette.error);
+    }
+    // Focus marker: a ground ring under the selected subject in the
+    // all-subject world, so the focus is unambiguous at group scale.
+    const focus = current[focusIndex];
+    if (subjects.length > 1 && focus && focus.landmarks.size > 0) {
+      const landmarks = [...focus.landmarks.values()];
+      const root = bodyLocalCentre(landmarks);
+      const floor = Math.min(...landmarks.map((landmark) => landmark.zM));
+      focusRing.position.set(root.xM - focus.centre.xM, floor, -(root.yM - focus.centre.yM));
+      focusRing.scale.setScalar(Math.max(0.6, sceneRadius / 18));
+      focusRing.visible = true;
+    } else {
+      focusRing.visible = false;
     }
     jointMesh.instanceMatrix.needsUpdate = true;
     errorMesh.instanceMatrix.needsUpdate = true;
@@ -276,10 +343,12 @@ function PoseHotPath({ subjects, overlays, providerConnections, showProviderSkel
     event.stopPropagation();
     const descriptor = event.instanceId === undefined ? undefined : descriptors[event.instanceId];
     if (!descriptor) return;
-    const state = useAnalysisStore.getState();
-    state.selectJoint(descriptor.jointName);
-    if (subjects.length > 1) state.selectEntity(descriptor.subjectId);
-  }, [descriptors, subjects.length]);
+    if (subjects.length > 1 && descriptor.subjectIndex !== focusIndex) {
+      onSelectSubject?.(descriptor.subjectId);
+      return;
+    }
+    useAnalysisStore.getState().selectJoint(descriptor.jointName);
+  }, [descriptors, focusIndex, onSelectSubject, subjects.length]);
   const handleJointHover = useCallback((event: ThreeEvent<PointerEvent>) => {
     const descriptor = event.instanceId === undefined ? undefined : descriptors[event.instanceId];
     useAnalysisStore.getState().hoverJoint(descriptor?.jointName ?? null);
@@ -290,22 +359,30 @@ function PoseHotPath({ subjects, overlays, providerConnections, showProviderSkel
     <>
       <primitive object={jointMesh} onClick={handleJointClick} onPointerOver={handleJointHover} onPointerOut={() => { useAnalysisStore.getState().hoverJoint(null); useAnalysisStore.getState().hoverEntity(null); }} />
       <primitive object={errorMesh} />
-      {showProviderSkeleton ? <BatchedSegments subjects={subjects} currentRef={currentRef} connections={providerConnections} color={PROVIDER_SKELETON_COLOR} /> : null}
-      {showTorsoCue ? <BatchedSegments subjects={subjects} currentRef={currentRef} connections={TORSO_CUE_CONNECTIONS} color={TORSO_CUE_COLOR} /> : null}
-      {showFootContact ? <BatchedSegments subjects={subjects} currentRef={currentRef} connections={FOOT_CONTACT_CUE_CONNECTIONS} color={FOOT_CONTACT_CUE_COLOR} /> : null}
-      {showHandContact ? <BatchedSegments subjects={subjects} currentRef={currentRef} connections={HAND_CONTACT_CUE_CONNECTIONS} color={FOOT_CONTACT_CUE_COLOR} /> : null}
-      {showHeadNeck ? <BatchedSegments subjects={subjects} currentRef={currentRef} connections={HEAD_NECK_CUE_CONNECTIONS} color={HEAD_NECK_CUE_COLOR} /> : null}
-      {processorSegments.length > 0 ? <BatchedSegments subjects={subjects} currentRef={currentRef} connections={processorSegments} color={SEGMENT_COLOR} /> : null}
-      {showAngles && overlays.angles.length > 0 ? <BatchedAngles subjects={subjects} currentRef={currentRef} definitions={overlays.angles} color={ANGLE_COLOR} /> : null}
-      {showArticulationAngles && articulationAngles.length > 0 ? <BatchedAngles subjects={subjects} currentRef={currentRef} definitions={articulationAngles} color={ARTICULATION_ANGLE_CUE_COLOR} articulation /> : null}
+      <primitive object={focusRing} />
+      {showProviderSkeleton ? <BatchedSegments indices={focusIndices} currentRef={currentRef} connections={providerConnections} color={PROVIDER_SKELETON_COLOR} /> : null}
+      {showProviderSkeleton && contextIndices.length > 0 ? <BatchedSegments indices={contextIndices} currentRef={currentRef} connections={providerConnections} color={CONTEXT_SUBJECT_COLOR} /> : null}
+      {showTorsoCue ? <BatchedSegments indices={focusIndices} currentRef={currentRef} connections={TORSO_CUE_CONNECTIONS} color={TORSO_CUE_COLOR} /> : null}
+      {showFootContact ? <BatchedSegments indices={focusIndices} currentRef={currentRef} connections={FOOT_CONTACT_CUE_CONNECTIONS} color={FOOT_CONTACT_CUE_COLOR} /> : null}
+      {showHandContact ? <BatchedSegments indices={focusIndices} currentRef={currentRef} connections={HAND_CONTACT_CUE_CONNECTIONS} color={FOOT_CONTACT_CUE_COLOR} /> : null}
+      {showHeadNeck ? <BatchedSegments indices={focusIndices} currentRef={currentRef} connections={HEAD_NECK_CUE_CONNECTIONS} color={HEAD_NECK_CUE_COLOR} /> : null}
+      {processorSegments.length > 0 ? <BatchedSegments indices={focusIndices} currentRef={currentRef} connections={processorSegments} color={SEGMENT_COLOR} /> : null}
+      {showAngles && overlays.angles.length > 0 ? <BatchedAngles indices={focusIndices} currentRef={currentRef} definitions={overlays.angles} color={ANGLE_COLOR} /> : null}
+      {showArticulationAngles && articulationAngles.length > 0 ? <BatchedAngles indices={focusIndices} currentRef={currentRef} definitions={articulationAngles} color={ARTICULATION_ANGLE_CUE_COLOR} articulation /> : null}
     </>
   );
 }
 
 function useInstancedGlyph(count: number, error: boolean): InstancedMesh {
   const mesh = useMemo(() => {
-    const geometry = new SphereGeometry(error ? 1 : 0.026, error ? 8 : 12, error ? 8 : 12);
-    const material = error ? new MeshBasicMaterial({ transparent: true, opacity: 0.12, depthWrite: false, vertexColors: true }) : new MeshStandardMaterial({ vertexColors: true, roughness: 0.35, metalness: 0.05 });
+    const geometry = new SphereGeometry(error ? 1 : 0.03, error ? 12 : 14, error ? 10 : 12);
+    // Instance colours come from `instanceColor`; `vertexColors` would also
+    // multiply by a geometry colour attribute the sphere does not have, which
+    // rendered every landmark black (RES-112 P-02). Joints are unlit so their
+    // identity colour reads the same from every camera angle.
+    const material = error
+      ? new MeshBasicMaterial({ transparent: true, opacity: 0.14, depthWrite: false })
+      : new MeshBasicMaterial();
     const instance = new InstancedMesh(geometry, material, count);
     instance.instanceMatrix.setUsage(DynamicDrawUsage);
     return instance;
@@ -318,22 +395,18 @@ function useInstancedGlyph(count: number, error: boolean): InstancedMesh {
   return mesh;
 }
 
-function subjectColor(index: number, count: number): string {
-  return count <= 1 ? JOINT_COLOR : ALL_SUBJECT_COLORS[index % ALL_SUBJECT_COLORS.length]!;
-}
-
-function BatchedSegments({ subjects, currentRef, connections, color }: {
-  readonly subjects: readonly PoseSubjectFrames[];
+function BatchedSegments({ indices, currentRef, connections, color }: {
+  readonly indices: readonly number[];
   readonly currentRef: React.MutableRefObject<CurrentLandmarks>;
   readonly connections: readonly DisplayConnectionDefinition[];
   readonly color: string;
 }) {
-  const record = useMemo(() => createLineRecord(subjects.length * connections.length * 2, color), [color, connections.length, subjects.length]);
+  const record = useMemo(() => createLineRecord(indices.length * connections.length * 2, color), [color, connections.length, indices.length]);
   useEffect(() => () => disposeLineRecord(record), [record]);
   useFrame(() => {
     let offset = 0;
     let visible = false;
-    for (let subjectIndex = 0; subjectIndex < subjects.length; subjectIndex += 1) {
+    for (const subjectIndex of indices) {
       const current = currentRef.current[subjectIndex];
       for (const connection of connections) {
         const points = connectionPoints(current?.landmarks, connection, current?.centre ?? WORLD_ORIGIN);
@@ -348,20 +421,20 @@ function BatchedSegments({ subjects, currentRef, connections, color }: {
   return <primitive object={record.object} />;
 }
 
-function BatchedAngles({ subjects, currentRef, definitions, color, articulation = false }: {
-  readonly subjects: readonly PoseSubjectFrames[];
+function BatchedAngles({ indices, currentRef, definitions, color, articulation = false }: {
+  readonly indices: readonly number[];
   readonly currentRef: React.MutableRefObject<CurrentLandmarks>;
   readonly definitions: readonly AngleDefinition[];
   readonly color: string;
   readonly articulation?: boolean;
 }) {
   const maxPoints = 21;
-  const record = useMemo(() => createLineRecord(subjects.length * definitions.length * (maxPoints - 1), color), [color, definitions.length, subjects.length]);
+  const record = useMemo(() => createLineRecord(indices.length * definitions.length * (maxPoints - 1), color), [color, definitions.length, indices.length]);
   useEffect(() => () => disposeLineRecord(record), [record]);
   useFrame(() => {
     let offset = 0;
     let visible = false;
-    for (let subjectIndex = 0; subjectIndex < subjects.length; subjectIndex += 1) {
+    for (const subjectIndex of indices) {
       const current = currentRef.current[subjectIndex];
       for (const definition of definitions) {
         const points = articulation
@@ -464,30 +537,12 @@ export function arcPoints(vertex: PoseLandmark, first: PoseLandmark, second: Pos
   return points;
 }
 
-export function PoseCanvas({ frames, subjectFrames, allSubjects, overlays, providerConnections, preset, cameraMode, coordinateMode, onManualCamera, playing, showProviderSkeleton, showTorsoCue, showFootContact, showHandContact, showHeadNeck, showArticulationAngles, showSegments, showAngles, showErrorRadii, onReady }: {
-  readonly frames: readonly PoseFrame[];
-  readonly subjectFrames: readonly PoseSubjectFrames[];
-  readonly allSubjects: boolean;
-  readonly overlays: ProcessorOverlays;
-  readonly providerConnections: readonly DisplayConnectionDefinition[];
-  readonly preset: CameraPreset;
-  readonly cameraMode: CameraMode;
-  readonly coordinateMode: PoseCoordinateMode;
-  readonly onManualCamera?: () => void;
+export function PoseCanvas({ playing, onReady, ...scene }: PoseSceneProps & {
   readonly playing: boolean;
-  readonly showProviderSkeleton: boolean;
-  readonly showTorsoCue: boolean;
-  readonly showFootContact: boolean;
-  readonly showHandContact: boolean;
-  readonly showHeadNeck: boolean;
-  readonly showArticulationAngles: boolean;
-  readonly showSegments: boolean;
-  readonly showAngles: boolean;
-  readonly showErrorRadii: boolean;
   readonly onReady?: () => void;
 }) {
   return <Canvas frameloop={playing ? "always" : "demand"} camera={{ fov: 40, near: 0.01, far: 100 }} dpr={[1, 2]} gl={{ antialias: true }} onCreated={() => onReady?.()}>
-    <PoseScene frames={frames} subjectFrames={subjectFrames} allSubjects={allSubjects} overlays={overlays} providerConnections={providerConnections} preset={preset} cameraMode={cameraMode} coordinateMode={coordinateMode} {...(onManualCamera ? { onManualCamera } : {})} showProviderSkeleton={showProviderSkeleton} showTorsoCue={showTorsoCue} showFootContact={showFootContact} showHandContact={showHandContact} showHeadNeck={showHeadNeck} showArticulationAngles={showArticulationAngles} showSegments={showSegments} showAngles={showAngles} showErrorRadii={showErrorRadii} />
+    <PoseScene {...scene} />
   </Canvas>;
 }
 
