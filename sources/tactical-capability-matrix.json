@@ -181,7 +181,7 @@
         "goalkeeper_role_authority": "player_role.acronym=GK (2 players); broad group may be Other"
       },
       "unavailable_reasons": [
-        "no accepted local dynamic-event or phase artifact",
+        "no accepted local event or phase artifact; the upstream dynamic-event and phase files are absent from this accepted slice",
         "provider body-pose Z is relative to player centroid and is not pitch-registered"
       ]
     },

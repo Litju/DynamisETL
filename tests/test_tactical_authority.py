@@ -45,6 +45,10 @@ def test_tactical_authority_files_are_consistent() -> None:
         capabilities["datasets"]["skillcorner-opendata"]["capabilities"]["level_d_event_linked"]
         == "unavailable"
     )
+    assert any(
+        reason.startswith("no accepted local event or phase artifact")
+        for reason in capabilities["datasets"]["skillcorner-opendata"]["unavailable_reasons"]
+    )
     assert (
         capabilities["datasets"]["womens-soccer-positioning"]["capabilities"]["level_a_geometry"]
         == "unavailable_for_pitch_team_geometry"
