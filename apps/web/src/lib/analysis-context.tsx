@@ -9,6 +9,8 @@
 
 import { createContext, useContext } from "react";
 
+import type { TacticalView } from "@/lib/search";
+
 export interface DurableRange {
   readonly fromNs: bigint;
   readonly toNs: bigint;
@@ -31,6 +33,7 @@ export interface AnalysisContextValue {
   readonly toNs: bigint | null;
   readonly metricId: string | null;
   readonly derivedMetricId: string | null;
+  readonly tacticalView?: TacticalView;
   /** Commit a playhead selection; serialized as decimal `t_ns` text. */
   readonly commitTime: (tNs: bigint | null) => void;
   /** Commit a brushed range. */
@@ -44,6 +47,7 @@ export interface AnalysisContextValue {
   readonly selectStream: (streamId: string | null) => void;
   /** Select the result whose methodology/provenance the inspector follows. */
   readonly selectResult: (derivedMetricId: string | null) => void;
+  readonly selectTacticalView?: (view: TacticalView) => void;
 }
 
 export const AnalysisContext = createContext<AnalysisContextValue | null>(null);

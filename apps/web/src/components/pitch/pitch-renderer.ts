@@ -45,13 +45,45 @@ export interface PitchLayers {
   readonly trails: boolean;
   readonly labels: boolean;
   readonly events: boolean;
+  readonly geometry: boolean;
+  readonly territory: boolean;
+  readonly influence: boolean;
 }
 
 export const DEFAULT_PITCH_LAYERS: PitchLayers = {
   trails: true,
   labels: true,
   events: true,
+  geometry: true,
+  territory: false,
+  influence: false,
 };
+
+export interface TacticalHull {
+  readonly groupId: string;
+  readonly points: readonly [number, number][];
+}
+
+export interface TacticalTerritoryCell {
+  readonly entityId: string;
+  readonly groupId: string;
+  readonly points: readonly [number, number][];
+}
+
+export interface TacticalInfluenceCell {
+  readonly xM: number;
+  readonly yM: number;
+  readonly widthM: number;
+  readonly heightM: number;
+  readonly groupId: string;
+  readonly arrivalTimeS: number;
+}
+
+export interface TacticalOverlay {
+  readonly hulls: readonly TacticalHull[];
+  readonly territoryCells: readonly TacticalTerritoryCell[];
+  readonly influenceCells: readonly TacticalInfluenceCell[];
+}
 
 export interface PitchRendererHandle {
   setFrame(
@@ -65,6 +97,7 @@ export interface PitchRendererHandle {
     selectedId: string | null,
   ): void;
   setEvents(events: readonly PitchEvent[]): void;
+  setTacticalOverlay(overlay: TacticalOverlay): void;
   setLayers(layers: PitchLayers): void;
   /** Frame the whole pitch again after a zoom or pan. */
   resetView(): void;
@@ -167,6 +200,7 @@ export async function createPitchRenderer(
   // entity a reader is tracking.
   const trailLayer: Graphics = new pixi.Graphics();
   const eventLayer: Graphics = new pixi.Graphics();
+  const tacticalLayer: Graphics = new pixi.Graphics();
   const entityLayer: Graphics = new pixi.Graphics();
   const labelLayer: Container = new pixi.Container();
   trailLayer.eventMode = "none";
@@ -174,7 +208,7 @@ export async function createPitchRenderer(
   entityLayer.eventMode = "none";
   labelLayer.eventMode = "none";
   overlay.eventMode = "none";
-  overlay.addChild(trailLayer, eventLayer, entityLayer, labelLayer);
+  overlay.addChild(trailLayer, tacticalLayer, eventLayer, entityLayer, labelLayer);
 
   const viewport: { current: Viewport } = {
     current: fitViewport(host.clientWidth, host.clientHeight),
@@ -191,6 +225,7 @@ export async function createPitchRenderer(
   let lastSelected: string | null = null;
   let lastTrail: readonly TrailPoint[] = [];
   let lastEvents: readonly PitchEvent[] = [];
+  let lastTactical: TacticalOverlay = { hulls: [], territoryCells: [], influenceCells: [] };
   let layers: PitchLayers = DEFAULT_PITCH_LAYERS;
 
   // Label text objects are pooled: a match frame relabels the same 23 objects
@@ -325,6 +360,55 @@ export async function createPitchRenderer(
     }
   }
 
+  function drawTactical() {
+    tacticalLayer.clear();
+    const groupColor = (groupId: string) =>
+      groupId === "home" || groupId.endsWith("00000P") ? colors.home : colors.away;
+    if (layers.influence) {
+      for (const cell of lastTactical.influenceCells) {
+        const point = pitchToScreen(cell.xM, cell.yM, viewport.current);
+        const alpha = Math.max(0.08, Math.min(0.34, 0.34 - cell.arrivalTimeS * 0.02));
+        tacticalLayer
+          .rect(
+            point.x - (cell.widthM * viewport.current.scale) / 2,
+            point.y - (cell.heightM * viewport.current.scale) / 2,
+            cell.widthM * viewport.current.scale,
+            cell.heightM * viewport.current.scale,
+          )
+          .fill({ color: groupColor(cell.groupId), alpha })
+          .stroke({ width: 0.5, color: groupColor(cell.groupId), alpha: 0.45 });
+      }
+    }
+    if (layers.territory) {
+      for (const cell of lastTactical.territoryCells) {
+        if (cell.points.length < 3) continue;
+        const first = pitchToScreen(cell.points[0]![0], cell.points[0]![1], viewport.current);
+        tacticalLayer.moveTo(first.x, first.y);
+        for (const point of cell.points.slice(1)) {
+          const screen = pitchToScreen(point[0], point[1], viewport.current);
+          tacticalLayer.lineTo(screen.x, screen.y);
+        }
+        tacticalLayer.closePath().fill({ color: groupColor(cell.groupId), alpha: 0.08 }).stroke({
+          width: 0.7,
+          color: groupColor(cell.groupId),
+          alpha: 0.55,
+        });
+      }
+    }
+    if (layers.geometry) {
+      for (const hull of lastTactical.hulls) {
+        if (hull.points.length < 2) continue;
+        const first = pitchToScreen(hull.points[0]![0], hull.points[0]![1], viewport.current);
+        tacticalLayer.moveTo(first.x, first.y);
+        for (const point of hull.points.slice(1)) {
+          const screen = pitchToScreen(point[0], point[1], viewport.current);
+          tacticalLayer.lineTo(screen.x, screen.y);
+        }
+        tacticalLayer.closePath().stroke({ width: 2, color: groupColor(hull.groupId), alpha: 0.9 });
+      }
+    }
+  }
+
   function drawTrail() {
     trailLayer.clear();
     if (!layers.trails || lastTrail.length < 2) return;
@@ -401,6 +485,7 @@ export async function createPitchRenderer(
   function redraw() {
     applyViewport(world, viewport.current);
     drawTrail();
+    drawTactical();
     drawEvents();
     drawEntities();
     drawLabels();
@@ -451,6 +536,10 @@ export async function createPitchRenderer(
     setEvents(events) {
       lastEvents = events;
       drawEvents();
+    },
+    setTacticalOverlay(next) {
+      lastTactical = next;
+      drawTactical();
     },
     setLayers(next) {
       layers = next;

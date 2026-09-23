@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import pyarrow as pa
@@ -89,11 +90,7 @@ def _cell(
         )
         for other in players
     }
-    same_point_ids = sorted(
-        entity_id
-        for entity_id, point in points.items()
-        if point == (x, y)
-    )
+    same_point_ids = sorted(entity_id for entity_id, point in points.items() if point == (x, y))
     if same_point_ids and player.entity_id != same_point_ids[0]:
         return ()
     polygon = _rectangle(length, width)
@@ -243,6 +240,7 @@ def process_tactical_territory(
                     "group_id": player.group_id,
                     "object_type": player.object_type,
                     "cell_area_m2": cell_areas[player.entity_id],
+                    "cell_polygon_json": json.dumps(cells[player.entity_id], separators=(",", ":")),
                     "cell_percentage": 100.0 * cell_areas[player.entity_id] / pitch_area,
                     "frame_third_0_area_m2": _third_area(
                         cells[player.entity_id], length=length, width=width, third=0

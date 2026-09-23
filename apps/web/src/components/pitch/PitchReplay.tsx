@@ -20,12 +20,20 @@ import {
   type PitchLayers,
   type PitchPalette,
   type PitchRendererHandle,
+  type TacticalOverlay,
 } from "@/components/pitch/pitch-renderer";
 import { eventStreams } from "@/lib/capabilities";
 import type { DenseWindow, StreamView } from "@/api/types";
 import { useAnalysisContext } from "@/lib/analysis-context";
 import { ApiError } from "@/lib/api/client";
-import { artifactQuery, sessionQuery, windowQuery, type WindowQuery } from "@/lib/api/queries";
+import {
+  artifactQuery,
+  sessionQuery,
+  tacticalArtifactsQuery,
+  tacticalSeriesQuery,
+  windowQuery,
+  type WindowQuery,
+} from "@/lib/api/queries";
 import { readPalette } from "@/lib/chart-palette";
 import { affordableSpanNs, canonicalSpan } from "@/lib/dense-window";
 import type { DenseChunkBounds } from "@/lib/dense-chunks";
@@ -43,8 +51,8 @@ const MAX_EVENT_POINTS = 2_000;
 export function toPitchEvents(rows: ReadonlyArray<Record<string, unknown>>): PitchEvent[] {
   const events: PitchEvent[] = [];
   for (const row of rows) {
-    const x = row["x_m"];
-    const y = row["y_m"];
+    const x = row["x_m"] ?? row["event_x_m"];
+    const y = row["y_m"] ?? row["event_y_m"];
     const t = row["t_rel_ns"];
     // An event without a recorded location cannot be placed on the pitch, and
     // guessing one would invent spatial evidence the source does not hold.
@@ -62,6 +70,58 @@ export function toPitchEvents(rows: ReadonlyArray<Record<string, unknown>>): Pit
     });
   }
   return events;
+}
+
+function polygon(value: unknown): readonly [number, number][] {
+  if (typeof value !== "string") return [];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((point): [number, number][] => {
+      if (!Array.isArray(point) || point.length < 2) return [];
+      const x = point[0];
+      const y = point[1];
+      return typeof x === "number" && typeof y === "number" && Number.isFinite(x) && Number.isFinite(y)
+        ? [[x, y]]
+        : [];
+    });
+  } catch {
+    return [];
+  }
+}
+
+function tacticalOverlayFromRows(
+  geometryRows: readonly Record<string, unknown>[],
+  territoryRows: readonly Record<string, unknown>[],
+  influenceRows: readonly Record<string, unknown>[],
+): TacticalOverlay {
+  const hulls = geometryRows.flatMap((row) => {
+    const groupId = row["group_id"];
+    const points = polygon(row["hull_polygon_json"]);
+    return typeof groupId === "string" && points.length >= 2 ? [{ groupId, points }] : [];
+  });
+  const territoryCells = territoryRows.flatMap((row) => {
+    const entityId = row["entity_id"];
+    const groupId = row["group_id"];
+    const points = polygon(row["cell_polygon_json"]);
+    return typeof entityId === "string" && typeof groupId === "string" && points.length >= 3
+      ? [{ entityId, groupId, points }]
+      : [];
+  });
+  const xValues = [...new Set(influenceRows.map((row) => row["x_m"]).filter((value): value is number => typeof value === "number"))].sort((a, b) => a - b);
+  const yValues = [...new Set(influenceRows.map((row) => row["y_m"]).filter((value): value is number => typeof value === "number"))].sort((a, b) => a - b);
+  const widthM = xValues.length > 1 ? Math.abs(xValues[1]! - xValues[0]!) : 5;
+  const heightM = yValues.length > 1 ? Math.abs(yValues[1]! - yValues[0]!) : 4;
+  const influenceCells = influenceRows.flatMap((row) => {
+    const x = row["x_m"];
+    const y = row["y_m"];
+    const groupId = row["owner_group_id"];
+    const arrivalTimeS = row["arrival_time_s"];
+    return typeof x === "number" && typeof y === "number" && typeof groupId === "string" && typeof arrivalTimeS === "number"
+      ? [{ xM: x, yM: y, widthM, heightM, groupId, arrivalTimeS }]
+      : [];
+  });
+  return { hulls, territoryCells, influenceCells };
 }
 
 /**
@@ -312,6 +372,7 @@ export function PitchReplay() {
       explicitRange={explicitBounds !== null}
       windowLabel={`${formatDurationNs(activeWindowBounds.toNs - activeWindowBounds.fromNs)} window`}
       playbackStatus={playback.status}
+      tacticalBounds={activeWindowBounds}
       onSelectEntity={handleSelectEntity}
     />
   );
@@ -350,6 +411,7 @@ function PitchView({
   explicitRange,
   windowLabel,
   playbackStatus,
+  tacticalBounds,
   onSelectEntity,
 }: {
   stream: StreamView;
@@ -358,13 +420,16 @@ function PitchView({
   explicitRange: boolean;
   windowLabel: string;
   playbackStatus: "idle" | "ready" | "buffering" | "ended";
+  tacticalBounds: { readonly fromNs: bigint; readonly toNs: bigint };
   onSelectEntity: (objectId: string) => void;
 }) {
+  const context = useAnalysisContext();
   const hostRef = useRef<HTMLDivElement | null>(null);
   const rendererRef = useRef<PitchRendererHandle | null>(null);
   const selectedEntityId = useAnalysisStore((state) => state.selectedEntityId);
   const committedRangeNs = useAnalysisStore((state) => state.committedRangeNs);
   const [rendererReady, setRendererReady] = useState(false);
+  const [layers, setLayers] = useState<PitchLayers>(DEFAULT_PITCH_LAYERS);
   // The scene is rebuilt when the window changes; these refs carry the current
   // presentation state into the newly created renderer.
   const layersRef = useRef<PitchLayers>(DEFAULT_PITCH_LAYERS);
@@ -389,6 +454,53 @@ function PitchView({
     [rows],
   );
   const groups = useMemo(() => assignGroups(frames), [frames]);
+
+  const tacticalArtifacts = useQuery({
+    ...tacticalArtifactsQuery({
+      datasetId: context?.datasetId ?? "",
+      sessionId: context?.sessionId,
+      streamId: stream.stream_id,
+    }),
+    enabled: Boolean(context?.datasetId && context?.sessionId),
+  });
+  const teamArtifact = useMemo(
+    () => tacticalArtifacts.data?.find((artifact) => artifact.artifact_metadata?.series_name === "team_geometry") ?? null,
+    [tacticalArtifacts.data],
+  );
+  const territoryArtifact = useMemo(
+    () => tacticalArtifacts.data?.find((artifact) => artifact.artifact_metadata?.series_name === "player_territory") ?? null,
+    [tacticalArtifacts.data],
+  );
+  const influenceArtifact = useMemo(
+    () => tacticalArtifacts.data?.find((artifact) => artifact.artifact_metadata?.series_name === "influence_grid") ?? null,
+    [tacticalArtifacts.data],
+  );
+  const tacticalWindow = (artifactId: string | null) => tacticalSeriesQuery({
+    artifactId: artifactId ?? "",
+    fromNs: Number(tacticalBounds.fromNs),
+    toNs: Number(tacticalBounds.toNs),
+    maxPoints: 2_000,
+  });
+  const teamTactical = useQuery({
+    ...tacticalWindow(teamArtifact?.artifact_id ?? null),
+    enabled: Boolean(teamArtifact),
+  });
+  const territoryTactical = useQuery({
+    ...tacticalWindow(territoryArtifact?.artifact_id ?? null),
+    enabled: Boolean(territoryArtifact && layers.territory),
+  });
+  const influenceTactical = useQuery({
+    ...tacticalWindow(influenceArtifact?.artifact_id ?? null),
+    enabled: Boolean(influenceArtifact && layers.influence),
+  });
+  const tacticalOverlay = useMemo(
+    () => tacticalOverlayFromRows(
+      (teamTactical.data?.rows ?? []) as Record<string, unknown>[],
+      (territoryTactical.data?.rows ?? []) as Record<string, unknown>[],
+      (influenceTactical.data?.rows ?? []) as Record<string, unknown>[],
+    ),
+    [influenceTactical.data, teamTactical.data, territoryTactical.data],
+  );
 
   const palette = useMemo<PitchPalette>(() => {
     const tokens = readPalette();
@@ -426,6 +538,7 @@ function PitchView({
       setRendererReady(true);
       created.setLayers(layersRef.current);
       created.setEvents(eventsRef.current);
+      created.setTacticalOverlay?.(tacticalOverlay);
       const current = useAnalysisStore.getState();
       created.setTrail(
         trailForRange(frames, current.committedRangeNs, current.selectedEntityId),
@@ -445,7 +558,7 @@ function PitchView({
       rendererRef.current = null;
     };
     // The scene is rebuilt only when the loaded tracking window changes.
-  }, [frames, groups, palette, onSelectEntity]);
+  }, [frames, groups, palette, onSelectEntity, tacticalOverlay]);
 
   useEffect(() => {
     return useAnalysisStore.subscribe((state, previous) => {
@@ -474,7 +587,6 @@ function PitchView({
 
   // Layer visibility is renderer-local presentation state: it changes nothing
   // about the data and never belongs in the durable URL.
-  const [layers, setLayers] = useState<PitchLayers>(DEFAULT_PITCH_LAYERS);
   useEffect(() => {
     layersRef.current = layers;
     rendererRef.current?.setLayers(layers);
@@ -482,6 +594,9 @@ function PitchView({
   useEffect(() => {
     rendererRef.current?.setEvents(events);
   }, [events]);
+  useEffect(() => {
+    rendererRef.current?.setTacticalOverlay?.(tacticalOverlay);
+  }, [tacticalOverlay]);
 
   const [, bumpHeader] = useReducer((value: number) => value + 1, 0);
   useEffect(() => {
@@ -562,6 +677,27 @@ function PitchView({
                 label="Events"
                 pressed={layers.events}
                 onToggle={() => setLayers((current) => ({ ...current, events: !current.events }))}
+              />
+            ) : null}
+            {teamArtifact ? (
+              <LayerToggle
+                label="Hull"
+                pressed={layers.geometry}
+                onToggle={() => setLayers((current) => ({ ...current, geometry: !current.geometry }))}
+              />
+            ) : null}
+            {territoryArtifact ? (
+              <LayerToggle
+                label="Territory"
+                pressed={layers.territory}
+                onToggle={() => setLayers((current) => ({ ...current, territory: !current.territory }))}
+              />
+            ) : null}
+            {influenceArtifact ? (
+              <LayerToggle
+                label="Influence"
+                pressed={layers.influence}
+                onToggle={() => setLayers((current) => ({ ...current, influence: !current.influence }))}
               />
             ) : null}
             <button
@@ -649,6 +785,9 @@ function PitchView({
             Source event
           </span>
         ) : null}
+        {teamArtifact ? <span>Hull = deterministic tracking geometry</span> : null}
+        {territoryArtifact ? <span>Territory = clipped Voronoi geometry</span> : null}
+        {influenceArtifact ? <span>Influence = MODEL_ESTIMATED arrival surface</span> : null}
         <span>Trails cover the committed range only</span>
         <span>Possession and context flags appear only when the source provides them</span>
         <span className="mono ml-auto tabular">frame {currentFrameIndex}</span>

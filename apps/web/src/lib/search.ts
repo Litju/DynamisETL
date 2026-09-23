@@ -13,6 +13,8 @@ export const DECIMAL_NS = /^-?\d+$/;
 
 export const WORKBENCH_VIEWS = ["overview", "signals", "field", "pose", "provenance"] as const;
 export type WorkbenchView = (typeof WORKBENCH_VIEWS)[number];
+export const TACTICAL_VIEWS = ["live", "space", "shape", "range", "events", "report"] as const;
+export type TacticalView = (typeof TACTICAL_VIEWS)[number];
 
 export const MODALITIES = [
   "gnss",
@@ -57,6 +59,7 @@ export const labSearchSchema = z.object({
   to_ns: nsText,
   range_ns: nsText,
   view: z.enum(WORKBENCH_VIEWS).catch("overview").default("overview"),
+  tactical: z.enum(TACTICAL_VIEWS).optional().catch(undefined),
   compare: optionalText,
 });
 export type LabSearch = z.infer<typeof labSearchSchema>;

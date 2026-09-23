@@ -7,6 +7,7 @@ import { CommandPalette } from "@/components/command/CommandPalette";
 import { ContextBar } from "@/components/shell/ContextBar";
 import { Explorer } from "@/components/shell/Explorer";
 import { Inspector } from "@/components/shell/Inspector";
+import { TacticalAnalysisPane } from "@/components/shell/TacticalAnalysisPane";
 import { PoseTelemetry } from "@/components/pose/PoseTelemetry";
 import { NavRail } from "@/components/shell/NavRail";
 import { Transport } from "@/components/shell/Transport";
@@ -60,10 +61,12 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const layout = shellLayoutFor(pathname);
   const showExplorer = !focusMode && layout.explorer;
-  const poseRoute = new URLSearchParams(location.searchStr ?? "").get("view") === "pose";
+  const routeView = new URLSearchParams(location.searchStr ?? "").get("view");
+  const poseRoute = routeView === "pose";
   const showPoseTelemetry = !focusMode && layout.inspector && poseRoute;
+  const showTacticalAnalysis = !focusMode && layout.inspector && routeView === "field";
   const showInspector =
-    showPoseTelemetry || (!focusMode && inspectorVisible(inspectorOverride, layout.inspector));
+    showPoseTelemetry || showTacticalAnalysis || (!focusMode && inspectorVisible(inspectorOverride, layout.inspector));
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-surface-0 text-text-primary">
@@ -105,6 +108,8 @@ export function AppShell({ children }: { children: ReactNode }) {
               >
                 {showPoseTelemetry ? (
                   <PoseTelemetry />
+                ) : showTacticalAnalysis ? (
+                  <TacticalAnalysisPane onCollapse={() => setInspectorOpen(false)} />
                 ) : (
                   <Inspector onCollapse={() => setInspectorOpen(false)} />
                 )}
@@ -113,7 +118,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           ) : null}
         </Group>
         {!focusMode && !showInspector ? (
-          <InspectorRail onExpand={() => setInspectorOpen(true)} />
+        <InspectorRail tactical={showTacticalAnalysis} onExpand={() => setInspectorOpen(true)} />
         ) : null}
       </div>
       {layout.transport ? <Transport nominalRateHz={nominalRateHz} /> : null}
@@ -127,14 +132,14 @@ export function AppShell({ children }: { children: ReactNode }) {
  * one click away on surfaces that already own their own evidence, without
  * spending viewport on a pane that would only say "no data".
  */
-function InspectorRail({ onExpand }: { onExpand: () => void }) {
+function InspectorRail({ onExpand, tactical = false }: { onExpand: () => void; tactical?: boolean }) {
   return (
     <div className="flex w-8 shrink-0 flex-col items-center border-l border-border-subtle bg-surface-0 py-2">
       <button
         type="button"
         onClick={onExpand}
-        aria-label="Open the inspector"
-        title="Open the inspector (method, provenance, quality, rights)"
+        aria-label={`Open the ${tactical ? "tactical analysis" : "inspector"}`}
+        title={tactical ? "Open tactical analysis" : "Open the inspector (method, provenance, quality, rights)"}
         className="flex size-7 items-center justify-center rounded-control text-text-muted transition-colors duration-quick hover:bg-surface-2 hover:text-text-secondary"
       >
         <PanelRight size={15} aria-hidden="true" />
@@ -144,7 +149,7 @@ function InspectorRail({ onExpand }: { onExpand: () => void }) {
         className="t-section mt-3 select-none text-text-muted tracking-[0.18em]"
         style={{ writingMode: "vertical-rl" }}
       >
-        Inspector
+        {tactical ? "Tactical" : "Inspector"}
       </span>
     </div>
   );

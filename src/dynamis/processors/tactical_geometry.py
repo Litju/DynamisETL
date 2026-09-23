@@ -105,9 +105,7 @@ def _frames(table: pa.Table, parameters: dict[str, Any]) -> tuple[Frame, ...]:
         raise ValueError(f"{ALGORITHM_ID}: missing tracking columns {sorted(missing_columns)}")
     length = float(parameters["pitch_length_m"])
     width = float(parameters["pitch_width_m"])
-    grouped: dict[int, dict[str, dict[str, Position]]] = defaultdict(
-        lambda: defaultdict(dict)
-    )
+    grouped: dict[int, dict[str, dict[str, Position]]] = defaultdict(lambda: defaultdict(dict))
     balls: dict[int, tuple[float, float]] = {}
     diagnostics: dict[int, list[int]] = defaultdict(lambda: [0, 0, 0, 0])
     for row in table.to_pylist():
@@ -329,9 +327,7 @@ def process_tactical_geometry(
             team_hulls[group_id] = hull
             pairwise = tuple(_distance(left, right) for left, right in combinations(players, 2))
             minimum_met = count >= minimum_players
-            rms = math.sqrt(
-                sum(_distance(player, centroid) ** 2 for player in players) / count
-            )
+            rms = math.sqrt(sum(_distance(player, centroid) ** 2 for player in players) / count)
             quality = {
                 "minimum_players_met": minimum_met,
                 "player_count": count,
@@ -374,6 +370,7 @@ def process_tactical_geometry(
                     "ball_distance_to_centroid_m": (
                         _distance(centroid, frame.ball) if frame.ball is not None else None
                     ),
+                    "hull_polygon_json": json.dumps(hull, separators=(",", ":")),
                 }
             )
             team_rows.append(row)

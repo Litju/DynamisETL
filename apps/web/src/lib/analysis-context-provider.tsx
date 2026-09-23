@@ -2,7 +2,7 @@ import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useMemo, type ReactNode } from "react";
 
 import { AnalysisContext, type AnalysisContextValue } from "@/lib/analysis-context";
-import { normalizeLabSearch, type LabSearch } from "@/lib/search";
+import { normalizeLabSearch, type LabSearch, type TacticalView } from "@/lib/search";
 import { formatNsDecimal, tryParseNs } from "@/lib/time";
 
 /**
@@ -42,6 +42,7 @@ export function AnalysisContextProvider({ children }: { children: ReactNode }) {
       toNs: tryParseNs(search.to_ns),
       metricId: search.metric ?? null,
       derivedMetricId: search.result ?? null,
+      tacticalView: search.tactical ?? "live",
       commitTime: (tNs) =>
         update({ t_ns: tNs === null ? undefined : formatNsDecimal(tNs) }),
       commitRange: (range) =>
@@ -67,8 +68,9 @@ export function AnalysisContextProvider({ children }: { children: ReactNode }) {
         update({ stream: streamIdValue === null ? undefined : streamIdValue }),
       selectResult: (derivedMetricId) =>
         update({ result: derivedMetricId === null ? undefined : derivedMetricId }),
+      selectTacticalView: (view: TacticalView) => update({ tactical: view }),
     };
-  }, [datasetId, navigate, search.result, search.stream, search.subject, search.t_ns, search.to_ns, search.from_ns, search.metric, search.trial, sessionId]);
+  }, [datasetId, navigate, search.result, search.stream, search.subject, search.t_ns, search.to_ns, search.from_ns, search.metric, search.tactical, search.trial, sessionId]);
 
   return <AnalysisContext.Provider value={value}>{children}</AnalysisContext.Provider>;
 }
