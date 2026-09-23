@@ -567,6 +567,14 @@
             "title": "Domain",
             "type": "string"
           },
+          "ingested_modalities": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Ingested Modalities",
+            "type": "array"
+          },
           "initial_scope": {
             "title": "Initial Scope",
             "type": "string"
@@ -680,6 +688,14 @@
           "domain": {
             "title": "Domain",
             "type": "string"
+          },
+          "ingested_modalities": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Ingested Modalities",
+            "type": "array"
           },
           "license": {
             "$ref": "#/components/schemas/LicenseView"

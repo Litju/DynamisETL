@@ -547,6 +547,11 @@ export interface components {
             doi: string | null;
             /** Domain */
             domain: string;
+            /**
+             * Ingested Modalities
+             * @default []
+             */
+            ingested_modalities: string[];
             /** Initial Scope */
             initial_scope: string;
             license: components["schemas"]["LicenseView"];
@@ -585,6 +590,11 @@ export interface components {
             doi: string | null;
             /** Domain */
             domain: string;
+            /**
+             * Ingested Modalities
+             * @default []
+             */
+            ingested_modalities: string[];
             license: components["schemas"]["LicenseView"];
             /** Metric Count */
             metric_count: number;

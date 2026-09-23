@@ -46,7 +46,10 @@ class DatasetSummary(BaseModel):
     domain: str
     doi: str | None
     upstream_urls: list[str]
+    #: Modalities the registry declares for the source.
     modalities: list[str]
+    #: Modalities with at least one registered canonical stream (what opens).
+    ingested_modalities: list[str] = []
     license: LicenseView
     version_count: int
     session_count: int

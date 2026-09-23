@@ -96,6 +96,7 @@ def materialize_tracking_level(
     ref: SilverStreamRef,
     table: pa.Table,
     tracking_input: Any,
+    code_sha: str | None = None,
 ) -> ProcessorRunResult:
     """Run and persist one tracking-only tactical level for one stream."""
     result = TRACKING_LEVELS[level](table)
@@ -106,6 +107,7 @@ def materialize_tracking_level(
         inputs=(tracking_input,),
         series_key=ref.stream_id,
         engine=engine,
+        code_sha=code_sha,
     )
 
 
@@ -119,6 +121,7 @@ def materialize_event_level(
     tracking_input: Any,
     event_table: pa.Table,
     event_input: Any,
+    code_sha: str | None = None,
 ) -> ProcessorRunResult | None:
     """Run and persist Level D source-event snapshots for one tracking period.
 
@@ -136,6 +139,7 @@ def materialize_event_level(
         inputs=(event_input, tracking_input),
         series_key=ref.stream_id,
         engine=engine,
+        code_sha=code_sha,
     )
 
 

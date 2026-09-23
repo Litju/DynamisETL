@@ -263,6 +263,7 @@ def _locomotor_step(
     ref: SilverStreamRef,
     *,
     force: bool,
+    code_sha: str | None,
 ) -> bool:
     from dynamis.processors.locomotor import locomotor_spec, process_locomotor
 
@@ -285,6 +286,7 @@ def _locomotor_step(
             inputs=(processor_input,),
             series_key=ref.stream_id,
             engine=engine,
+            code_sha=code_sha,
         ).run_id
 
     return _step(
@@ -304,6 +306,7 @@ def _pose_step(
     ref: SilverStreamRef,
     *,
     force: bool,
+    code_sha: str | None,
 ) -> bool:
     from dynamis.processors.pose import pose_spec, process_pose
 
@@ -326,6 +329,7 @@ def _pose_step(
             inputs=(processor_input,),
             series_key=ref.stream_id,
             engine=engine,
+            code_sha=code_sha,
         ).run_id
 
     return _step(
@@ -347,6 +351,7 @@ def _tactical_steps(
     *,
     levels: tuple[str, ...],
     force: bool,
+    code_sha: str | None,
 ) -> None:
     event_table: pa.Table | None = None
     event_input: Any = None
@@ -389,6 +394,7 @@ def _tactical_steps(
                         tracking_input=tracking_input,
                         event_table=event_table,
                         event_input=event_input,
+                        code_sha=code_sha,
                     )
                     return None if run is None else run.run_id
 
@@ -412,6 +418,7 @@ def _tactical_steps(
                         ref=ref,
                         table=table,
                         tracking_input=tracking_input,
+                        code_sha=code_sha,
                     ).run_id
 
                 runner = run_tracking
@@ -438,8 +445,13 @@ def materialize(
     *,
     force: bool,
     skip_levels: tuple[str, ...],
+    code_sha: str | None = None,
 ) -> bool:
-    """Materialize every supported processor; return True when metrics changed."""
+    """Materialize every supported processor; return True when metrics changed.
+
+    ``code_sha`` pins one code revision for every run of the preparation, so a
+    long run never records a HEAD that moved while it was executing.
+    """
     metrics_changed = False
     for flagship in FLAGSHIPS:
         _log(f"{flagship.dataset_id} / {flagship.session_id}")
@@ -447,9 +459,13 @@ def materialize(
         tracking = [ref for ref in refs if ref.modality == "tracking"]
         events = [ref for ref in refs if ref.modality == "event"]
         for ref in tracking:
-            metrics_changed |= _locomotor_step(resolved, engine, report, flagship, ref, force=force)
+            metrics_changed |= _locomotor_step(
+                resolved, engine, report, flagship, ref, force=force, code_sha=code_sha
+            )
         for ref in (ref for ref in refs if ref.modality == "pose"):
-            metrics_changed |= _pose_step(resolved, engine, report, flagship, ref, force=force)
+            metrics_changed |= _pose_step(
+                resolved, engine, report, flagship, ref, force=force, code_sha=code_sha
+            )
         levels = tuple(
             level for level in supported_levels(flagship.dataset_id) if level not in skip_levels
         )
@@ -462,6 +478,7 @@ def materialize(
             events,
             levels=levels,
             force=force,
+            code_sha=code_sha,
         )
     return metrics_changed
 
@@ -672,12 +689,15 @@ def main(argv: list[str] | None = None) -> int:
                     "recorded under the HEAD revision; commit first or pass --allow-dirty:\n"
                     + "\n".join(dirty)
                 )
+            from dynamis.processors.spec import code_git_sha
+
             metrics_changed = materialize(
                 resolved,
                 engine,
                 report,
                 force=args.force,
                 skip_levels=tuple(args.skip_level),
+                code_sha=code_git_sha(),
             )
             current, _counts = gold_is_current(engine)
             if metrics_changed or not current:

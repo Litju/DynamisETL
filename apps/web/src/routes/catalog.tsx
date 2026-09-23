@@ -269,8 +269,13 @@ function FilterSelect({
 
 /** Compact non-color-only capability marks for the catalog row. */
 function SurfaceMarks({ dataset }: { dataset: DatasetSummary }) {
-  const surfaces = datasetSurfaces(dataset.modalities, dataset.stream_count);
-  const events = datasetHasEvents(dataset.modalities, dataset.stream_count);
+  // Laboratories open only for modalities with registered streams; a declared
+  // but unacquired modality (SkillCorner events) never advertises a lab.
+  const openable = dataset.ingested_modalities && dataset.ingested_modalities.length > 0
+    ? dataset.ingested_modalities
+    : dataset.modalities;
+  const surfaces = datasetSurfaces(openable, dataset.stream_count);
+  const events = datasetHasEvents(openable, dataset.stream_count);
   if (surfaces.length === 0 && !events) {
     // No canonical stream exists, so no renderer can open. Derived metrics
     // still resolve through Compare and Methodology.

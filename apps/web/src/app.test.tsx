@@ -28,6 +28,7 @@ const DATASET: DatasetSummary = {
   doi: null,
   upstream_urls: ["https://github.com/SkillCorner/opendata"],
   modalities: ["tracking", "pose"],
+  ingested_modalities: ["pose", "tracking"],
   license: {
     policy_id: "skillcorner-opendata",
     identifier: "CC BY 4.0",

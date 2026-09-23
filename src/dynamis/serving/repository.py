@@ -168,12 +168,33 @@ SELECT
     l.noncommercial_only, l.share_alike, l.redistribution, l.local_only, l.restrictions,
     (SELECT json_agg(m.modality ORDER BY m.modality) FROM dataset_source_modality m
         WHERE m.dataset_id = s.dataset_id) AS modalities,
+    (SELECT json_agg(DISTINCT st.modality) FROM sensor_stream st
+        WHERE st.dataset_id = s.dataset_id) AS ingested_modalities,
     (SELECT count(*) FROM dataset_version v WHERE v.dataset_id = s.dataset_id) AS version_count,
     (SELECT count(*) FROM "session" se WHERE se.dataset_id = s.dataset_id) AS session_count,
     (SELECT count(*) FROM subject su WHERE su.dataset_id = s.dataset_id) AS subject_count,
     (SELECT count(*) FROM trial t WHERE t.dataset_id = s.dataset_id) AS trial_count,
     (SELECT count(*) FROM sensor_stream st WHERE st.dataset_id = s.dataset_id) AS stream_count,
-    (SELECT count(*) FROM derived_metric dm WHERE dm.dataset_id = s.dataset_id) AS metric_count,
+    -- Current revisions only (run-scoped rule shared with metric serving);
+    -- superseded history stays in the provenance marts.
+    (SELECT count(*) FROM (
+        SELECT dm.run_id,
+            row_number() OVER (
+                PARTITION BY dm.metric_id, COALESCE(dm.subject_id, ''),
+                    COALESCE(dm.session_id, ''), COALESCE(dm.trial_id, ''),
+                    COALESCE(dm.stream_id, ''), COALESCE(dm.provenance ->> 'entity_id', '')
+                ORDER BY dm.computed_at DESC NULLS LAST, dm.run_id DESC
+            ) AS revision_rank,
+            first_value(dm.run_id) OVER (
+                PARTITION BY dm.provenance ->> 'algorithm_id', COALESCE(dm.subject_id, ''),
+                    COALESCE(dm.session_id, ''), COALESCE(dm.trial_id, ''),
+                    COALESCE(dm.stream_id, '')
+                ORDER BY dm.computed_at DESC NULLS LAST, dm.run_id DESC
+            ) AS scope_run_id
+        FROM derived_metric dm WHERE dm.dataset_id = s.dataset_id
+    ) current_metric
+    WHERE current_metric.revision_rank = 1
+        AND current_metric.run_id = current_metric.scope_run_id) AS metric_count,
     (SELECT count(*) FROM quality_issue q WHERE q.dataset_id = s.dataset_id) AS quality_issue_count
 FROM dataset_source s
 JOIN license_policy l ON l.policy_id = s.license_policy_id
@@ -189,6 +210,7 @@ def _dataset_summary(row: Any) -> DatasetSummary:
         doi=row["doi"],
         upstream_urls=[str(item) for item in _list(row["upstream_urls"])],
         modalities=[str(item) for item in _list(row["modalities"])],
+        ingested_modalities=sorted(str(item) for item in _list(row.get("ingested_modalities"))),
         license=_license_view(row),
         version_count=int(row["version_count"]),
         session_count=int(row["session_count"]),
