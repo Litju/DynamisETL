@@ -120,6 +120,10 @@ class SessionParticipantView(BaseModel):
     subject_id: str
     role: str
     group_label: str | None
+    #: Registered subject cohort (for football providers: the team name).
+    cohort: str | None = None
+    #: Registered human-readable subject note (for football: shirt and name).
+    notes: str | None = None
 
 
 class SessionDetail(BaseModel):

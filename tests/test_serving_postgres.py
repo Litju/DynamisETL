@@ -118,6 +118,9 @@ def test_postgres_serving_end_to_end(
         assert detail.status_code == 200
         payload = detail.json()
         assert payload["streams"][0]["modality"] == "lpt"
+        # RES-112 S-07: registered human labels are served with the participant.
+        assert payload["participants"][0]["cohort"] == "Fixture cohort"
+        assert payload["participants"][0]["notes"] == "shirt 7 (Fixture Athlete)"
         assert payload["streams"][0]["si_units"] == ["m"]
         assert payload["streams"][0]["sample_artifact_ids"] == ["serving-sample"]
 
@@ -231,8 +234,9 @@ def _insert_explorer_rows(connection, dataset_root: Path) -> None:
     )
     connection.execute(
         text(
-            "INSERT INTO subject (dataset_id, subject_id, sex) "
-            "VALUES ('white-cmj-acc-grf', 'subject-1', 'unspecified')"
+            "INSERT INTO subject (dataset_id, subject_id, sex, cohort, notes) "
+            "VALUES ('white-cmj-acc-grf', 'subject-1', 'unspecified', 'Fixture cohort', "
+            "'shirt 7 (Fixture Athlete)')"
         )
     )
     connection.execute(

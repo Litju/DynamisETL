@@ -99,7 +99,7 @@ export function sessionTeams(session: SessionDetail | undefined): {
   for (const participant of session?.participants ?? []) {
     const groupId = participant.group_label;
     if (!groupId) continue;
-    const name = (participant as { cohort?: string | null }).cohort;
+    const name = participant.cohort;
     if (!labels.has(groupId) || (name && labels.get(groupId) === groupId)) {
       labels.set(groupId, name && name.length > 0 ? name : groupId);
     }

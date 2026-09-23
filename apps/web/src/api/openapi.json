@@ -2119,6 +2119,17 @@
       },
       "SessionParticipantView": {
         "properties": {
+          "cohort": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cohort"
+          },
           "group_label": {
             "anyOf": [
               {
@@ -2129,6 +2140,17 @@
               }
             ],
             "title": "Group Label"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
           },
           "role": {
             "title": "Role",

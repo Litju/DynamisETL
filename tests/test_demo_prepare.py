@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from benchmarks.tactical import _events, _tracking
+
 from dynamis.demo.prepare import FLAGSHIPS, flagship_urls
 from dynamis.processors.tactical_corpus import LEVEL_SERIES, TRACKING_LEVELS, supported_levels
 from dynamis.processors.tactical_events import process_tactical_event_snapshots

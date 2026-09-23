@@ -385,8 +385,12 @@ def session_detail(
     participants = (
         connection.execute(
             sa.text(
-                "SELECT subject_id, role, group_label FROM session_participant "
-                "WHERE dataset_id = :dataset_id AND session_id = :session_id ORDER BY subject_id"
+                "SELECT p.subject_id, p.role, p.group_label, s.cohort, s.notes "
+                "FROM session_participant p "
+                "LEFT JOIN subject s "
+                "ON s.dataset_id = p.dataset_id AND s.subject_id = p.subject_id "
+                "WHERE p.dataset_id = :dataset_id AND p.session_id = :session_id "
+                "ORDER BY p.subject_id"
             ),
             {"dataset_id": dataset_id, "session_id": session_id},
         )
@@ -448,6 +452,8 @@ def session_detail(
                 subject_id=row["subject_id"],
                 role=row["role"],
                 group_label=row["group_label"],
+                cohort=row["cohort"],
+                notes=row["notes"],
             )
             for row in participants
         ],

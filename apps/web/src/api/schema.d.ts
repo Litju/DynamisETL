@@ -1037,8 +1037,12 @@ export interface components {
         };
         /** SessionParticipantView */
         SessionParticipantView: {
+            /** Cohort */
+            cohort?: string | null;
             /** Group Label */
             group_label: string | null;
+            /** Notes */
+            notes?: string | null;
             /** Role */
             role: string;
             /** Subject Id */
