@@ -60,6 +60,9 @@ const MAX_EVENT_POINTS = 2_000;
 const TACTICAL_MAX_POINTS = 100_000;
 /** Level C grids are emitted at most once per second (LEVEL-C-CONTRACT.md). */
 const INFLUENCE_MAX_AGE_NS = 1_500_000_000;
+const HULL_COLUMNS = ["t_rel_ns", "group_id", "hull_polygon_json"] as const;
+const TERRITORY_COLUMNS = ["t_rel_ns", "entity_id", "group_id", "cell_polygon_json"] as const;
+const INFLUENCE_COLUMNS = ["t_rel_ns", "x_m", "y_m", "owner_group_id", "arrival_time_s"] as const;
 
 /** Shape served event rows into renderer marks, dropping unplaceable ones. */
 export function toPitchEvents(rows: ReadonlyArray<Record<string, unknown>>): PitchEvent[] {
@@ -511,22 +514,25 @@ function PitchView({
   const teamArtifact = seriesArtifact(tacticalArtifacts.data, "team_geometry");
   const territoryArtifact = seriesArtifact(tacticalArtifacts.data, "player_territory");
   const influenceArtifact = seriesArtifact(tacticalArtifacts.data, "influence_grid");
-  const tacticalWindow = (artifactId: string | null) => tacticalSeriesQuery({
+  // Overlays read only the columns they draw: a full territory chunk is
+  // ~5 MB of JSON, the projected one ~1.5 MB (RES-112 performance audit).
+  const tacticalWindow = (artifactId: string | null, columns: readonly string[]) => tacticalSeriesQuery({
     artifactId: artifactId ?? "",
     fromNs: Number(tacticalBounds.fromNs),
     toNs: Number(tacticalBounds.toNs),
     maxPoints: TACTICAL_MAX_POINTS,
+    columns,
   });
   const teamTactical = useQuery({
-    ...tacticalWindow(teamArtifact?.artifact_id ?? null),
+    ...tacticalWindow(teamArtifact?.artifact_id ?? null, HULL_COLUMNS),
     enabled: Boolean(teamArtifact && layers.geometry),
   });
   const territoryTactical = useQuery({
-    ...tacticalWindow(territoryArtifact?.artifact_id ?? null),
+    ...tacticalWindow(territoryArtifact?.artifact_id ?? null, TERRITORY_COLUMNS),
     enabled: Boolean(territoryArtifact && layers.territory),
   });
   const influenceTactical = useQuery({
-    ...tacticalWindow(influenceArtifact?.artifact_id ?? null),
+    ...tacticalWindow(influenceArtifact?.artifact_id ?? null, INFLUENCE_COLUMNS),
     enabled: Boolean(influenceArtifact && layers.influence),
   });
   // A display-reduced tactical response is a subset of frames; it is never

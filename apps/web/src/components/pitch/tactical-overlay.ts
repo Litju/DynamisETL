@@ -70,8 +70,22 @@ export function latestRowsAtOrBefore(
   return { timeNs: time, rows: index.byTime.get(time) ?? [] };
 }
 
+const EMPTY_POLYGON: readonly [number, number][] = [];
+/** Parsed polygons by source string; per-frame drawing never re-parses JSON. */
+const polygonCache = new Map<string, readonly [number, number][]>();
+const POLYGON_CACHE_LIMIT = 50_000;
+
 export function polygonFromJson(value: unknown): readonly [number, number][] {
-  if (typeof value !== "string") return [];
+  if (typeof value !== "string") return EMPTY_POLYGON;
+  const cached = polygonCache.get(value);
+  if (cached) return cached;
+  const parsed = parsePolygon(value);
+  if (polygonCache.size >= POLYGON_CACHE_LIMIT) polygonCache.clear();
+  polygonCache.set(value, parsed);
+  return parsed;
+}
+
+function parsePolygon(value: string): readonly [number, number][] {
   try {
     const parsed: unknown = JSON.parse(value);
     if (!Array.isArray(parsed)) return [];

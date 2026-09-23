@@ -50,6 +50,8 @@ export interface TacticalSeriesQuery {
   readonly fromNs?: number | undefined;
   readonly toNs?: number | undefined;
   readonly maxPoints?: number | undefined;
+  /** Column projection; overlays read only what they draw. */
+  readonly columns?: readonly string[] | undefined;
 }
 
 function compact(params: Record<string, string | number | undefined>): Record<string, string> {
@@ -360,10 +362,13 @@ export const tacticalSeriesQuery = (query: TacticalSeriesQuery) =>
               from_ns: query.fromNs,
               to_ns: query.toNs,
               max_points: query.maxPoints,
+              columns: query.columns?.join(","),
             }),
           },
           signal,
         }),
       ),
-    staleTime: 15_000,
+    // A processing artifact id names immutable content (a rerun gets a new
+    // run/artifact identity), so a served window never goes stale.
+    staleTime: Number.POSITIVE_INFINITY,
   });
