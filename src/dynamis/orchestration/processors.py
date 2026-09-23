@@ -19,8 +19,6 @@ This module intentionally avoids ``from __future__ import annotations``:
 Dagster resolves annotations at decoration time.
 """
 
-import pyarrow as pa
-import pyarrow.compute as pc
 from dagster import (
     AssetCheckResult,
     AssetCheckSeverity,
@@ -41,9 +39,7 @@ from dynamis.processors.acceptance import (
     process_corpus,
     white_cross_sensor_acceptance,
 )
-from dynamis.processors.corpus import list_silver_streams, load_silver
-from dynamis.processors.runtime import execute_processor
-from dynamis.processors.tactical_events import process_tactical_event_snapshots
+from dynamis.processors.tactical_corpus import dataset_event_runs
 from dynamis.processors.tactical_geometry import process_tactical_geometry
 from dynamis.processors.tactical_influence import process_tactical_influence
 from dynamis.processors.tactical_territory import process_tactical_territory
@@ -215,51 +211,7 @@ def dfl_tactical_event_processing() -> dict:
     """Level D source-event snapshots for DFL/Sportec's synchronized event slice."""
     resolved, engine = _engine()
     try:
-        with engine.connect() as connection:
-            event_refs = list_silver_streams(
-                connection, dataset_id=DFL_DATASET_ID, modality="event"
-            )
-            tracking_refs = list_silver_streams(
-                connection, dataset_id=DFL_DATASET_ID, modality="tracking"
-            )
-        if len(event_refs) != 1 or not tracking_refs:
-            raise ValueError(
-                "DFL tactical event processing requires one event stream and tracking periods"
-            )
-        event_table, event_input = load_silver(resolved, event_refs[0])
-        run_ids: list[str] = []
-        emitted = 0
-        synchronized = 0
-        for tracking_ref in tracking_refs:
-            tracking_table, tracking_input = load_silver(resolved, tracking_ref)
-            period_events = event_table.filter(
-                pc.call_function(
-                    "equal", [event_table["trial_id"], pa.scalar(tracking_ref.trial_id)]
-                )
-            )
-            if period_events.num_rows == 0:
-                continue
-            result = process_tactical_event_snapshots(period_events, tracking_table)
-            run = execute_processor(
-                resolved,
-                result=result,
-                dataset_id=DFL_DATASET_ID,
-                inputs=(event_input, tracking_input),
-                series_key=f"{tracking_ref.stream_id}-events",
-                engine=engine,
-            )
-            run_ids.append(run.run_id)
-            emitted += int(result.diagnostics["emitted_events"])
-            synchronized += int(result.diagnostics["synchronized_events"])
-        return {
-            "dataset_id": DFL_DATASET_ID,
-            "algorithm_id": "tactical.source_event_snapshot",
-            "runs": len(run_ids),
-            "run_ids": sorted(run_ids),
-            "emitted_events": emitted,
-            "synchronized_events": synchronized,
-            "derived_event_labels": False,
-        }
+        return dataset_event_runs(resolved, engine, dataset_id=DFL_DATASET_ID)
     finally:
         engine.dispose()
 

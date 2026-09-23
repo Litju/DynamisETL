@@ -26,6 +26,7 @@ dependencies = [
 ]
 
 [project.scripts]
+dynamis-demo-prepare = "dynamis.demo.prepare:main"
 dynamis-fetch = "dynamis.acquisition.cli:main"
 dynamis-gold = "dynamis.gold.cli:main"
 dynamis-ingest = "dynamis.pipeline.cli:main"
