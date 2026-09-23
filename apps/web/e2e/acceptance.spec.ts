@@ -106,6 +106,17 @@ test("2. selecting a player on the pitch updates the durable subject context", a
   await expect(page.getByText(/detected$|extrapolated$/).last()).toBeVisible();
 });
 
+test("2b. field uses the Tactical Analysis pane with explicit unavailable states", async ({ page }) => {
+  await page.goto("/lab/skillcorner-opendata/1925299?stream=tracking-1&view=field&t_ns=0");
+  const pane = page.getByRole("region", { name: "Tactical Analysis" });
+  await expect(pane).toBeVisible();
+  await expect(pane.getByRole("tab", { name: "Live" })).toBeVisible();
+  await expect(pane.getByRole("tab", { name: "Shape" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Inspector" })).toHaveCount(0);
+  await pane.getByRole("tab", { name: "Shape" }).click();
+  await expect(pane.getByText("Unavailable for this source").last()).toBeVisible();
+});
+
 test("3/4. committed time propagates from the keyboard to the transport and pose view", async ({
   page,
 }) => {
