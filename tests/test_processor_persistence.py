@@ -173,9 +173,14 @@ def test_pipeline_metric_provenance_is_complete_and_idempotent(
             run = connection.execute(
                 text(
                     "SELECT run_id, dataset_id, algorithm_id, status, code_git_sha, "
-                    "parameters_hash, input_checksums FROM processing_run"
+                    "parameters_hash, input_checksums FROM processing_run "
+                    "WHERE run_id = 'run-test'"
                 )
             ).fetchall()
+            # The dense-only run is persisted as a run with no scalar metrics.
+            dense_only_runs = connection.execute(
+                text("SELECT count(*) FROM processing_run WHERE run_id = 'run-test-dense-only'")
+            ).scalar_one()
             metric_rows = connection.execute(
                 text("SELECT count(*) FROM derived_metric")
             ).scalar_one()
@@ -187,6 +192,7 @@ def test_pipeline_metric_provenance_is_complete_and_idempotent(
         assert artifact_count == 1
         assert len(rows) == 1
         assert len(run) == 1
+        assert dense_only_runs == 1
         metric = rows[0]
         assert metric.dataset_id == "white-cmj-acc-grf"
         assert metric.metric_id == "test.persistence.scalar"
