@@ -90,17 +90,39 @@ function polygon(value: unknown): readonly [number, number][] {
   }
 }
 
-function tacticalOverlayFromRows(
+function rowsAtTacticalTime(
+  rows: readonly Record<string, unknown>[],
+  timeNs: bigint | null,
+): readonly Record<string, unknown>[] {
+  if (rows.length === 0) return [];
+  const target = timeNs === null ? Number(rows.at(-1)?.["t_rel_ns"] ?? 0) : Number(timeNs);
+  let nearest = rows[0]!;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  for (const row of rows) {
+    const time = row["t_rel_ns"];
+    if (typeof time !== "number") continue;
+    const distance = Math.abs(time - target);
+    if (distance < nearestDistance) {
+      nearest = row;
+      nearestDistance = distance;
+    }
+  }
+  const selectedTime = nearest["t_rel_ns"];
+  return rows.filter((row) => row["t_rel_ns"] === selectedTime);
+}
+
+export function tacticalOverlayFromRows(
   geometryRows: readonly Record<string, unknown>[],
   territoryRows: readonly Record<string, unknown>[],
   influenceRows: readonly Record<string, unknown>[],
+  timeNs: bigint | null = null,
 ): TacticalOverlay {
-  const hulls = geometryRows.flatMap((row) => {
+  const hulls = rowsAtTacticalTime(geometryRows, timeNs).flatMap((row) => {
     const groupId = row["group_id"];
     const points = polygon(row["hull_polygon_json"]);
     return typeof groupId === "string" && points.length >= 2 ? [{ groupId, points }] : [];
   });
-  const territoryCells = territoryRows.flatMap((row) => {
+  const territoryCells = rowsAtTacticalTime(territoryRows, timeNs).flatMap((row) => {
     const entityId = row["entity_id"];
     const groupId = row["group_id"];
     const points = polygon(row["cell_polygon_json"]);
@@ -108,11 +130,12 @@ function tacticalOverlayFromRows(
       ? [{ entityId, groupId, points }]
       : [];
   });
-  const xValues = [...new Set(influenceRows.map((row) => row["x_m"]).filter((value): value is number => typeof value === "number"))].sort((a, b) => a - b);
-  const yValues = [...new Set(influenceRows.map((row) => row["y_m"]).filter((value): value is number => typeof value === "number"))].sort((a, b) => a - b);
+  const selectedInfluenceRows = rowsAtTacticalTime(influenceRows, timeNs);
+  const xValues = [...new Set(selectedInfluenceRows.map((row) => row["x_m"]).filter((value): value is number => typeof value === "number"))].sort((a, b) => a - b);
+  const yValues = [...new Set(selectedInfluenceRows.map((row) => row["y_m"]).filter((value): value is number => typeof value === "number"))].sort((a, b) => a - b);
   const widthM = xValues.length > 1 ? Math.abs(xValues[1]! - xValues[0]!) : 5;
   const heightM = yValues.length > 1 ? Math.abs(yValues[1]! - yValues[0]!) : 4;
-  const influenceCells = influenceRows.flatMap((row) => {
+  const influenceCells = selectedInfluenceRows.flatMap((row) => {
     const x = row["x_m"];
     const y = row["y_m"];
     const groupId = row["owner_group_id"];
@@ -427,6 +450,7 @@ function PitchView({
   const hostRef = useRef<HTMLDivElement | null>(null);
   const rendererRef = useRef<PitchRendererHandle | null>(null);
   const selectedEntityId = useAnalysisStore((state) => state.selectedEntityId);
+  const tacticalTimeNs = useAnalysisStore((state) => state.playheadNs ?? state.committedTimeNs);
   const committedRangeNs = useAnalysisStore((state) => state.committedRangeNs);
   const [rendererReady, setRendererReady] = useState(false);
   const [layers, setLayers] = useState<PitchLayers>(DEFAULT_PITCH_LAYERS);
@@ -498,8 +522,9 @@ function PitchView({
       (teamTactical.data?.rows ?? []) as Record<string, unknown>[],
       (territoryTactical.data?.rows ?? []) as Record<string, unknown>[],
       (influenceTactical.data?.rows ?? []) as Record<string, unknown>[],
+      tacticalTimeNs,
     ),
-    [influenceTactical.data, teamTactical.data, territoryTactical.data],
+    [influenceTactical.data, tacticalTimeNs, teamTactical.data, territoryTactical.data],
   );
 
   const palette = useMemo<PitchPalette>(() => {

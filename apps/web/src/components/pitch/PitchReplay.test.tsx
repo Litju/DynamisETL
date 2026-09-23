@@ -3,7 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { AnalysisContext, type AnalysisContextValue } from "@/lib/analysis-context";
-import { PitchReplay } from "@/components/pitch/PitchReplay";
+import { PitchReplay, tacticalOverlayFromRows } from "@/components/pitch/PitchReplay";
 import { useAnalysisStore } from "@/lib/state/analysis";
 
 const setFrame = vi.fn();
@@ -240,4 +240,20 @@ it("requires an explicit stream and never invents one", async () => {
   installFetch();
   renderPitch({ streamId: null });
   expect(await screen.findByText("No stream selected.")).toBeInTheDocument();
+});
+
+it("limits tactical overlays to the playhead frame instead of painting the whole window", () => {
+  const overlay = tacticalOverlayFromRows(
+    [
+      { t_rel_ns: 0, group_id: "home", hull_polygon_json: "[[0,0],[1,0],[0,1]]" },
+      { t_rel_ns: 0, group_id: "away", hull_polygon_json: "[[2,0],[3,0],[2,1]]" },
+      { t_rel_ns: 100, group_id: "home", hull_polygon_json: "[[10,0],[11,0],[10,1]]" },
+      { t_rel_ns: 100, group_id: "away", hull_polygon_json: "[[12,0],[13,0],[12,1]]" },
+    ],
+    [],
+    [],
+    100n,
+  );
+  expect(overlay.hulls).toHaveLength(2);
+  expect(overlay.hulls.map((hull) => hull.points[0]?.[0])).toEqual([10, 12]);
 });
