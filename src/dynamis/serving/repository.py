@@ -547,9 +547,18 @@ WITH ranked AS (
                 COALESCE(m.trial_id, ''), COALESCE(m.stream_id, ''),
                 COALESCE(m.provenance ->> 'entity_id', '')
             ORDER BY m.computed_at DESC NULLS LAST, m.run_id DESC
-        ) AS revision_rank
+        ) AS revision_rank,
+        first_value(m.run_id) OVER (
+            PARTITION BY
+                m.dataset_id, m.provenance ->> 'algorithm_id', COALESCE(m.subject_id, ''),
+                COALESCE(m.session_id, ''), COALESCE(m.trial_id, ''), COALESCE(m.stream_id, '')
+            ORDER BY m.computed_at DESC NULLS LAST, m.run_id DESC
+        ) AS scope_run_id
     FROM derived_metric m
     LEFT JOIN metric_definition d ON d.metric_id = m.metric_id
+),
+current_revision AS (
+    SELECT * FROM ranked WHERE revision_rank = 1 AND run_id = scope_run_id
 )
 """
 
@@ -617,13 +626,13 @@ def query_metrics(
             ],
         )
     total = connection.execute(
-        sa.text(f"{_CONTROL_METRIC_SELECT} SELECT count(*) FROM ranked{where}"),
+        sa.text(f"{_CONTROL_METRIC_SELECT} SELECT count(*) FROM current_revision{where}"),
         parameters,
     ).scalar_one()
     rows = (
         connection.execute(
             sa.text(
-                f"{_CONTROL_METRIC_SELECT} SELECT * FROM ranked{where} "
+                f"{_CONTROL_METRIC_SELECT} SELECT * FROM current_revision{where} "
                 "ORDER BY dataset_id, metric_id, COALESCE(session_id, ''), "
                 "COALESCE(subject_id, ''), COALESCE(trial_id, ''), COALESCE(stream_id, ''), "
                 "entity_key LIMIT :limit OFFSET :offset"
@@ -1152,19 +1161,33 @@ def list_tactical_artifacts(
     if series_name is not None:
         clauses.append("p.artifact_metadata->>'series_name' = :series_name")
         parameters["series_name"] = series_name
+    # Only the current completed run of each algorithm over a session stream is
+    # served: a rerun (new code revision or parameters) supersedes the previous
+    # run's series instead of listing both, so a series name resolves to exactly
+    # one artifact.
     query = f"""
-        SELECT p.artifact_id, p.dataset_id, p.layer, p.relative_path,
-            p.checksum_sha256, p.row_count, p.byte_size, p.artifact_type,
-            p.artifact_metadata, p.artifact_metadata->>'stream_id' AS stream_id,
-            p.artifact_metadata->>'measurement_class' AS measurement_class,
-            p.artifact_metadata->>'coordinate_frame_id' AS coordinate_frame_id,
-            p.artifact_metadata->>'algorithm_version' AS algorithm_version,
-            p.artifact_metadata->>'parameters_hash' AS parameters_hash,
-            r.algorithm_id, r.run_id
-        FROM processing_artifact p
-        JOIN processing_run r ON r.run_id = p.run_id
-        WHERE {" AND ".join(clauses)}
-        ORDER BY p.artifact_metadata->>'series_name', p.artifact_id
+        WITH candidates AS (
+            SELECT p.artifact_id, p.dataset_id, p.layer, p.relative_path,
+                p.checksum_sha256, p.row_count, p.byte_size, p.artifact_type,
+                p.artifact_metadata, p.artifact_metadata->>'stream_id' AS stream_id,
+                p.artifact_metadata->>'measurement_class' AS measurement_class,
+                p.artifact_metadata->>'coordinate_frame_id' AS coordinate_frame_id,
+                p.artifact_metadata->>'algorithm_version' AS algorithm_version,
+                p.artifact_metadata->>'parameters_hash' AS parameters_hash,
+                r.algorithm_id, r.run_id,
+                first_value(r.run_id) OVER (
+                    PARTITION BY r.algorithm_id,
+                        COALESCE(p.artifact_metadata->>'session_id', ''),
+                        COALESCE(p.artifact_metadata->>'stream_id', '')
+                    ORDER BY r.completed_at DESC NULLS LAST, r.run_id DESC
+                ) AS current_run_id
+            FROM processing_artifact p
+            JOIN processing_run r ON r.run_id = p.run_id
+            WHERE r.status = 'completed' AND {" AND ".join(clauses)}
+        )
+        SELECT * FROM candidates
+        WHERE run_id = current_run_id
+        ORDER BY artifact_metadata->>'series_name', artifact_id
     """
     rows = connection.execute(sa.text(query), parameters).mappings().all()
     return [_artifact_view(row, kind="processing") for row in rows]
