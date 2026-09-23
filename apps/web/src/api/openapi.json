@@ -86,6 +86,28 @@
       "ArtifactDetail": {
         "description": "One artifact plus the canonical time bounds of its samples.\n\nThe bounds require reading the Parquet footer/column statistics, so they are\nserved only for a single requested artifact and never inside a list\nresponse. A laboratory uses them to choose a deterministic first window\ninstead of asking the reader to guess a time range.",
         "properties": {
+          "algorithm_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Algorithm Id"
+          },
+          "algorithm_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Algorithm Version"
+          },
           "artifact_id": {
             "title": "Artifact Id",
             "type": "string"
@@ -97,6 +119,11 @@
             ],
             "title": "Artifact Kind",
             "type": "string"
+          },
+          "artifact_metadata": {
+            "additionalProperties": true,
+            "title": "Artifact Metadata",
+            "type": "object"
           },
           "byte_size": {
             "anyOf": [
@@ -241,6 +268,17 @@
             ],
             "title": "Modality"
           },
+          "parameters_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parameters Hash"
+          },
           "relative_path": {
             "title": "Relative Path",
             "type": "string"
@@ -248,6 +286,17 @@
           "row_count": {
             "title": "Row Count",
             "type": "integer"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
           },
           "si_units": {
             "items": {
@@ -302,6 +351,28 @@
       },
       "ArtifactRefView": {
         "properties": {
+          "algorithm_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Algorithm Id"
+          },
+          "algorithm_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Algorithm Version"
+          },
           "artifact_id": {
             "title": "Artifact Id",
             "type": "string"
@@ -313,6 +384,11 @@
             ],
             "title": "Artifact Kind",
             "type": "string"
+          },
+          "artifact_metadata": {
+            "additionalProperties": true,
+            "title": "Artifact Metadata",
+            "type": "object"
           },
           "byte_size": {
             "anyOf": [
@@ -385,6 +461,17 @@
             ],
             "title": "Modality"
           },
+          "parameters_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parameters Hash"
+          },
           "relative_path": {
             "title": "Relative Path",
             "type": "string"
@@ -392,6 +479,17 @@
           "row_count": {
             "title": "Row Count",
             "type": "integer"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
           },
           "si_units": {
             "items": {
@@ -2299,6 +2397,543 @@
         "title": "StreamView",
         "type": "object"
       },
+      "TacticalCapabilityLevels": {
+        "properties": {
+          "level_a_geometry": {
+            "title": "Level A Geometry",
+            "type": "string"
+          },
+          "level_b_territory": {
+            "title": "Level B Territory",
+            "type": "string"
+          },
+          "level_c_influence": {
+            "title": "Level C Influence",
+            "type": "string"
+          },
+          "level_d_event_linked": {
+            "title": "Level D Event Linked",
+            "type": "string"
+          },
+          "level_e_shape_phase": {
+            "title": "Level E Shape Phase",
+            "type": "string"
+          }
+        },
+        "required": [
+          "level_a_geometry",
+          "level_b_territory",
+          "level_c_influence",
+          "level_d_event_linked",
+          "level_e_shape_phase"
+        ],
+        "title": "TacticalCapabilityLevels",
+        "type": "object"
+      },
+      "TacticalCapabilityView": {
+        "properties": {
+          "accepted_slice": {
+            "additionalProperties": true,
+            "title": "Accepted Slice",
+            "type": "object"
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/TacticalCapabilityLevels"
+          },
+          "dataset_id": {
+            "title": "Dataset Id",
+            "type": "string"
+          },
+          "quality_evidence": {
+            "additionalProperties": true,
+            "title": "Quality Evidence",
+            "type": "object"
+          },
+          "semantics": {
+            "additionalProperties": true,
+            "title": "Semantics",
+            "type": "object"
+          },
+          "unavailable_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unavailable Reasons",
+            "type": "array"
+          }
+        },
+        "required": [
+          "dataset_id",
+          "accepted_slice",
+          "semantics",
+          "capabilities",
+          "quality_evidence",
+          "unavailable_reasons"
+        ],
+        "title": "TacticalCapabilityView",
+        "type": "object"
+      },
+      "TacticalEventPage": {
+        "properties": {
+          "meta": {
+            "$ref": "#/components/schemas/TacticalSeriesMeta"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/TacticalEventView"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "meta",
+          "rows"
+        ],
+        "title": "TacticalEventPage",
+        "type": "object"
+      },
+      "TacticalEventView": {
+        "properties": {
+          "ball_x_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ball X M"
+          },
+          "ball_y_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ball Y M"
+          },
+          "event_ball_distance_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Ball Distance M"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "event_subtype": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Subtype"
+          },
+          "event_type": {
+            "title": "Event Type",
+            "type": "string"
+          },
+          "event_x_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event X M"
+          },
+          "event_y_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Y M"
+          },
+          "provider_context_json": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Context Json"
+          },
+          "provider_player_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Player Id"
+          },
+          "provider_team_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Team Id"
+          },
+          "quality_json": {
+            "title": "Quality Json",
+            "type": "string"
+          },
+          "t_rel_ns": {
+            "title": "T Rel Ns",
+            "type": "integer"
+          },
+          "tracking_player_count": {
+            "title": "Tracking Player Count",
+            "type": "integer"
+          },
+          "tracking_t_rel_ns": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tracking T Rel Ns"
+          },
+          "tracking_team_count": {
+            "title": "Tracking Team Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "event_id",
+          "event_type",
+          "event_subtype",
+          "provider_team_id",
+          "provider_player_id",
+          "event_x_m",
+          "event_y_m",
+          "provider_context_json",
+          "t_rel_ns",
+          "tracking_t_rel_ns",
+          "tracking_player_count",
+          "tracking_team_count",
+          "ball_x_m",
+          "ball_y_m",
+          "event_ball_distance_m",
+          "quality_json"
+        ],
+        "title": "TacticalEventView",
+        "type": "object"
+      },
+      "TacticalMethodologyPage": {
+        "properties": {
+          "authority": {
+            "title": "Authority",
+            "type": "string"
+          },
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/TacticalMetricMethodologyView"
+            },
+            "title": "Metrics",
+            "type": "array"
+          }
+        },
+        "required": [
+          "metrics",
+          "authority"
+        ],
+        "title": "TacticalMethodologyPage",
+        "type": "object"
+      },
+      "TacticalMetricMethodologyView": {
+        "properties": {
+          "algorithm_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Algorithm Id"
+          },
+          "algorithm_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Algorithm Version"
+          },
+          "definition": {
+            "title": "Definition",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "level": {
+            "enum": [
+              "A",
+              "B",
+              "C",
+              "D",
+              "E"
+            ],
+            "title": "Level",
+            "type": "string"
+          },
+          "measurement_class": {
+            "title": "Measurement Class",
+            "type": "string"
+          },
+          "metric_id": {
+            "title": "Metric Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "metric_id",
+          "level",
+          "name",
+          "unit",
+          "kind",
+          "definition",
+          "measurement_class"
+        ],
+        "title": "TacticalMetricMethodologyView",
+        "type": "object"
+      },
+      "TacticalQualityView": {
+        "properties": {
+          "capabilities": {
+            "$ref": "#/components/schemas/TacticalCapabilityLevels"
+          },
+          "dataset_id": {
+            "title": "Dataset Id",
+            "type": "string"
+          },
+          "disclosure": {
+            "title": "Disclosure",
+            "type": "string"
+          },
+          "measurement_classes": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Measurement Classes",
+            "type": "object"
+          },
+          "quality_evidence": {
+            "additionalProperties": true,
+            "title": "Quality Evidence",
+            "type": "object"
+          },
+          "unavailable_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unavailable Reasons",
+            "type": "array"
+          }
+        },
+        "required": [
+          "dataset_id",
+          "capabilities",
+          "quality_evidence",
+          "measurement_classes",
+          "unavailable_reasons",
+          "disclosure"
+        ],
+        "title": "TacticalQualityView",
+        "type": "object"
+      },
+      "TacticalSeriesMeta": {
+        "properties": {
+          "algorithm_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Algorithm Id"
+          },
+          "algorithm_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Algorithm Version"
+          },
+          "artifact": {
+            "$ref": "#/components/schemas/ArtifactRefView"
+          },
+          "coordinate_frame_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coordinate Frame Id"
+          },
+          "display_note": {
+            "title": "Display Note",
+            "type": "string"
+          },
+          "from_ns": {
+            "title": "From Ns",
+            "type": "integer"
+          },
+          "input_measurement_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Measurement Class"
+          },
+          "level": {
+            "enum": [
+              "A",
+              "B",
+              "C",
+              "D",
+              "E"
+            ],
+            "title": "Level",
+            "type": "string"
+          },
+          "measurement_class": {
+            "title": "Measurement Class",
+            "type": "string"
+          },
+          "parameters_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parameters Hash"
+          },
+          "quality": {
+            "additionalProperties": true,
+            "title": "Quality",
+            "type": "object"
+          },
+          "returned_rows": {
+            "title": "Returned Rows",
+            "type": "integer"
+          },
+          "series_name": {
+            "title": "Series Name",
+            "type": "string"
+          },
+          "source_rows": {
+            "title": "Source Rows",
+            "type": "integer"
+          },
+          "to_ns": {
+            "title": "To Ns",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "artifact",
+          "series_name",
+          "level",
+          "measurement_class",
+          "input_measurement_class",
+          "coordinate_frame_id",
+          "algorithm_id",
+          "algorithm_version",
+          "parameters_hash",
+          "from_ns",
+          "to_ns",
+          "source_rows",
+          "returned_rows",
+          "quality",
+          "display_note"
+        ],
+        "title": "TacticalSeriesMeta",
+        "type": "object"
+      },
+      "TacticalSeriesView": {
+        "properties": {
+          "meta": {
+            "$ref": "#/components/schemas/TacticalSeriesMeta"
+          },
+          "rows": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "meta",
+          "rows"
+        ],
+        "title": "TacticalSeriesView",
+        "type": "object"
+      },
       "TrialView": {
         "properties": {
           "ended_at": {
@@ -3379,6 +4014,405 @@
         "summary": "Serving Status",
         "tags": [
           "system"
+        ]
+      }
+    },
+    "/api/tactical/artifacts": {
+      "get": {
+        "operationId": "tactical_artifacts_api_tactical_artifacts_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "dataset_id",
+            "required": true,
+            "schema": {
+              "title": "Dataset Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "session_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "stream_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Stream Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "series_name",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Series Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ArtifactRefView"
+                  },
+                  "title": "Response Tactical Artifacts Api Tactical Artifacts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Tactical Artifacts",
+        "tags": [
+          "tactical"
+        ]
+      }
+    },
+    "/api/tactical/capabilities/{dataset_id}": {
+      "get": {
+        "operationId": "tactical_capabilities_api_tactical_capabilities__dataset_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dataset_id",
+            "required": true,
+            "schema": {
+              "title": "Dataset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TacticalCapabilityView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Tactical Capabilities",
+        "tags": [
+          "tactical"
+        ]
+      }
+    },
+    "/api/tactical/events/{artifact_id}": {
+      "get": {
+        "operationId": "tactical_events_api_tactical_events__artifact_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "artifact_id",
+            "required": true,
+            "schema": {
+              "title": "Artifact Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from_ns",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From Ns"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to_ns",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To Ns"
+            }
+          },
+          {
+            "in": "query",
+            "name": "max_points",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 100000,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Max Points"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TacticalEventPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Tactical Events",
+        "tags": [
+          "tactical"
+        ]
+      }
+    },
+    "/api/tactical/methodology": {
+      "get": {
+        "operationId": "tactical_methodology_api_tactical_methodology_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TacticalMethodologyPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Tactical Methodology",
+        "tags": [
+          "tactical"
+        ]
+      }
+    },
+    "/api/tactical/quality/{dataset_id}": {
+      "get": {
+        "operationId": "tactical_quality_api_tactical_quality__dataset_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dataset_id",
+            "required": true,
+            "schema": {
+              "title": "Dataset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TacticalQualityView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Tactical Quality",
+        "tags": [
+          "tactical"
+        ]
+      }
+    },
+    "/api/tactical/series/{artifact_id}": {
+      "get": {
+        "operationId": "tactical_series_api_tactical_series__artifact_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "artifact_id",
+            "required": true,
+            "schema": {
+              "title": "Artifact Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from_ns",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From Ns"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to_ns",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To Ns"
+            }
+          },
+          {
+            "in": "query",
+            "name": "columns",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Columns"
+            }
+          },
+          {
+            "in": "query",
+            "name": "max_points",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 100000,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Max Points"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TacticalSeriesView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Tactical Series",
+        "tags": [
+          "tactical"
         ]
       }
     }

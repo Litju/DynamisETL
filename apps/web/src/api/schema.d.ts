@@ -288,6 +288,108 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tactical/artifacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tactical Artifacts */
+        get: operations["tactical_artifacts_api_tactical_artifacts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tactical/capabilities/{dataset_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tactical Capabilities */
+        get: operations["tactical_capabilities_api_tactical_capabilities__dataset_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tactical/events/{artifact_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tactical Events */
+        get: operations["tactical_events_api_tactical_events__artifact_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tactical/methodology": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tactical Methodology */
+        get: operations["tactical_methodology_api_tactical_methodology_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tactical/quality/{dataset_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tactical Quality */
+        get: operations["tactical_quality_api_tactical_quality__dataset_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tactical/series/{artifact_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tactical Series */
+        get: operations["tactical_series_api_tactical_series__artifact_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -325,6 +427,10 @@ export interface components {
          *     instead of asking the reader to guess a time range.
          */
         ArtifactDetail: {
+            /** Algorithm Id */
+            algorithm_id?: string | null;
+            /** Algorithm Version */
+            algorithm_version?: string | null;
             /** Artifact Id */
             artifact_id: string;
             /**
@@ -332,6 +438,10 @@ export interface components {
              * @enum {string}
              */
             artifact_kind: "sample" | "processing";
+            /** Artifact Metadata */
+            artifact_metadata?: {
+                [key: string]: unknown;
+            };
             /** Byte Size */
             byte_size: number | null;
             /** Canonical Time Max Ns */
@@ -362,10 +472,14 @@ export interface components {
             measurement_class: string | null;
             /** Modality */
             modality: string | null;
+            /** Parameters Hash */
+            parameters_hash?: string | null;
             /** Relative Path */
             relative_path: string;
             /** Row Count */
             row_count: number;
+            /** Run Id */
+            run_id?: string | null;
             /** Si Units */
             si_units: string[];
             /** Stream Id */
@@ -375,6 +489,10 @@ export interface components {
         };
         /** ArtifactRefView */
         ArtifactRefView: {
+            /** Algorithm Id */
+            algorithm_id?: string | null;
+            /** Algorithm Version */
+            algorithm_version?: string | null;
             /** Artifact Id */
             artifact_id: string;
             /**
@@ -382,6 +500,10 @@ export interface components {
              * @enum {string}
              */
             artifact_kind: "sample" | "processing";
+            /** Artifact Metadata */
+            artifact_metadata?: {
+                [key: string]: unknown;
+            };
             /** Byte Size */
             byte_size: number | null;
             /** Checksum Sha256 */
@@ -400,10 +522,14 @@ export interface components {
             measurement_class: string | null;
             /** Modality */
             modality: string | null;
+            /** Parameters Hash */
+            parameters_hash?: string | null;
             /** Relative Path */
             relative_path: string;
             /** Row Count */
             row_count: number;
+            /** Run Id */
+            run_id?: string | null;
             /** Si Units */
             si_units: string[];
             /** Stream Id */
@@ -983,6 +1109,174 @@ export interface components {
             /** Trial Id */
             trial_id: string | null;
         };
+        /** TacticalCapabilityLevels */
+        TacticalCapabilityLevels: {
+            /** Level A Geometry */
+            level_a_geometry: string;
+            /** Level B Territory */
+            level_b_territory: string;
+            /** Level C Influence */
+            level_c_influence: string;
+            /** Level D Event Linked */
+            level_d_event_linked: string;
+            /** Level E Shape Phase */
+            level_e_shape_phase: string;
+        };
+        /** TacticalCapabilityView */
+        TacticalCapabilityView: {
+            /** Accepted Slice */
+            accepted_slice: {
+                [key: string]: unknown;
+            };
+            capabilities: components["schemas"]["TacticalCapabilityLevels"];
+            /** Dataset Id */
+            dataset_id: string;
+            /** Quality Evidence */
+            quality_evidence: {
+                [key: string]: unknown;
+            };
+            /** Semantics */
+            semantics: {
+                [key: string]: unknown;
+            };
+            /** Unavailable Reasons */
+            unavailable_reasons: string[];
+        };
+        /** TacticalEventPage */
+        TacticalEventPage: {
+            meta: components["schemas"]["TacticalSeriesMeta"];
+            /** Rows */
+            rows: components["schemas"]["TacticalEventView"][];
+        };
+        /** TacticalEventView */
+        TacticalEventView: {
+            /** Ball X M */
+            ball_x_m: number | null;
+            /** Ball Y M */
+            ball_y_m: number | null;
+            /** Event Ball Distance M */
+            event_ball_distance_m: number | null;
+            /** Event Id */
+            event_id: string;
+            /** Event Subtype */
+            event_subtype: string | null;
+            /** Event Type */
+            event_type: string;
+            /** Event X M */
+            event_x_m: number | null;
+            /** Event Y M */
+            event_y_m: number | null;
+            /** Provider Context Json */
+            provider_context_json: string | null;
+            /** Provider Player Id */
+            provider_player_id: string | null;
+            /** Provider Team Id */
+            provider_team_id: string | null;
+            /** Quality Json */
+            quality_json: string;
+            /** T Rel Ns */
+            t_rel_ns: number;
+            /** Tracking Player Count */
+            tracking_player_count: number;
+            /** Tracking T Rel Ns */
+            tracking_t_rel_ns: number | null;
+            /** Tracking Team Count */
+            tracking_team_count: number;
+        };
+        /** TacticalMethodologyPage */
+        TacticalMethodologyPage: {
+            /** Authority */
+            authority: string;
+            /** Metrics */
+            metrics: components["schemas"]["TacticalMetricMethodologyView"][];
+        };
+        /** TacticalMetricMethodologyView */
+        TacticalMetricMethodologyView: {
+            /** Algorithm Id */
+            algorithm_id?: string | null;
+            /** Algorithm Version */
+            algorithm_version?: string | null;
+            /** Definition */
+            definition: string;
+            /** Kind */
+            kind: string;
+            /**
+             * Level
+             * @enum {string}
+             */
+            level: "A" | "B" | "C" | "D" | "E";
+            /** Measurement Class */
+            measurement_class: string;
+            /** Metric Id */
+            metric_id: string;
+            /** Name */
+            name: string;
+            /** Unit */
+            unit: string;
+        };
+        /** TacticalQualityView */
+        TacticalQualityView: {
+            capabilities: components["schemas"]["TacticalCapabilityLevels"];
+            /** Dataset Id */
+            dataset_id: string;
+            /** Disclosure */
+            disclosure: string;
+            /** Measurement Classes */
+            measurement_classes: {
+                [key: string]: string;
+            };
+            /** Quality Evidence */
+            quality_evidence: {
+                [key: string]: unknown;
+            };
+            /** Unavailable Reasons */
+            unavailable_reasons: string[];
+        };
+        /** TacticalSeriesMeta */
+        TacticalSeriesMeta: {
+            /** Algorithm Id */
+            algorithm_id: string | null;
+            /** Algorithm Version */
+            algorithm_version: string | null;
+            artifact: components["schemas"]["ArtifactRefView"];
+            /** Coordinate Frame Id */
+            coordinate_frame_id: string | null;
+            /** Display Note */
+            display_note: string;
+            /** From Ns */
+            from_ns: number;
+            /** Input Measurement Class */
+            input_measurement_class: string | null;
+            /**
+             * Level
+             * @enum {string}
+             */
+            level: "A" | "B" | "C" | "D" | "E";
+            /** Measurement Class */
+            measurement_class: string;
+            /** Parameters Hash */
+            parameters_hash: string | null;
+            /** Quality */
+            quality: {
+                [key: string]: unknown;
+            };
+            /** Returned Rows */
+            returned_rows: number;
+            /** Series Name */
+            series_name: string;
+            /** Source Rows */
+            source_rows: number;
+            /** To Ns */
+            to_ns: number;
+        };
+        /** TacticalSeriesView */
+        TacticalSeriesView: {
+            meta: components["schemas"]["TacticalSeriesMeta"];
+            /** Rows */
+            rows: {
+                [key: string]: unknown;
+            }[];
+        };
         /** TrialView */
         TrialView: {
             /** Ended At */
@@ -1509,6 +1803,193 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ServingStatus"];
+                };
+            };
+        };
+    };
+    tactical_artifacts_api_tactical_artifacts_get: {
+        parameters: {
+            query: {
+                dataset_id: string;
+                session_id?: string | null;
+                stream_id?: string | null;
+                series_name?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactRefView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tactical_capabilities_api_tactical_capabilities__dataset_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dataset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TacticalCapabilityView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tactical_events_api_tactical_events__artifact_id__get: {
+        parameters: {
+            query?: {
+                from_ns?: number | null;
+                to_ns?: number | null;
+                max_points?: number | null;
+            };
+            header?: never;
+            path: {
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TacticalEventPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tactical_methodology_api_tactical_methodology_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TacticalMethodologyPage"];
+                };
+            };
+        };
+    };
+    tactical_quality_api_tactical_quality__dataset_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dataset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TacticalQualityView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tactical_series_api_tactical_series__artifact_id__get: {
+        parameters: {
+            query?: {
+                from_ns?: number | null;
+                to_ns?: number | null;
+                columns?: string | null;
+                max_points?: number | null;
+            };
+            header?: never;
+            path: {
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TacticalSeriesView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

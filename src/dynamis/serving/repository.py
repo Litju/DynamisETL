@@ -1029,7 +1029,13 @@ def _artifact_by_checksum(connection: Connection, checksum: str) -> ArtifactRefV
             sa.text(
                 """SELECT p.artifact_id, p.dataset_id, p.layer, p.relative_path,
                 p.checksum_sha256, p.row_count, p.byte_size, p.artifact_type,
-                p.artifact_metadata, r.algorithm_id, r.run_id
+                p.artifact_metadata, p.artifact_metadata->>'stream_id' AS stream_id,
+                p.artifact_metadata->>'measurement_class' AS measurement_class,
+                p.artifact_metadata->>'coordinate_frame_id' AS coordinate_frame_id,
+                p.artifact_metadata->>'input_measurement_class' AS input_measurement_class,
+                p.artifact_metadata->>'algorithm_version' AS algorithm_version,
+                p.artifact_metadata->>'parameters_hash' AS parameters_hash,
+                r.algorithm_id, r.run_id
                 FROM processing_artifact p
                 JOIN processing_run r ON r.run_id = p.run_id
                 WHERE p.checksum_sha256 = :checksum ORDER BY p.artifact_id LIMIT 1"""
@@ -1065,6 +1071,11 @@ def _artifact_view(row: Any, *, kind: Literal["sample", "processing"]) -> Artifa
         si_units=[str(item) for item in _list(row.get("si_units"))],
         coordinate_frame_id=row.get("coordinate_frame_id"),
         synchronization_spec_id=row.get("synchronization_spec_id"),
+        algorithm_id=row.get("algorithm_id"),
+        algorithm_version=row.get("algorithm_version"),
+        parameters_hash=row.get("parameters_hash"),
+        run_id=row.get("run_id"),
+        artifact_metadata=dict(row.get("artifact_metadata") or {}),
     )
 
 
@@ -1097,7 +1108,13 @@ def _artifact_by_id(connection: Connection, artifact_id: str) -> ArtifactRefView
             sa.text(
                 """SELECT p.artifact_id, p.dataset_id, p.layer, p.relative_path,
                 p.checksum_sha256, p.row_count, p.byte_size, p.artifact_type,
-                p.artifact_metadata, r.algorithm_id, r.run_id
+                p.artifact_metadata, p.artifact_metadata->>'stream_id' AS stream_id,
+                p.artifact_metadata->>'measurement_class' AS measurement_class,
+                p.artifact_metadata->>'coordinate_frame_id' AS coordinate_frame_id,
+                p.artifact_metadata->>'input_measurement_class' AS input_measurement_class,
+                p.artifact_metadata->>'algorithm_version' AS algorithm_version,
+                p.artifact_metadata->>'parameters_hash' AS parameters_hash,
+                r.algorithm_id, r.run_id
                 FROM processing_artifact p
                 JOIN processing_run r ON r.run_id = p.run_id
                 WHERE p.artifact_id = :artifact_id"""
@@ -1110,6 +1127,47 @@ def _artifact_by_id(connection: Connection, artifact_id: str) -> ArtifactRefView
     if processing is not None:
         return _artifact_view(processing, kind="processing")
     return None
+
+
+def list_tactical_artifacts(
+    connection: Connection,
+    *,
+    dataset_id: str,
+    session_id: str | None = None,
+    stream_id: str | None = None,
+    series_name: str | None = None,
+) -> list[ArtifactRefView]:
+    """List persisted tactical series without exposing non-tactical artifacts."""
+    clauses = [
+        "p.dataset_id = :dataset_id",
+        "p.artifact_metadata->>'tactical_level' IS NOT NULL",
+    ]
+    parameters: dict[str, Any] = {"dataset_id": dataset_id}
+    if session_id is not None:
+        clauses.append("p.artifact_metadata->>'session_id' = :session_id")
+        parameters["session_id"] = session_id
+    if stream_id is not None:
+        clauses.append("p.artifact_metadata->>'stream_id' = :stream_id")
+        parameters["stream_id"] = stream_id
+    if series_name is not None:
+        clauses.append("p.artifact_metadata->>'series_name' = :series_name")
+        parameters["series_name"] = series_name
+    query = f"""
+        SELECT p.artifact_id, p.dataset_id, p.layer, p.relative_path,
+            p.checksum_sha256, p.row_count, p.byte_size, p.artifact_type,
+            p.artifact_metadata, p.artifact_metadata->>'stream_id' AS stream_id,
+            p.artifact_metadata->>'measurement_class' AS measurement_class,
+            p.artifact_metadata->>'coordinate_frame_id' AS coordinate_frame_id,
+            p.artifact_metadata->>'algorithm_version' AS algorithm_version,
+            p.artifact_metadata->>'parameters_hash' AS parameters_hash,
+            r.algorithm_id, r.run_id
+        FROM processing_artifact p
+        JOIN processing_run r ON r.run_id = p.run_id
+        WHERE {" AND ".join(clauses)}
+        ORDER BY p.artifact_metadata->>'series_name', p.artifact_id
+    """
+    rows = connection.execute(sa.text(query), parameters).mappings().all()
+    return [_artifact_view(row, kind="processing") for row in rows]
 
 
 def list_quality_issues(

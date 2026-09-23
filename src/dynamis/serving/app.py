@@ -24,6 +24,7 @@ from dynamis.config import ConfigurationError, Settings
 from dynamis.config import settings as resolve_settings
 from dynamis.gold.publish import resolve_gold_schema
 from dynamis.serving import repository
+from dynamis.serving import tactical as tactical_authority
 from dynamis.serving.dense import (
     ArtifactPathError,
     DenseWindowError,
@@ -61,6 +62,13 @@ from dynamis.serving.models import (
     ServingStatus,
     SessionDetail,
     SessionSummary,
+    TacticalCapabilityView,
+    TacticalEventPage,
+    TacticalEventView,
+    TacticalMethodologyPage,
+    TacticalQualityView,
+    TacticalSeriesMeta,
+    TacticalSeriesView,
 )
 from dynamis.storage.control_plane import control_plane_engine
 
@@ -126,6 +134,20 @@ class ServingBackend(Protocol):
         max_points: int | None,
         entity_id: str | None = None,
     ) -> DenseWindowResult: ...
+
+    def tactical_artifacts(
+        self,
+        dataset_id: str,
+        session_id: str | None = None,
+        stream_id: str | None = None,
+        series_name: str | None = None,
+    ) -> list[ArtifactRefView]: ...
+
+    def tactical_capability(self, dataset_id: str) -> TacticalCapabilityView | None: ...
+
+    def tactical_methodology(self) -> TacticalMethodologyPage: ...
+
+    def tactical_quality(self, dataset_id: str) -> TacticalQualityView | None: ...
 
 
 class PostgresServingBackend:
@@ -268,6 +290,31 @@ class PostgresServingBackend:
             max_points=max_points,
             entity_id=entity_id,
         )
+
+    def tactical_artifacts(
+        self,
+        dataset_id: str,
+        session_id: str | None = None,
+        stream_id: str | None = None,
+        series_name: str | None = None,
+    ) -> list[ArtifactRefView]:
+        with self._connect() as connection:
+            return repository.list_tactical_artifacts(
+                connection,
+                dataset_id=dataset_id,
+                session_id=session_id,
+                stream_id=stream_id,
+                series_name=series_name,
+            )
+
+    def tactical_capability(self, dataset_id: str) -> TacticalCapabilityView | None:
+        return tactical_authority.tactical_capability(dataset_id)
+
+    def tactical_methodology(self) -> TacticalMethodologyPage:
+        return tactical_authority.tactical_methodology()
+
+    def tactical_quality(self, dataset_id: str) -> TacticalQualityView | None:
+        return tactical_authority.tactical_quality(dataset_id)
 
 
 def _backend_from_app(request: Request) -> ServingBackend:
@@ -525,6 +572,184 @@ def create_app(
     @app.get("/api/rights", response_model=RightsPage, tags=["rights"])
     def rights(service: BackendDependency) -> RightsPage:
         return RightsPage(policies=service.licenses())
+
+    @app.get(
+        "/api/tactical/capabilities/{dataset_id}",
+        response_model=TacticalCapabilityView,
+        tags=["tactical"],
+    )
+    def tactical_capabilities(
+        dataset_id: str, service: BackendDependency
+    ) -> TacticalCapabilityView:
+        found = service.tactical_capability(dataset_id)
+        if found is None:
+            raise HTTPException(
+                status_code=404, detail=f"tactical capability for {dataset_id!r} is unavailable"
+            )
+        return found
+
+    @app.get(
+        "/api/tactical/methodology",
+        response_model=TacticalMethodologyPage,
+        tags=["tactical"],
+    )
+    def tactical_methodology(service: BackendDependency) -> TacticalMethodologyPage:
+        return service.tactical_methodology()
+
+    @app.get(
+        "/api/tactical/quality/{dataset_id}",
+        response_model=TacticalQualityView,
+        tags=["tactical"],
+    )
+    def tactical_quality(dataset_id: str, service: BackendDependency) -> TacticalQualityView:
+        found = service.tactical_quality(dataset_id)
+        if found is None:
+            raise HTTPException(
+                status_code=404, detail=f"tactical quality for {dataset_id!r} is unavailable"
+            )
+        return found
+
+    @app.get(
+        "/api/tactical/artifacts",
+        response_model=list[ArtifactRefView],
+        tags=["tactical"],
+    )
+    def tactical_artifacts(
+        dataset_id: str,
+        service: BackendDependency,
+        session_id: str | None = None,
+        stream_id: str | None = None,
+        series_name: str | None = None,
+    ) -> list[ArtifactRefView]:
+        return service.tactical_artifacts(dataset_id, session_id, stream_id, series_name)
+
+    def _tactical_series(
+        artifact_id: str,
+        request: Request,
+        service: BackendDependency,
+        *,
+        from_ns: int | None,
+        to_ns: int | None,
+        columns: str | None,
+        max_points: int | None,
+    ) -> tuple[TacticalSeriesView | None, Response | None]:
+        ref = service.artifact(artifact_id)
+        if ref is None:
+            raise HTTPException(
+                status_code=404, detail=f"artifact {artifact_id!r} is not registered"
+            )
+        parsed_columns = _parse_columns(columns)
+        etag = window_etag(
+            ref,
+            from_ns=from_ns,
+            to_ns=to_ns,
+            columns=parsed_columns,
+            max_points=max_points,
+            entity_id=None,
+            representation="tactical-json",
+        )
+        if request.headers.get("if-none-match") == etag:
+            return None, Response(status_code=304, headers={"ETag": etag, "Vary": "Accept"})
+        result = service.window(
+            artifact_id,
+            from_ns=from_ns,
+            to_ns=to_ns,
+            columns=parsed_columns,
+            max_points=max_points,
+        )
+        metadata = ref.artifact_metadata
+        level = str(metadata.get("tactical_level") or "A")
+        if level not in {"A", "B", "C", "D", "E"}:
+            raise HTTPException(
+                status_code=500, detail="tactical artifact has invalid level metadata"
+            )
+        tactical_meta = TacticalSeriesMeta(
+            artifact=ref,
+            series_name=str(metadata.get("series_name") or "unknown"),
+            level=level,
+            measurement_class=ref.measurement_class or "PIPELINE_DERIVED",
+            input_measurement_class=(
+                metadata.get("input_measurement_class")
+                if isinstance(metadata.get("input_measurement_class"), str)
+                else None
+            ),
+            coordinate_frame_id=ref.coordinate_frame_id,
+            algorithm_id=ref.algorithm_id,
+            algorithm_version=ref.algorithm_version,
+            parameters_hash=ref.parameters_hash,
+            from_ns=result.meta.from_ns,
+            to_ns=result.meta.to_ns,
+            source_rows=result.meta.source_rows,
+            returned_rows=result.meta.returned_rows,
+            quality=dict(metadata.get("quality") or {}),
+            display_note=(
+                "Authoritative processor output; MODEL_ESTIMATED means an assumption-bearing "
+                "model, not measured territory."
+                if ref.measurement_class == "MODEL_ESTIMATED"
+                else "Authoritative deterministic processor output."
+            ),
+        )
+        return (
+            TacticalSeriesView(meta=tactical_meta, rows=table_records(result.table)),
+            Response(headers={"ETag": etag, "Vary": "Accept"}),
+        )
+
+    @app.get(
+        "/api/tactical/series/{artifact_id}",
+        response_model=TacticalSeriesView,
+        tags=["tactical"],
+    )
+    def tactical_series(
+        artifact_id: str,
+        request: Request,
+        service: BackendDependency,
+        from_ns: int | None = Query(default=None),
+        to_ns: int | None = Query(default=None),
+        columns: str | None = Query(default=None),
+        max_points: int | None = Query(default=None, ge=1, le=100_000),
+    ) -> Response:
+        payload, response = _tactical_series(
+            artifact_id,
+            request,
+            service,
+            from_ns=from_ns,
+            to_ns=to_ns,
+            columns=columns,
+            max_points=max_points,
+        )
+        if response is not None and payload is None:
+            return response
+        assert payload is not None and response is not None
+        return JSONResponse(content=payload.model_dump(mode="json"), headers=response.headers)
+
+    @app.get(
+        "/api/tactical/events/{artifact_id}",
+        response_model=TacticalEventPage,
+        tags=["tactical"],
+    )
+    def tactical_events(
+        artifact_id: str,
+        request: Request,
+        service: BackendDependency,
+        from_ns: int | None = Query(default=None),
+        to_ns: int | None = Query(default=None),
+        max_points: int | None = Query(default=None, ge=1, le=100_000),
+    ) -> Response:
+        payload, response = _tactical_series(
+            artifact_id,
+            request,
+            service,
+            from_ns=from_ns,
+            to_ns=to_ns,
+            columns=None,
+            max_points=max_points,
+        )
+        if response is not None and payload is None:
+            return response
+        assert payload is not None and response is not None
+        event_rows = [TacticalEventView(**row) for row in payload.rows]
+        event_page = TacticalEventPage(meta=payload.meta, rows=event_rows)
+        return JSONResponse(content=event_page.model_dump(mode="json"), headers=response.headers)
 
     @app.get(
         "/api/artifacts/{artifact_id}",
