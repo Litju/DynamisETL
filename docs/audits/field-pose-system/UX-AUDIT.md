@@ -102,4 +102,18 @@ Each refinement lands as an atomic commit and is listed here with its before/aft
 
 | unit | commit | before | after |
 | --- | --- | --- | --- |
-| — | — | — | — |
+| UX-H1 human labels first (team names, shirt/name, compact athlete labels; ids secondary) | `587af7b`, `ff4d245`, `6b581e4` | `before/04-field-dfl-live.png`, `before/02-overview-dfl.png` | `final/04-field-dfl-live-1440x900.png`, `final/02-overview-dfl-1440x900.png` |
+| UX-H2/H3 right panes as instruments: sticky period/frame/selection context, underline tabs, per-team tables with units and class | `90e5ae6`, `6b581e4` | `before/04-field-dfl-live.png` | `final/04…07-*.png` |
+| UX-H4 / §4 explicit state vocabulary (unsupported, not materialized, no data at this time, filtered, rights) | `90e5ae6` | `before/05-field-dfl-*.png` | `final/07-field-skillcorner-1440x900.png`, `after/08-field-sc-events.png` |
+| UX-H5 breadcrumb priorities | `ff4d245` | `before/07-field-sc-default.png` | `final/08-pose-body-local-1440x900.png` |
+| §3 controls: 24/28 px heights, pressed = fill + check + border, model mark on MODEL layers, switch rows, focus ring | `18e554d`, `763f21a`, `ad1df16` | `before/07-field-sc-default.png`, `before/09-pose-default.png` | `final/05`, `final/08` |
+| §3 transport timeline with committed range band | `ad1df16` | `before/*` (no timeline) | all finals |
+| §5 tactical visual language: semantic layer order, lighter deterministic outlines, tiled MODEL influence, ball halo, selection on top, team tokens | `18e554d` | `before/07-field-sc-layer-hull.png` | `final/05-field-dfl-space-1440x900.png` |
+| §6 Pose visual language: light unlit joints, fog behind the subject, focus ring and muted context in the all-subject world | `d5a3fe7`, `6b581e4` | `before/09-pose-default.png`, `before/09-pose-all-subjects.png` | `final/08`, `final/09` |
+| §7 density at 1366: single-line tactical tabs, wrapping team headers, no overflow at any width | `90e5ae6`, `6b581e4` | `before/14-1366x768-*.png` | `final/*-1366x768.png` |
+| §8 motion: restrained tab indicator, reduced motion in CSS and in the Pose follow camera | `7e9fa89` | — | `e2e-real/a11y.spec.ts` |
+| §9 accessibility: roving tablist with tabpanel, canvas text alternatives for pitch and Pose, contrast and focusable scroll regions | `90e5ae6`, `482a96a` | — | `e2e-real/a11y.spec.ts` (11/11) |
+
+Dynamis Instrument language was preserved throughout: graphite surfaces, compact density, mono
+for identifiers and values, measurement class always text + shape + colour. No component library,
+mesh body or decorative motion was introduced.

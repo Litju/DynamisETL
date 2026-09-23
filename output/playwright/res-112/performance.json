@@ -1,0 +1,108 @@
+{
+  "field-dfl": {
+    "base-replay-hull-default": {
+      "fps": 47,
+      "worstFrameMs": 33,
+      "longTasks": 0,
+      "longTaskMs": 0,
+      "heapMb": 25,
+      "requests": 0,
+      "advancedS": 5.3164
+    },
+    "with-territory": {
+      "fps": 35,
+      "worstFrameMs": 67,
+      "longTasks": 1,
+      "longTaskMs": 62,
+      "heapMb": 25,
+      "requests": 4,
+      "advancedS": 5.4665
+    },
+    "with-influence": {
+      "fps": 30,
+      "worstFrameMs": 50,
+      "longTasks": 0,
+      "longTaskMs": 0,
+      "heapMb": 25,
+      "requests": 0,
+      "advancedS": 5.6164
+    },
+    "combined-across-chunk-boundary": {
+      "fps": 31,
+      "worstFrameMs": 67,
+      "longTasks": 2,
+      "longTaskMs": 109,
+      "heapMb": 25,
+      "requests": 8,
+      "advancedS": 10.4663
+    },
+    "inPlaybackWindowP95Ms": 317,
+    "duplicateRequests": []
+  },
+  "playback-chunk": {
+    "samples": [
+      109,
+      93,
+      82,
+      89,
+      84,
+      87,
+      88,
+      82,
+      78,
+      75,
+      82,
+      76,
+      77,
+      79,
+      81,
+      78,
+      80,
+      78,
+      83,
+      83
+    ],
+    "p95Ms": 93,
+    "budgetMs": 250
+  },
+  "pose-sc": {
+    "one-subject-all-layers": {
+      "fps": 53,
+      "worstFrameMs": 33,
+      "longTasks": 0,
+      "longTaskMs": 0,
+      "heapMb": 21,
+      "requests": 0,
+      "advancedS": 5.1498
+    },
+    "follow-camera": {
+      "fps": 54,
+      "worstFrameMs": 34,
+      "longTasks": 0,
+      "longTaskMs": 0,
+      "heapMb": 21,
+      "requests": 0,
+      "advancedS": 5.066434
+    },
+    "all-subjects": {
+      "fps": 21,
+      "worstFrameMs": 100,
+      "longTasks": 33,
+      "longTaskMs": 1826,
+      "heapMb": 21,
+      "requests": 7,
+      "advancedS": 5.583
+    },
+    "subjectSwitchMs": 458,
+    "duplicateRequests": []
+  },
+  "routes": {
+    "readyMs": {
+      "catalog": 721,
+      "overview": 766,
+      "field": 1145,
+      "pose": 1574
+    },
+    "poseRendererLoadedLazily": true
+  }
+}

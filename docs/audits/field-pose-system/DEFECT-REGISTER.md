@@ -23,38 +23,51 @@ accessibility · performance · UX/UI · false positive.
 
 | id | surface | class | severity | title | status |
 | --- | --- | --- | --- | --- | --- |
-| [D-01](#d-01) | Field / data | data/materialization | S1 | DFL tactical Level A/B/C/D never materialized; every tactical tab is empty | open |
-| [D-02](#d-02) | Field / data | data/materialization | S2 | Level C influence never materialized for any dataset although capability declares it | open |
-| [D-03](#d-03) | Overview / data | scientific-semantics | S1 | Ball trajectory served as athlete locomotor metrics and headlined as top performer | open |
-| [D-04](#d-04) | Runbook | data/materialization | S2 | No deterministic preparation path; flagship routes open silently empty | open |
-| [F-01](#f-01) | Field + Pose | state/query | S1 | Laboratory opens with no canonical time: playhead unavailable, frame −1, renderers disagree | open |
-| [F-02](#f-02) | Field / transport | functional | S1 | DFL playback cannot start: first advance is declared "end of artifact" | open |
-| [F-03](#f-03) | Field / Pixi | performance | S1 | Pixi renderer destroyed and rebuilt on every playback frame when tactical data exists | open |
-| [F-04](#f-04) | Field / Pixi | rendering + scientific-semantics | S1 | Tactical overlays are not the current canonical frame | open |
-| [F-05](#f-05) | Field / Pixi | rendering | S2 | Overlay team colours hard-coded to a DFL group-id suffix; hulls contradict player colours | open |
-| [F-06](#f-06) | Field / state | state/query | S2 | Pitch entity selection writes the Pose `subject` key with a history push per click | open |
-| [F-07](#f-07) | Field / Pixi | UX/UI | S3 | Overlay layer order/weights: hull stroke dominates, ball and selection can be occluded | open |
-| [T-01](#t-01) | Tactical pane | UX/UI + data | S1 | Generic "NO DATA" hides the real reason (missing materialization vs unsupported vs no rows) | open |
-| [T-02](#t-02) | Tactical pane | performance + state/query | S1 | Live tab query key moves every animation frame during playback | open |
-| [T-03](#t-03) | Tactical pane | scientific-semantics | S2 | Live tab shows one arbitrary team row; no per-team context | open |
-| [T-04](#t-04) | Tactical pane | scientific-semantics | S2 | Space tab shows the first row of the window, not the current frame, one team only | open |
-| [T-05](#t-05) | Tactical pane | scientific-semantics | S2 | Range tab interleaves both teams into one series and silently uses a ±1 s window | open |
-| [T-06](#t-06) | Tactical pane | functional | S2 | Events tab reports "no source events" when the snapshot artifact is missing | open |
-| [T-07](#t-07) | Tactical pane | scientific-semantics | S2 | Evidence strip asserts `PIPELINE_DERIVED` for absent data | open |
-| [T-08](#t-08) | Tactical pane | UX/UI | S3 | Report JSON carries no artifact/run identity; tabs wrap at 1366 px | open |
-| [P-01](#p-01) | Pose | state/query | S2 | Pose opens with playhead unavailable (shared root with F-01) | open |
-| [P-02](#p-02) | Pose / 3D | rendering | S2 | Landmark glyphs black on the dark scene; skeleton hard to read; error radii read as artefacts | open |
-| [P-03](#p-03) | Pose / state | state/query + UX | S2 | Render mode, coordinate authority and camera ownership are three conflicting states | open |
-| [P-04](#p-04) | Pose / 3D | rendering | S3 | All-subject world: identical colours, tiny figures, selected subject not distinguished | open |
-| [P-05](#p-05) | Pose / state | UX/UI | S3 | Subject switch while playing silently stops playback | open |
-| [P-06](#p-06) | Pose / controls | UX/UI + a11y | S3 | Layer controls are native checkboxes outside the instrument language | open |
-| [S-01](#s-01) | Transport | functional | S1 | No timeline: Field/Pose cannot seek to an arbitrary time | open |
-| [S-02](#s-02) | Lab route | state/query | S3 | A deep link to a view the session cannot open leaves no tab selected | open |
-| [S-03](#s-03) | Overview | rendering | S3 | Bar value labels overlap; metric table clips entity/class; KPI value wraps | open |
-| [S-04](#s-04) | Shell | UX/UI | S4 | Breadcrumb truncates route and trial names at 1440 px | open |
-| [S-05](#s-05) | Catalog | scientific-semantics | S3 | Catalog advertises an Events laboratory for SkillCorner, which has no accepted event artifact | open |
-| [S-06](#s-06) | Runs | UX/UI + scientific-semantics | S3 | Tactical runs read "0 metrics"; processor chart formats counts as `950.0` / `0.000` | open |
-| [S-07](#s-07) | API + shell | state/query + UX/UI | S3 | Registered team and player labels are never served; every surface shows raw provider ids | open |
+| [D-01](#d-01) | Field / data | data/materialization | S1 | DFL tactical Level A/B/C/D never materialized; every tactical tab is empty | fixed |
+| [D-02](#d-02) | Field / data | data/materialization | S2 | Level C influence never materialized for any dataset although capability declares it | fixed |
+| [D-03](#d-03) | Overview / data | scientific-semantics | S1 | Ball trajectory served as athlete locomotor metrics and headlined as top performer | fixed |
+| [D-04](#d-04) | Runbook | data/materialization | S2 | No deterministic preparation path; flagship routes open silently empty | fixed |
+| [F-01](#f-01) | Field + Pose | state/query | S1 | Laboratory opens with no canonical time: playhead unavailable, frame −1, renderers disagree | fixed |
+| [F-02](#f-02) | Field / transport | functional | S1 | DFL playback cannot start: first advance is declared "end of artifact" | fixed |
+| [F-03](#f-03) | Field / Pixi | performance | S1 | Pixi renderer destroyed and rebuilt on every playback frame when tactical data exists | fixed |
+| [F-04](#f-04) | Field / Pixi | rendering + scientific-semantics | S1 | Tactical overlays are not the current canonical frame | fixed |
+| [F-05](#f-05) | Field / Pixi | rendering | S2 | Overlay team colours hard-coded to a DFL group-id suffix; hulls contradict player colours | fixed |
+| [F-06](#f-06) | Field / state | state/query | S2 | Pitch entity selection writes the Pose `subject` key with a history push per click | fixed |
+| [F-07](#f-07) | Field / Pixi | UX/UI | S3 | Overlay layer order/weights: hull stroke dominates, ball and selection can be occluded | fixed |
+| [T-01](#t-01) | Tactical pane | UX/UI + data | S1 | Generic "NO DATA" hides the real reason (missing materialization vs unsupported vs no rows) | fixed |
+| [T-02](#t-02) | Tactical pane | performance + state/query | S1 | Live tab query key moves every animation frame during playback | fixed |
+| [T-03](#t-03) | Tactical pane | scientific-semantics | S2 | Live tab shows one arbitrary team row; no per-team context | fixed |
+| [T-04](#t-04) | Tactical pane | scientific-semantics | S2 | Space tab shows the first row of the window, not the current frame, one team only | fixed |
+| [T-05](#t-05) | Tactical pane | scientific-semantics | S2 | Range tab interleaves both teams into one series and silently uses a ±1 s window | fixed |
+| [T-06](#t-06) | Tactical pane | functional | S2 | Events tab reports "no source events" when the snapshot artifact is missing | fixed |
+| [T-07](#t-07) | Tactical pane | scientific-semantics | S2 | Evidence strip asserts `PIPELINE_DERIVED` for absent data | fixed |
+| [T-08](#t-08) | Tactical pane | UX/UI | S3 | Report JSON carries no artifact/run identity; tabs wrap at 1366 px | fixed |
+| [P-01](#p-01) | Pose | state/query | S2 | Pose opens with playhead unavailable (shared root with F-01) | fixed |
+| [P-02](#p-02) | Pose / 3D | rendering | S2 | Landmark glyphs black on the dark scene; skeleton hard to read; error radii read as artefacts | fixed |
+| [P-03](#p-03) | Pose / state | state/query + UX | S2 | Render mode, coordinate authority and camera ownership are three conflicting states | fixed |
+| [P-04](#p-04) | Pose / 3D | rendering | S3 | All-subject world: identical colours, tiny figures, selected subject not distinguished | fixed |
+| [P-05](#p-05) | Pose / state | UX/UI | S3 | Subject switch while playing silently stops playback | intentional (RES-109 §12); explicit notice added |
+| [P-06](#p-06) | Pose / controls | UX/UI + a11y | S3 | Layer controls are native checkboxes outside the instrument language | fixed |
+| [S-01](#s-01) | Transport | functional | S1 | No timeline: Field/Pose cannot seek to an arbitrary time | fixed |
+| [S-02](#s-02) | Lab route | state/query | S3 | A deep link to a view the session cannot open leaves no tab selected | fixed |
+| [S-03](#s-03) | Overview | rendering | S3 | Bar value labels overlap; metric table clips entity/class; KPI value wraps | fixed |
+| [S-04](#s-04) | Shell | UX/UI | S4 | Breadcrumb truncates route and trial names at 1440 px | fixed |
+| [S-05](#s-05) | Catalog | scientific-semantics | S3 | Catalog advertises an Events laboratory for SkillCorner, which has no accepted event artifact | fixed |
+| [S-06](#s-06) | Runs | UX/UI + scientific-semantics | S3 | Tactical runs read "0 metrics"; processor chart formats counts as `950.0` / `0.000` | fixed |
+| [S-07](#s-07) | API + shell | state/query + UX/UI | S3 | Registered team and player labels are never served; every surface shows raw provider ids | fixed |
+| [D-05](#d-05) | Pose / data | data/materialization | S2 | Served Pose kinematics predate the RES-101 `gap_policy` parameters | fixed |
+| [F-08](#f-08) | Field / state | state/query | S2 | Switching period keeps the previous period's time; pitch renders empty | fixed |
+| [P-07](#p-07) | Pose | performance | S2 | PoseViewer and telemetry re-render every animation frame during playback | fixed |
+| [S-08](#s-08) | Explorer | state/query | S3 | Selecting a stream of another modality is silently reverted | fixed |
+| [S-09](#s-09) | Catalog | scientific-semantics | S3 | Catalog metric counts include every superseded revision | fixed |
+| [R-01](#r-01) | Tactical pane | functional | S2 | Current-frame read window misses frames just before a 30 s bucket boundary | fixed |
+| [R-02](#r-02) | Playback | performance + state/query | S2 | Chunk coordinator recreated on every commit, cancelling fresh prefetches | fixed |
+| [R-03](#r-03) | Field overlays | performance | S2 | Overlays fetch all columns (5.3 MB territory chunk) and re-parse polygons every frame | fixed |
+| [R-04](#r-04) | API | performance | S2 | Current-revision catalog count computed per request (~1.8 s) | fixed |
+| [R-05](#r-05) | Prepare CLI | functional | S3 | Preparation crashed on a non-UTF-8 console; long runs recorded a moving HEAD | fixed |
+| [A-01](#a-01) | Pane / Pose | accessibility | S3 | Low-contrast unit text, unfocusable scroll region, Pose canvas without text alternative | fixed |
+| [SCI-01](#sci-01) | Tactical authority | scientific-semantics | S2 | Capability matrix under-declares positions, possession and SkillCorner attacking direction | deferred — needs a frozen tactical-science contract |
+| [K-01](#k-01) | Pose | performance | S3 | All-subject playback decodes 20k-row JSON chunks on the main thread | known limitation (measured) |
 | [FP-01](#fp-01) | Catalog | false positive | — | Dataset name mojibake | closed (not a defect) |
 | [FP-02](#fp-02) | Console | false positive | — | `THREE.Clock` deprecation and GL `ReadPixels` stall warnings | closed (upstream / headless capture) |
 
@@ -76,7 +89,7 @@ accessibility · performance · UX/UI · false positive.
 - **Severity:** S1. **Scientific impact:** a declared-supported capability silently yields nothing.
   **UX impact:** the flagship DFL tactical laboratory is empty.
 - **Before:** `before/04-field-dfl-live.png`, `05-field-dfl-{space,range,events,report}.png`.
-- **Fix commit:** — · **Verification:** —
+- **Fix / verification:** see [Resolution](#resolution).
 
 ### D-02
 
@@ -91,7 +104,7 @@ accessibility · performance · UX/UI · false positive.
 - **Severity:** S2. **Scientific impact:** the model-estimated surface cannot be compared with the
   deterministic territory. **UX impact:** silent capability gap.
 - **Before:** `before/07-field-sc-default.png` (no Influence toggle).
-- **Fix commit:** — · **Verification:** —
+- **Fix / verification:** see [Resolution](#resolution).
 
 ### D-03
 
@@ -108,7 +121,7 @@ accessibility · performance · UX/UI · false positive.
   locomotor load; any cross-player comparison is contaminated.
   **UX impact:** the first number the reader sees is wrong.
 - **Before:** `before/02-overview-dfl.png`.
-- **Fix commit:** — · **Verification:** —
+- **Fix / verification:** see [Resolution](#resolution).
 
 ### D-04
 
@@ -117,7 +130,7 @@ accessibility · performance · UX/UI · false positive.
   processors, verifies serving registration and prints flagship URLs, failing loudly otherwise.
 - **Actual:** none exists; the only way to find D-01/D-02 was to open the product.
 - **Root cause:** missing preparation contract.
-- **Severity:** S2. **Fix commit:** — · **Verification:** —
+- **Severity:** S2. **Fix / verification:** see [Resolution](#resolution).
 
 ## Field playback and state
 
@@ -136,7 +149,7 @@ accessibility · performance · UX/UI · false positive.
 - **Severity:** S1. **Scientific impact:** surfaces disagree about which frame is shown.
   **UX impact:** the default route looks broken.
 - **Before:** `before/04-field-dfl-live.png`, `07-field-sc-default.png`, `09-pose-default.png`.
-- **Fix commit:** — · **Verification:** —
+- **Fix / verification:** see [Resolution](#resolution).
 
 ### F-02
 
@@ -147,7 +160,7 @@ accessibility · performance · UX/UI · false positive.
 - **Root cause:** `usePlaybackClock` starts from `0n` when no time is committed; the coordinator
   clamps to `canonicalMinNs` (1.02 s) and `allowAdvance` treats *reaching either canonical edge*
   as "ended", even when moving forward away from the start.
-- **Severity:** S1. **Fix commit:** — · **Verification:** —
+- **Severity:** S1. **Fix / verification:** see [Resolution](#resolution).
 - **Before:** `before/06-field-dfl-after-play.png`.
 
 ### F-03
@@ -160,7 +173,7 @@ accessibility · performance · UX/UI · false positive.
   a dependency of the renderer-creation effect, so every playback frame re-renders `PitchView`,
   destroys the Pixi application and creates a new WebGL context.
 - **Root cause:** renderer lifecycle keyed on per-frame derived state (introduced in `5a6203c`).
-- **Severity:** S1. **Fix commit:** — · **Verification:** —
+- **Severity:** S1. **Fix / verification:** see [Resolution](#resolution).
 
 ### F-04
 
@@ -177,7 +190,7 @@ accessibility · performance · UX/UI · false positive.
   exact current-frame read.
 - **Severity:** S1. **Scientific impact:** geometry from another instant is drawn as the current
   shape. **Before:** `before/07-field-sc-default.png`, `14-1366x768-field-sc.png`.
-- **Fix commit:** — · **Verification:** —
+- **Fix / verification:** see [Resolution](#resolution).
 
 ### F-05
 
@@ -187,7 +200,7 @@ accessibility · performance · UX/UI · false positive.
   of the dot colour assigned by `assignGroups`.
 - **Root cause:** a second, hard-coded team-colour rule instead of the entity group map.
 - **Severity:** S2. **Before:** `before/07-field-sc-default.png`.
-- **Fix commit:** — · **Verification:** —
+- **Fix / verification:** see [Resolution](#resolution).
 
 ### F-06
 
@@ -196,7 +209,7 @@ accessibility · performance · UX/UI · false positive.
   writing the tracking object id (including `ball`) into the Pose `subject` key; the declared
   `entity` search key is never used.
 - **Root cause:** Field entity and Pose subject share one durable key.
-- **Severity:** S2. **Fix commit:** — · **Verification:** —
+- **Severity:** S2. **Fix / verification:** see [Resolution](#resolution).
 
 ### F-07
 
@@ -204,7 +217,7 @@ accessibility · performance · UX/UI · false positive.
 - **Actual:** hull stroke 2 px at α 0.9 in the away colour sits above territory and below entities
   but has the heaviest weight on the canvas; with Territory + Hull the pitch is dominated by
   overlay colour. Model-estimated influence and deterministic territory share one fill language.
-- **Severity:** S3. **Fix commit:** — · **Verification:** —
+- **Severity:** S3. **Fix / verification:** see [Resolution](#resolution).
 
 ## Tactical Analysis pane
 
@@ -214,52 +227,52 @@ accessibility · performance · UX/UI · false positive.
 - **Actual:** "NO DATA — No tactical frame at the current time. Select an exact tracking time or
   load a tactical processor artifact." The system knows the capability is supported and that no
   artifact is registered, but says neither.
-- **Severity:** S1. **Before:** `before/04-field-dfl-live.png`. **Fix commit:** — · **Verification:** —
+- **Severity:** S1. **Before:** `before/04-field-dfl-live.png`. **Fix / verification:** see [Resolution](#resolution).
 
 ### T-02
 
 - **Actual:** Live bounds are `playhead ± 1 s` read from the per-frame playhead; the
   `tacticalSeriesQuery` key changes on every animation frame during playback.
 - **Root cause:** live query window keyed on transient playhead instead of the loaded chunk.
-- **Severity:** S1 (request storm, flicker). **Fix commit:** — · **Verification:** —
+- **Severity:** S1 (request storm, flicker). **Fix / verification:** see [Resolution](#resolution).
 
 ### T-03
 
 - **Actual:** `nearestRow` searches both teams' rows and shows whichever row is nearest in time;
   "Group" prints the raw provider id.
-- **Severity:** S2. **Fix commit:** — · **Verification:** —
+- **Severity:** S2. **Fix / verification:** see [Resolution](#resolution).
 
 ### T-04
 
 - **Actual:** Space shows `territoryRows[0]` — the first row of the window — for one team only;
   it does not follow the playhead.
-- **Severity:** S2. **Fix commit:** — · **Verification:** —
+- **Severity:** S2. **Fix / verification:** see [Resolution](#resolution).
 
 ### T-05
 
 - **Actual:** Without a committed range the Range tab uses the ±1 s live window, and plots both
   teams' rows as one "length" and one "width" series (zig-zag between teams); x axis is raw
   "canonical ms".
-- **Severity:** S2. **Fix commit:** — · **Verification:** —
+- **Severity:** S2. **Fix / verification:** see [Resolution](#resolution).
 
 ### T-06
 
 - **Actual:** DFL Events: "No source events in the selected range" while the pitch header reports
   "3 source events in window" — the snapshot artifact is missing (D-01), not the events.
-- **Severity:** S2. **Before:** `before/05-field-dfl-events.png`. **Fix commit:** — · **Verification:** —
+- **Severity:** S2. **Before:** `before/05-field-dfl-events.png`. **Fix / verification:** see [Resolution](#resolution).
 
 ### T-07
 
 - **Actual:** the evidence strip falls back to `PIPELINE_DERIVED` when no series is loaded, asserting
   a measurement class for data that does not exist.
-- **Severity:** S2. **Fix commit:** — · **Verification:** —
+- **Severity:** S2. **Fix / verification:** see [Resolution](#resolution).
 
 ### T-08
 
 - **Actual:** Report JSON lists counts and capability only (no artifact ids, run ids, parameter
   hashes, time window); at 1366×768 the tab strip wraps "Report" onto a second line.
 - **Severity:** S3. **Before:** `before/05-field-dfl-report.png`, `14-1366x768-field-sc.png`.
-- **Fix commit:** — · **Verification:** —
+- **Fix / verification:** see [Resolution](#resolution).
 
 ## Pose
 
@@ -273,7 +286,7 @@ accessibility · performance · UX/UI · false positive.
 - **Actual:** landmark spheres render near-black on the dark scene; the skeleton reads as thin lines
   with dark dots; p90 error radii render as pink half-arcs that read as artefacts.
 - **Severity:** S2. **Before:** `before/09-pose-default.png`, `09-pose-subject-switch.png`.
-- **Fix commit:** — · **Verification:** —
+- **Fix / verification:** see [Resolution](#resolution).
 
 ### P-03
 
@@ -282,7 +295,7 @@ accessibility · performance · UX/UI · false positive.
   camera ("camera follow is disabled" text shown while follow is pressed); the "render mode"
   control is a toggle whose label never changes and reads as a select value.
 - **Severity:** S2. **Before:** `before/09-pose-default.png`, `09-pose-all-subjects.png`.
-- **Fix commit:** — · **Verification:** —
+- **Fix / verification:** see [Resolution](#resolution).
 
 ### P-04
 
@@ -305,7 +318,7 @@ accessibility · performance · UX/UI · false positive.
 
 - **Actual:** the footer "Transport and timeline" has no timeline. Field and Pose can only step
   frame-by-frame or play; seeking to an arbitrary time (issue §3 playback: "seek") is impossible.
-- **Severity:** S1. **Fix commit:** — · **Verification:** —
+- **Severity:** S1. **Fix / verification:** see [Resolution](#resolution).
 
 ### S-02
 
@@ -360,3 +373,112 @@ page only.
 `GL Driver Message … GPU stall due to ReadPixels` is emitted by Chromium while Playwright captures a
 WebGL canvas. Neither is an application console error; both are tracked in the acceptance matrix
 console allow-list with this justification.
+
+## Defects found during repair
+
+### D-05
+Served `pose.translation_invariant_kinematics` runs predated RES-101's `gap_policy` parameter
+(stored hash `4cfb…`, accepted configuration `b207…`). `dynamis-demo-prepare` re-materialized both
+Pose periods with the accepted configuration.
+
+### F-08
+DFL period 2 starts at 3 721.66 s; switching from period 1 kept period-1 `t_ns`, outside the new
+stream's canonical span, so no frame could be drawn.
+
+### P-07
+`PoseViewer` and `PoseTelemetry` subscribed to the per-frame playhead; the control column and 29
+telemetry rows re-rendered at animation rate.
+
+### S-08
+The Explorer stream link changed only `stream`; the defaults resolver then replaced a stream that
+did not match the current view, so clicking `pose-period-1` from Field did nothing.
+
+### S-09
+`DatasetSummary.metric_count` counted all historical revisions (DFL 6 930 vs 1 113 current).
+
+### R-01
+DFL frames lie on a 40 ms grid from 1.02 s: at 300.000 s the drawn frame is 299.980 s, in the
+previous 30 s read bucket, so Live showed "no row at this frame".
+
+### R-02
+`usePlaybackChunkCoordinator` memoized the coordinator on the committed time; each commit disposed
+it and cancelled the prefetches it had just issued.
+
+### R-03
+A Territory overlay chunk was 5.3 MB of JSON (~1.1 s) because every column was fetched, and each
+drawn frame re-parsed every polygon JSON string.
+
+### R-04
+The S-09 count ran a window query over `derived_metric` per dataset on every catalog request
+(~1.8 s against the 250 ms `control_api_p95` budget).
+
+### R-05
+The first full preparation crashed printing `→` to a cp1252 console before refreshing Gold; runs
+that finished after unrelated commits recorded a later HEAD than the one they started under.
+
+### A-01
+axe on real routes: unit suffixes at 70 % opacity failed contrast; the Report `<pre>` scrolled
+without being focusable. The Pose WebGL surface had no text alternative.
+
+### SCI-01
+Local Bronze authority declares more than the RES-110 capability matrix admits:
+
+| source | declared in Bronze | capability matrix today |
+| --- | --- | --- |
+| DFL `DFL-MAT-J03WPY` | `PlayingPosition` per player (TW, IVL/IVR, LV/RV, DMZ/DML/DMR, OLM/ORM, ZO, STL/STZ/STR); `BallPossession` (1/2) on every tracking frame (79 194 / 67 017 frames) | possession / ball-carrier unavailable; attacking direction unavailable (DFL declares none) |
+| SkillCorner `1925299` | `player_role` + `position_group` per player; `home_team_side` per period (`right_to_left`, `left_to_right`); `possession.{player_id, group}` per frame | attacking direction and ball-carrier unavailable |
+
+This supports phase-aware (in / out of possession), unit-based (defensive, midfield, attacking
+lines) and direction-normalized zone analysis. That is new tactical science outside RES-112's
+repair mandate and needs a frozen metric contract under RES-110 authority before any value is
+served. Nothing in RES-112 claims these capabilities.
+
+### K-01
+Production build, 5 s all-subject playback: 52 long tasks (~2.9 s), 20 fps under headless software
+GL. The per-frame Pose update is not the cost; decoding a 20k-row JSON chunk every ~0.7 s on the
+main thread is. Moving Pose to the Arrow worker transport Signals already uses is recommended
+with RES-111. Single-subject Pose: 0 long tasks, ~47 fps, 18 MB heap.
+
+## Resolution
+
+Evidence roots: before `output/playwright/res-112/before/`; after (same harness)
+`output/playwright/res-112/after/`; final fixed-viewport set `output/playwright/res-112/final/`;
+performance receipt `output/playwright/res-112/performance.json`; preparation receipt
+`${DYNAMIS_DATASET_ROOT}/cache/receipts/dynamis-demo/preparation/`.
+
+| id | fix commit(s) | verification | before → after |
+| --- | --- | --- | --- |
+| D-01 | `5370da7` | prepare READY: DFL A/B/C/D served for both periods; `e2e-real/tactical.spec.ts` | `before/05-field-dfl-*.png` → `final/04…06-field-dfl-*.png` |
+| D-02 | `5370da7` | prepare READY: Level C served for DFL and SkillCorner; Influence layer, Space Level C table | `before/07-field-sc-default.png` → `final/05-field-dfl-space-1440x900.png` |
+| D-03 | `2248d6f` | `test_locomotor_processor.py`, `test_current_revision_postgres.py`, `test_gold_project.py`; READY "athletes only"; served DFL 1 155→1 113, SC 3 336→3 294 | `before/02-overview-dfl.png` → `final/02-overview-dfl-1440x900.png` |
+| D-04 | `5370da7`, `554758a`, `546fb17`, `89f7d72` | `test_demo_prepare.py`; `--check` exit codes; `docs/DEMO-RUNBOOK.md` | — |
+| D-05 | `5370da7` (preparation run) | READY "pose kinematics" for both periods | — |
+| F-01 | `ad1df16` | `defaults.test.ts`; `field.spec.ts` canonical open (SC 0 ns, DFL 1.02 s); `pose.spec.ts` | `before/04-field-dfl-live.png` → `final/04-field-dfl-live-1440x900.png` |
+| F-02 | `ad1df16` | `playback-chunk-coordinator.test.ts`; `field.spec.ts` DFL playback | `before/06-field-dfl-after-play.png` → `after/06-field-dfl-after-play.png` |
+| F-03 | `18e554d` | `PitchReplay.test.tsx` one renderer across playback; `field.spec.ts` 1 canvas over 5 s | audit stall → `after/07-field-sc-after-play.png` |
+| F-04 | `18e554d` | `tactical-overlay.test.ts`; drawn frame = overlay frame in `field.spec.ts` / `tactical.spec.ts` | `before/07-field-sc-default.png` → `final/07-field-skillcorner-1440x900.png` |
+| F-05 | `18e554d` | `tactical-overlay.test.ts` team roles | same |
+| F-06 | `ad1df16`, `18e554d` | `PitchReplay.test.tsx`; `field.spec.ts` entity key without history entry | — |
+| F-07 | `18e554d`, `6b581e4` | visual review | `before/07-field-sc-layer-hull.png` → `final/05-field-dfl-space-1440x900.png` |
+| F-08 | `ad1df16` | `defaults.test.ts`; `field.spec.ts` period switch | — |
+| T-01…T-08 | `90e5ae6`, `ac43f3c`, `482a96a` | `tactical-pane-model.test.ts`; `tactical.spec.ts`; `a11y.spec.ts` | `before/05-*.png`, `before/08-*.png` → `final/04…07-*.png` |
+| P-01 | `ad1df16` | `pose.spec.ts` | `before/09-pose-default.png` → `final/08-pose-body-local-1440x900.png` |
+| P-02 | `d5a3fe7`, `6b581e4` | visual review | same |
+| P-03 | `d5a3fe7`, `763f21a` | `pose-view-state.test.ts` (exhaustive); `pose.spec.ts` | `before/09-pose-all-subjects.png` → `final/09-pose-all-subjects-1440x900.png` |
+| P-04 | `d5a3fe7` | visual review (focus ring, muted context subjects) | same |
+| P-05 | `763f21a` | `pose.spec.ts` explicit notice; RES-109 fixture contract unchanged | — |
+| P-06, P-07 | `763f21a`, `7e9fa89` | `PoseViewer.test.tsx`; `performance.json` single subject 0 long tasks | — |
+| S-01 | `ad1df16` | `field.spec.ts` timeline seek; `a11y.spec.ts` keyboard | — |
+| S-02 | `ad1df16`, `a51b837` | fixture `acceptance.spec.ts` 3/4 and 8 | `before/03-signals-dfl.png` → `after/03-signals-dfl.png` |
+| S-03 | `ff4d245`, `6b581e4` | visual review | `before/02-overview-dfl.png` → `final/02-overview-dfl-1440x900.png` |
+| S-04 | `ff4d245` | visual review at 1366/1440/1600 | `before/14-*.png` → `final/*-1366x768.png`, `*-1600x1000.png` |
+| S-05, S-09 | `89f7d72`, `0963876` | `test_serving_postgres.py`; catalog chips | `before/01-catalog.png` → `final/01-catalog-1440x900.png` |
+| S-06 | `ff4d245`, `6b581e4` | visual review | `before/13-runs.png` → `final/13-runs-1440x900.png` |
+| S-07 | `587af7b`, `ff4d245` | `test_serving_postgres.py`; `tactical.spec.ts` team names | Field/Pose finals |
+| S-08 | `ad1df16` | stream link opens its own laboratory | — |
+| R-01 | `ac43f3c` | `tactical-pane-model.test.ts`; `tactical.spec.ts` at 300.000 s | — |
+| R-02 | `ba0ee31` | after-audit: no aborted/reissued chunk requests at load; fixture playback suites | — |
+| R-03 | `89a5616` | `performance.json`: DFL combined overlays 2 long tasks / 10 s (production build) | — |
+| R-04 | `0963876` | `/api/catalog/datasets` ~20 ms warm (was ~1.8 s) | — |
+| R-05 | `546fb17`, `89f7d72` | second preparation run READY | — |
+| A-01 | `482a96a` | `e2e-real/a11y.spec.ts` 11 passed; fixture `a11y.spec.ts` 8 passed | — |

@@ -90,6 +90,29 @@ test.describe("SkillCorner Field", () => {
     await expectCleanConsole(console);
   });
 
+  test("zoom, pan and reset keep the renderer, frame and overlays stable", async ({ page }) => {
+    const console = probe(page);
+    await page.goto(`${SC}?view=field&t_ns=120000000000`);
+    const canvas = await waitForPitch(page);
+    await page.getByRole("button", { name: /Territory/ }).click();
+    await expect.poll(async () => Number(await canvas.getAttribute("data-overlay-territory-cells"))).toBeGreaterThan(10);
+    const cells = await canvas.getAttribute("data-overlay-territory-cells");
+    const element = canvas.locator("canvas");
+    const box = (await element.boundingBox())!;
+    const before = await element.elementHandle();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.wheel(0, -600);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 120, box.y + box.height / 2 + 40, { steps: 8 });
+    await page.mouse.up();
+    await page.getByRole("button", { name: "Reset view" }).click();
+    // Viewport changes are renderer-local: same canvas, same frame, same overlay.
+    expect(await (await element.elementHandle())!.evaluate((node, original) => node === original, before)).toBe(true);
+    await expect(canvas).toHaveAttribute("data-drawn-frame-ns", "120000000000");
+    await expect(canvas).toHaveAttribute("data-overlay-territory-cells", cells!);
+    await expectCleanConsole(console);
+  });
+
   test("entity selection uses its own key and survives a chunk handoff", async ({ page }) => {
     const console = probe(page);
     await page.goto(`${SC}?view=field&t_ns=26000000000&entity=ball`);
