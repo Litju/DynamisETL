@@ -632,7 +632,7 @@ def create_app(
         to_ns: int | None,
         columns: str | None,
         max_points: int | None,
-    ) -> tuple[TacticalSeriesView | None, Response | None]:
+    ) -> tuple[TacticalSeriesView | None, dict[str, str] | Response | None]:
         ref = service.artifact(artifact_id)
         if ref is None:
             raise HTTPException(
@@ -692,7 +692,7 @@ def create_app(
         )
         return (
             TacticalSeriesView(meta=tactical_meta, rows=table_records(result.table)),
-            Response(headers={"ETag": etag, "Vary": "Accept"}),
+            {"ETag": etag, "Vary": "Accept"},
         )
 
     @app.get(
@@ -718,10 +718,11 @@ def create_app(
             columns=columns,
             max_points=max_points,
         )
-        if response is not None and payload is None:
+        if payload is None:
+            assert isinstance(response, Response)
             return response
-        assert payload is not None and response is not None
-        return JSONResponse(content=payload.model_dump(mode="json"), headers=response.headers)
+        assert isinstance(response, dict)
+        return JSONResponse(content=payload.model_dump(mode="json"), headers=response)
 
     @app.get(
         "/api/tactical/events/{artifact_id}",
@@ -745,12 +746,13 @@ def create_app(
             columns=None,
             max_points=max_points,
         )
-        if response is not None and payload is None:
+        if payload is None:
+            assert isinstance(response, Response)
             return response
-        assert payload is not None and response is not None
+        assert isinstance(response, dict)
         event_rows = [TacticalEventView(**row) for row in payload.rows]
         event_page = TacticalEventPage(meta=payload.meta, rows=event_rows)
-        return JSONResponse(content=event_page.model_dump(mode="json"), headers=response.headers)
+        return JSONResponse(content=event_page.model_dump(mode="json"), headers=response)
 
     @app.get(
         "/api/artifacts/{artifact_id}",

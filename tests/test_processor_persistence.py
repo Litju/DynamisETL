@@ -69,6 +69,10 @@ def _result(*, value: float = 2.5) -> ProcessorResult:
     )
 
 
+def _dense_only_result() -> ProcessorResult:
+    return ProcessorResult(spec=_spec(), metrics=(), series=(_series(),))
+
+
 @pytest.mark.postgres
 def test_pipeline_metric_provenance_is_complete_and_idempotent(
     postgres_url: str,
@@ -144,6 +148,19 @@ def test_pipeline_metric_provenance_is_complete_and_idempotent(
         assert second["derived_metric"] == 1
         assert second["processing_artifact"] == 1
         assert second["metric_definition"] == 0
+
+        with control.begin() as connection:
+            dense_only = persist_processing_result(
+                connection,
+                dataset_id="white-cmj-acc-grf",
+                run_id="run-test-dense-only",
+                result=_dense_only_result(),
+                input_checksums=("h" * 64,),
+                computed_at=checked_at,
+                code_sha="f" * 40,
+            )
+        assert dense_only["metric_definition"] == 0
+        assert dense_only["derived_metric"] == 0
 
         with control.connect() as connection:
             rows = connection.execute(
