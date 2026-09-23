@@ -87,6 +87,10 @@ def test_tactical_authority_routes_are_typed_and_fail_closed() -> None:
     assert capabilities.json()["capabilities"]["level_d_event_linked"] == (
         "supported_source_snapshots_only"
     )
+    assert capabilities.json()["capabilities"]["possession_context"] == (
+        "supported_source_team_only"
+    )
+    assert capabilities.json()["semantics"]["attacking_direction"].startswith("unavailable")
 
     quality = client.get("/api/tactical/quality/womens-soccer-positioning")
     assert quality.status_code == 200
@@ -97,6 +101,13 @@ def test_tactical_authority_routes_are_typed_and_fail_closed() -> None:
     assert any(
         item["metric_id"] == "tactical.team.centroid_x" for item in methodology.json()["metrics"]
     )
+    shape = next(
+        item
+        for item in methodology.json()["metrics"]
+        if item["metric_id"] == "tactical.triangle.area"
+    )
+    assert shape["level"] == "V3"
+    assert shape["algorithm_id"] == "tactical.matchlab_shape"
 
     assert client.get("/api/tactical/capabilities/not-a-dataset").status_code == 404
 

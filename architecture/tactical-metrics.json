@@ -358,7 +358,7 @@
       "name": "Delaunay edge persistence",
       "unit": "1",
       "kind": "series",
-      "definition": "Fraction of valid Delaunay frames containing the same unordered player-ID edge in the trailing 1 s window."
+      "definition": "Fraction of observed team-frame timestamps containing the same unordered player-ID edge in the trailing 1 s window. Frames with insufficient points count as empty."
     },
     {
       "id": "tactical.triangle.area",
@@ -524,7 +524,7 @@
       "triangle_persistence": {
         "min": 0,
         "max": 1,
-        "meaning": "fraction of valid triangulated frames in trailing window"
+        "meaning": "fraction of all observed team-frame timestamps in trailing window; empty or degenerate triangulations count as absent"
       },
       "shape_orientation_deg": {
         "min": 0,
@@ -541,6 +541,91 @@
         "min": -22,
         "max": 22,
         "meaning": "nearby ATT count minus nearby DEF count"
+      },
+      "team_influence_percentage": {
+        "min": 0,
+        "max": 100,
+        "display_overflow": "impossible_for_valid_grid",
+        "meaning": "winner-take-all minimum-arrival-time cell share"
+      },
+      "player_influence_area_m2": {
+        "min": 0,
+        "max": 7140,
+        "display_overflow": "saturate_color_only",
+        "meaning": "model-estimated cell area owned by the selected player"
+      },
+      "frame_third_voronoi_area_m2": {
+        "min": 0,
+        "max": 2380,
+        "display_overflow": "saturate_color_only",
+        "meaning": "geometric Voronoi territory intersected with one source-frame X third"
+      },
+      "triangle_ball_distance_m": {
+        "min": 0,
+        "max": 125.11,
+        "display_overflow": "saturate_color_only",
+        "meaning": "distance to the finite same-frame ball point"
+      },
+      "triangle_opponent_density_per_m2": {
+        "min": 0,
+        "max": 0.1,
+        "display_overflow": "saturate_color_only",
+        "meaning": "opposing player count inside triangle divided by raw triangle area"
+      },
+      "triangle_geometric_control_margin_m": {
+        "min": -125.11,
+        "max": 125.11,
+        "display_overflow": "saturate_color_only",
+        "meaning": "opponent nearest-player distance minus focal-team nearest-player distance at centroid"
+      },
+      "functional_unit_depth_m": {
+        "min": 0,
+        "max": 105,
+        "display_overflow": "saturate_color_only",
+        "meaning": "source-frame or team-normalized X range"
+      },
+      "functional_unit_width_m": {
+        "min": 0,
+        "max": 68,
+        "display_overflow": "saturate_color_only",
+        "meaning": "source-frame or team-normalized Y range"
+      },
+      "functional_unit_dispersion_m": {
+        "min": 0,
+        "max": 125.11,
+        "display_overflow": "saturate_color_only",
+        "meaning": "RMS player distance to role-group centroid"
+      },
+      "functional_unit_line_height_x_m": {
+        "min": -52.5,
+        "max": 52.5,
+        "display_overflow": "saturate_color_only",
+        "meaning": "frame-axis or team-attack-normalized mean X"
+      },
+      "functional_unit_line_gap_m": {
+        "min": 0,
+        "max": 105,
+        "display_overflow": "saturate_color_only",
+        "meaning": "absolute separation of source-role mean X values"
+      },
+      "outfield_block_depth_m": {
+        "min": 0,
+        "max": 105,
+        "display_overflow": "saturate_color_only",
+        "meaning": "DEF/MID/ATT X range; GK and unknown roles excluded"
+      },
+      "zone": {
+        "domain": [
+          "own_third",
+          "middle_third",
+          "opponent_third",
+          "left_third",
+          "center_third",
+          "right_third",
+          "out_of_bounds",
+          "unknown"
+        ],
+        "meaning": "attack-relative thirds only with declared direction; otherwise source-frame thirds"
       }
     },
     "source_label_rule": "provider event/phase labels remain SOURCE_DERIVED; DynamisData phases are separate versioned MODEL_ESTIMATED outputs"

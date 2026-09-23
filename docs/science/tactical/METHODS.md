@@ -62,22 +62,27 @@ to make identical-input runs stable. Raw geometry remains available for
 research/debug and is not treated as a team success score.
 
 The default live shape graph is the subset of current raw Delaunay edges present
-in at least 80% of valid team triangulations in the trailing 1.0 s. A stable edge
-also requires at least 0.8 s of observed window coverage. A time gap over 0.2 s
-starts a new persistence window. Selected-player neighbourhood is the set of
-stable incident edges; it makes no marking or tactical-intent claim.
+in at least 80% of observed team-frame timestamps in the trailing 1.0 s. Frames
+with too few or collinear points count in the denominator with an empty graph.
+A stable edge also requires at least 0.8 s of observed window coverage. A time
+gap over 0.2 s starts a new persistence window. Selected-player neighbourhood is
+the set of stable incident edges; it makes no marking or tactical-intent claim.
 
 Each valid raw triangle reports area, longest/shortest edge ratio, undirected
 principal orientation, centroid-to-ball distance when available, zone and zone
 frame, triangle-ID persistence, opposing players inside, and geometric nearest
 team at its centroid. Nearest-team context is the deterministic Voronoi owner at
-that point; its distance margin is not a probability or possession label.
-Source possession team/player/status is included as separate context only.
+that point. Its distance margin is nearest-opponent distance minus nearest-
+focal-team distance: positive favors the focal team, negative favors the
+opponent, and zero is an equal-distance tie. It is not a probability or
+possession label. Triangle persistence divides occurrences by all observed
+team-frame timestamps in the same trailing window. Source possession
+team/player/status is included as separate context only.
 
-With direction, zone thirds use normalized X boundaries at `-pitch_length/6`
-and `+pitch_length/6`, yielding `own_third`, `middle_third`, or
-`opponent_third`. Without direction, only `left_third`, `center_third`, or
-`right_third` frame zones may be emitted. Points outside the nominal pitch are
+With direction, zone thirds use normalized X boundaries at `-L/6` and `+L/6`:
+`own_third` for `x < -L/6`, `middle_third` for `-L/6 <= x < L/6`, and
+`opponent_third` for `x >= L/6`. Without direction, only `left_third`,
+`center_third`, or `right_third` frame zones may be emitted. Points outside the nominal pitch are
 labelled `out_of_bounds`; no clipping is used for triangle geometry.
 
 ## Attacker/defender geometry

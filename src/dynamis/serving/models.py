@@ -388,6 +388,11 @@ class TacticalCapabilityLevels(BaseModel):
     level_c_influence: str
     level_d_event_linked: str
     level_e_shape_phase: str
+    matchlab_v3_functional_units: str
+    matchlab_v3_shape_graph: str
+    matchlab_v3_triangles: str
+    matchlab_v3_interactions: str
+    possession_context: str
 
 
 class TacticalCapabilityView(BaseModel):
@@ -401,7 +406,7 @@ class TacticalCapabilityView(BaseModel):
 
 class TacticalMetricMethodologyView(BaseModel):
     metric_id: str
-    level: Literal["A", "B", "C", "D", "E"]
+    level: Literal["A", "B", "C", "D", "E", "V3"]
     name: str
     unit: str
     kind: str

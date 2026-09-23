@@ -11,7 +11,8 @@ They cover:
 - direction normalization for both sides while preserving pair distances and
   raw source coordinates;
 - square Delaunay triangulation, deterministic cocircular output, duplicate
-  positions, collinear points, stable-edge persistence, and a time-gap reset;
+  positions, collinear points, stable-edge persistence over all observed team
+  frames, and a time-gap reset;
 - triangle area/aspect/orientation, ball distance, zone, opponent inclusion,
   nearest-team context, and persistence bounds;
 - nearest/second-nearest defender, 10 m overload, mutual-nearest tie-up, and

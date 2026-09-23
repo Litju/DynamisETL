@@ -24,6 +24,7 @@ ALGORITHMS = {
     "C": "tactical.arrival_time",
     "D": "tactical.source_event_snapshot",
     "E": "tactical.team_shape",
+    "V3": "tactical.matchlab_shape",
 }
 
 
@@ -67,10 +68,18 @@ def tactical_methodology() -> TacticalMethodologyPage:
                 unit=item["unit"],
                 kind=item["kind"],
                 definition=item["definition"],
-                measurement_class=metrics["levels"][item["level"]]["measurement_class"],
+                measurement_class=(
+                    metrics["matchlab_tactical_v3"]["measurement_class"]
+                    if item["level"] == "V3"
+                    else metrics["levels"][item["level"]]["measurement_class"]
+                ),
                 algorithm_id=ALGORITHMS[item["level"]],
                 algorithm_version=(
-                    metrics.get("level_c_model", {}).get("version") if item["level"] == "C" else "1"
+                    metrics.get("level_c_model", {}).get("version")
+                    if item["level"] == "C"
+                    else metrics["matchlab_tactical_v3"]["algorithm_version"]
+                    if item["level"] == "V3"
+                    else "1"
                 ),
             )
             for item in metrics["metrics"]
