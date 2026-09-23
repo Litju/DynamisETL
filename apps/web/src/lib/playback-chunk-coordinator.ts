@@ -109,7 +109,12 @@ export class PlaybackChunkCoordinator {
       this.activate(targetPlan, bounded);
     }
 
-    if (bounded === this.options.canonicalMaxNs || bounded === this.options.canonicalMinNs) {
+    // Only the edge the playhead is travelling towards ends playback: a clock
+    // that starts before the first canonical frame clamps onto it moving forward.
+    if (
+      (direction > 0 && bounded === this.options.canonicalMaxNs) ||
+      (direction < 0 && bounded === this.options.canonicalMinNs)
+    ) {
       this.setState({ status: "ended", waitingFor: null });
       this.options.onEnded?.();
     }

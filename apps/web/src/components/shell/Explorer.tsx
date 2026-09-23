@@ -5,6 +5,7 @@ import { useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import { StatePanel } from "@/components/common/StatePanel";
 import { sessionQuery } from "@/lib/api/queries";
+import { surfaceForModality } from "@/lib/capabilities";
 import type { LabSearch } from "@/lib/search";
 import { cn } from "@/lib/cn";
 
@@ -178,11 +179,22 @@ function ExplorerForSession({
                 to="/lab/$datasetId/$sessionId"
                 params={{ datasetId, sessionId }}
                 data-nav-item
-                search={(previous: LabSearch) => ({
-                  ...previous,
-                  stream: stream.stream_id,
-                  trial: stream.trial_id ?? previous.trial,
-                })}
+                search={(previous: LabSearch) => {
+                  // A stream opens in its own laboratory: selecting a pose
+                  // stream from Field (or tracking from Pose) switches the
+                  // renderer instead of being reverted to a matching stream.
+                  const surface = surfaceForModality(stream.modality);
+                  const inRenderer =
+                    previous.view === "signals" || previous.view === "field" || previous.view === "pose";
+                  return {
+                    ...previous,
+                    stream: stream.stream_id,
+                    trial: stream.trial_id ?? previous.trial,
+                    ...(inRenderer && surface !== null && surface !== previous.view
+                      ? { view: surface }
+                      : {}),
+                  };
+                }}
                 className={cn(
                   "flex items-center justify-between gap-2 rounded-control border-l-2 border-transparent px-2 py-1 transition-colors duration-quick hover:bg-surface-2",
                   selectedStream === stream.stream_id &&

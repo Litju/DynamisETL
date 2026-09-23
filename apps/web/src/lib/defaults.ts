@@ -10,10 +10,11 @@
  * identically.
  */
 
-import type { SessionDetail, StreamView } from "@/api/types";
+import type { ArtifactDetail, SessionDetail, StreamView } from "@/api/types";
 import {
   sessionSurfaces,
   streamsForSurface,
+  surfaceForModality,
   type LabSurface,
 } from "@/lib/capabilities";
 import type { LabSearch, WorkbenchView } from "@/lib/search";
@@ -78,8 +79,16 @@ export function resolveLabDefaults(
   const surfaces = sessionSurfaces(session.streams);
   const patch: Partial<LabSearch> = {};
 
-  const view = (current.view ?? defaultViewFor(session)) as WorkbenchView;
-  if (current.view === undefined) patch.view = view;
+  // A renderer view the session cannot open (a shared link from another
+  // session, a hand-edited URL) resolves to overview instead of an unselected tab.
+  const requested = current.view ?? defaultViewFor(session);
+  // A session that has a stream of the surface but no artifact keeps the view,
+  // so the renderer can state exactly what is missing.
+  const unavailable =
+    (requested === "signals" || requested === "field" || requested === "pose") &&
+    !session.streams.some((stream) => surfaceForModality(stream.modality) === requested);
+  const view = (unavailable ? "overview" : requested) as WorkbenchView;
+  if (current.view !== view) patch.view = view;
 
   // The stream must match the surface being shown, so a laboratory tab never
   // opens against a stream of the wrong modality.
@@ -121,6 +130,44 @@ export function resolveLabDefaults(
   }
 
   return { patch, surfaces };
+}
+
+/**
+ * The canonical time a renderer view should land on.
+ *
+ * A laboratory with no committed time has no frame the transport, pitch,
+ * tactical pane and Pose scene can agree on, so the durable time is resolved
+ * from the selected stream's own artifact: the first canonical frame, or for
+ * Pose the selected subject's first observation. A committed time outside the
+ * stream's canonical span (a period switch keeps the previous period's time)
+ * is equally unrenderable and resolves the same way. Returns `null` when the
+ * current time is already valid or the artifact carries no span.
+ */
+export function canonicalTimeDefault(
+  artifact: Pick<ArtifactDetail, "canonical_time_min_ns" | "canonical_time_max_ns" | "entity_observations">,
+  options: {
+    readonly currentNs: bigint | null;
+    readonly view: WorkbenchView;
+    readonly subjectId: string | null;
+  },
+): bigint | null {
+  const min = artifact.canonical_time_min_ns;
+  const max = artifact.canonical_time_max_ns;
+  if (min === null || min === undefined || max === null || max === undefined) return null;
+  const minNs = BigInt(min);
+  const maxNs = BigInt(max);
+  if (options.currentNs !== null && options.currentNs >= minNs && options.currentNs <= maxNs) {
+    return null;
+  }
+  if (options.view === "pose" && options.subjectId !== null) {
+    const observation = (artifact.entity_observations ?? []).find(
+      (item) => item.entity_id === options.subjectId,
+    );
+    if (observation && observation.observation_count > 0) {
+      return BigInt(observation.first_observed_ns);
+    }
+  }
+  return minNs;
 }
 
 /** True when a patch would actually change the durable state. */
