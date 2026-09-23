@@ -136,6 +136,14 @@ def _log(message: str) -> None:
     print(message, flush=True)
 
 
+def _safe_console() -> None:
+    """Never fail a preparation run on a console that cannot encode a character."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(errors="replace")
+
+
 # --- 1. sources ---------------------------------------------------------------
 
 
@@ -237,7 +245,7 @@ def _step(
         _log(f"  current   {name}  ({current})")
         return False
     started = datetime.now(UTC)
-    _log(f"  running   {name} …")
+    _log(f"  running   {name} ...")
     run_id = run()
     seconds = round((datetime.now(UTC) - started).total_seconds(), 1)
     report.steps.append(
@@ -510,7 +518,7 @@ def refresh_gold(resolved: Settings, engine: Engine) -> dict[str, Any]:
     from dynamis.gold.export import export_serving
     from dynamis.gold.publish import publish_gold
 
-    _log("gold: export → dbt build → publish …")
+    _log("gold: export -> dbt build -> publish ...")
     export = export_serving(resolved, engine)
     built = build_gold(resolved)
     if not built.success:
@@ -647,12 +655,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--base-url", default="http://127.0.0.1:5173")
     args = parser.parse_args(argv)
+    _safe_console()
 
     resolved = settings()
     engine = control_plane_engine(resolved)
     report = Report()
     try:
-        _log("sources: verifying accepted local artifacts …")
+        _log("sources: verifying accepted local artifacts ...")
         verify_sources(resolved, engine, report)
         _log(f"sources: {len(report.sources)} registered streams present")
         if not args.check:
