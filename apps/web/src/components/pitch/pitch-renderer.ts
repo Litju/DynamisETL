@@ -28,6 +28,8 @@ export interface PitchPalette {
   readonly trail: string;
   readonly label: string;
   readonly event: string;
+  /** Dark (or light, in Report Light) halo that keeps the ball above overlays. */
+  readonly halo: string;
 }
 
 /** One discrete source event placed on the pitch. */
@@ -59,14 +61,22 @@ export const DEFAULT_PITCH_LAYERS: PitchLayers = {
   influence: false,
 };
 
+/**
+ * Team role of an overlay item, resolved from the same group assignment the
+ * entity markers use, so a hull or cell is always drawn in its team's colour.
+ */
+export type TacticalRole = "home" | "away" | "other";
+
 export interface TacticalHull {
   readonly groupId: string;
+  readonly role: TacticalRole;
   readonly points: readonly [number, number][];
 }
 
 export interface TacticalTerritoryCell {
   readonly entityId: string;
   readonly groupId: string;
+  readonly role: TacticalRole;
   readonly points: readonly [number, number][];
 }
 
@@ -76,6 +86,7 @@ export interface TacticalInfluenceCell {
   readonly widthM: number;
   readonly heightM: number;
   readonly groupId: string;
+  readonly role: TacticalRole;
   readonly arrivalTimeS: number;
 }
 
@@ -84,6 +95,12 @@ export interface TacticalOverlay {
   readonly territoryCells: readonly TacticalTerritoryCell[];
   readonly influenceCells: readonly TacticalInfluenceCell[];
 }
+
+export const EMPTY_TACTICAL_OVERLAY: TacticalOverlay = {
+  hulls: [],
+  territoryCells: [],
+  influenceCells: [],
+};
 
 export interface PitchRendererHandle {
   setFrame(
@@ -116,6 +133,7 @@ const FALLBACK_HEX: Record<string, number> = {
   trail: 0x7f8a99,
   label: 0xc8d0da,
   event: 0xd8b25a,
+  halo: 0x111418,
 };
 
 function toPixiColor(css: string, fallback: number): number {
@@ -180,6 +198,7 @@ export async function createPitchRenderer(
     trail: toPixiColor(palette.trail, FALLBACK_HEX.trail!),
     label: toPixiColor(palette.label, FALLBACK_HEX.label!),
     event: toPixiColor(palette.event, FALLBACK_HEX.event!),
+    halo: toPixiColor(palette.halo, FALLBACK_HEX.halo!),
   };
 
   // Two coordinate spaces, deliberately separated.
@@ -195,9 +214,10 @@ export async function createPitchRenderer(
   const world: Container = new pixi.Container();
   const overlay: Container = new pixi.Container();
   app.stage.addChild(world, overlay);
-  // Draw order is the analytical hierarchy: background context first, current
-  // positions last, so a trail or an event mark can never sit on top of the
-  // entity a reader is tracking.
+  // Draw order is the analytical hierarchy: tactical surfaces are the lowest
+  // context (model influence < territory < hull outline), then trails, source
+  // events, entities and labels. A tactical overlay can therefore never cover a
+  // player, the ball or the selection a reader is tracking.
   const trailLayer: Graphics = new pixi.Graphics();
   const eventLayer: Graphics = new pixi.Graphics();
   const tacticalLayer: Graphics = new pixi.Graphics();
@@ -208,7 +228,8 @@ export async function createPitchRenderer(
   entityLayer.eventMode = "none";
   labelLayer.eventMode = "none";
   overlay.eventMode = "none";
-  overlay.addChild(trailLayer, tacticalLayer, eventLayer, entityLayer, labelLayer);
+  tacticalLayer.eventMode = "none";
+  overlay.addChild(tacticalLayer, trailLayer, eventLayer, entityLayer, labelLayer);
 
   const viewport: { current: Viewport } = {
     current: fitViewport(host.clientWidth, host.clientHeight),
@@ -252,7 +273,14 @@ export async function createPitchRenderer(
 
   function drawEntities() {
     entityLayer.clear();
-    for (const entity of lastEntities) {
+    // Players first, then the ball with a halo, then the selection, so neither
+    // the ball nor the selected entity is ever hidden under a neighbour.
+    const ordered = [...lastEntities].sort((left, right) => {
+      const rank = (entity: EntityFrame) =>
+        entity.objectId === lastSelected ? 2 : entity.isBall ? 1 : 0;
+      return rank(left) - rank(right);
+    });
+    for (const entity of ordered) {
       if (!Number.isFinite(entity.xM) || !Number.isFinite(entity.yM)) continue;
       const point = pitchToScreen(entity.xM, entity.yM, viewport.current, DEFAULT_PITCH);
       const group = lastGroups.get(entity.objectId) ?? "other";
@@ -267,6 +295,9 @@ export async function createPitchRenderer(
                 ? colors.official
                 : colors.extrapolated;
       const radius = entity.isBall ? 4 : 6;
+      if (entity.isBall) {
+        entityLayer.circle(point.x, point.y, radius + 2).fill({ color: colors.halo, alpha: 0.85 });
+      }
       const filled = entity.detected !== false;
       if (filled) {
         entityLayer.circle(point.x, point.y, radius).fill({ color });
@@ -360,23 +391,28 @@ export async function createPitchRenderer(
     }
   }
 
+  /**
+   * Tactical overlays in a stable visual language.
+   *
+   * Deterministic geometry (hull, territory) is drawn as polygons: thin solid
+   * outlines with a faint fill. The MODEL_ESTIMATED influence surface is drawn
+   * as inset tiles, a visibly different texture, so a reader never mistakes the
+   * arrival-time model for measured territory. Colour always follows the team
+   * role of the entity markers.
+   */
   function drawTactical() {
     tacticalLayer.clear();
-    const groupColor = (groupId: string) =>
-      groupId === "home" || groupId.endsWith("00000P") ? colors.home : colors.away;
+    const roleColor = (role: TacticalRole) =>
+      role === "home" ? colors.home : role === "away" ? colors.away : colors.extrapolated;
     if (layers.influence) {
       for (const cell of lastTactical.influenceCells) {
         const point = pitchToScreen(cell.xM, cell.yM, viewport.current);
-        const alpha = Math.max(0.08, Math.min(0.34, 0.34 - cell.arrivalTimeS * 0.02));
+        const alpha = Math.max(0.05, Math.min(0.2, 0.2 - cell.arrivalTimeS * 0.015));
+        const width = cell.widthM * viewport.current.scale * 0.72;
+        const height = cell.heightM * viewport.current.scale * 0.72;
         tacticalLayer
-          .rect(
-            point.x - (cell.widthM * viewport.current.scale) / 2,
-            point.y - (cell.heightM * viewport.current.scale) / 2,
-            cell.widthM * viewport.current.scale,
-            cell.heightM * viewport.current.scale,
-          )
-          .fill({ color: groupColor(cell.groupId), alpha })
-          .stroke({ width: 0.5, color: groupColor(cell.groupId), alpha: 0.45 });
+          .rect(point.x - width / 2, point.y - height / 2, width, height)
+          .fill({ color: roleColor(cell.role), alpha });
       }
     }
     if (layers.territory) {
@@ -388,10 +424,10 @@ export async function createPitchRenderer(
           const screen = pitchToScreen(point[0], point[1], viewport.current);
           tacticalLayer.lineTo(screen.x, screen.y);
         }
-        tacticalLayer.closePath().fill({ color: groupColor(cell.groupId), alpha: 0.08 }).stroke({
-          width: 0.7,
-          color: groupColor(cell.groupId),
-          alpha: 0.55,
+        tacticalLayer.closePath().fill({ color: roleColor(cell.role), alpha: 0.06 }).stroke({
+          width: 0.6,
+          color: roleColor(cell.role),
+          alpha: 0.35,
         });
       }
     }
@@ -404,7 +440,7 @@ export async function createPitchRenderer(
           const screen = pitchToScreen(point[0], point[1], viewport.current);
           tacticalLayer.lineTo(screen.x, screen.y);
         }
-        tacticalLayer.closePath().stroke({ width: 2, color: groupColor(hull.groupId), alpha: 0.9 });
+        tacticalLayer.closePath().stroke({ width: 1.25, color: roleColor(hull.role), alpha: 0.75 });
       }
     }
   }
