@@ -213,7 +213,10 @@ function PoseStage({ subjects, bounds, ...props }: PoseSceneProps & {
     }
     const desiredVector = new Vector3(desired[0], desired[1], desired[2]);
     if (target.distanceTo(desiredVector) > Math.max(0.1, bounds.radius * 0.2)) {
-      target.lerp(desiredVector, Math.min(1, Math.max(0, delta) * 6));
+      // Camera easing is JavaScript motion, outside the CSS reduced-motion
+      // rule: honour the preference by moving the target in one step.
+      const reduced = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+      target.lerp(desiredVector, reduced ? 1 : Math.min(1, Math.max(0, delta) * 6));
       controlsRef.current?.setTarget(target.x, target.y, target.z, false);
       invalidate();
     }
