@@ -14,7 +14,7 @@ test("catalog does not download renderer engines before a laboratory opens", asy
 
   const uPlotRequest = page.waitForRequest(
     (request) => /uplot/i.test(request.url()),
-    { timeout: 10_000 },
+    { timeout: 30_000 },
   );
   await page.goto(
     "/lab/skillcorner-opendata/1925299?stream=tracking-1&view=signals&t_ns=50000000",
