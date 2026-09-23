@@ -1,0 +1,50 @@
+{
+  "schema_version": "1",
+  "authority": "RES-110 tactical metric/method contract",
+  "levels": {
+    "A": {"measurement_class": "PIPELINE_DERIVED", "input_contract": "canonical tracking positions"},
+    "B": {"measurement_class": "PIPELINE_DERIVED", "input_contract": "canonical tracking positions plus declared pitch boundary"},
+    "C": {"measurement_class": "MODEL_ESTIMATED", "input_contract": "canonical positions plus versioned kinematic assumptions"},
+    "D": {"measurement_class": "PIPELINE_DERIVED", "input_contract": "source event rows plus explicitly synchronized tracking"},
+    "E": {"measurement_class": "MODEL_ESTIMATED", "input_contract": "temporally stable team tracking and a versioned shape/phase model"}
+  },
+  "global_method_contract": {
+    "coordinate_frame": "Every output cites the input coordinate_frame_id; no implicit axis swap or origin conversion is allowed.",
+    "attacking_direction": "Attack-normalized quantities require a declared per-team direction. If unavailable, frame-axis quantities may be served only with frame-axis labels.",
+    "player_policy": "Include finite player and goalkeeper rows. Goalkeepers are not silently excluded. Outfield-only metrics require an explicit identity authority.",
+    "time_policy": "Group only exact canonical t_rel_ns values. Do not interpolate across gaps or silently merge periods.",
+    "missing_policy": "Missing coordinates are absent from the frame calculation and quality records state the missing count. Extrapolated/source-model rows are retained with input quality provenance unless a processor parameter explicitly excludes them.",
+    "minimum_players": 2,
+    "units": "SI units; ratios and proportions use unit 1.",
+    "provenance": ["metric_definition", "algorithm_id", "algorithm_version", "parameters_hash", "code_git_sha", "input_checksums", "coordinate_frame_id", "measurement_class", "quality"]
+  },
+  "metrics": [
+    {"id": "tactical.team.centroid_x", "level": "A", "name": "Team centroid X", "unit": "m", "kind": "series", "definition": "Arithmetic mean of finite included player x_m at one canonical timestamp."},
+    {"id": "tactical.team.centroid_y", "level": "A", "name": "Team centroid Y", "unit": "m", "kind": "series", "definition": "Arithmetic mean of finite included player y_m at one canonical timestamp."},
+    {"id": "tactical.team.length", "level": "A", "name": "Team length", "unit": "m", "kind": "series", "definition": "max(x_m) - min(x_m) in the declared frame; not attack-normalized unless direction is declared."},
+    {"id": "tactical.team.width", "level": "A", "name": "Team width", "unit": "m", "kind": "series", "definition": "max(y_m) - min(y_m) in the declared frame."},
+    {"id": "tactical.team.length_width_ratio", "level": "A", "name": "Team length:width ratio", "unit": "1", "kind": "series", "definition": "length / width; unavailable when width is zero."},
+    {"id": "tactical.team.hull_area", "level": "A", "name": "Team convex-hull occupied area", "unit": "m**2", "kind": "series", "definition": "Area of the convex hull of included player positions; fewer than three non-collinear points produce zero area."},
+    {"id": "tactical.team.stretch_index", "level": "A", "name": "Team stretch index", "unit": "1", "kind": "series", "definition": "Root-mean-square player distance from the team centroid divided by pitch diagonal; pitch dimensions are parameters."},
+    {"id": "tactical.team.pairwise_distance_mean", "level": "A", "name": "Mean pairwise teammate distance", "unit": "m", "kind": "series", "definition": "Mean of all unordered included-player pair distances."},
+    {"id": "tactical.team.pairwise_distance_min", "level": "A", "name": "Minimum pairwise teammate distance", "unit": "m", "kind": "series", "definition": "Minimum unordered included-player pair distance."},
+    {"id": "tactical.team.pairwise_distance_max", "level": "A", "name": "Maximum pairwise teammate distance", "unit": "m", "kind": "series", "definition": "Maximum unordered included-player pair distance."},
+    {"id": "tactical.player.nearest_teammate_distance", "level": "A", "name": "Nearest teammate distance", "unit": "m", "kind": "series", "definition": "Minimum Euclidean distance to another included player in the same declared group."},
+    {"id": "tactical.player.nearest_opponent_distance", "level": "A", "name": "Nearest opponent distance", "unit": "m", "kind": "series", "definition": "Minimum Euclidean distance to an included player in another declared group."},
+    {"id": "tactical.team.inter_centroid_distance", "level": "A", "name": "Inter-team centroid distance", "unit": "m", "kind": "series", "definition": "Euclidean distance between two declared team centroids."},
+    {"id": "tactical.player.distance_to_team_centroid", "level": "A", "name": "Distance to team centroid", "unit": "m", "kind": "series", "definition": "Euclidean distance from one player to its declared team centroid."},
+    {"id": "tactical.ball.distance_to_team_centroid", "level": "A", "name": "Ball-to-team-centroid distance", "unit": "m", "kind": "series", "definition": "Euclidean distance from the finite ball row to each team centroid; no possession is inferred."},
+    {"id": "tactical.team.expansion_rate_x", "level": "A", "name": "Longitudinal expansion rate", "unit": "m/s", "kind": "series", "definition": "First finite difference of frame-axis team length over adjacent canonical timestamps within one continuous stream."},
+    {"id": "tactical.team.expansion_rate_y", "level": "A", "name": "Lateral expansion rate", "unit": "m/s", "kind": "series", "definition": "First finite difference of frame-axis team width over adjacent canonical timestamps within one continuous stream."},
+    {"id": "tactical.player.voronoi_area", "level": "B", "name": "Clipped player Voronoi area", "unit": "m**2", "kind": "series", "definition": "Player nearest-point cell clipped to the declared rectangular pitch boundary."},
+    {"id": "tactical.team.voronoi_controlled_area", "level": "B", "name": "Team Voronoi-controlled area", "unit": "m**2", "kind": "series", "definition": "Sum of clipped player cells for one declared team."},
+    {"id": "tactical.team.voronoi_control_percentage", "level": "B", "name": "Team Voronoi control percentage", "unit": "%", "kind": "series", "definition": "Team controlled area / pitch area * 100; this is geometric territory, not possession probability."},
+    {"id": "tactical.team.frame_third_controlled_area", "level": "B", "name": "Team frame-third controlled area", "unit": "m**2", "kind": "series", "definition": "Clipped player-cell area intersected with one equal-width frame-axis x third; not attacking thirds."},
+    {"id": "tactical.player.arrival_time", "level": "C", "name": "Player time-to-arrival field", "unit": "s", "kind": "series", "definition": "Declared kinematic travel-time estimate from current position to a bounded grid cell."},
+    {"id": "tactical.team.influence_percentage", "level": "C", "name": "Team dominant influence percentage", "unit": "%", "kind": "series", "definition": "Percentage of bounded grid cells whose minimum declared arrival time belongs to the team."},
+    {"id": "tactical.player.influence_area", "level": "C", "name": "Selected-player influence area", "unit": "m**2", "kind": "series", "definition": "Area of bounded cells for which the selected player has the minimum declared arrival time."},
+    {"id": "tactical.player.opponent_min_arrival_time", "level": "C", "name": "Opponent minimum arrival time", "unit": "s", "kind": "series", "definition": "Minimum declared arrival time from an opponent to a selected location."},
+    {"id": "tactical.source_event.snapshot", "level": "D", "name": "Source event tracking snapshot", "unit": "1", "kind": "series", "definition": "Chronological source event identity/context joined to the nearest synchronized tracking frame; never relabelled as a new event class."},
+    {"id": "tactical.shape.team_window", "level": "E", "name": "Team shape window", "unit": "1", "kind": "series", "definition": "Reserved until a temporal shape model, stable-window rule and source capability gate pass."}
+  ]
+}
