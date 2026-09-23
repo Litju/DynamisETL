@@ -51,7 +51,7 @@ export function RunsPage() {
     });
   };
 
-  const rows = runs.data?.rows ?? [];
+  const rows = useMemo(() => runs.data?.rows ?? [], [runs.data]);
   const selected = rows.find((run) => run.run_id === search.run) ?? null;
   const summary = useMemo(() => summariseRuns(rows), [rows]);
 
