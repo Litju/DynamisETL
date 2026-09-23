@@ -227,12 +227,12 @@ function PlayheadReadout() {
       <span className="t-value mono tabular">
         {effective !== null ? formatClockNs(effective) : "—"}
       </span>
-      <span
-        data-testid="playhead-ns"
-        className="mono text-[10px] text-text-muted"
-        title={committedTimeNs !== null ? `Committed ${formatClockNs(committedTimeNs)}` : "No committed time"}
-      >
+      <span data-testid="playhead-ns" className="mono text-[10px] text-text-muted">
         {effective !== null ? `${effective} ns` : "unavailable"}
+      </span>
+      <span className="t-section ml-2 text-text-muted" title="Durable time in the URL; playback commits on pause">committed</span>
+      <span className="mono text-[11px] tabular text-text-secondary">
+        {committedTimeNs !== null ? formatClockNs(committedTimeNs) : "—"}
       </span>
     </div>
   );

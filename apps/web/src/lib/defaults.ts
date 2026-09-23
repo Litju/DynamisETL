@@ -14,7 +14,6 @@ import type { ArtifactDetail, SessionDetail, StreamView } from "@/api/types";
 import {
   sessionSurfaces,
   streamsForSurface,
-  surfaceForModality,
   type LabSurface,
 } from "@/lib/capabilities";
 import type { LabSearch, WorkbenchView } from "@/lib/search";
@@ -79,16 +78,8 @@ export function resolveLabDefaults(
   const surfaces = sessionSurfaces(session.streams);
   const patch: Partial<LabSearch> = {};
 
-  // A renderer view the session cannot open (a shared link from another
-  // session, a hand-edited URL) resolves to overview instead of an unselected tab.
-  const requested = current.view ?? defaultViewFor(session);
-  // A session that has a stream of the surface but no artifact keeps the view,
-  // so the renderer can state exactly what is missing.
-  const unavailable =
-    (requested === "signals" || requested === "field" || requested === "pose") &&
-    !session.streams.some((stream) => surfaceForModality(stream.modality) === requested);
-  const view = (unavailable ? "overview" : requested) as WorkbenchView;
-  if (current.view !== view) patch.view = view;
+  const view = (current.view ?? defaultViewFor(session)) as WorkbenchView;
+  if (current.view === undefined) patch.view = view;
 
   // The stream must match the surface being shown, so a laboratory tab never
   // opens against a stream of the wrong modality.

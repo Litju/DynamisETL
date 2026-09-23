@@ -120,12 +120,14 @@ export function LabPage() {
   // open it, so the workbench never advertises an analysis the data cannot
   // render. Provenance follows the selected result and is always reachable.
   const surfaces = sessionSurfaces(session.data.streams);
+  // A deep link to a view this session offers no stream for keeps that view
+  // selected, so the laboratory itself can state why it is empty (RES-112 S-02).
   const availableViews: WorkbenchView[] = [
     "overview",
     ...WORKBENCH_VIEWS.filter(
       (candidate): candidate is WorkbenchView =>
         candidate !== "overview" &&
-        (candidate === "provenance" || surfaces.includes(candidate as never)),
+        (candidate === "provenance" || candidate === view || surfaces.includes(candidate as never)),
     ),
   ];
   return (

@@ -247,16 +247,3 @@ describe("canonicalTimeDefault (RES-112 F-01/F-08/P-01)", () => {
     expect(canonicalTimeDefault({ canonical_time_min_ns: null, canonical_time_max_ns: null, entity_observations: null }, { currentNs: null, view: "field", subjectId: null })).toBeNull();
   });
 });
-
-describe("unavailable view deep links (RES-112 S-02)", () => {
-  it("resolves a renderer view the session cannot open to overview", () => {
-    const session = {
-      dataset_id: "d",
-      session: { session_id: "s" },
-      participants: [],
-      trials: [],
-      streams: [],
-    } as unknown as SessionDetail;
-    expect(resolveLabDefaults(session, { view: "signals" }).patch.view).toBe("overview");
-  });
-});

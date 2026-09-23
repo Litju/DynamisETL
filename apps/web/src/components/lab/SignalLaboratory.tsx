@@ -19,6 +19,7 @@ import { useDenseWindow } from "@/components/lab/use-dense-window";
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
 import type { MetricValue, StreamView } from "@/api/types";
 import { useAnalysisContext } from "@/lib/analysis-context";
+import { SIGNAL_MODALITIES } from "@/lib/capabilities";
 import { ApiError } from "@/lib/api/client";
 import { artifactQuery, metricsQuery, sessionQuery } from "@/lib/api/queries";
 import { cn } from "@/lib/cn";
@@ -152,6 +153,18 @@ export function SignalLaboratory() {
     return <ErrorPanel error={session.error} onRetry={() => void session.refetch()} />;
   }
   if (streamId === null) {
+    const signalStreams = (session.data?.streams ?? []).filter((candidate) =>
+      SIGNAL_MODALITIES.has(candidate.modality),
+    );
+    if (signalStreams.length === 0) {
+      return (
+        <StatePanel
+          state="unsupported"
+          title="This session has no stream the Signals laboratory plots."
+          detail="Signals plots force, IMU, GNSS and LPT streams. Tracking opens in Field and body pose in Pose; select a stream in the explorer to open it in its own laboratory."
+        />
+      );
+    }
     return (
       <StatePanel
         state="empty"
