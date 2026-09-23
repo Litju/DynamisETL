@@ -15,6 +15,7 @@ import {
   LEVEL_NAMES,
   bucketBounds,
   byTeam,
+  liveReadWindow,
   levelArtifact,
   levelStatus,
   numberOf,
@@ -48,6 +49,8 @@ const TABS: ReadonlyArray<readonly [TacticalView, string]> = [
 
 /** Live/Space read windows: one query per 30 s of canonical time. */
 const LIVE_BUCKET_NS = 30_000_000_000n;
+/** Covers the drawn frame and a sampled grid just before a bucket boundary. */
+const LIVE_LOOKBACK_NS = 2_000_000_000n;
 /** Events follow a wider bucket when no range is committed. */
 const EVENT_BUCKET_NS = 120_000_000_000n;
 const EXACT_MAX_POINTS = 100_000;
@@ -227,7 +230,7 @@ export function TacticalAnalysisPane({ onCollapse }: { onCollapse?: () => void }
   const range = context?.fromNs !== null && context?.fromNs !== undefined && context?.toNs !== null && context?.toNs !== undefined
     ? { fromNs: context.fromNs, toNs: context.toNs }
     : null;
-  const liveWindow = timeNs === null ? null : bucketBounds(timeNs, LIVE_BUCKET_NS);
+  const liveWindow = timeNs === null ? null : liveReadWindow(timeNs, LIVE_BUCKET_NS, LIVE_LOOKBACK_NS);
   const eventWindow = range ?? (timeNs === null ? null : bucketBounds(timeNs, EVENT_BUCKET_NS));
   const seriesQuery = (artifact: ArtifactRef | null, bounds: { fromNs: bigint; toNs: bigint } | null, enabled: boolean) => ({
     ...tacticalSeriesQuery({

@@ -87,6 +87,20 @@ export function bucketBounds(timeNs: bigint, bucketNs: bigint): { fromNs: bigint
   return { fromNs, toNs: fromNs + bucketNs - 1n };
 }
 
+/**
+ * Read window for a current-frame read-out: the playhead's bucket plus a
+ * look-back, because the frame drawn at a time just after a bucket boundary
+ * lies in the previous bucket (and a <=1 Hz model grid may be older still).
+ */
+export function liveReadWindow(
+  timeNs: bigint,
+  bucketNs: bigint,
+  lookbackNs: bigint,
+): { fromNs: bigint; toNs: bigint } {
+  const bucket = bucketBounds(timeNs, bucketNs);
+  return { fromNs: bucket.fromNs - lookbackNs, toNs: bucket.toNs };
+}
+
 /** Rows (one per team) at the frame the playhead is on, or none. */
 export function rowsAtFrame(
   rows: readonly TacticalRow[] | undefined,

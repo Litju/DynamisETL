@@ -4,6 +4,7 @@ import type { ArtifactRef, TacticalCapabilityView } from "@/api/types";
 import {
   bucketBounds,
   byTeam,
+  liveReadWindow,
   levelStatus,
   reportPayload,
   rowsAtFrame,
@@ -60,6 +61,14 @@ describe("current-frame helpers", () => {
   it("aligns live windows to fixed buckets so the key changes once per bucket", () => {
     expect(bucketBounds(45_000_000_000n, 30_000_000_000n)).toEqual({ fromNs: 30_000_000_000n, toNs: 59_999_999_999n });
     expect(bucketBounds(59_999_999_999n, 30_000_000_000n).fromNs).toBe(30_000_000_000n);
+  });
+
+  it("reads back across a bucket boundary so the drawn frame is always included", () => {
+    // DFL frames sit on a 40 ms grid from 1.02 s: at 300.000 s the drawn frame
+    // is 299.980 s, which belongs to the previous 30 s bucket.
+    const window = liveReadWindow(300_000_000_000n, 30_000_000_000n, 2_000_000_000n);
+    expect(window.fromNs).toBeLessThanOrEqual(299_980_000_000n);
+    expect(window.toNs).toBe(329_999_999_999n);
   });
 
   it("returns one row per team at the playhead frame only (T-03/T-04)", () => {
