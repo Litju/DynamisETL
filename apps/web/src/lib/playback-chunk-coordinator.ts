@@ -292,7 +292,6 @@ export function usePlaybackChunkCoordinator<T>(options: {
     canonicalMinNs,
     canonicalMaxNs,
     chunkSpanNs,
-    anchorNs,
     queryClient,
     coordinatorKey,
     queryOptionsFor,
@@ -333,17 +332,22 @@ export function usePlaybackChunkCoordinator<T>(options: {
         });
       },
     };
+    // The coordinator follows every later seek through its store subscription,
+    // so the anchor matters only at construction and is read then. Keying the
+    // coordinator on the committed time recreated it on every commit (the
+    // canonical default time on open included), and disposal cancelled the
+    // in-flight prefetches it had just issued (RES-112 audit).
     const create = () => new PlaybackChunkCoordinator({
       canonicalMinNs,
       canonicalMaxNs,
       chunkSpanNs,
-      anchorNs,
+      anchorNs: effectiveTimeNs(useAnalysisStore.getState()) ?? options.anchorNs,
       port,
       onEnded: () => useAnalysisStore.getState().setPlaying(false),
     });
     return coordinatorKey ? acquireSharedCoordinator(coordinatorKey, ownerId, create) : create();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- anchor read at construction only
   }, [
-    anchorNs,
     canonicalMaxNs,
     canonicalMinNs,
     chunkSpanNs,
