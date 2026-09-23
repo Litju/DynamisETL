@@ -77,10 +77,10 @@ function TeamName({ groupId, teams }: { groupId: string; teams: TeamContext }) {
     <span className="inline-flex min-w-0 items-center gap-1.5" title={groupId}>
       <span
         aria-hidden="true"
-        className="inline-block size-2 shrink-0 rounded-full"
+        className="inline-block size-2 shrink-0 self-start rounded-full mt-1"
         style={{ backgroundColor: TEAM_COLOURS[index] ?? "var(--d-text-muted)" }}
       />
-      <span className="truncate">{teams.labels.get(groupId) ?? groupId}</span>
+      <span className="min-w-0 break-words text-left leading-tight">{teams.labels.get(groupId) ?? groupId}</span>
     </span>
   );
 }

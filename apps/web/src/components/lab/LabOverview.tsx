@@ -387,7 +387,7 @@ function metricColumns(labels: ReadonlyMap<string, string>): DataTableColumn<Met
   {
     id: "metric",
     header: "Metric",
-    size: 2.6,
+    size: 2.2,
     accessor: (metric) => metric.metric_name ?? metric.metric_id,
     cell: (metric) => (
       <span className="min-w-0">
@@ -406,7 +406,7 @@ function metricColumns(labels: ReadonlyMap<string, string>): DataTableColumn<Met
   {
     id: "entity",
     header: "Entity",
-    size: 1.6,
+    size: 1.4,
     accessor: (metric) => {
       const key = entityKeyOf(metric) ?? "";
       return labels.get(key) ?? key;
@@ -425,7 +425,7 @@ function metricColumns(labels: ReadonlyMap<string, string>): DataTableColumn<Met
   {
     id: "value",
     header: "Value",
-    size: 1.3,
+    size: 1.2,
     align: "right",
     accessor: (metric) => metric.value_num ?? Number.NEGATIVE_INFINITY,
     cell: (metric) => (
@@ -444,7 +444,7 @@ function metricColumns(labels: ReadonlyMap<string, string>): DataTableColumn<Met
   {
     id: "class",
     header: "Class",
-    size: 1.5,
+    size: 1.9,
     accessor: (metric) => metric.measurement_class,
     cell: (metric) => <MeasurementClassBadge measurementClass={metric.measurement_class} compact />,
   },

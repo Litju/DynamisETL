@@ -91,6 +91,19 @@ export function toPitchEvents(rows: ReadonlyArray<Record<string, unknown>>): Pit
  * provider team ids in sorted order (the same rule the markers always used),
  * labelled with the registered team name when the API serves one.
  */
+/**
+ * On-pitch labels: the registered shirt number when the provider registered
+ * one (`shirt 16 (…)` → `16`), otherwise the renderer's short id.
+ */
+export function shirtLabels(session: SessionDetail | undefined): ReadonlyMap<string, string> {
+  const labels = new Map<string, string>();
+  for (const participant of session?.participants ?? []) {
+    const match = /^shirt\s+(\d+)(?!\d)/i.exec(participant.notes ?? "");
+    if (match) labels.set(participant.subject_id, match[1]!);
+  }
+  return labels;
+}
+
 export function sessionTeams(session: SessionDetail | undefined): {
   readonly order: readonly string[];
   readonly labels: ReadonlyMap<string, string>;
@@ -128,6 +141,7 @@ export function PitchReplay() {
     return streams.find((candidate) => candidate.stream_id === streamId) ?? null;
   }, [session.data, streamId]);
   const teams = useMemo(() => sessionTeams(session.data), [session.data]);
+  const entityLabels = useMemo(() => shirtLabels(session.data), [session.data]);
 
   const committedTimeNs = useAnalysisStore((state) => state.committedTimeNs);
   const fromNs = context?.fromNs ?? null;
@@ -370,6 +384,7 @@ export function PitchReplay() {
       tacticalBounds={activeWindowBounds}
       teamOrder={teams.order}
       teamLabels={teams.labels}
+      entityLabels={entityLabels}
       onSelectEntity={handleSelectEntity}
     />
   );
@@ -438,6 +453,7 @@ function PitchView({
   tacticalBounds,
   teamOrder,
   teamLabels,
+  entityLabels,
   onSelectEntity,
 }: {
   stream: StreamView;
@@ -450,6 +466,7 @@ function PitchView({
   tacticalBounds: { readonly fromNs: bigint; readonly toNs: bigint };
   teamOrder: readonly string[];
   teamLabels: ReadonlyMap<string, string>;
+  entityLabels: ReadonlyMap<string, string>;
   onSelectEntity: (objectId: string | null) => void;
 }) {
   const context = useAnalysisContext();
@@ -679,6 +696,9 @@ function PitchView({
     sceneRef.current.events = events;
     rendererRef.current?.setEvents(events);
   }, [events]);
+  useEffect(() => {
+    rendererRef.current?.setEntityLabels?.(entityLabels);
+  }, [entityLabels, rendererReady]);
 
   const [, bumpHeader] = useReducer((value: number) => value + 1, 0);
   useEffect(() => {

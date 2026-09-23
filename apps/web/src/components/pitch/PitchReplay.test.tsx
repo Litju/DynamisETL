@@ -3,7 +3,7 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { AnalysisContext, type AnalysisContextValue } from "@/lib/analysis-context";
-import { PitchReplay, sessionTeams } from "@/components/pitch/PitchReplay";
+import { PitchReplay, sessionTeams, shirtLabels } from "@/components/pitch/PitchReplay";
 import { useAnalysisStore } from "@/lib/state/analysis";
 
 const setFrame = vi.fn();
@@ -295,4 +295,16 @@ it("derives a session-stable team order with registered labels", () => {
   } as never);
   expect(teams.order).toEqual(["1802", "871"]);
   expect(teams.labels.get("871")).toBe("Perth Glory Football Club");
+});
+
+it("labels pitch entities with registered shirt numbers only", () => {
+  const labels = shirtLabels({
+    ...SESSION,
+    participants: [
+      { subject_id: "p1", role: "player", group_label: "871", notes: "shirt 16 (C. Schindler)" },
+      { subject_id: "p2", role: "player", group_label: "871", notes: "unregistered note" },
+    ],
+  } as never);
+  expect(labels.get("p1")).toBe("16");
+  expect(labels.has("p2")).toBe(false);
 });

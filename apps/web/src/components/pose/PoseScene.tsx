@@ -375,7 +375,7 @@ function PoseHotPath({ subjects, overlays, providerConnections, showProviderSkel
 
 function useInstancedGlyph(count: number, error: boolean): InstancedMesh {
   const mesh = useMemo(() => {
-    const geometry = new SphereGeometry(error ? 1 : 0.03, error ? 12 : 14, error ? 10 : 12);
+    const geometry = new SphereGeometry(error ? 1 : 0.024, error ? 12 : 14, error ? 10 : 12);
     // Instance colours come from `instanceColor`; `vertexColors` would also
     // multiply by a geometry colour attribute the sphere does not have, which
     // rendered every landmark black (RES-112 P-02). Joints are unlit so their

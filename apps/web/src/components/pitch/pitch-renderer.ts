@@ -114,6 +114,8 @@ export interface PitchRendererHandle {
     selectedId: string | null,
   ): void;
   setEvents(events: readonly PitchEvent[]): void;
+  /** Registered short labels (e.g. shirt numbers) by object id. */
+  setEntityLabels?(labels: ReadonlyMap<string, string>): void;
   setTacticalOverlay(overlay: TacticalOverlay): void;
   setLayers(layers: PitchLayers): void;
   /** Frame the whole pitch again after a zoom or pan. */
@@ -248,6 +250,7 @@ export async function createPitchRenderer(
   let lastEvents: readonly PitchEvent[] = [];
   let lastTactical: TacticalOverlay = { hulls: [], territoryCells: [], influenceCells: [] };
   let layers: PitchLayers = DEFAULT_PITCH_LAYERS;
+  let entityLabels: ReadonlyMap<string, string> = new Map();
 
   // Label text objects are pooled: a match frame relabels the same 23 objects
   // every step rather than allocating new ones at playback frequency.
@@ -346,7 +349,7 @@ export async function createPitchRenderer(
       if (!Number.isFinite(entity.xM) || !Number.isFinite(entity.yM)) continue;
       const point = pitchToScreen(entity.xM, entity.yM, viewport.current, DEFAULT_PITCH);
       const label = labelAt(slot);
-      label.text = shortEntityLabel(entity.objectId);
+      label.text = entityLabels.get(entity.objectId) ?? shortEntityLabel(entity.objectId);
       label.style.fill = isFocus ? colors.selection : colors.label;
       const box = {
         x: point.x + 8,
@@ -567,6 +570,10 @@ export async function createPitchRenderer(
       lastSelected = selectedId;
       drawTrail();
       drawEntities();
+      drawLabels();
+    },
+    setEntityLabels(next) {
+      entityLabels = next;
       drawLabels();
     },
     setEvents(events) {

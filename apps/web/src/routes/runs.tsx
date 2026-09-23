@@ -281,12 +281,12 @@ const RUN_COLUMNS: DataTableColumn<RunRow>[] = [
   {
     id: "metrics",
     header: "Outputs",
-    size: 1,
+    size: 1.2,
     align: "right",
     accessor: (run) => run.metric_count + run.artifact_count,
     cell: (run) => (
       <span
-        className="mono text-[11px] tabular"
+        className="mono whitespace-nowrap text-[11px] tabular"
         title={`${run.metric_count} derived metrics · ${run.artifact_count} series artifacts`}
       >
         {run.metric_count > 0
