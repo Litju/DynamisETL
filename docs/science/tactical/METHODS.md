@@ -79,6 +79,10 @@ possession label. Triangle persistence divides occurrences by all observed
 team-frame timestamps in the same trailing window. Source possession
 team/player/status is included as separate context only.
 
+Every derived row carries `quality_json` with input measurement classes, role
+counts, direction availability, missing/out-of-pitch/extrapolated/duplicate
+counts, and whether source possession context was present and known.
+
 With direction, zone thirds use normalized X boundaries at `-L/6` and `+L/6`:
 `own_third` for `x < -L/6`, `middle_third` for `-L/6 <= x < L/6`, and
 `opponent_third` for `x >= L/6`. Without direction, only `left_third`,

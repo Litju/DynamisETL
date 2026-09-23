@@ -65,6 +65,10 @@ class _Frame:
     t_rel_ns: int
     groups: dict[str, tuple[_Player, ...]]
     ball: tuple[float, float] | None
+    missing_rows: int
+    outside_pitch_rows: int
+    extrapolated_rows: int
+    duplicate_rows: int
 
 
 def _point_in_triangle(
@@ -131,6 +135,7 @@ def _series_table(
     rows: list[dict[str, Any]],
     *,
     series_name: str,
+    parameters: Mapping[str, Any],
     measurement_class: str = "PIPELINE_DERIVED",
     null_types: Mapping[str, pa.DataType] | None = None,
 ) -> pa.Table | None:
@@ -149,6 +154,10 @@ def _series_table(
             b"dynamis.algorithm_id": ALGORITHM_ID.encode(),
             b"dynamis.algorithm_version": ALGORITHM_VERSION.encode(),
             b"dynamis.series_name": series_name.encode(),
+            b"dynamis.metric_authority": b"architecture/tactical-metrics.json",
+            b"dynamis.parameters": json.dumps(
+                dict(parameters), sort_keys=True, separators=(",", ":")
+            ).encode(),
         }
     )
     return table.replace_schema_metadata(metadata)
@@ -169,7 +178,13 @@ def _parameters(parameters: Mapping[str, Any] | None) -> dict[str, Any]:
     return resolved
 
 
-def _frames(table: pa.Table, *, role_by_player: Mapping[str, str]) -> tuple[_Frame, ...]:
+def _frames(
+    table: pa.Table,
+    *,
+    role_by_player: Mapping[str, str],
+    pitch_length_m: float,
+    pitch_width_m: float,
+) -> tuple[_Frame, ...]:
     missing = REQUIRED_COLUMNS - set(table.column_names)
     if missing:
         raise ValueError(f"{ALGORITHM_ID}: missing tracking columns {sorted(missing)}")
@@ -184,20 +199,30 @@ def _frames(table: pa.Table, *, role_by_player: Mapping[str, str]) -> tuple[_Fra
         lambda: defaultdict(dict)
     )
     balls: dict[tuple[str, int], tuple[float, float]] = {}
+    quality: dict[tuple[str, int], list[int]] = defaultdict(lambda: [0, 0, 0, 0])
     for row in table.to_pylist():
-        if row.get("x_m") is None or row.get("y_m") is None:
-            continue
-        x, y = float(row["x_m"]), float(row["y_m"])
-        if not (math.isfinite(x) and math.isfinite(y)):
-            continue
         trial_id = str(row.get("trial_id") or "")
         timestamp = int(row["t_rel_ns"])
         key = (trial_id, timestamp)
+        if row.get("x_m") is None or row.get("y_m") is None:
+            quality[key][0] += 1
+            continue
+        x, y = float(row["x_m"]), float(row["y_m"])
+        if not (math.isfinite(x) and math.isfinite(y)):
+            quality[key][0] += 1
+            continue
+        if not (-pitch_length_m / 2 <= x <= pitch_length_m / 2) or not (
+            -pitch_width_m / 2 <= y <= pitch_width_m / 2
+        ):
+            quality[key][1] += 1
+        if row.get("is_detected") is False:
+            quality[key][2] += 1
         object_type = str(row.get("object_type") or "")
         if object_type == "ball":
-            object_id = str(row.get("object_id") or "")
             current = balls.get(key)
             candidate = (x, y)
+            if current is not None:
+                quality[key][3] += 1
             if current is None or candidate < current:
                 balls[key] = candidate
             continue
@@ -206,6 +231,7 @@ def _frames(table: pa.Table, *, role_by_player: Mapping[str, str]) -> tuple[_Fra
         if object_type not in PLAYER_TYPES or not group_id or not object_id:
             continue
         if object_id in grouped[key][group_id]:
+            quality[key][3] += 1
             continue
         role = str(role_by_player.get(object_id, "unknown")).strip()
         role = "unknown" if role.casefold() == "unknown" else role.upper()
@@ -228,6 +254,10 @@ def _frames(table: pa.Table, *, role_by_player: Mapping[str, str]) -> tuple[_Fra
                 for group_id, players in sorted(groups.items())
             },
             ball=balls.get((trial_id, timestamp)),
+            missing_rows=quality[(trial_id, timestamp)][0],
+            outside_pitch_rows=quality[(trial_id, timestamp)][1],
+            extrapolated_rows=quality[(trial_id, timestamp)][2],
+            duplicate_rows=quality[(trial_id, timestamp)][3],
         )
         for (trial_id, timestamp), groups in sorted(grouped.items())
     )
@@ -272,6 +302,24 @@ def _frame_row(
     possession_context: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
     transform = "team_attack_positive_x" if direction else "source_frame"
+    players = frame.groups.get(group_id, ())
+    role_counts = Counter(player.role for player in players)
+    quality = {
+        "input_measurement_classes": sorted(input_class.split(",")),
+        "player_count": len(players),
+        "role_counts": dict(sorted(role_counts.items())),
+        "unknown_role_count": role_counts.get("unknown", 0),
+        "role_authority": role_authority,
+        "attacking_direction_available": direction is not None,
+        "missing_coordinate_rows": frame.missing_rows,
+        "outside_pitch_rows": frame.outside_pitch_rows,
+        "extrapolated_rows": frame.extrapolated_rows,
+        "duplicate_rows": frame.duplicate_rows,
+        "source_possession_frame_present": possession_context is not None,
+        "source_possession_known": (
+            possession_context is not None and possession_context["team_id"] is not None
+        ),
+    }
     return {
         **context,
         "source_coordinate_frame_id": context["coordinate_frame_id"],
@@ -301,6 +349,7 @@ def _frame_row(
         "source_possession_measurement_class": (
             "SOURCE_DERIVED" if possession_context is not None else None
         ),
+        "quality_json": json.dumps(quality, sort_keys=True, separators=(",", ":")),
     }
 
 
@@ -352,7 +401,12 @@ def process_tactical_shape(
     directions = dict(attacking_direction_by_team or {})
     if any(value not in {"left_to_right", "right_to_left"} for value in directions.values()):
         raise ValueError(f"{ALGORITHM_ID}: directions must be declared source values")
-    frames = _frames(tracking, role_by_player=role_by_player)
+    frames = _frames(
+        tracking,
+        role_by_player=role_by_player,
+        pitch_length_m=float(resolved["pitch_length_m"]),
+        pitch_width_m=float(resolved["pitch_width_m"]),
+    )
     if not frames:
         raise ValueError(f"{ALGORITHM_ID}: no finite tracking players")
     first = tracking.slice(0, 1).to_pylist()[0]
@@ -400,6 +454,14 @@ def process_tactical_shape(
                     "source_possession_player_id": source_possession["player_id"],
                     "source_ball_status": source_possession["ball_status"],
                     "source_possession_known": source_possession["team_id"] is not None,
+                    "quality_json": json.dumps(
+                        {
+                            "source_measurement_class": "SOURCE_DERIVED",
+                            "source_possession_known": source_possession["team_id"] is not None,
+                        },
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ),
                 }
             )
         for group_id in source_group_ids:
@@ -809,6 +871,7 @@ def process_tactical_shape(
         table = _series_table(
             rows,
             series_name=name,
+            parameters=resolved,
             measurement_class=measurement_class,
             null_types=null_types,
         )

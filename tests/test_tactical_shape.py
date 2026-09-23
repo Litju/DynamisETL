@@ -1,3 +1,4 @@
+import json
 import math
 
 import pyarrow as pa
@@ -173,6 +174,15 @@ def test_functional_unit_geometry_and_attack_normalization() -> None:
     assert home["DEF"]["mid_att_gap_m"] == 10.0
     assert home["DEF"]["outfield_block_depth_m"] == 18.0
     assert home["ATT"]["coordinate_normalization"] == "team_attack_positive_x"
+    quality = json.loads(home["DEF"]["quality_json"])
+    assert quality["role_counts"] == {"ATT": 3, "DEF": 2, "GK": 1, "MID": 2}
+    assert quality["attacking_direction_available"]
+    assert quality["extrapolated_rows"] == 0
+    series = next(item for item in result.series if item.name == "functional_unit_geometry")
+    metadata = series.table.schema.metadata or {}
+    assert metadata[b"dynamis.algorithm_id"] == b"tactical.matchlab_shape"
+    assert metadata[b"dynamis.algorithm_version"] == b"1"
+    assert b"stable_window_ns" in metadata[b"dynamis.parameters"]
 
 
 def test_stable_graph_triangles_interactions_and_source_context() -> None:
@@ -214,6 +224,12 @@ def test_stable_graph_triangles_interactions_and_source_context() -> None:
     assert len(possession) == len(timestamps)
     assert all(row["measurement_class"] == "SOURCE_DERIVED" for row in possession)
     assert all(row["source_possession_team_id"] == "home" for row in possession)
+    possession_series = next(
+        item for item in result.series if item.name == "source_possession_context"
+    )
+    assert (possession_series.table.schema.metadata or {})[
+        b"dynamis.measurement_class"
+    ] == b"SOURCE_DERIVED"
 
 
 def test_direction_missing_fails_closed_to_frame_axis() -> None:
