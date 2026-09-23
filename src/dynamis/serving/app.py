@@ -176,11 +176,11 @@ class PostgresServingBackend:
 
     def datasets(self) -> list[DatasetSummary]:
         with self._connect() as connection:
-            return repository.list_datasets(connection)
+            return repository.list_datasets(connection, gold_schema=self.gold_schema)
 
     def dataset(self, dataset_id: str) -> DatasetDetail | None:
         with self._connect() as connection:
-            return repository.dataset_detail(connection, dataset_id)
+            return repository.dataset_detail(connection, dataset_id, gold_schema=self.gold_schema)
 
     def sessions(self, dataset_id: str) -> list[SessionSummary]:
         with self._connect() as connection:

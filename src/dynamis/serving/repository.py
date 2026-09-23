@@ -160,24 +160,7 @@ def _license_view(row: Any) -> LicenseView:
     )
 
 
-_DATASET_SELECT = """
-SELECT
-    s.dataset_id, s.name, s.provider, s.domain, s.doi, s.upstream_urls,
-    s.v1_role, s.initial_scope, s.adapter_id,
-    l.policy_id, l.identifier, l.status AS license_status, l.attribution_required,
-    l.noncommercial_only, l.share_alike, l.redistribution, l.local_only, l.restrictions,
-    (SELECT json_agg(m.modality ORDER BY m.modality) FROM dataset_source_modality m
-        WHERE m.dataset_id = s.dataset_id) AS modalities,
-    (SELECT json_agg(DISTINCT st.modality) FROM sensor_stream st
-        WHERE st.dataset_id = s.dataset_id) AS ingested_modalities,
-    (SELECT count(*) FROM dataset_version v WHERE v.dataset_id = s.dataset_id) AS version_count,
-    (SELECT count(*) FROM "session" se WHERE se.dataset_id = s.dataset_id) AS session_count,
-    (SELECT count(*) FROM subject su WHERE su.dataset_id = s.dataset_id) AS subject_count,
-    (SELECT count(*) FROM trial t WHERE t.dataset_id = s.dataset_id) AS trial_count,
-    (SELECT count(*) FROM sensor_stream st WHERE st.dataset_id = s.dataset_id) AS stream_count,
-    -- Current revisions only (run-scoped rule shared with metric serving);
-    -- superseded history stays in the provenance marts.
-    (SELECT count(*) FROM (
+_CONTROL_CURRENT_METRIC_COUNT = """(SELECT count(*) FROM (
         SELECT dm.run_id,
             row_number() OVER (
                 PARTITION BY dm.metric_id, COALESCE(dm.subject_id, ''),
@@ -194,7 +177,39 @@ SELECT
         FROM derived_metric dm WHERE dm.dataset_id = s.dataset_id
     ) current_metric
     WHERE current_metric.revision_rank = 1
-        AND current_metric.run_id = current_metric.scope_run_id) AS metric_count,
+        AND current_metric.run_id = current_metric.scope_run_id)"""
+
+
+def _dataset_select(connection: Connection, gold_schema: str | None) -> str:
+    """Dataset summaries with current-revision metric counts.
+
+    Published Gold is exactly the current revisions, so its mart is counted
+    directly; the control-plane rule (the same run-scoped current revision the
+    metric endpoint serves) is the fallback before Gold is published.
+    """
+    if gold_schema is not None and gold_published(connection, gold_schema):
+        metric_count = (
+            f'(SELECT count(*) FROM "{gold_schema}"."{TRIAL_METRICS_MART}" g '
+            "WHERE g.dataset_id = s.dataset_id)"
+        )
+    else:
+        metric_count = _CONTROL_CURRENT_METRIC_COUNT
+    return f"""
+SELECT
+    s.dataset_id, s.name, s.provider, s.domain, s.doi, s.upstream_urls,
+    s.v1_role, s.initial_scope, s.adapter_id,
+    l.policy_id, l.identifier, l.status AS license_status, l.attribution_required,
+    l.noncommercial_only, l.share_alike, l.redistribution, l.local_only, l.restrictions,
+    (SELECT json_agg(m.modality ORDER BY m.modality) FROM dataset_source_modality m
+        WHERE m.dataset_id = s.dataset_id) AS modalities,
+    (SELECT json_agg(DISTINCT st.modality) FROM sensor_stream st
+        WHERE st.dataset_id = s.dataset_id) AS ingested_modalities,
+    (SELECT count(*) FROM dataset_version v WHERE v.dataset_id = s.dataset_id) AS version_count,
+    (SELECT count(*) FROM "session" se WHERE se.dataset_id = s.dataset_id) AS session_count,
+    (SELECT count(*) FROM subject su WHERE su.dataset_id = s.dataset_id) AS subject_count,
+    (SELECT count(*) FROM trial t WHERE t.dataset_id = s.dataset_id) AS trial_count,
+    (SELECT count(*) FROM sensor_stream st WHERE st.dataset_id = s.dataset_id) AS stream_count,
+    {metric_count} AS metric_count,
     (SELECT count(*) FROM quality_issue q WHERE q.dataset_id = s.dataset_id) AS quality_issue_count
 FROM dataset_source s
 JOIN license_policy l ON l.policy_id = s.license_policy_id
@@ -222,15 +237,18 @@ def _dataset_summary(row: Any) -> DatasetSummary:
     )
 
 
-def list_datasets(connection: Connection) -> list[DatasetSummary]:
-    rows = connection.execute(sa.text(_DATASET_SELECT + " ORDER BY s.dataset_id")).mappings().all()
+def list_datasets(connection: Connection, gold_schema: str | None = None) -> list[DatasetSummary]:
+    query = _dataset_select(connection, gold_schema) + " ORDER BY s.dataset_id"
+    rows = connection.execute(sa.text(query)).mappings().all()
     return [_dataset_summary(row) for row in rows]
 
 
-def dataset_detail(connection: Connection, dataset_id: str) -> DatasetDetail | None:
+def dataset_detail(
+    connection: Connection, dataset_id: str, gold_schema: str | None = None
+) -> DatasetDetail | None:
     row = (
         connection.execute(
-            sa.text(_DATASET_SELECT + " WHERE s.dataset_id = :dataset_id"),
+            sa.text(_dataset_select(connection, gold_schema) + " WHERE s.dataset_id = :dataset_id"),
             {"dataset_id": dataset_id},
         )
         .mappings()
