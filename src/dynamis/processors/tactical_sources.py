@@ -8,8 +8,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-import pyarrow as pa
 import lxml.etree as etree
+import pyarrow as pa
 
 from dynamis.adapters.skillcorner.metadata import parse_match_metadata
 from dynamis.adapters.skillcorner.tracking import match_time_ns
