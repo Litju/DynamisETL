@@ -16,6 +16,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:e2e:real": "playwright test -c playwright.real.config.ts",
     "test:e2e:install": "playwright install chromium",
     "api:generate": "node scripts/generate-api.mjs --write",
     "api:check": "node scripts/generate-api.mjs --check"
