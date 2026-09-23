@@ -125,20 +125,20 @@ export function RunsPage() {
               <>
                 <header className="shrink-0 border-b border-border-subtle px-4 py-2">
                   <h2 className="t-analysis-title">
-                    Metrics produced by processor
+                    Runs by processor
                   </h2>
                   <p className="mt-0.5 text-[11px] text-text-muted">
-                    Select a run to see its exact inputs, revision and outputs
+                    Runs in view per processor revision. Tactical processors emit series artifacts rather than scalar metrics. Select a run to see its exact inputs, revision and outputs.
                   </p>
                 </header>
                 <div className="min-h-0 flex-1">
                   {summary.byProcessor.ranked.length > 0 ? (
                     <EChart
-                      ariaLabel="Derived metrics produced by each processor"
+                      ariaLabel="Processing runs per processor revision"
                       option={rankedMetricOption(summary.byProcessor, palette)}
                     />
                   ) : (
-                    <StatePanel state="empty" title="No run has produced a metric yet." />
+                    <StatePanel state="empty" title="No processing run is registered yet." />
                   )}
                 </div>
               </>
@@ -169,15 +169,15 @@ export function summariseRuns(rows: readonly RunRow[]): RunsSummary {
     if (run.code_git_sha === null) unknownSha += 1;
     const key = `${run.algorithm_name ?? run.algorithm_id}@${run.algorithm_version ?? "?"}`;
     const entry = perProcessor.get(key) ?? { metrics: 0, runId: run.run_id };
-    entry.metrics += run.metric_count;
+    entry.metrics += 1;
     perProcessor.set(key, entry);
   }
   return {
     processors: perProcessor.size,
     unknownSha,
     byProcessor: {
-      metricId: "runs.metrics_by_processor",
-      metricName: "Derived metrics produced",
+      metricId: "runs.runs_by_processor",
+      metricName: "Processing runs",
       siUnit: "1",
       measurementClass: "PIPELINE_DERIVED",
       ranked: [...perProcessor.entries()]
@@ -280,13 +280,18 @@ const RUN_COLUMNS: DataTableColumn<RunRow>[] = [
   },
   {
     id: "metrics",
-    header: "Metrics",
-    size: 0.8,
+    header: "Outputs",
+    size: 1,
     align: "right",
-    accessor: (run) => run.metric_count,
+    accessor: (run) => run.metric_count + run.artifact_count,
     cell: (run) => (
-      <span className="mono text-[11px] tabular">
-        {run.metric_count.toLocaleString("en-US")}
+      <span
+        className="mono text-[11px] tabular"
+        title={`${run.metric_count} derived metrics · ${run.artifact_count} series artifacts`}
+      >
+        {run.metric_count > 0
+          ? `${run.metric_count.toLocaleString("en-US")} metrics`
+          : `${run.artifact_count.toLocaleString("en-US")} series`}
       </span>
     ),
   },

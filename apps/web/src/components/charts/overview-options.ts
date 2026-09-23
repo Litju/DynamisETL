@@ -14,16 +14,23 @@ import { seriesColor } from "@/lib/chart-palette";
 import type { MetricSummary, ZoneSeries } from "@/lib/overview-summaries";
 
 /** Entities shown before the chart becomes a wall of labels. */
-export const MAX_RANKED_ENTITIES = 18;
+export const MAX_RANKED_ENTITIES = 12;
 
 function axisLabel(value: unknown): string {
   const label = String(value);
   return label.length > 28 ? `${label.slice(0, 27)}…` : label;
 }
 
+/** Entity axis label: registered name when known, else the id. */
+function entityLabeler(labelFor?: (entityId: string) => string | undefined) {
+  return (value: unknown) => axisLabel(labelFor?.(String(value)) ?? String(value));
+}
+
 function valueFormatter(unit: string) {
   return (value: number): string => {
     if (!Number.isFinite(value)) return "unavailable";
+    // Dimensionless counts are integers; never print them as "950.0".
+    if (unit === "1" && Number.isInteger(value)) return value.toLocaleString("en-US");
     const magnitude = Math.abs(value);
     const digits = magnitude >= 1000 ? 0 : magnitude >= 100 ? 1 : magnitude >= 1 ? 2 : 3;
     const text = value.toFixed(digits);
@@ -40,6 +47,7 @@ function valueFormatter(unit: string) {
 export function rankedMetricOption(
   summary: MetricSummary,
   palette: ChartPalette,
+  labelFor?: (entityId: string) => string | undefined,
 ): EChartsOption {
   const shown = summary.ranked.slice(0, MAX_RANKED_ENTITIES);
   // ECharts stacks a value axis upward, so the order is reversed to put the
@@ -63,7 +71,9 @@ export function rankedMetricOption(
       textStyle: { color: palette.text, fontSize: 11 },
       formatter: (params: unknown) => {
         const point = params as { name?: string; value?: number };
-        return `${point.name ?? ""}<br/>${format(Number(point.value))}`;
+        const name = point.name ?? "";
+        const label = labelFor?.(name);
+        return `${label ? `${label} · ${name}` : name}<br/>${format(Number(point.value))}`;
       },
     },
     xAxis: {
@@ -78,7 +88,7 @@ export function rankedMetricOption(
     yAxis: {
       type: "category",
       data: entries.map((entry) => entry.entityId),
-      axisLabel: { color: palette.axis, fontSize: 10, formatter: axisLabel },
+      axisLabel: { color: palette.axis, fontSize: 10, formatter: entityLabeler(labelFor), interval: 0 },
       axisLine: { lineStyle: { color: palette.border } },
       axisTick: { show: false },
     },
@@ -99,6 +109,7 @@ export function rankedMetricOption(
           fontSize: 10,
           formatter: (params: { value?: unknown }) => format(Number(params.value)),
         },
+        labelLayout: { hideOverlap: true },
         animation: false,
       },
     ],
@@ -110,6 +121,7 @@ export function zoneBreakdownOption(
   zones: ZoneSeries,
   palette: ChartPalette,
   maxEntities = MAX_RANKED_ENTITIES,
+  labelFor?: (entityId: string) => string | undefined,
 ): EChartsOption {
   const entities = zones.entities.slice(0, maxEntities);
   const shown = [...entities].reverse();
@@ -151,7 +163,7 @@ export function zoneBreakdownOption(
     yAxis: {
       type: "category",
       data: shown,
-      axisLabel: { color: palette.axis, fontSize: 10 },
+      axisLabel: { color: palette.axis, fontSize: 10, formatter: entityLabeler(labelFor), interval: 0 },
       axisLine: { lineStyle: { color: palette.border } },
       axisTick: { show: false },
     },
