@@ -1,6 +1,6 @@
 ﻿import { useQuery } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
 
 import { MeasurementClassBadge, ModalityBadge } from "@/components/common/Badges";
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
@@ -13,10 +13,8 @@ import {
   NO_OVERLAYS,
   overlaysFromParameters,
   summarizeFrame,
-  type CameraMode,
   type DisplayConnectionDefinition,
   type PoseSubjectFrames,
-  type PoseCoordinateMode,
   type PoseLandmark,
 } from "@/components/pose/pose-model";
 import type { StreamView } from "@/api/types";
@@ -33,6 +31,8 @@ import {
   retirePoseSubjectQueries,
   usePosePlaybackWindow,
 } from "@/components/pose/use-pose-playback";
+import { INITIAL_POSE_VIEW, poseViewReducer } from "@/components/pose/pose-view-state";
+import { useThrottledPlayhead } from "@/hooks/useThrottledPlayhead";
 import { formatMetricValue } from "@/lib/measurement";
 import { useAnalysisStore } from "@/lib/state/analysis";
 import { formatClockNs } from "@/lib/time";
@@ -54,14 +54,23 @@ export function PoseViewer() {
   const sessionId = context?.sessionId ?? null;
   const streamId = context?.streamId ?? null;
   const committedTimeNs = useAnalysisStore((state) => state.committedTimeNs);
-  const playheadNs = useAnalysisStore((state) => state.playheadNs);
+  // Read-outs follow a throttled playhead; the 3D hot path reads the store
+  // directly, so playback never re-renders this component per frame.
+  const throttledTimeNs = useThrottledPlayhead(200);
   const playing = useAnalysisStore((state) => state.playing);
   const subjectSwitching = useAnalysisStore((state) => state.subjectSwitching);
   const switchingFromSubjectId = useAnalysisStore((state) => state.switchingFromSubjectId);
   const selectedJoint = useAnalysisStore((state) => state.selectedJoint);
   const hoveredJoint = useAnalysisStore((state) => state.hoveredJoint);
   const [rendererReady, setRendererReady] = useState(false);
-  const [allSubjects, setAllSubjects] = useState(false);
+  const [view, dispatchView] = useReducer(poseViewReducer, INITIAL_POSE_VIEW);
+  const allSubjects = view.scope === "all";
+  const coordinateMode = view.frame;
+  const cameraMode = view.camera;
+  const [pausedBySwitch, setPausedBySwitch] = useState(false);
+  useEffect(() => useAnalysisStore.subscribe((state, previous) => {
+    if (state.playing && !previous.playing) setPausedBySwitch(false);
+  }), []);
   const subjectSwitchRequest = useRef(0);
   const subjectSwitchAbort = useRef<AbortController | null>(null);
   const [subjectSwitchError, setSubjectSwitchError] = useState<string | null>(null);
@@ -94,6 +103,11 @@ export function PoseViewer() {
     stream?.subject_id ?? null,
   );
   const observedSubjectList = observed.subjects;
+  const participantLabel = (candidate: string) => {
+    const participant = session.data?.participants.find((item) => item.subject_id === candidate);
+    const name = participant?.notes ?? null;
+    return name ? `${name}${participant?.cohort ? ` · ${participant.cohort}` : ""} — ${candidate}` : candidate;
+  };
   const selectedSubject = context?.subjectId ?? null;
   const streamSubject = stream?.subject_id ?? null;
   const subjectId = useMemo(() => {
@@ -219,8 +233,6 @@ export function PoseViewer() {
     [methodology.data],
   );
 
-  const [coordinateMode, setCoordinateMode] = useState<PoseCoordinateMode>("body_local");
-  const [cameraMode, setCameraMode] = useState<CameraMode>("body_local");
   const [showProviderSkeleton, setShowProviderSkeleton] = useState(true);
   const [showTorsoCue, setShowTorsoCue] = useState(true);
   const [showFootContact, setShowFootContact] = useState(true);
@@ -259,6 +271,8 @@ export function PoseViewer() {
     const observation = observed.observations.find((item) => item.entityId === nextSubjectId);
     const fallbackTimeNs = context?.timeNs ?? committedTimeNs ?? canonical?.minNs ?? null;
     if (fallbackTimeNs === null) return;
+    // RES-109 §12: a switch stops playback; say so instead of stopping silently.
+    setPausedBySwitch(useAnalysisStore.getState().playing);
     useAnalysisStore.getState().beginSubjectSwitch(subjectId);
     let resolvedObservation = observation;
     if (
@@ -406,7 +420,7 @@ export function PoseViewer() {
     );
   }
 
-  const currentTime = playheadNs ?? committedTimeNs;
+  const currentTime = throttledTimeNs;
   const currentLandmarks = landmarksAt(selectedFrames, currentTime);
   const currentFrameIndex = currentTime === null ? 0 : frameIndexAt(selectedFrames, currentTime);
   const summary = summarizeFrame(
@@ -435,6 +449,11 @@ export function PoseViewer() {
             ? "local analytical frame · Z is player-centroid-relative, not absolute height · body-root recentered for display"
             : "match/world frame · source XY placement preserved; Z remains provider-relative, not ground height"}
         </span>
+        {pausedBySwitch && !playing ? (
+          <span role="status" className="text-text-secondary">
+            Playback paused for the subject switch — press Play to continue.
+          </span>
+        ) : null}
         {playbackStatus === "buffering" && playing ? (
           <span data-testid="playback-buffering" className="text-quality-warning">BUFFERING · waiting for exact next chunk</span>
         ) : null}
@@ -471,7 +490,9 @@ export function PoseViewer() {
               preset="reset"
               cameraMode={cameraMode}
               coordinateMode={coordinateMode}
-              onManualCamera={() => setCameraMode("manual")}
+              onManualCamera={() => dispatchView({ type: "manual" })}
+              selectedSubjectId={subjectId}
+              onSelectSubject={(nextSubjectId) => void handleSubjectChange(nextSubjectId)}
               playing={playing}
               showProviderSkeleton={showProviderSkeleton}
               showTorsoCue={showTorsoCue}
@@ -488,22 +509,17 @@ export function PoseViewer() {
         </div>
         <aside className="w-60 shrink-0 overflow-y-auto border-l border-border-subtle bg-surface-1 p-2 text-[11px]">
           {observed.subjects.length > 0 ? (
-            <div className="mb-3">
-              <label
-                htmlFor="pose-subject"
-                className="t-section text-text-muted"
-              >
-                subject
-              </label>
+            <ControlSection title="Subject">
               <select
                 id="pose-subject"
+                aria-label="Pose subject"
                 value={subjectId ?? ""}
                 onChange={(event) => handleSubjectChange(event.target.value)}
-                className="mono mt-1 h-7 w-full rounded-control border border-border-subtle bg-surface-0 px-1.5 text-[12px] text-text-secondary outline-none focus:border-accent"
+                className="t-control w-full rounded-control border border-border-subtle bg-surface-0 px-1.5 text-[12px] text-text-secondary outline-none focus:border-accent"
               >
                 {[...new Set(subjectId ? [...observed.subjects, subjectId] : observed.subjects)].map((candidate) => (
                   <option key={candidate} value={candidate}>
-                    {candidate}
+                    {participantLabel(candidate)}
                   </option>
                 ))}
               </select>
@@ -513,192 +529,100 @@ export function PoseViewer() {
                 </p>
               ) : null}
               <p className="mt-1 text-[10px] text-text-muted">
-                {observed.subjects.length} individuals in the artifact/session authority;
-                landmarks are never merged across subjects.
+                {observed.subjects.length} individuals in the artifact/session authority; landmarks are never
+                merged across subjects.
               </p>
-            </div>
+            </ControlSection>
           ) : null}
-          <div className="mb-3">
-            <span className="t-section text-text-muted">render mode</span>
-            <button
-              type="button"
-              data-testid="pose-all-subjects-toggle"
-              aria-pressed={allSubjects}
-              onClick={() => {
-                const next = !allSubjects;
-                setAllSubjects(next);
-                setCoordinateMode(next ? "match_world" : "body_local");
-                setCameraMode(next ? "all_subjects" : "body_local");
-              }}
-              className={
-                allSubjects
-                  ? "mt-1 w-full rounded-control bg-surface-3 px-1.5 py-1 text-left text-text-primary"
-                  : "mt-1 w-full rounded-control border border-border-subtle px-1.5 py-1 text-left text-text-muted hover:text-text-secondary"
-              }
-            >
-              all subjects · fixed camera
-            </button>
+          <ControlSection title="Scope">
+            <div role="group" aria-label="Pose scope" className="grid grid-cols-2 gap-1">
+              <SegmentButton pressed={!allSubjects} onClick={() => dispatchView({ type: "scope", scope: "subject" })}>
+                selected subject
+              </SegmentButton>
+              <SegmentButton
+                testId="pose-all-subjects-toggle"
+                pressed={allSubjects}
+                onClick={() => dispatchView({ type: "scope", scope: allSubjects ? "subject" : "all" })}
+              >
+                all subjects
+              </SegmentButton>
+            </div>
             <p className="mt-1 text-[10px] text-text-muted">
               {allSubjects
-                ? `${subjectFrames.length} subjects share one source-coordinate world; camera follow is disabled.`
-                : "Render only the selected identity with playback camera follow."}
+                ? `${subjectFrames.length} subjects share one source-coordinate world; the selected subject is highlighted and the others are context. Click a figure to select it.`
+                : "One identity, recentred or placed in the source world."}
             </p>
-          </div>
-          <div className="mb-2">
-            <span className="t-section text-text-muted">coordinate authority</span>
-            <div role="group" aria-label="Pose coordinate authority" className="mt-1 flex gap-1">
-              <button
-                type="button"
-                data-testid="pose-body-local-mode"
-                aria-pressed={coordinateMode === "body_local"}
+          </ControlSection>
+          <ControlSection title="Coordinate frame">
+            <div role="group" aria-label="Pose coordinate authority" className="grid grid-cols-2 gap-1">
+              <SegmentButton
+                testId="pose-body-local-mode"
+                pressed={coordinateMode === "body_local"}
                 disabled={allSubjects}
-                onClick={() => {
-                  setCoordinateMode("body_local");
-                  setCameraMode("body_local");
-                }}
-                className={coordinateMode === "body_local" ? "rounded-control bg-surface-3 px-1.5 py-0.5 text-text-primary" : "rounded-control border border-border-subtle px-1.5 py-0.5 text-text-muted disabled:opacity-40"}
+                title={allSubjects ? "Body-local recentring is per subject; the all-subject world uses match/world placement." : undefined}
+                onClick={() => dispatchView({ type: "frame", frame: "body_local" })}
               >
                 body-local
-              </button>
-              <button
-                type="button"
-                data-testid="pose-match-world-mode"
-                aria-pressed={coordinateMode === "match_world"}
-                onClick={() => setCoordinateMode("match_world")}
-                className={coordinateMode === "match_world" ? "rounded-control bg-surface-3 px-1.5 py-0.5 text-text-primary" : "rounded-control border border-border-subtle px-1.5 py-0.5 text-text-muted"}
+              </SegmentButton>
+              <SegmentButton
+                testId="pose-match-world-mode"
+                pressed={coordinateMode === "match_world"}
+                onClick={() => dispatchView({ type: "frame", frame: "match_world" })}
               >
                 match/world
-              </button>
+              </SegmentButton>
             </div>
             <p className="mt-1 text-[10px] text-text-muted">
               Body-local removes display-only root travel; match/world preserves source XY identity.
             </p>
-          </div>
-          <div className="mb-2">
-            <span className="t-section text-text-muted">camera ownership</span>
-            <div className="mt-1 flex flex-wrap gap-1">
+          </ControlSection>
+          <ControlSection title="Camera">
+            <div role="group" aria-label="Camera ownership" className="flex flex-wrap gap-1">
               {CAMERA_MODES.map((candidate) => (
-                <button
+                <SegmentButton
                   key={candidate}
-                  type="button"
-                  aria-pressed={cameraMode === candidate}
-                  onClick={() => {
-                    if (candidate === "all_subjects") {
-                      setAllSubjects(true);
-                      setCoordinateMode("match_world");
-                    }
-                    if (candidate === "body_local") {
-                      setAllSubjects(false);
-                      setCoordinateMode("body_local");
-                    }
-                    setCameraMode(candidate);
-                  }}
-                  className={
-                    cameraMode === candidate
-                      ? "rounded-control bg-surface-3 px-1.5 py-0.5 text-text-primary"
-                      : "rounded-control border border-border-subtle px-1.5 py-0.5 text-text-muted hover:text-text-secondary"
-                  }
+                  pressed={cameraMode === candidate}
+                  onClick={() => dispatchView({ type: "camera", camera: candidate })}
                 >
                   {candidate.replaceAll("_", "-")}
-                </button>
+                </SegmentButton>
               ))}
               <button
                 type="button"
                 data-testid="pose-camera-reset"
-                onClick={() => {
-                  setCoordinateMode(allSubjects ? "match_world" : "body_local");
-                  setCameraMode(allSubjects ? "all_subjects" : "body_local");
-                }}
-                className="rounded-control border border-border-subtle px-1.5 py-0.5 text-text-muted hover:text-text-secondary"
+                onClick={() => dispatchView({ type: "reset" })}
+                className="t-control-compact rounded-control border border-border-subtle px-1.5 text-text-muted hover:border-border-strong hover:text-text-secondary"
               >
                 reset
               </button>
             </div>
-          </div>
-          <label className="mb-2 flex items-center gap-1 text-text-muted">
-            <input
-              type="checkbox"
-              className="size-6 shrink-0"
-              checked={showErrorRadii}
-              onChange={(event) => setShowErrorRadii(event.target.checked)}
-            />
-            provider p90 predicted error radius
-          </label>
-          <div className="mb-3 space-y-1">
-            <span className="t-section text-text-muted">layers</span>
-            <label className="flex items-center gap-1 text-text-muted">
-              <input
-                type="checkbox"
-                className="size-6 shrink-0"
-                checked={showProviderSkeleton}
-                onChange={(event) => setShowProviderSkeleton(event.target.checked)}
-              />
-              provider skeleton / landmark connections
-            </label>
-            <label className="flex items-center gap-1 text-text-muted">
-              <input
-                type="checkbox"
-                className="size-6 shrink-0"
-                checked={showSegments}
-                onChange={(event) => setShowSegments(event.target.checked)}
-              />
-              analytical segments
-            </label>
-            <label className="flex items-center gap-1 text-text-muted">
-              <input
-                type="checkbox"
-                className="size-6 shrink-0"
-                checked={showTorsoCue}
-                onChange={(event) => setShowTorsoCue(event.target.checked)}
-              />
-              view-only torso cue
-            </label>
-            <label className="flex items-center gap-1 text-text-muted">
-              <input
-                type="checkbox"
-                className="size-6 shrink-0"
-                checked={showFootContact}
-                onChange={(event) => setShowFootContact(event.target.checked)}
-              />
-              foot contact triangles
-            </label>
-            <label className="flex items-center gap-1 text-text-muted">
-              <input
-                type="checkbox"
-                className="size-6 shrink-0"
-                checked={showHandContact}
-                onChange={(event) => setShowHandContact(event.target.checked)}
-              />
-              hand thumb / pinky closures
-            </label>
-            <label className="flex items-center gap-1 text-text-muted">
-              <input
-                type="checkbox"
-                className="size-6 shrink-0"
-                checked={showHeadNeck}
-                onChange={(event) => setShowHeadNeck(event.target.checked)}
-              />
-              head / neck completeness
-            </label>
-            <label className="flex items-center gap-1 text-text-muted">
-              <input
-                type="checkbox"
-                className="size-6 shrink-0"
-                checked={showArticulationAngles}
-                onChange={(event) => setShowArticulationAngles(event.target.checked)}
-              />
-              view-only articulation angles
-            </label>
-            <label className="flex items-center gap-1 text-text-muted">
-              <input
-                type="checkbox"
-                className="size-6 shrink-0"
-                checked={showAngles}
-                onChange={(event) => setShowAngles(event.target.checked)}
-              />
-              joint angles
-            </label>
-          </div>
+            <p className="mt-1 text-[10px] text-text-muted" data-testid="pose-camera-ownership">
+              {cameraMode === "manual"
+                ? "Manual: the camera is yours until you choose a mode or reset; automatic follow is off."
+                : cameraMode === "follow_subject"
+                  ? "Follow: the camera tracks the subject root; dragging hands control to manual."
+                  : cameraMode === "joint_focus"
+                    ? "Joint focus: the camera tracks the selected landmark."
+                    : cameraMode === "all_subjects"
+                      ? "Group view: fixed on the observed group; no follow."
+                      : cameraMode === "world_fixed"
+                        ? "World-fixed: the camera stays put in the source world."
+                        : "Body-local: fixed three-quarter view of the recentred subject."}
+            </p>
+          </ControlSection>
+          <ControlSection title="Layers">
+            <div role="group" aria-label="Pose layers" className="space-y-0.5">
+              <LayerSwitch label="skeleton connections" detail="provider" checked={showProviderSkeleton} onChange={setShowProviderSkeleton} />
+              <LayerSwitch label="analytical segments" detail="processor" checked={showSegments} onChange={setShowSegments} />
+              <LayerSwitch label="joint angles" detail="processor" checked={showAngles} onChange={setShowAngles} />
+              <LayerSwitch label="articulation angles" detail="view-only" checked={showArticulationAngles} onChange={setShowArticulationAngles} />
+              <LayerSwitch label="torso cue" detail="view-only" checked={showTorsoCue} onChange={setShowTorsoCue} />
+              <LayerSwitch label="foot contact" detail="view-only" checked={showFootContact} onChange={setShowFootContact} />
+              <LayerSwitch label="hand closures" detail="view-only" checked={showHandContact} onChange={setShowHandContact} />
+              <LayerSwitch label="head / neck" detail="view-only" checked={showHeadNeck} onChange={setShowHeadNeck} />
+              <LayerSwitch label="p90 error radius" detail="provider" checked={showErrorRadii} onChange={setShowErrorRadii} />
+            </div>
+          </ControlSection>
           <div className="mb-3">
             <span className="t-section text-text-muted">
               viewer frame
@@ -801,6 +725,92 @@ export function PoseViewer() {
         </aside>
       </div>
     </div>
+  );
+}
+
+function ControlSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section aria-label={title} className="mb-3 border-b border-border-subtle/60 pb-3 last:border-b-0">
+      <h3 className="t-section mb-1.5 text-text-muted">{title}</h3>
+      {children}
+    </section>
+  );
+}
+
+function SegmentButton({
+  pressed,
+  onClick,
+  children,
+  disabled = false,
+  title,
+  testId,
+}: {
+  pressed: boolean;
+  onClick: () => void;
+  children: ReactNode;
+  disabled?: boolean;
+  title?: string | undefined;
+  testId?: string;
+}) {
+  return (
+    <button
+      type="button"
+      data-testid={testId}
+      aria-pressed={pressed}
+      disabled={disabled}
+      title={title}
+      onClick={onClick}
+      className={
+        pressed
+          ? "t-control-compact rounded-control border border-accent bg-surface-3 px-1.5 text-text-primary"
+          : "t-control-compact rounded-control border border-border-subtle px-1.5 text-text-muted hover:border-border-strong hover:text-text-secondary disabled:cursor-not-allowed disabled:opacity-40"
+      }
+    >
+      {children}
+    </button>
+  );
+}
+
+/** A layer switch: role=switch, state as text + track position, not colour alone. */
+function LayerSwitch({
+  label,
+  detail,
+  checked,
+  onChange,
+}: {
+  label: string;
+  detail: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={`${label} (${detail})`}
+      onClick={() => onChange(!checked)}
+      className="flex w-full items-center gap-2 rounded-control px-1 py-1 text-left hover:bg-surface-2"
+    >
+      <span
+        aria-hidden="true"
+        className={
+          checked
+            ? "relative inline-block h-3 w-5 shrink-0 rounded-full bg-accent"
+            : "relative inline-block h-3 w-5 shrink-0 rounded-full border border-border-strong bg-surface-0"
+        }
+      >
+        <span
+          className={
+            checked
+              ? "absolute right-0.5 top-0.5 size-2 rounded-full bg-surface-0"
+              : "absolute left-0.5 top-[1px] size-2 rounded-full bg-text-muted"
+          }
+        />
+      </span>
+      <span className="min-w-0 flex-1 truncate text-[11px] text-text-secondary">{label}</span>
+      <span className="shrink-0 text-[9px] uppercase tracking-wide text-text-muted">{detail}</span>
+    </button>
   );
 }
 
