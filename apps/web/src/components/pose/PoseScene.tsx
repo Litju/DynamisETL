@@ -265,7 +265,7 @@ function PoseHotPath({ subjects, overlays, providerConnections, showProviderSkel
   // URL-selected Pose subject (never the Field entity selection).
   const focusIndex = subjects.length <= 1
     ? 0
-    : Math.max(0, subjects.findIndex((subject) => subject.subjectId === selectedSubjectId));
+    : subjects.findIndex((subject) => subject.subjectId === selectedSubjectId);
   const focusIndices = useMemo(() => [focusIndex], [focusIndex]);
   const contextIndices = useMemo(
     () => subjects.map((_subject, index) => index).filter((index) => index !== focusIndex),

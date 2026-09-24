@@ -20,7 +20,7 @@ async function shoot(page: Page, name: string) {
 
 async function pitchReady(page: Page) {
   await expect(page.getByTestId("pitch-canvas")).toHaveAttribute("data-renderer-ready", "true");
-  await expect(page.getByTestId("pitch-canvas")).not.toHaveAttribute("data-drawn-frame-ns", "");
+  await expect(page.getByTestId("pitch-canvas")).toHaveAttribute("data-drawn-frame-ns", /^-?\d+$/);
 }
 
 async function poseReady(page: Page) {

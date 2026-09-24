@@ -142,14 +142,14 @@ test("SkillCorner field, overlays and playback", async ({ page }) => {
     pane: await text(page, "[aria-label='Tactical analysis views'] >> xpath=ancestor::section[1]"),
   });
   for (const layer of ["Hull", "Territory", "Influence"]) {
-    const toggle = page.getByRole("button", { name: layer, exact: true });
-    if (await toggle.count()) {
-      await toggle.click();
-      await settle(page, 2_000);
-      await shot(page, `07-field-sc-layer-${layer.toLowerCase()}`, probe, {
-        pressed: await toggle.getAttribute("aria-pressed"),
-      });
-    }
+    const name = layer === "Influence" ? /Influence.*model/i : layer;
+    const toggle = page.getByRole("button", { name });
+    await expect(toggle).toBeVisible();
+    await toggle.click();
+    await settle(page, 2_000);
+    await shot(page, `07-field-sc-layer-${layer.toLowerCase()}`, probe, {
+      pressed: await toggle.getAttribute("aria-pressed"),
+    });
   }
   const pixiMarker = await page.evaluate(() => document.querySelectorAll("[data-testid='pitch-canvas'] canvas").length);
   const before = probe.api.length;

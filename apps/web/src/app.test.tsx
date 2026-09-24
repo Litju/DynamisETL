@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createAppRouter } from "@/router";
-import type { DatasetSummary, MetricPage, SessionDetail } from "@/api/types";
+import type { DatasetDetail, DatasetSummary, MetricPage, SessionDetail } from "@/api/types";
 
 // jsdom has no canvas rasteriser, so the real chart engine cannot initialise
 // here. The shell test is about routing, durable state and composition; the
@@ -27,7 +27,7 @@ const DATASET: DatasetSummary = {
   domain: "football",
   doi: null,
   upstream_urls: ["https://github.com/SkillCorner/opendata"],
-  modalities: ["tracking", "pose"],
+  modalities: ["tracking", "pose", "event"],
   ingested_modalities: ["pose", "tracking"],
   license: {
     policy_id: "skillcorner-opendata",
@@ -48,6 +48,23 @@ const DATASET: DatasetSummary = {
   stream_count: 3,
   metric_count: 4,
   quality_issue_count: 1,
+};
+
+const DATASET_DETAIL: DatasetDetail = {
+  ...DATASET,
+  adapter_id: "skillcorner-open-data",
+  initial_scope: "match and player tracking",
+  v1_role: "accepted tracking source",
+  versions: [
+    {
+      citation: null,
+      release_date: null,
+      retrieval_status: "fetched",
+      retrieved_at: null,
+      upstream_url: "https://github.com/SkillCorner/opendata",
+      version: "v1",
+    },
+  ],
 };
 
 const SESSION: SessionDetail = {
@@ -156,6 +173,12 @@ function installFetchStub(): void {
       if (path === "/api/catalog/datasets") {
         return jsonResponse([DATASET]);
       }
+      if (path === "/api/catalog/datasets/skillcorner-opendata") {
+        return jsonResponse(DATASET_DETAIL);
+      }
+      if (path === "/api/catalog/datasets/skillcorner-opendata/sessions") {
+        return jsonResponse([SESSION.session]);
+      }
       if (path === "/api/catalog/datasets/skillcorner-opendata/sessions/1925299") {
         return jsonResponse(SESSION);
       }
@@ -209,6 +232,15 @@ describe("workbench shell", () => {
     expect(screen.getByText(/Performance Laboratory/)).toBeInTheDocument();
     expect(await screen.findByText("SkillCorner Open Data")).toBeInTheDocument();
     expect(screen.getByText("CC BY 4.0")).toBeInTheDocument();
+  });
+
+  it("does not advertise an un-ingested event laboratory", async () => {
+    renderAt("/catalog?dataset=skillcorner-opendata");
+
+    expect(await screen.findByRole("link", { name: "Field" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Pose" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Events" })).not.toBeInTheDocument();
+    expect(screen.queryByTitle("Events laboratory available for this dataset")).not.toBeInTheDocument();
   });
 
   it("compacts the inspector to a rail where nothing is inspectable", async () => {

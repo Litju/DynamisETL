@@ -64,7 +64,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const routeView = new URLSearchParams(location.searchStr ?? "").get("view");
   const poseRoute = routeView === "pose";
   const showPoseTelemetry = !focusMode && layout.inspector && poseRoute;
-  const showTacticalAnalysis = !focusMode && layout.inspector && routeView === "field";
+  const tacticalRoute = !focusMode && layout.inspector && routeView === "field";
+  const showTacticalAnalysis = tacticalRoute && inspectorVisible(inspectorOverride, layout.inspector);
   const showInspector =
     showPoseTelemetry || showTacticalAnalysis || (!focusMode && inspectorVisible(inspectorOverride, layout.inspector));
 
@@ -118,7 +119,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           ) : null}
         </Group>
         {!focusMode && !showInspector ? (
-        <InspectorRail tactical={showTacticalAnalysis} onExpand={() => setInspectorOpen(true)} />
+        <InspectorRail tactical={tacticalRoute} onExpand={() => setInspectorOpen(true)} />
         ) : null}
       </div>
       {layout.transport ? <Transport nominalRateHz={nominalRateHz} /> : null}

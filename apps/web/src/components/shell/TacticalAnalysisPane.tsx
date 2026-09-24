@@ -27,6 +27,7 @@ import {
 import type { TacticalRow } from "@/components/pitch/tactical-overlay";
 import { useThrottledPlayhead } from "@/hooks/useThrottledPlayhead";
 import { useAnalysisContext } from "@/lib/analysis-context";
+import { ApiError } from "@/lib/api/client";
 import {
   sessionQuery,
   tacticalArtifactsQuery,
@@ -280,7 +281,7 @@ export function TacticalAnalysisPane({ onCollapse }: { onCollapse?: () => void }
   } else if (capabilities.isPending || artifacts.isPending) {
     body = <LoadingPanel label="Loading tactical capability" />;
   } else if (capabilities.isError) {
-    body = capabilities.error instanceof Error && /404/.test(capabilities.error.message)
+    body = capabilities.error instanceof ApiError && capabilities.error.status === 404
       ? <StatePanel state="unsupported" title="No tactical capability authority exists for this dataset." detail="Tactical analysis is limited to sources in the tactical capability matrix." />
       : <ErrorPanel error={capabilities.error} onRetry={() => void capabilities.refetch()} />;
   } else if (artifacts.isError) {
