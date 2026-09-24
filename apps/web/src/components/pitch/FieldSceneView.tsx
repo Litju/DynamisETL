@@ -3,6 +3,7 @@ import { useThree } from "@react-three/fiber";
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, forwardRef } from "react";
 
 import { MatchWorld } from "@/components/matchlab/MatchWorld";
+import type { ScalarFieldSpec } from "@/components/matchlab/ScalarFieldLayer";
 import {
   TRACKING_KIND,
   tacticalOverlayAtBuffers,
@@ -20,6 +21,17 @@ import type { MatchFrameContextValue } from "@/lib/match-frame-context";
 import type { TrackingLayerPalette } from "@/components/matchlab/TrackingLayer";
 import type { TacticalLayerPalette } from "@/components/matchlab/TacticalLayer";
 import { effectiveTimeNs, useAnalysisStore } from "@/lib/state/analysis";
+
+/** RES-110 architecture/tactical-metrics.json: fixed arrival_time_s colour domain. */
+const ARRIVAL_TIME_DOMAIN = { min: 0, max: 5 } as const;
+const ARRIVAL_TIME_FIELD: ScalarFieldSpec = {
+  metricId: "tactical.player.arrival_time",
+  method: "tactical.arrival_time v1 kinematic model",
+  unit: "s",
+  measurementClass: "MODEL_ESTIMATED",
+  domain: ARRIVAL_TIME_DOMAIN,
+  mode: "heatmap",
+};
 
 export interface FieldSceneViewHandle {
   resetView(): void;
@@ -103,6 +115,7 @@ export const FieldSceneView = forwardRef<FieldSceneViewHandle, FieldSceneViewPro
       frameTimeNs,
       roleOf,
       influenceMaxAgeNs,
+      false,
     ),
     [frameTimeNs, geometryBuffers, influenceBuffers, influenceMaxAgeNs, roleOf, territoryBuffers],
   );
@@ -137,6 +150,12 @@ export const FieldSceneView = forwardRef<FieldSceneViewHandle, FieldSceneViewPro
         trackingPalette={trackingPalette}
         tacticalOverlay={tacticalOverlay.overlay}
         tacticalLayers={layers}
+        scalarField={{
+          buffers: influenceBuffers,
+          spec: ARRIVAL_TIME_FIELD,
+          maxAgeNs: influenceMaxAgeNs,
+          visible: layers.influence,
+        }}
         events={events}
         tacticalPalette={tacticalPalette}
         poseLayer={null}

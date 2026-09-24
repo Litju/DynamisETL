@@ -114,21 +114,42 @@ describe("Arrow MatchFrame preparation", () => {
   it("keeps influence grid timestamps and grid spacing instead of interpolating values", () => {
     const result = prepareTacticalGridWindow(
       decoded(
-        [100n, 100n, 1_000n],
+        [100n, 100n, 100n, 100n, 1_000n],
         [
-          numbers("x_m", [0, 5, 0]),
-          numbers("y_m", [0, 0, 0]),
-          strings("owner_group_id", ["home", "away", "home"]),
-          numbers("arrival_time_s", [1, 2, 3]),
+          numbers("x_m", [0, 5, 0, 5, 0]),
+          numbers("y_m", [0, 0, 4, 4, 0]),
+          strings("owner_group_id", ["home", "away", "home", "away", "home"]),
+          numbers("arrival_time_s", [1, 2, 3, 4, 5]),
         ],
       ),
     );
 
     expect([...result.gridTimesNs]).toEqual([100n, 1_000n]);
-    expect([...result.gridOffsets]).toEqual([0, 2, 3]);
-    expect([...result.cellWidthM]).toEqual([5, 5]);
-    expect([...result.cellHeightM]).toEqual([4, 4]);
-    expect([...result.values]).toEqual([1, 2, 3]);
+    expect([...result.gridOffsets]).toEqual([0, 4, 5]);
+    expect(result.cellWidthM[0]).toBe(5);
+    expect(result.cellWidthM[1]).toBeNaN();
+    expect(result.cellHeightM[0]).toBe(4);
+    expect(result.cellHeightM[1]).toBeNaN();
+    expect([...result.values]).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("prepares an unowned generic scalar grid without inventing a team", () => {
+    const result = prepareTacticalGridWindow(
+      decoded(
+        [100n, 100n, 100n, 100n],
+        [
+          numbers("x_m", [0, 1, 0, 1]),
+          numbers("y_m", [0, 0, 1, 1]),
+          numbers("scalar_value", [2, 4, 3, 5]),
+        ],
+      ),
+      "scalar_value",
+      null,
+    );
+
+    expect(result.groupIds).toEqual([]);
+    expect([...result.groupIndexes]).toEqual([-1, -1, -1, -1]);
+    expect([...result.values]).toEqual([2, 4, 3, 5]);
   });
 
   it("keeps discrete event identity, type and canonical time", () => {

@@ -152,21 +152,29 @@ export async function prepareTacticalPolygonsDecodedOffThread(
   return prepareTacticalPolygonWindow(decoded, objectColumn, polygonColumn);
 }
 
-export async function prepareTacticalGridOffThread(buffer: ArrayBuffer): Promise<TacticalGridWindowBuffers> {
+export async function prepareTacticalGridOffThread(
+  buffer: ArrayBuffer,
+  valueColumn = "arrival_time_s",
+  groupColumn: string | null = "owner_group_id",
+): Promise<TacticalGridWindowBuffers> {
   const worker = getWorker();
-  if (worker) return worker.prepareTacticalGrid(transfer(buffer, [buffer]));
+  if (worker) return worker.prepareTacticalGrid(transfer(buffer, [buffer]), valueColumn, groupColumn);
   const [{ decodeWindow }, { prepareTacticalGridWindow }] = await Promise.all([
     import("@/lib/arrow/decode"),
     import("@/lib/arrow/match-frame-preparation"),
   ]);
-  return prepareTacticalGridWindow(decodeWindow(buffer));
+  return prepareTacticalGridWindow(decodeWindow(buffer), valueColumn, groupColumn);
 }
 
-export async function prepareTacticalGridDecodedOffThread(decoded: DecodedWindow): Promise<TacticalGridWindowBuffers> {
+export async function prepareTacticalGridDecodedOffThread(
+  decoded: DecodedWindow,
+  valueColumn = "arrival_time_s",
+  groupColumn: string | null = "owner_group_id",
+): Promise<TacticalGridWindowBuffers> {
   const worker = getWorker();
-  if (worker) return worker.prepareTacticalGrid(transferDecodedWindow(decoded));
+  if (worker) return worker.prepareTacticalGrid(transferDecodedWindow(decoded), valueColumn, groupColumn);
   const { prepareTacticalGridWindow } = await import("@/lib/arrow/match-frame-preparation");
-  return prepareTacticalGridWindow(decoded);
+  return prepareTacticalGridWindow(decoded, valueColumn, groupColumn);
 }
 
 export async function prepareEventsOffThread(buffer: ArrayBuffer): Promise<EventWindowBuffers> {

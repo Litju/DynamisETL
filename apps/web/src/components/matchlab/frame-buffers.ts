@@ -190,6 +190,7 @@ export function tacticalOverlayAtBuffers(
   frameTimeNs: bigint | null,
   roleOf: (groupId: string) => "home" | "away" | "other",
   influenceMaxAgeNs: number,
+  includeInfluenceCells = true,
 ): { readonly overlay: TacticalOverlay; readonly influenceGridTimeNs: bigint | null } {
   const exactIndex = (times: BigInt64Array, timeNs: bigint | null): number => {
     if (timeNs === null) return -1;
@@ -255,7 +256,7 @@ export function tacticalOverlayAtBuffers(
     }
   }
   const influenceCells: TacticalOverlay["influenceCells"][number][] = [];
-  if (gridIndex >= 0) {
+  if (includeInfluenceCells && gridIndex >= 0) {
     for (let cell = buffers.influence.gridOffsets[gridIndex]!; cell < buffers.influence.gridOffsets[gridIndex + 1]!; cell += 1) {
       const groupId = buffers.influence.groupIds[buffers.influence.groupIndexes[cell]!];
       if (groupId === undefined) continue;
@@ -276,7 +277,10 @@ export function tacticalOverlayAtBuffers(
       territoryCells: territoryIndex < 0 ? [] : polygonsAt(buffers.territory, territoryIndex, true) as TacticalOverlay["territoryCells"],
       influenceCells,
     },
-    influenceGridTimeNs: influenceCells.length > 0 && gridIndex >= 0 ? buffers.influence.gridTimesNs[gridIndex]! : null,
+    influenceGridTimeNs: gridIndex >= 0 &&
+      buffers.influence.gridOffsets[gridIndex + 1]! > buffers.influence.gridOffsets[gridIndex]!
+      ? buffers.influence.gridTimesNs[gridIndex]!
+      : null,
   };
 }
 

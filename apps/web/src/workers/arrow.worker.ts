@@ -38,7 +38,11 @@ export interface ArrowWorkerApi {
     objectColumn: "group_id" | "entity_id",
     polygonColumn: "hull_polygon_json" | "cell_polygon_json",
   ): TacticalPolygonWindowBuffers;
-  prepareTacticalGrid(buffer: ArrayBuffer | DecodedWindow): TacticalGridWindowBuffers;
+  prepareTacticalGrid(
+    buffer: ArrayBuffer | DecodedWindow,
+    valueColumn?: string,
+    groupColumn?: string | null,
+  ): TacticalGridWindowBuffers;
   prepareEvents(buffer: ArrayBuffer | DecodedWindow): EventWindowBuffers;
 }
 
@@ -135,8 +139,8 @@ const api: ArrowWorkerApi = {
       prepareTacticalPolygonWindow(decodedInput(buffer), objectColumn, polygonColumn),
     );
   },
-  prepareTacticalGrid(buffer) {
-    return transferGrid(prepareTacticalGridWindow(decodedInput(buffer)));
+  prepareTacticalGrid(buffer, valueColumn = "arrival_time_s", groupColumn: string | null = "owner_group_id") {
+    return transferGrid(prepareTacticalGridWindow(decodedInput(buffer), valueColumn, groupColumn));
   },
   prepareEvents(buffer) {
     return transferEvents(prepareEventWindow(decodedInput(buffer)));

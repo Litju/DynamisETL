@@ -3,9 +3,10 @@ import {
   TrackingLayer,
   type TrackingLayerPalette,
 } from "@/components/matchlab/TrackingLayer";
-import type { TrackingWindowBuffers } from "@/components/matchlab/frame-buffers";
+import type { TacticalGridWindowBuffers, TrackingWindowBuffers } from "@/components/matchlab/frame-buffers";
 import { ContextLayer, type ContextSubject, type SourceAlignmentDisplay } from "@/components/matchlab/ContextLayer";
 import { TacticalLayer, type TacticalLayerPalette } from "@/components/matchlab/TacticalLayer";
+import { ScalarFieldLayer, type ScalarFieldSpec } from "@/components/matchlab/ScalarFieldLayer";
 import type { PitchEvent, PitchLayers, TacticalOverlay } from "@/components/matchlab/render-types";
 import type { PoseLayerProps } from "@/components/pose/PoseScene";
 import type { MatchFrameContextValue } from "@/lib/match-frame-context";
@@ -29,6 +30,12 @@ export interface MatchWorldProps {
   readonly trackingPalette: TrackingLayerPalette;
   readonly tacticalOverlay: TacticalOverlay;
   readonly tacticalLayers: Pick<PitchLayers, "events" | "geometry" | "territory" | "influence">;
+  readonly scalarField: {
+    readonly buffers: TacticalGridWindowBuffers | null;
+    readonly spec: ScalarFieldSpec;
+    readonly maxAgeNs: number;
+    readonly visible: boolean;
+  };
   readonly events: readonly PitchEvent[];
   readonly tacticalPalette: TacticalLayerPalette;
   readonly poseLayer: PoseLayerProps | null;
@@ -50,6 +57,7 @@ export function MatchWorld({
   trackingPalette,
   tacticalOverlay,
   tacticalLayers,
+  scalarField,
   events,
   tacticalPalette,
   poseLayer,
@@ -79,8 +87,15 @@ export function MatchWorld({
         events={events}
         matchFrame={matchFrame}
         palette={tacticalPalette}
-        layers={tacticalLayers}
+        layers={{ ...tacticalLayers, influence: false }}
         visible={visibility.tactical}
+      />
+      <ScalarFieldLayer
+        buffers={scalarField.buffers}
+        spec={scalarField.spec}
+        matchFrame={matchFrame}
+        maxAgeNs={scalarField.maxAgeNs}
+        visible={visibility.tactical && scalarField.visible}
       />
       {visibility.pose && poseLayer !== null ? (
         <PoseLayer

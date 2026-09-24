@@ -19,7 +19,7 @@ type GridRecord = {
   readonly timeNs: bigint;
   readonly xM: number;
   readonly yM: number;
-  readonly groupId: string;
+  readonly groupId: string | null;
   readonly value: number;
 };
 
@@ -284,8 +284,12 @@ export function prepareTacticalPolygonWindow(
   };
 }
 
-/** Prepare one processor-produced influence grid at each exact grid timestamp. */
-export function prepareTacticalGridWindow(decoded: DecodedWindow): TacticalGridWindowBuffers {
+/** Prepare one processor-produced scalar grid at each exact timestamp. */
+export function prepareTacticalGridWindow(
+  decoded: DecodedWindow,
+  valueColumn = "arrival_time_s",
+  groupColumn: string | null = "owner_group_id",
+): TacticalGridWindowBuffers {
   const columns = columnMap(decoded);
   const byTime = new Map<bigint, GridRecord[]>();
   const groupIds = new Set<string>();
@@ -293,14 +297,14 @@ export function prepareTacticalGridWindow(decoded: DecodedWindow): TacticalGridW
   for (let row = 0; row < decoded.rowCount; row += 1) {
     const xM = numberAt(columns, "x_m", row);
     const yM = numberAt(columns, "y_m", row);
-    const value = numberAt(columns, "arrival_time_s", row);
-    const groupId = stringAt(columns, "owner_group_id", row);
+    const value = numberAt(columns, valueColumn, row);
+    const groupId = groupColumn === null ? null : stringAt(columns, groupColumn, row);
     if (!Number.isFinite(xM) || !Number.isFinite(yM) || !Number.isFinite(value) || groupId === "") continue;
     const timeNs = decoded.timeNs[row] ?? 0n;
     const cells = byTime.get(timeNs) ?? [];
     cells.push({ timeNs, xM, yM, groupId, value });
     byTime.set(timeNs, cells);
-    groupIds.add(groupId);
+    if (groupId !== null) groupIds.add(groupId);
     rowCount += 1;
   }
 
@@ -321,13 +325,13 @@ export function prepareTacticalGridWindow(decoded: DecodedWindow): TacticalGridW
     gridOffsets[gridIndex] = outputRow;
     const xValues = [...new Set(cells.map((cell) => cell.xM))].sort((left, right) => left - right);
     const yValues = [...new Set(cells.map((cell) => cell.yM))].sort((left, right) => left - right);
-    cellWidthM[gridIndex] = xValues.length > 1 ? Math.abs(xValues[1]! - xValues[0]!) : 5;
-    cellHeightM[gridIndex] = yValues.length > 1 ? Math.abs(yValues[1]! - yValues[0]!) : 4;
+    cellWidthM[gridIndex] = xValues.length > 1 ? Math.abs(xValues[1]! - xValues[0]!) : Number.NaN;
+    cellHeightM[gridIndex] = yValues.length > 1 ? Math.abs(yValues[1]! - yValues[0]!) : Number.NaN;
     for (const cell of cells) {
       positionsXY[outputRow * 2] = cell.xM;
       positionsXY[outputRow * 2 + 1] = cell.yM;
       values[outputRow] = cell.value;
-      groupIndexes[outputRow] = teamIndex.get(cell.groupId)!;
+      groupIndexes[outputRow] = cell.groupId === null ? -1 : teamIndex.get(cell.groupId)!;
       outputRow += 1;
     }
   });

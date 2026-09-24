@@ -929,7 +929,7 @@ function PitchView({
               <LayerToggle
                 label="Influence"
                 model
-                title="Level C arrival-time influence grid (MODEL_ESTIMATED, sampled ≤ 1 Hz)"
+                title="Level C arrival-time influence grid (MODEL_ESTIMATED, sampled ≤ 1 Hz, fixed 0–5 s color domain; color saturates only)"
                 pressed={layers.influence}
                 onToggle={() => setLayers((current) => ({ ...current, influence: !current.influence }))}
               />
@@ -1087,7 +1087,7 @@ function PitchView({
         {territoryArtifact && layers.territory ? <span>Territory: clipped Voronoi, current frame</span> : null}
         {influenceArtifact && layers.influence ? (
           <span>
-            Influence: MODEL_ESTIMATED tiles
+            Influence: MODEL_ESTIMATED · fixed color domain 0–5 s
           {influenceGridTimeNs !== null ? ` · grid @ ${formatClockNs(influenceGridTimeNs)}` : " · no grid within 1.5 s"}
           </span>
         ) : null}

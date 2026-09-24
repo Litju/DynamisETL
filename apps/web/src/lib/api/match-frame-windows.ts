@@ -75,16 +75,20 @@ export const tacticalPolygonWindowQuery = (
     staleTime: Number.POSITIVE_INFINITY,
   });
 
-export const tacticalGridWindowQuery = (query: TacticalSeriesQuery) =>
+export const tacticalGridWindowQuery = (
+  query: TacticalSeriesQuery,
+  valueColumn = "arrival_time_s",
+  groupColumn: string | null = "owner_group_id",
+) =>
   queryOptions({
-    queryKey: queryKeys.tacticalSeries(query),
+    queryKey: [...queryKeys.tacticalSeries(query), "scalar-grid", valueColumn, groupColumn],
     queryFn: async ({ signal }) =>
       fetchWindowArrowPrepared(
         query.artifactId,
         query,
-        prepareTacticalGridOffThread,
+        (buffer) => prepareTacticalGridOffThread(buffer, valueColumn, groupColumn),
         signal,
-        prepareTacticalGridDecodedOffThread,
+        (decoded) => prepareTacticalGridDecodedOffThread(decoded, valueColumn, groupColumn),
       ),
     staleTime: Number.POSITIVE_INFINITY,
   });
