@@ -220,6 +220,7 @@ function renderLab(overrides: Partial<AnalysisContextValue> = {}) {
     commitTime: vi.fn(),
     commitRange: vi.fn(),
     selectSubject: vi.fn(),
+    selectFieldEntity: vi.fn(),
     selectStream: vi.fn(),
     selectResult: vi.fn(),
     ...overrides,

@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
-import { extractFrames, frameIndexAt, landmarksAt, summarizeFrame } from "@/components/pose/pose-model";
+import { extractFrames, frameIndexAt, nextFrameIndexAt, poseFrameIndexAt, summarizeFrame } from "@/components/pose/pose-model";
 import { poseSubjectObservations, stablePoseSubjects } from "@/components/pose/use-pose-subjects";
 import { useAnalysisContext } from "@/lib/analysis-context";
+import { useMatchFrameContext } from "@/lib/match-frame-context";
 import { artifactQuery, sessionQuery } from "@/lib/api/queries";
 import { affordableSpanNs, canonicalSpan } from "@/lib/dense-window";
 import { usePosePlaybackWindow } from "@/components/pose/use-pose-playback";
@@ -15,6 +16,7 @@ import { formatClockNs } from "@/lib/time";
 /** Full live landmark telemetry for the Pose route's right-hand evidence pane. */
 export function PoseTelemetry() {
   const context = useAnalysisContext();
+  const matchFrame = useMatchFrameContext();
   // 29 rows of text: refreshed at most five times per second during playback.
   const effective = useThrottledPlayhead(200);
   const selectedJoint = useAnalysisStore((state) => state.selectedJoint);
@@ -30,6 +32,13 @@ export function PoseTelemetry() {
       streams.find((candidate) => candidate.modality === "pose") ??
       null;
   }, [context?.streamId, session.data?.streams]);
+  const maxGapNs =
+    stream?.nominal_sampling_rate_hz !== null &&
+    stream?.nominal_sampling_rate_hz !== undefined &&
+    Number.isFinite(stream.nominal_sampling_rate_hz) &&
+    stream.nominal_sampling_rate_hz > 0
+      ? 1.5 * (1e9 / stream.nominal_sampling_rate_hz)
+      : 0;
   const artifactId = stream?.sample_artifact_ids[0] ?? null;
   const artifact = useQuery({
     ...artifactQuery(artifactId ?? ""),
@@ -45,7 +54,8 @@ export function PoseTelemetry() {
     [artifact.data, session.data?.participants, stream?.subject_id],
   );
   const observations = useMemo(() => poseSubjectObservations(artifact.data), [artifact.data]);
-  const subjectId = context?.subjectId ?? subjects[0] ?? stream?.subject_id ?? null;
+  const subjectId =
+    matchFrame?.selectedPlayerId ?? context?.subjectId ?? subjects[0] ?? stream?.subject_id ?? null;
   const subjectObservation = observations.find((item) => item.entityId === subjectId);
   const participant = session.data?.participants.find((item) => item.subject_id === subjectId) ?? null;
   const canonical = canonicalSpan(artifact.data);
@@ -74,16 +84,19 @@ export function PoseTelemetry() {
       ),
     [subjectId, window.data],
   );
-  const landmarks = landmarksAt(frames, effective);
+  const frameIndex = poseFrameIndexAt(frames, effective, maxGapNs);
+  const currentFrame = frameIndex >= 0 ? frames[frameIndex] ?? null : null;
+  const landmarks = currentFrame?.landmarks ?? [];
   const byName = new Map(landmarks.map((landmark) => [landmark.jointName, landmark]));
   const jointNames = stream?.skeleton_joint_names ?? landmarks.map((landmark) => landmark.jointName);
-  const frameIndex = effective === null ? 0 : frameIndexAt(frames, effective);
-  const summary = summarizeFrame(
-    frames.length > 0 && frameIndex >= 0 ? frames[frameIndex] ?? null : null,
-  );
+  const previousFrameIndex = effective === null ? -1 : frameIndexAt(frames, effective);
+  const nextIndex = effective === null ? -1 : nextFrameIndexAt(frames, effective);
+  const previousFrame = previousFrameIndex >= 0 ? frames[previousFrameIndex] ?? null : null;
+  const nextFrame = nextIndex >= 0 ? frames[nextIndex] ?? null : null;
+  const summary = summarizeFrame(currentFrame);
   const status = subjectSwitching
     ? "Switching subject…"
-    : frames.length === 0
+    : currentFrame === null
       ? subjectObservation === undefined || subjectObservation.observationCount === 0
         ? `No Pose observations for subject ${subjectId ?? "not scoped"} in ${context?.trialId ?? "the selected period/range"}.`
         : `Subject ${subjectId} not observed at ${effective === null ? "the current time" : formatClockNs(effective)}.`
@@ -127,7 +140,14 @@ export function PoseTelemetry() {
         {status ? (
           <div className="p-2 text-[11px] text-text-muted">
             {subjectObservation && subjectObservation.observationCount > 0
-              ? `First observation ${formatClockNs(subjectObservation.firstObservedNs)} · last ${formatClockNs(subjectObservation.lastObservedNs)}.`
+              ? (previousFrame
+                  ? "Previous source sample " + formatClockNs(BigInt(previousFrame.tRelNs)) + " · "
+                  : "") +
+                (nextFrame
+                  ? "Next source sample " + formatClockNs(BigInt(nextFrame.tRelNs)) + " · "
+                  : "") +
+                "First observation " + formatClockNs(subjectObservation.firstObservedNs) +
+                " · last " + formatClockNs(subjectObservation.lastObservedNs) + "."
               : "The selected identity remains selected; unavailable landmarks are not fabricated."}
           </div>
         ) : (

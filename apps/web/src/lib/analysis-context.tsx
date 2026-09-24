@@ -27,7 +27,7 @@ export interface AnalysisContextValue {
   readonly sessionId: string;
   readonly trialId: string | null;
   readonly subjectId: string | null;
-  /** Field entity (tracked object) selection; independent of the Pose subject. */
+  /** Legacy field-object query value; a registered player resolves to subjectId. */
   readonly entityId?: string | null;
   readonly timeNs: bigint | null;
   readonly streamId: string | null;
@@ -45,8 +45,8 @@ export interface AnalysisContextValue {
     subjectId: string | null,
     options?: SubjectSelectionOptions,
   ) => void;
-  /** Select a tracked Field entity (player or ball) without a history entry. */
-  readonly selectEntity?: (entityId: string | null) => void;
+  /** Select a non-player tracked object and clear the selected player atomically. */
+  readonly selectFieldEntity: (entityId: string | null) => void;
   /** Select a stream durably (which renderer the laboratory shows). */
   readonly selectStream: (streamId: string | null) => void;
   /** Select the result whose methodology/provenance the inspector follows. */

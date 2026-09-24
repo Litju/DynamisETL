@@ -2,6 +2,7 @@ import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useMemo, type ReactNode } from "react";
 
 import { AnalysisContext, type AnalysisContextValue } from "@/lib/analysis-context";
+import { MatchFrameContextProvider } from "@/lib/match-frame-context";
 import { normalizeLabSearch, type LabSearch, type TacticalView } from "@/lib/search";
 import { formatNsDecimal, tryParseNs } from "@/lib/time";
 
@@ -59,14 +60,18 @@ export function AnalysisContextProvider({ children }: { children: ReactNode }) {
           search: (previous: LabSearch) => ({
             ...previous,
             subject: subjectIdValue === null ? undefined : subjectIdValue,
+            ...(subjectIdValue !== null ? { entity: undefined } : {}),
             ...(options?.targetTimeNs !== undefined
               ? { t_ns: formatNsDecimal(options.targetTimeNs) }
               : {}),
           }),
           replace: options?.replace ?? false,
         }),
-      selectEntity: (entityIdValue) =>
-        update({ entity: entityIdValue === null ? undefined : entityIdValue }),
+      selectFieldEntity: (entityIdValue) =>
+        update({
+          subject: undefined,
+          entity: entityIdValue === null ? undefined : entityIdValue,
+        }),
       selectStream: (streamIdValue) =>
         update({ stream: streamIdValue === null ? undefined : streamIdValue }),
       selectResult: (derivedMetricId) =>
@@ -75,5 +80,11 @@ export function AnalysisContextProvider({ children }: { children: ReactNode }) {
     };
   }, [datasetId, navigate, search.result, search.stream, search.subject, search.t_ns, search.to_ns, search.from_ns, search.metric, search.tactical, search.trial, search.entity, sessionId]);
 
-  return <AnalysisContext.Provider value={value}>{children}</AnalysisContext.Provider>;
+  return (
+    <AnalysisContext.Provider value={value}>
+      <MatchFrameContextProvider poseVisible={search.view === "pose"}>
+        {children}
+      </MatchFrameContextProvider>
+    </AnalysisContext.Provider>
+  );
 }

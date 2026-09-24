@@ -27,6 +27,7 @@ import {
 import type { TacticalRow } from "@/components/pitch/tactical-overlay";
 import { useThrottledPlayhead } from "@/hooks/useThrottledPlayhead";
 import { useAnalysisContext } from "@/lib/analysis-context";
+import { useMatchFrameContext } from "@/lib/match-frame-context";
 import { ApiError } from "@/lib/api/client";
 import {
   sessionQuery,
@@ -193,8 +194,10 @@ function ClassLine({ measurementClass, method }: { measurementClass: string; met
 
 export function TacticalAnalysisPane({ onCollapse }: { onCollapse?: () => void } = {}) {
   const context = useAnalysisContext();
+  const matchFrame = useMatchFrameContext();
   const timeNs = useThrottledPlayhead(200);
-  const selectedEntityId = useAnalysisStore((state) => state.selectedEntityId);
+  const selectedEntityId =
+    matchFrame?.selectedTrackingObjectId ?? context?.subjectId ?? context?.entityId ?? null;
   const datasetId = context?.datasetId ?? "";
   const session = useQuery({
     ...sessionQuery(datasetId, context?.sessionId ?? ""),

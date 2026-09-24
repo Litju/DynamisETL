@@ -171,7 +171,7 @@ function toPixiColor(css: string, fallback: number): number {
 export async function createPitchRenderer(
   host: HTMLElement,
   palette: PitchPalette,
-  onSelect: (objectId: string) => void,
+  onSelect: (objectId: string, objectType: string) => void,
 ): Promise<PitchRendererHandle> {
   const pixi = await import("pixi.js");
   const app: Application = new pixi.Application();
@@ -471,14 +471,14 @@ export async function createPitchRenderer(
       event.clientY - rect.top,
       viewport.current,
     );
-    let best: { id: string; distance: number } | null = null;
+    let best: { id: string; objectType: string; distance: number } | null = null;
     for (const entity of lastEntities) {
       const distance = Math.hypot(entity.xM - pitch.xM, entity.yM - pitch.yM);
       if (distance <= 1.5 && (best === null || distance < best.distance)) {
-        best = { id: entity.objectId, distance };
+        best = { id: entity.objectId, objectType: entity.objectType, distance };
       }
     }
-    if (best) onSelect(best.id);
+    if (best) onSelect(best.id, best.objectType);
   };
 
   // Zoom and pan are renderer-local interaction state; React never re-renders.

@@ -3,6 +3,7 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { AnalysisContext, type AnalysisContextValue } from "@/lib/analysis-context";
+import { MatchFrameContextProvider } from "@/lib/match-frame-context";
 import { PitchReplay, sessionTeams, shirtLabels } from "@/components/pitch/PitchReplay";
 import { useAnalysisStore } from "@/lib/state/analysis";
 
@@ -61,7 +62,10 @@ const SESSION = {
     trial_count: 1,
     stream_count: 1,
   },
-  participants: [],
+  participants: [
+    { subject_id: "p1", role: "player", group_label: "home" },
+    { subject_id: "p2", role: "player", group_label: "away" },
+  ],
   trials: [],
   streams: [STREAM],
 };
@@ -171,6 +175,7 @@ function renderPitch(overrides: Partial<AnalysisContextValue> = {}) {
     commitTime: vi.fn(),
     commitRange: vi.fn(),
     selectSubject: vi.fn(),
+    selectFieldEntity: vi.fn(),
     selectStream: vi.fn(),
     selectResult: vi.fn(),
     ...overrides,
@@ -179,7 +184,9 @@ function renderPitch(overrides: Partial<AnalysisContextValue> = {}) {
   render(
     <QueryClientProvider client={client}>
       <AnalysisContext.Provider value={context}>
-        <PitchReplay />
+        <MatchFrameContextProvider poseVisible={false}>
+          <PitchReplay />
+        </MatchFrameContextProvider>
       </AnalysisContext.Provider>
     </QueryClientProvider>,
   );
@@ -196,7 +203,6 @@ beforeEach(() => {
   useAnalysisStore.setState({
     playheadNs: 0n,
     committedTimeNs: 0n,
-    selectedEntityId: null,
     committedRangeNs: null,
   });
 });
@@ -274,15 +280,14 @@ it("draws no frame for a time outside the loaded window instead of reusing its l
   expect(call[0]).toEqual([]);
 });
 
-it("selects a pitch entity on its own durable key, never the Pose subject", async () => {
+it("selects a tracked player through the shared MatchFrameContext", async () => {
   installFetch();
-  const context = renderPitch({ selectEntity: vi.fn() });
+  const context = renderPitch({ selectSubject: vi.fn(), selectFieldEntity: vi.fn() });
   await waitFor(() => expect(createPitchRenderer).toHaveBeenCalled());
-  const onSelect = createPitchRenderer.mock.calls[0]?.[2] as (objectId: string) => void;
-  act(() => onSelect("p2"));
-  expect(context.selectEntity).toHaveBeenCalledWith("p2");
-  expect(context.selectSubject).not.toHaveBeenCalled();
-  expect(useAnalysisStore.getState().selectedEntityId).toBe("p2");
+  const onSelect = createPitchRenderer.mock.calls[0]?.[2] as (objectId: string, objectType: string) => void;
+  act(() => onSelect("p2", "player"));
+  expect(context.selectSubject).toHaveBeenCalledWith("p2", { targetTimeNs: 0n });
+  expect(context.selectFieldEntity).not.toHaveBeenCalled();
 });
 
 it("derives a session-stable team order with registered labels", () => {

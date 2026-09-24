@@ -7,9 +7,9 @@ import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StateP
 import {
   CAMERA_MODES,
   extractFrames,
-  frameIndexAt,
   groupFramesBySubject,
-  landmarksAt,
+  nextFrameIndexAt,
+  poseFrameIndexAt,
   NO_OVERLAYS,
   overlaysFromParameters,
   summarizeFrame,
@@ -19,11 +19,12 @@ import {
 } from "@/components/pose/pose-model";
 import type { StreamView } from "@/api/types";
 import { useAnalysisContext } from "@/lib/analysis-context";
+import { useMatchFrameContext } from "@/lib/match-frame-context";
 import { ApiError } from "@/lib/api/client";
 import { artifactQuery, methodologyQuery, metricsQuery, sessionQuery } from "@/lib/api/queries";
 import {
-  firstPoseObservationInRange,
   fetchPoseObservationsInRange,
+  firstPoseObservationInRange,
   usePoseSubjects,
 } from "@/components/pose/use-pose-subjects";
 import { affordableSpanNs, canonicalSpan } from "@/lib/dense-window";
@@ -34,7 +35,7 @@ import {
 import { INITIAL_POSE_VIEW, poseViewReducer } from "@/components/pose/pose-view-state";
 import { useThrottledPlayhead } from "@/hooks/useThrottledPlayhead";
 import { formatMetricValue } from "@/lib/measurement";
-import { useAnalysisStore } from "@/lib/state/analysis";
+import { effectiveTimeNs, useAnalysisStore } from "@/lib/state/analysis";
 import { formatClockNs } from "@/lib/time";
 
 const PoseCanvas = lazy(() => import("@/components/pose/PoseScene"));
@@ -49,6 +50,7 @@ const MAX_POSE_POINTS = 20_000;
  */
 export function PoseViewer() {
   const context = useAnalysisContext();
+  const matchFrame = useMatchFrameContext();
   const queryClient = useQueryClient();
   const datasetId = context?.datasetId ?? null;
   const sessionId = context?.sessionId ?? null;
@@ -68,15 +70,13 @@ export function PoseViewer() {
   const coordinateMode = view.frame;
   const cameraMode = view.camera;
   const [pausedBySwitch, setPausedBySwitch] = useState(false);
-  useEffect(() => useAnalysisStore.subscribe((state, previous) => {
-    if (state.playing && !previous.playing) setPausedBySwitch(false);
-  }), []);
   const subjectSwitchRequest = useRef(0);
   const subjectSwitchAbort = useRef<AbortController | null>(null);
   const [subjectSwitchError, setSubjectSwitchError] = useState<string | null>(null);
-
+  useEffect(() => useAnalysisStore.subscribe((state, previous) => {
+    if (state.playing && !previous.playing) setPausedBySwitch(false);
+  }), []);
   useEffect(() => () => subjectSwitchAbort.current?.abort(), []);
-
   const session = useQuery({
     ...sessionQuery(datasetId ?? "", sessionId ?? ""),
     enabled: Boolean(datasetId && sessionId),
@@ -85,6 +85,12 @@ export function PoseViewer() {
     const streams = session.data?.streams ?? [];
     return streams.find((candidate) => candidate.stream_id === streamId) ?? null;
   }, [session.data, streamId]);
+  const maxPoseFrameGapNs = useMemo(() => {
+    const rate = stream?.nominal_sampling_rate_hz;
+    return rate !== null && rate !== undefined && Number.isFinite(rate) && rate > 0
+      ? 1.5 * (1e9 / rate)
+      : 0;
+  }, [stream?.nominal_sampling_rate_hz]);
 
   const artifactId = stream?.sample_artifact_ids[0] ?? null;
   const artifact = useQuery({ ...artifactQuery(artifactId ?? ""), enabled: Boolean(artifactId) });
@@ -108,7 +114,7 @@ export function PoseViewer() {
     const name = participant?.notes ?? null;
     return name ? `${name}${participant?.cohort ? ` · ${participant.cohort}` : ""} — ${candidate}` : candidate;
   };
-  const selectedSubject = context?.subjectId ?? null;
+  const selectedSubject = matchFrame?.selectedPlayerId ?? context?.subjectId ?? null;
   const streamSubject = stream?.subject_id ?? null;
   const subjectId = useMemo(() => {
     if (selectedSubject !== null) return selectedSubject;
@@ -225,6 +231,58 @@ export function PoseViewer() {
         : frames,
     [allSubjects, frames, subjectFrames, subjectId],
   );
+  const currentTime = throttledTimeNs ?? committedTimeNs ?? context?.timeNs ?? null;
+  const currentFrameIndex = poseFrameIndexAt(selectedFrames, currentTime, maxPoseFrameGapNs);
+  const currentFrame = currentFrameIndex >= 0 ? selectedFrames[currentFrameIndex] ?? null : null;
+  const previousFrameIndex =
+    currentTime === null ? -1 : poseFrameIndexAt(selectedFrames, currentTime, Number.POSITIVE_INFINITY);
+  const nextFrameIndex = currentTime === null ? -1 : nextFrameIndexAt(selectedFrames, currentTime);
+  const previousFrame = previousFrameIndex >= 0 ? selectedFrames[previousFrameIndex] ?? null : null;
+  const nextFrame = nextFrameIndex >= 0 ? selectedFrames[nextFrameIndex] ?? null : null;
+  const nextObservationToNs = context?.toNs ?? canonical?.maxNs ?? null;
+  const nextObservationRange = useQuery({
+    queryKey: [
+      "pose-next-observation",
+      artifactId,
+      subjectId,
+      currentTime?.toString() ?? null,
+      nextObservationToNs?.toString() ?? null,
+    ],
+    queryFn: ({ signal }) =>
+      fetchPoseObservationsInRange(artifactId!, currentTime!, nextObservationToNs!, signal),
+    enabled:
+      artifactId !== null &&
+      subjectId !== null &&
+      currentTime !== null &&
+      nextObservationToNs !== null &&
+      currentTime < nextObservationToNs &&
+      currentFrame === null &&
+      nextFrame === null &&
+      !playing &&
+      !subjectSwitching &&
+      !window.isPending &&
+      !window.isPlaceholderData,
+    staleTime: 30_000,
+  });
+  const nextObservedNs =
+    nextFrame !== null
+      ? BigInt(nextFrame.tRelNs)
+      : nextObservationRange.data?.find((item) => item.entityId === subjectId)?.firstObservedNs ?? null;
+  const hasCurrentFrame = currentFrame !== null;
+  useEffect(() => {
+    if (
+      matchFrame === null ||
+      subjectSwitching ||
+      window.isPending ||
+      window.isPlaceholderData ||
+      currentFrame !== null
+    ) return;
+    matchFrame.reportResolvedFrame("pose", {
+      identity: null,
+      canonicalTimeNs: null,
+      availability: "absent",
+    });
+  }, [currentFrame, matchFrame, subjectSwitching, window.isPending, window.isPlaceholderData]);
   const overlays = useMemo(
     () =>
       methodology.data?.algorithm
@@ -252,14 +310,18 @@ export function PoseViewer() {
     [stream?.skeleton_display_connections],
   );
 
-  // Publish the resolved subject so the pitch, metric tables and inspector
-  // follow the same entity. Committing it durably keeps the view shareable.
+  // Publish the resolved subject through MatchFrameContext so Field, metrics
+  // and the inspector follow the same durable player identity.
   const selectSubject = context?.selectSubject;
   useEffect(() => {
     if (selectedSubject === null && subjectId !== null) {
-      selectSubject?.(subjectId, { replace: true });
+      if (matchFrame) {
+        matchFrame.selectPlayer(subjectId, { replace: true, origin: "pose" });
+      } else {
+        selectSubject?.(subjectId, { replace: true });
+      }
     }
-  }, [selectSubject, selectedSubject, subjectId]);
+  }, [matchFrame, selectSubject, selectedSubject, subjectId]);
 
   const handleSubjectChange = async (nextSubjectId: string) => {
     if (nextSubjectId === subjectId) return;
@@ -269,11 +331,16 @@ export function PoseViewer() {
     const requestId = ++subjectSwitchRequest.current;
     setSubjectSwitchError(null);
     const observation = observed.observations.find((item) => item.entityId === nextSubjectId);
-    const fallbackTimeNs = context?.timeNs ?? committedTimeNs ?? canonical?.minNs ?? null;
+    const fallbackTimeNs =
+      matchFrame?.getCurrentTimeNs() ??
+      effectiveTimeNs(useAnalysisStore.getState()) ??
+      context?.timeNs ??
+      canonical?.minNs ??
+      null;
     if (fallbackTimeNs === null) return;
-    // RES-109 §12: a switch stops playback; say so instead of stopping silently.
-    setPausedBySwitch(useAnalysisStore.getState().playing);
-    useAnalysisStore.getState().beginSubjectSwitch(subjectId);
+    const state = useAnalysisStore.getState();
+    setPausedBySwitch(state.playing);
+    state.setPlaying(false);
     let resolvedObservation = observation;
     if (
       artifactId !== null &&
@@ -289,10 +356,10 @@ export function PoseViewer() {
         );
         resolvedObservation = rangeObservations.find((item) => item.entityId === nextSubjectId);
       } catch {
-        if (requestId !== subjectSwitchRequest.current) return;
-        useAnalysisStore.getState().finishSubjectSwitch();
-        subjectSwitchAbort.current = null;
-        setSubjectSwitchError("Could not resolve Pose observations. The previous subject is restored; select again to retry.");
+        if (requestId === subjectSwitchRequest.current) {
+          subjectSwitchAbort.current = null;
+          setSubjectSwitchError("Could not resolve Pose observations. The previous subject remains selected; select again to retry.");
+        }
         return;
       }
     }
@@ -303,8 +370,12 @@ export function PoseViewer() {
         context?.fromNs ?? null,
         context?.toNs ?? null,
       ) ?? fallbackTimeNs;
-    useAnalysisStore.getState().beginSubjectSwitch(subjectId, targetTimeNs);
-    context?.selectSubject(nextSubjectId, { targetTimeNs });
+    if (matchFrame) {
+      matchFrame.selectPlayer(nextSubjectId, { origin: "pose", targetTimeNs });
+    } else {
+      useAnalysisStore.getState().beginSubjectSwitch(subjectId, targetTimeNs);
+      context?.selectSubject(nextSubjectId, { targetTimeNs });
+    }
     subjectSwitchAbort.current = null;
   };
 
@@ -413,19 +484,35 @@ export function PoseViewer() {
           noObservationInRange
             ? "The selected identity remains selected; this subject has no exact Pose observation in the active range."
             : subjectObservation
-              ? `First observation ${formatClockNs(subjectObservation.firstObservedNs)} · last ${formatClockNs(subjectObservation.lastObservedNs)}.`
+              ? [
+                  nextObservedNs !== null && currentTime !== null && nextObservedNs > currentTime
+                    ? "Next observation " + formatClockNs(nextObservedNs) + "."
+                    : null,
+                  previousFrame
+                    ? "Previous source sample " + formatClockNs(BigInt(previousFrame.tRelNs)) + "."
+                    : null,
+                  "First observation " + formatClockNs(subjectObservation.firstObservedNs) +
+                    " · last " + formatClockNs(subjectObservation.lastObservedNs) + ".",
+                ].filter((detail): detail is string => detail !== null).join(" ")
               : "The selected identity remains unchanged; unavailable joints are never imputed or replaced."
         }
       />
     );
   }
 
-  const currentTime = throttledTimeNs;
-  const currentLandmarks = landmarksAt(selectedFrames, currentTime);
-  const currentFrameIndex = currentTime === null ? 0 : frameIndexAt(selectedFrames, currentTime);
-  const summary = summarizeFrame(
-    currentFrameIndex >= 0 ? (selectedFrames[currentFrameIndex] ?? null) : null,
-  );
+  const currentLandmarks = currentFrame?.landmarks ?? [];
+  const summary = summarizeFrame(currentFrame);
+  const jumpToNextFrame = () => {
+    if (nextObservedNs === null || subjectId === null) return;
+    const targetTimeNs = nextObservedNs;
+    if (matchFrame) {
+      matchFrame.seekCanonicalTime(targetTimeNs);
+    } else {
+      useAnalysisStore.getState().setPlaying(false);
+      useAnalysisStore.getState().commitTime(targetTimeNs);
+      context?.commitTime(targetTimeNs);
+    }
+  };
   const inspected = [...currentLandmarks].find(
     (landmark: PoseLandmark) => landmark.jointName === (selectedJoint ?? hoveredJoint),
   );
@@ -457,7 +544,7 @@ export function PoseViewer() {
         {playbackStatus === "buffering" && playing ? (
           <span data-testid="playback-buffering" className="text-quality-warning">BUFFERING · waiting for exact next chunk</span>
         ) : null}
-        {hasSubjectFrames ? (
+        {hasCurrentFrame ? (
           <span className="tabular">
             {summary.observedLandmarks} observed · {summary.unavailableLandmarks} unavailable
           </span>
@@ -466,19 +553,53 @@ export function PoseViewer() {
             Subject {subjectId ?? "not scoped"} not observed at the current frame
           </span>
         )}
-        {hasSubjectFrames && summary.meanErrorM !== null ? (
+        {hasCurrentFrame && currentFrame && currentTime !== null && BigInt(currentFrame.tRelNs) !== currentTime ? (
+          <span className="tabular">
+            Pose source frame @ {formatClockNs(BigInt(currentFrame.tRelNs))} · canonical playhead {formatClockNs(currentTime)}
+          </span>
+        ) : null}
+        {hasCurrentFrame && summary.meanErrorM !== null ? (
           <span className="tabular">
             mean provider p90 predicted error radius{" "}
             {formatMetricValue(summary.meanErrorM, "m").text}
           </span>
         ) : null}
       </header>
+      {currentTime !== null && !hasCurrentFrame ? (
+        <div
+          role="status"
+          data-testid="pose-frame-availability"
+          className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border-subtle bg-surface-1 px-3 py-2 text-[11px] text-quality-warning"
+        >
+          <span>
+            No valid Pose sample for {subjectId ?? "the selected subject"} at canonical {formatClockNs(currentTime)}.
+            {previousFrame ? " Previous source sample " + formatClockNs(BigInt(previousFrame.tRelNs)) + "." : ""}
+            {nextObservedNs !== null && nextObservedNs > currentTime
+              ? " Next source sample " + formatClockNs(nextObservedNs) + "."
+              : ""}
+            {" "}The player and playhead remain unchanged.
+          </span>
+          {nextObservedNs !== null && nextObservedNs > currentTime ? (
+            <button
+              type="button"
+              onClick={jumpToNextFrame}
+              className="t-control-compact rounded-control border border-border-subtle px-2 text-text-secondary hover:border-border-strong"
+            >
+              Go to next Pose sample
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       <div className="flex min-h-0 flex-1">
         <div
           className="relative min-h-0 flex-1"
           data-testid="pose-canvas"
           data-renderer="r3f"
           data-renderer-ready={rendererReady ? "true" : "false"}
+          data-selected-player-id={subjectId ?? ""}
+          data-canonical-time-ns={currentTime?.toString() ?? ""}
+          data-source-frame-ns={currentFrame ? String(currentFrame.tRelNs) : ""}
+          data-pose-availability={hasCurrentFrame ? "available" : "absent"}
           role="img"
           aria-label={
             allSubjects
@@ -510,6 +631,10 @@ export function PoseViewer() {
               showAngles={showAngles}
               showErrorRadii={showErrorRadii}
               onReady={() => setRendererReady(true)}
+              maxFrameGapNs={maxPoseFrameGapNs}
+              sourceStreamId={stream.stream_id}
+              sourceArtifactId={matchFrame?.poseSource?.artifactId ?? artifactId}
+              reportResolvedFrame={matchFrame?.reportResolvedFrame}
             />
           </Suspense>
         </div>

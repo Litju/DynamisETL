@@ -44,15 +44,13 @@ export function LabPage() {
 
   const durableTimeNs = tryParseNs(search.t_ns);
   const durableSubject = search.subject ?? null;
-  const durableEntity = search.entity ?? null;
   const durableView = search.view ?? "overview";
   useEffect(() => {
     hydrate({
       committedTimeNs: durableTimeNs,
-      selectedEntityId: durableEntity,
       focusedPanel: durableView,
     });
-  }, [hydrate, durableEntity, durableTimeNs, durableView]);
+  }, [hydrate, durableTimeNs, durableView]);
   useEffect(() => () => {
     useAnalysisStore.getState().resetTransient();
   }, [datasetId, sessionId]);

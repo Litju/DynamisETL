@@ -31,6 +31,7 @@ import {
 import { eventStreams } from "@/lib/capabilities";
 import type { ArtifactRef, DenseWindow, SessionDetail, StreamView } from "@/api/types";
 import { useAnalysisContext } from "@/lib/analysis-context";
+import { useMatchFrameContext } from "@/lib/match-frame-context";
 import { ApiError } from "@/lib/api/client";
 import {
   artifactQuery,
@@ -125,11 +126,12 @@ export function sessionTeams(session: SessionDetail | undefined): {
 
 /**
  * Field laboratory: PixiJS pitch replay over canonical tracking windows.
- * React owns the scene lifecycle and selection; the renderer owns frame-rate
- * updates (playhead subscription), so playback never triggers reconciliation.
+ * MatchFrameContext owns shared identity; the renderer owns frame-rate updates
+ * through the playhead subscription, so playback never triggers reconciliation.
  */
 export function PitchReplay() {
   const context = useAnalysisContext();
+  const matchFrame = useMatchFrameContext();
   const datasetId = context?.datasetId ?? null;
   const sessionId = context?.sessionId ?? null;
   const streamId = context?.streamId ?? null;
@@ -275,15 +277,22 @@ export function PitchReplay() {
     [eventWindow.data],
   );
 
-  // The selection callback must be stable: the renderer is created once per
-  // mount, and the durable context object changes on every URL commit.
-  const selectEntityRef = useRef(context?.selectEntity);
+  // The selection callback stays stable while the renderer is mounted; the
+  // context action itself follows the latest durable URL state.
+  const matchFrameRef = useRef(matchFrame);
+  const selectFieldEntityRef = useRef(context?.selectFieldEntity);
   useEffect(() => {
-    selectEntityRef.current = context?.selectEntity;
-  }, [context?.selectEntity]);
-  const handleSelectEntity = useCallback((objectId: string | null) => {
-    useAnalysisStore.getState().selectEntity(objectId);
-    selectEntityRef.current?.(objectId);
+    matchFrameRef.current = matchFrame;
+  }, [matchFrame]);
+  useEffect(() => {
+    selectFieldEntityRef.current = context?.selectFieldEntity;
+  }, [context?.selectFieldEntity]);
+  const handleSelectEntity = useCallback((objectId: string | null, objectType?: string | null) => {
+    if (matchFrameRef.current) {
+      matchFrameRef.current.selectTrackingObject(objectId, objectType);
+    } else {
+      selectFieldEntityRef.current?.(objectId);
+    }
   }, []);
 
   const window = useQuery({
@@ -470,13 +479,20 @@ function PitchView({
   teamOrder: readonly string[];
   teamLabels: ReadonlyMap<string, string>;
   entityLabels: ReadonlyMap<string, string>;
-  onSelectEntity: (objectId: string | null) => void;
+  onSelectEntity: (objectId: string | null, objectType?: string | null) => void;
 }) {
   const context = useAnalysisContext();
   const theme = useUiStore((state) => state.theme);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const rendererRef = useRef<PitchRendererHandle | null>(null);
-  const selectedEntityId = useAnalysisStore((state) => state.selectedEntityId);
+  const matchFrame = useMatchFrameContext();
+  const matchFrameRef = useRef(matchFrame);
+  useEffect(() => {
+    matchFrameRef.current = matchFrame;
+  }, [matchFrame]);
+  const selectedEntityId =
+    matchFrame?.selectedTrackingObjectId ?? context?.subjectId ?? context?.entityId ?? null;
+  const selectedEntityRef = useRef(selectedEntityId);
   const committedRangeNs = useAnalysisStore((state) => state.committedRangeNs);
   const [rendererReady, setRendererReady] = useState(false);
   const [layers, setLayers] = useState<PitchLayers>(DEFAULT_PITCH_LAYERS);
@@ -607,9 +623,24 @@ function PitchView({
     const index = exactFrameIndex(scene.frames, timeNs, scene.maxGapNs);
     const frame = index >= 0 ? scene.frames[index]! : null;
     const frameTime = frame?.tRelNs ?? null;
+    const host = hostRef.current;
+    if (host) host.dataset.canonicalTimeNs = timeNs === null ? "" : timeNs.toString();
     if (!force && frameTime === scene.drawnFrameTime) return;
+    const currentMatchFrame = matchFrameRef.current;
+    if (currentMatchFrame) {
+      const identity = frameTime === null
+        ? null
+        : (currentMatchFrame.trackingSource?.artifactId ?? currentMatchFrame.trackingSource?.streamId ?? "tracking") +
+          ":" + frameTime;
+      const availability = frame === null ? "absent" : "available";
+      currentMatchFrame.reportResolvedFrame("tracking", {
+        identity,
+        canonicalTimeNs: frameTime === null ? null : BigInt(Math.trunc(frameTime)),
+        availability,
+      });
+    }
     scene.drawnFrameTime = frameTime;
-    const selected = useAnalysisStore.getState().selectedEntityId;
+    const selected = selectedEntityRef.current;
     renderer.setFrame(frame?.entities ?? [], scene.groups, selected);
     const overlay = tacticalOverlayAt(
       scene.indexes,
@@ -621,9 +652,9 @@ function PitchView({
     renderer.setTacticalOverlay(overlay.overlay);
     // Machine-readable evidence of what the canvas shows: the drawn entity
     // frame and the overlay's frame are the same canonical time by construction.
-    const host = hostRef.current;
     if (host) {
       host.dataset.drawnFrameNs = frameTime === null ? "" : String(frameTime);
+      host.dataset.sourceFrameNs = frameTime === null ? "" : String(frameTime);
       host.dataset.overlayHulls = String(overlay.overlay.hulls.length);
       host.dataset.overlayTerritoryCells = String(overlay.overlay.territoryCells.length);
       host.dataset.overlayInfluenceCells = String(overlay.overlay.influenceCells.length);
@@ -631,12 +662,18 @@ function PitchView({
   }, []);
 
   useEffect(() => {
+    if (selectedEntityRef.current === selectedEntityId) return;
+    selectedEntityRef.current = selectedEntityId;
+    drawAt(effectiveTimeNs(useAnalysisStore.getState()), true);
+  }, [drawAt, selectedEntityId]);
+
+  useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
     let disposed = false;
     let renderer: PitchRendererHandle | null = null;
     setRendererReady(false);
-    void createPitchRenderer(host, palette, (objectId) => onSelectEntity(objectId)).then((created) => {
+    void createPitchRenderer(host, palette, (objectId, objectType) => onSelectEntity(objectId, objectType)).then((created) => {
       if (disposed) {
         created.destroy();
         return;
@@ -647,9 +684,9 @@ function PitchView({
       created.setEvents(sceneRef.current.events);
       const current = useAnalysisStore.getState();
       created.setTrail(
-        trailForRange(sceneRef.current.frames, current.committedRangeNs, current.selectedEntityId),
+        trailForRange(sceneRef.current.frames, current.committedRangeNs, selectedEntityRef.current),
         sceneRef.current.groups,
-        current.selectedEntityId,
+        selectedEntityRef.current,
       );
       drawAt(effectiveTimeNs(current), true);
       setRendererReady(true);
@@ -680,7 +717,6 @@ function PitchView({
     return useAnalysisStore.subscribe((state, previous) => {
       const next = effectiveTimeNs(state);
       if (next !== effectiveTimeNs(previous)) drawAt(next);
-      if (state.selectedEntityId !== previous.selectedEntityId) drawAt(next, true);
     });
   }, [drawAt]);
 
@@ -711,7 +747,7 @@ function PitchView({
     let lastEmit = 0;
     return useAnalysisStore.subscribe((state, previous) => {
       const next = effectiveTimeNs(state);
-      if (next === effectiveTimeNs(previous) && state.selectedEntityId === previous.selectedEntityId) return;
+      if (next === effectiveTimeNs(previous)) return;
       // The DOM summary is a low-frequency text alternative, not a per-frame
       // render: it updates at most five times per second during playback.
       const now = performance.now();

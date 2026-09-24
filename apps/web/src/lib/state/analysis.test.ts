@@ -12,8 +12,10 @@ function reset() {
     playing: false,
     playbackRate: 1,
     nominalRateHz: null,
-    selectedEntityId: null,
     hoveredEntityId: null,
+    selectedTeamId: null,
+    selectedTacticalObjectId: null,
+    hoveredTacticalObjectId: null,
     hoveredJoint: null,
     focusedPanel: "overview",
     interacting: false,
@@ -64,7 +66,6 @@ describe("transient analysis state spine", () => {
     store.hydrate({
       committedTimeNs: 42n,
       committedRangeNs: { fromNs: 1n, toNs: 2n },
-      selectedEntityId: "SC-P1",
       focusedPanel: "pose",
     });
     expect(useAnalysisStore.getState().playheadNs).toBe(42n);
@@ -73,6 +74,9 @@ describe("transient analysis state spine", () => {
     store.setPlaying(true);
     store.setNominalRate(25);
     store.hoverEntity("entity-1");
+    store.selectTeam("home");
+    store.selectTacticalObject("zone-1");
+    store.hoverTacticalObject("zone-2");
     store.hoverJoint("knee");
     store.selectJoint("knee");
     useAnalysisStore.getState().resetTransient();
@@ -82,11 +86,12 @@ describe("transient analysis state spine", () => {
     expect(state.playheadNs).toBeNull();
     expect(state.nominalRateHz).toBeNull();
     expect(state.hoveredEntityId).toBeNull();
+    expect(state.selectedTeamId).toBeNull();
+    expect(state.selectedTacticalObjectId).toBeNull();
+    expect(state.hoveredTacticalObjectId).toBeNull();
     expect(state.hoveredJoint).toBeNull();
     expect(state.selectedJoint).toBeNull();
-    // Committed identity survives transient resets.
     expect(state.committedTimeNs).toBe(42n);
-    expect(state.selectedEntityId).toBe("SC-P1");
   });
 
   it("stops and clears a subject switch before applying its resolved target time", () => {
@@ -95,7 +100,6 @@ describe("transient analysis state spine", () => {
     store.setPlayhead(18n);
     store.setPlaying(true);
     store.setBrushRange({ fromNs: 1n, toNs: 2n });
-    store.selectEntity("SC-P1");
     store.hoverEntity("SC-P1");
     store.selectJoint("nose");
     store.beginSubjectSwitch("SC-P1");
@@ -105,7 +109,6 @@ describe("transient analysis state spine", () => {
     expect(state.playheadNs).toBe(18n);
     expect(state.committedTimeNs).toBe(17n);
     expect(state.brushRangeNs).toBeNull();
-    expect(state.selectedEntityId).toBeNull();
     expect(state.hoveredEntityId).toBeNull();
     expect(state.selectedJoint).toBeNull();
     expect(state.subjectSwitching).toBe(true);

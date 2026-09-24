@@ -25,6 +25,7 @@ import {
   boundsOf,
   cameraFor,
   landmarksAt,
+  poseFrameIndexAt,
   toViewerPoint,
   type AngleDefinition,
   type CameraMode,
@@ -38,6 +39,7 @@ import {
   type ViewerPoint,
   withoutDuplicateAngles,
 } from "@/components/pose/pose-model";
+import type { MatchFrameSourceKind, ResolvedMatchFrame } from "@/lib/match-frame-context";
 import { useAnalysisStore } from "@/lib/state/analysis";
 
 export const JOINT_COLOR = "#9fe3f2";
@@ -114,6 +116,10 @@ export interface PoseSceneProps {
   readonly selectedSubjectId?: string | null;
   /** Clicking a subject in the all-subject world selects it as the subject. */
   readonly onSelectSubject?: (subjectId: string) => void;
+  readonly maxFrameGapNs?: number;
+  readonly sourceStreamId?: string;
+  readonly sourceArtifactId?: string | null;
+  readonly reportResolvedFrame?: ((kind: MatchFrameSourceKind, frame: ResolvedMatchFrame) => void) | undefined;
 }
 
 interface LandmarkDescriptor {
@@ -195,7 +201,7 @@ function PoseStage({ subjects, bounds, ...props }: PoseSceneProps & {
     const subject = subjects[0];
     if (!subject) return;
     const time = useAnalysisStore.getState().playheadNs ?? useAnalysisStore.getState().committedTimeNs;
-    const landmarks = landmarksAt(subject.frames, time);
+    const landmarks = landmarksAt(subject.frames, time, props.maxFrameGapNs);
     let desired: readonly [number, number, number] | null = null;
     const centre = props.coordinateMode === "body_local" ? bodyLocalCentre(landmarks) : WORLD_ORIGIN;
     if (cameraMode === "follow_subject") {
@@ -239,7 +245,7 @@ function PoseStage({ subjects, bounds, ...props }: PoseSceneProps & {
   );
 }
 
-function PoseHotPath({ subjects, overlays, providerConnections, showProviderSkeleton, showTorsoCue, showFootContact, showHandContact, showHeadNeck, showArticulationAngles, showSegments, showAngles, showErrorRadii, coordinateMode, selectedSubjectId = null, onSelectSubject, sceneRadius }: PoseSceneProps & {
+function PoseHotPath({ subjects, overlays, providerConnections, showProviderSkeleton, showTorsoCue, showFootContact, showHandContact, showHeadNeck, showArticulationAngles, showSegments, showAngles, showErrorRadii, coordinateMode, selectedSubjectId = null, onSelectSubject, maxFrameGapNs, sourceStreamId, sourceArtifactId, reportResolvedFrame, sceneRadius }: PoseSceneProps & {
   readonly subjects: readonly PoseSubjectFrames[];
   readonly sceneRadius: number;
 }) {
@@ -256,6 +262,10 @@ function PoseHotPath({ subjects, overlays, providerConnections, showProviderSkel
   const errorMesh = useInstancedGlyph(descriptors.length, true);
   const currentRef = useRef<CurrentLandmarks>([]);
   const centresRef = useRef<Array<{ readonly xM: number; readonly yM: number }>>([]);
+  const lastResolvedFrameKey = useRef("unknown");
+  useEffect(() => {
+    lastResolvedFrameKey.current = "unknown";
+  }, [sourceArtifactId, sourceStreamId]);
   const identity = useMemo(() => new Quaternion(), []);
   const matrix = useMemo(() => new Matrix4(), []);
   const position = useMemo(() => new Vector3(), []);
@@ -293,15 +303,36 @@ function PoseHotPath({ subjects, overlays, providerConnections, showProviderSkel
   const articulationAngles = useMemo(() => withoutDuplicateAngles(ARTICULATION_ANGLE_CUES, overlays.angles), [overlays.angles]);
   useFrame(() => {
     const time = useAnalysisStore.getState().playheadNs ?? useAnalysisStore.getState().committedTimeNs;
+    const focusSubject = focusIndex >= 0 ? subjects[focusIndex] : undefined;
+    const focusFrameIndex = focusSubject
+      ? poseFrameIndexAt(focusSubject.frames, time, maxFrameGapNs ?? Number.POSITIVE_INFINITY)
+      : -1;
+    const focusFrame = focusFrameIndex >= 0 ? focusSubject?.frames[focusFrameIndex] ?? null : null;
     const current = subjects.map((subject, subjectIndex) => {
       const byName = new Map<string, PoseLandmark>();
-      for (const landmark of landmarksAt(subject.frames, time)) byName.set(landmark.jointName, landmark);
+      const frameIndex = poseFrameIndexAt(subject.frames, time, maxFrameGapNs ?? Number.POSITIVE_INFINITY);
+      const frame = frameIndex >= 0 ? (subject.frames[frameIndex] ?? null) : null;
+      for (const landmark of frame?.landmarks ?? []) byName.set(landmark.jointName, landmark);
       const centre = coordinateMode === "body_local"
         ? bodyLocalCentre([...byName.values()], centresRef.current[subjectIndex] ?? null)
         : WORLD_ORIGIN;
       centresRef.current[subjectIndex] = centre;
       return { landmarks: byName, centre };
     });
+    if (reportResolvedFrame) {
+      const identity = focusFrame === null
+        ? null
+        : (sourceArtifactId ?? sourceStreamId ?? "pose") + ":" + focusFrame.subjectId + ":" + focusFrame.tRelNs;
+      const key = (sourceArtifactId ?? sourceStreamId ?? "pose") + ":" + (identity ?? "absent");
+      if (key !== lastResolvedFrameKey.current) {
+        lastResolvedFrameKey.current = key;
+        reportResolvedFrame("pose", {
+          identity,
+          canonicalTimeNs: focusFrame === null ? null : BigInt(Math.trunc(focusFrame.tRelNs)),
+          availability: focusFrame === null ? "absent" : "available",
+        });
+      }
+    }
     currentRef.current = current;
     for (let index = 0; index < descriptors.length; index += 1) {
       const descriptor = descriptors[index]!;

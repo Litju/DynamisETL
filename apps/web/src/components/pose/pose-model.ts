@@ -198,13 +198,42 @@ export function frameIndexAt(frames: readonly PoseFrame[], tRelNs: bigint): numb
   return result;
 }
 
-/** Landmarks of the frame at or before the requested time (no interpolation). */
+/** Resolve a real frame at or before the time, within the source gap allowance. */
+export function poseFrameIndexAt(
+  frames: readonly PoseFrame[],
+  tRelNs: bigint | null,
+  maxGapNs: number,
+): number {
+  if (tRelNs === null) return nextFrameIndexAt(frames, 0n);
+  for (let index = frameIndexAt(frames, tRelNs); index >= 0; index -= 1) {
+    if (Number(tRelNs) - frames[index]!.tRelNs > maxGapNs) break;
+    if (frames[index]!.observed) return index;
+  }
+  return -1;
+}
+
+/** First real frame at or after the requested time, or -1 when none is loaded. */
+export function nextFrameIndexAt(frames: readonly PoseFrame[], tRelNs: bigint): number {
+  const target = Number(tRelNs);
+  let low = 0;
+  let high = frames.length;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (frames[middle]!.tRelNs < target) low = middle + 1;
+    else high = middle;
+  }
+  while (low < frames.length && !frames[low]!.observed) low += 1;
+  return low < frames.length ? low : -1;
+}
+
+/** Landmarks of a real frame at or before the requested time; no interpolation. */
 export function landmarksAt(
   frames: readonly PoseFrame[],
   tRelNs: bigint | null,
+  maxGapNs = Number.POSITIVE_INFINITY,
 ): readonly PoseLandmark[] {
   if (frames.length === 0) return [];
-  const index = tRelNs === null ? 0 : frameIndexAt(frames, tRelNs);
+  const index = poseFrameIndexAt(frames, tRelNs, maxGapNs);
   return index < 0 ? [] : (frames[index]?.landmarks ?? []);
 }
 
