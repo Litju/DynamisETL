@@ -163,9 +163,10 @@ before and after audit sets use the identical harness (`e2e-real/audit-capture.s
 
 - **K-01** Pose all-subject playback decodes JSON chunks on the main thread (measured above);
   Arrow-worker transport for Pose is recommended with RES-111.
-- **SCI-01** Positions, possession and SkillCorner attacking direction exist in Bronze but are not
-  part of the RES-110 capability authority; phase-, unit- and zone-based tactical metrics need a
-  frozen contract before they can be served. No such value is shown or implied.
+- **SCI-01** RES-110 now freezes and validates V3 position-role, source-possession, SkillCorner
+  attacking-direction, normalized-frame and tactical-geometry contracts. These V3 series are not
+  surfaced in the RES-112 Tactical Analysis pane. Provider phases remain unavailable; formation,
+  phase, pressing and transition labels are not asserted.
 - Development servers run React StrictMode, which double-mounts once on load (one duplicate
   request in dev); the production build shows none.
 - Fixture test `res109-real-data.spec.ts` stays env-gated (skipped) as in RES-109; the no-mock

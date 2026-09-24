@@ -35,13 +35,7 @@ For each included player, the processor constructs the nearest-point Voronoi cel
 
 ## Level C: transparent influence model
 
-The frozen model is a bounded grid, default 53 × 35 cells, over the pitch rectangle. For player `i`, position `p_i`, velocity `v_i`, reaction time `r`, maximum speed `s`, and acceleration `a`, the arrival estimate at grid point `q` is:
-
-```text
-t_i(q) = r + solve_min_t>=0 ||q - (p_i + v_i*t)|| <= 0.5*a*t^2 + s*t
-```
-
-The implementation uses the deterministic closed-form approximation `r + distance(p_i,q) / max(s, epsilon)` when velocity is absent and a bounded forward projection plus acceleration cap when velocity is available. These assumptions are parameters, not source facts. The minimum arrival time across a team controls a grid cell; ties use stable object id. Team influence percentage is controlled-cell count divided by grid-cell count, and a selected-player influence area is controlled-cell count times cell area. A pressure-on-ball result is available only when a ball-carrier identity is explicitly resolvable; proximity to the ball alone is not possession.
+Level C is a bounded `MODEL_ESTIMATED` arrival-time grid. Its exact 21 × 14 default, parameter values, velocity authority, arrival-time equations, and tie-breaking rules are frozen in [`LEVEL-C-CONTRACT.md`](LEVEL-C-CONTRACT.md). This document defers to that contract; a pressure-on-ball result remains unavailable without a source-resolved ball-carrier identity.
 
 ## Level D: source-supported event intelligence
 

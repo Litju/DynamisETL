@@ -477,7 +477,7 @@ performance receipt `output/playwright/res-112/performance.json`; preparation re
 | S-07 | `587af7b`, `ff4d245` | `test_serving_postgres.py`; `tactical.spec.ts` team names | Field/Pose finals |
 | S-08 | `ad1df16` | stream link opens its own laboratory | — |
 | R-01 | `ac43f3c` | `tactical-pane-model.test.ts`; `tactical.spec.ts` at 300.000 s | — |
-| R-02 | `ba0ee31` | after-audit: no aborted/reissued chunk requests at load; fixture playback suites | — |
+| R-02 | `ba0ee31` | fixture playback suites; after-audit load logs include aborted tracking and tactical window requests, followed by successful route windows | — |
 | R-03 | `89a5616` | `performance.json`: DFL combined overlays 2 long tasks / 10 s (production build) | — |
 | R-04 | `0963876` | `/api/catalog/datasets` ~20 ms warm (was ~1.8 s) | — |
 | R-05 | `546fb17`, `89f7d72` | second preparation run READY | — |
