@@ -333,7 +333,7 @@ TRACKING_ACCEPTANCE_PARAMETERS: dict[str, Any] = {
     "position_domain": "planar",
     # Athletes only: the ball shares the tracking stream but is not a locomotor
     # entity, so it never receives distance/speed/effort metrics.
-    "entity_object_types": ["player"],
+    "entity_object_types": ["player", "goalkeeper"],
     "derivative": {
         "filter": {
             "family": "none",

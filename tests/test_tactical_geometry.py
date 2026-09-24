@@ -52,6 +52,24 @@ def test_symmetric_geometry_known_answer() -> None:
     assert row["stretch_index"] == pytest.approx(0.1)
 
 
+def test_expansion_rate_starts_after_the_first_finite_extents() -> None:
+    table = tracking_table(
+        [
+            {"object_id": "h1", "t_rel_ns": 0, "x_m": 0.0, "y_m": 0.0},
+            {"object_id": "h1", "t_rel_ns": 1_000_000_000, "x_m": 0.0, "y_m": 0.0},
+            {"object_id": "h2", "t_rel_ns": 1_000_000_000, "x_m": 2.0, "y_m": 3.0},
+            {"object_id": "h1", "t_rel_ns": 2_000_000_000, "x_m": 0.0, "y_m": 0.0},
+            {"object_id": "h2", "t_rel_ns": 2_000_000_000, "x_m": 3.0, "y_m": 5.0},
+        ]
+    )
+    rows = process_tactical_geometry(table).series[0].table.to_pylist()
+    assert rows[0]["length_m"] is None
+    assert rows[1]["expansion_rate_x_m_s"] is None
+    assert rows[1]["expansion_rate_y_m_s"] is None
+    assert rows[2]["expansion_rate_x_m_s"] == pytest.approx(1.0)
+    assert rows[2]["expansion_rate_y_m_s"] == pytest.approx(2.0)
+
+
 def test_team_and_player_quality_fail_closed_for_missing_opponent() -> None:
     table = tracking_table(
         [

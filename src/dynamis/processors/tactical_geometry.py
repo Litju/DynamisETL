@@ -454,24 +454,22 @@ def process_tactical_geometry(
             )
             relation_rows.append(relation_row)
 
-    for rows in (team_rows,):
-        previous: dict[str, tuple[int, float, float]] = {}
-        for row in rows:
-            group_id = str(row["group_id"])
-            current = (
-                int(row["t_rel_ns"]),
-                float(row["length_m"] or 0.0),
-                float(row["width_m"] or 0.0),
-            )
-            before = previous.get(group_id)
-            row["expansion_rate_x_m_s"] = None
-            row["expansion_rate_y_m_s"] = None
-            if before is not None:
-                delta_s = (current[0] - before[0]) / 1_000_000_000
-                if delta_s > 0 and row["length_m"] is not None and row["width_m"] is not None:
-                    row["expansion_rate_x_m_s"] = (current[1] - before[1]) / delta_s
-                    row["expansion_rate_y_m_s"] = (current[2] - before[2]) / delta_s
-            previous[group_id] = current
+    previous: dict[str, tuple[int, float, float] | None] = {}
+    for row in team_rows:
+        group_id = str(row["group_id"])
+        row["expansion_rate_x_m_s"] = None
+        row["expansion_rate_y_m_s"] = None
+        if row["length_m"] is None or row["width_m"] is None:
+            previous[group_id] = None
+            continue
+        current = (int(row["t_rel_ns"]), float(row["length_m"]), float(row["width_m"]))
+        before = previous.get(group_id)
+        if before is not None:
+            delta_s = (current[0] - before[0]) / 1_000_000_000
+            if delta_s > 0:
+                row["expansion_rate_x_m_s"] = (current[1] - before[1]) / delta_s
+                row["expansion_rate_y_m_s"] = (current[2] - before[2]) / delta_s
+        previous[group_id] = current
 
     spec = ProcessorSpec(
         algorithm_id=ALGORITHM_ID,

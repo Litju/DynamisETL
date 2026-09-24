@@ -436,7 +436,6 @@ def process_tactical_shape(
     pitch_width = float(resolved["pitch_width_m"])
     minimum_x, maximum_x = -pitch_length / 2, pitch_length / 2
     minimum_y, maximum_y = -pitch_width / 2, pitch_width / 2
-    gap_by_frame: dict[tuple[int, str], dict[str, float | None]] = {}
 
     for frame in frames:
         source_possession = possession_by_time.get((frame.trial_id, frame.t_rel_ns))
@@ -536,11 +535,6 @@ def process_tactical_shape(
                 if outfield
                 else None
             )
-            gap_by_frame[(frame.t_rel_ns, group_id)] = {
-                "def_mid": def_mid,
-                "mid_att": mid_att,
-                "block_depth": block_depth,
-            }
             for row in role_rows[-len(unit_centres) :]:
                 row["def_mid_gap_m"] = def_mid
                 row["mid_att_gap_m"] = mid_att

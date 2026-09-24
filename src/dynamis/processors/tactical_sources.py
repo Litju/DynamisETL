@@ -28,16 +28,6 @@ _POSSESSION_SCHEMA = pa.schema(
         pa.field("measurement_class", pa.string(), nullable=False),
     ]
 )
-_SKILL_CORNER_GROUPS = {
-    "goalkeeper": "GK",
-    "central defender": "DEF",
-    "full back": "DEF",
-    "midfield": "MID",
-    "center forward": "ATT",
-    "wide attacker": "ATT",
-}
-
-
 @dataclass(frozen=True, slots=True)
 class TacticalSourceAuthority:
     role_by_player: dict[str, str]

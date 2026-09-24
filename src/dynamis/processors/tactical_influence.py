@@ -181,9 +181,11 @@ def process_tactical_influence(
     resolved = dict(INFLUENCE_PARAMETERS)
     if parameters:
         resolved.update(parameters)
-    for name in ("reaction_time_s", "max_speed_m_s", "max_acceleration_m_s2"):
+    for name in ("reaction_time_s", "max_acceleration_m_s2"):
         if float(resolved[name]) < 0:
             raise ValueError(f"{ALGORITHM_ID}: {name} must be non-negative")
+    if float(resolved["max_speed_m_s"]) <= 0:
+        raise ValueError(f"{ALGORITHM_ID}: max_speed_m_s must be positive")
     if int(resolved["grid_x"]) < 1 or int(resolved["grid_y"]) < 1:
         raise ValueError(f"{ALGORITHM_ID}: grid dimensions must be positive")
     if int(resolved["grid_interval_ns"]) <= 0:

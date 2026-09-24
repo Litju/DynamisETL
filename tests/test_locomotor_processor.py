@@ -329,21 +329,29 @@ def test_declared_entity_object_types_exclude_the_ball() -> None:
     table = _tracking_table(
         {
             "player-a": (2.0 * times, np.zeros(samples)),
+            "goalkeeper-a": (3.0 * times, np.zeros(samples)),
             "ball": (20.0 * times, np.zeros(samples)),
         }
     )
-    kinds = ["ball" if value == "ball" else "player" for value in table["object_id"].to_pylist()]
+    kinds = [
+        "ball" if value == "ball" else "goalkeeper" if value == "goalkeeper-a" else "player"
+        for value in table["object_id"].to_pylist()
+    ]
     table = table.set_column(
         table.schema.get_field_index("object_type"), "object_type", pa.array(kinds)
     )
     everything = process_locomotor(table, parameters=_planar_parameters())
-    assert {metric.entity_id for metric in everything.metrics} == {"player-a", "ball"}
+    assert {metric.entity_id for metric in everything.metrics} == {
+        "player-a",
+        "goalkeeper-a",
+        "ball",
+    }
 
     athletes = process_locomotor(
-        table, parameters=_planar_parameters(entity_object_types=["player"])
+        table, parameters=_planar_parameters(entity_object_types=["player", "goalkeeper"])
     )
-    assert {metric.entity_id for metric in athletes.metrics} == {"player-a"}
-    assert athletes.diagnostics["entity_object_types"] == ["player"]
+    assert {metric.entity_id for metric in athletes.metrics} == {"player-a", "goalkeeper-a"}
+    assert athletes.diagnostics["entity_object_types"] == ["player", "goalkeeper"]
     assert athletes.spec.parameters_hash != everything.spec.parameters_hash
     with pytest.raises(ValueError, match="no object of the declared"):
         process_locomotor(table, parameters=_planar_parameters(entity_object_types=["official"]))
@@ -357,8 +365,8 @@ def test_tracking_acceptance_parameters_are_athletes_only() -> None:
         TRACKING_ACCEPTANCE_PARAMETERS,
     )
 
-    assert TRACKING_ACCEPTANCE_PARAMETERS["entity_object_types"] == ["player"]
-    assert SKILLCORNER_ACCEPTANCE_PARAMETERS["entity_object_types"] == ["player"]
+    assert TRACKING_ACCEPTANCE_PARAMETERS["entity_object_types"] == ["player", "goalkeeper"]
+    assert SKILLCORNER_ACCEPTANCE_PARAMETERS["entity_object_types"] == ["player", "goalkeeper"]
 
 
 def test_step_speed_gate_can_exclude_implausible_steps_from_distance() -> None:

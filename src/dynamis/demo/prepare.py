@@ -553,7 +553,8 @@ def _ball_ids(resolved: Settings, refs: list[SilverStreamRef]) -> set[str]:
         table = pq.read_table(
             resolved.dataset_root / ref.relative_path, columns=["object_id", "object_type"]
         )
-        mask = pc.call_function("not_equal", [table["object_type"], pa.scalar("player")])
+        athletes = pc.is_in(table["object_type"], value_set=pa.array(["player", "goalkeeper"]))
+        mask = pc.invert(athletes)
         ids.update(str(value) for value in table.filter(mask)["object_id"].unique().to_pylist())
     return ids
 

@@ -107,3 +107,11 @@ def test_influence_is_bounded_and_discloses_model_class() -> None:
         for row in players
     )
     assert math.isfinite(result.series[2].table.to_pylist()[0]["arrival_time_s"])
+
+
+def test_influence_rejects_zero_maximum_speed() -> None:
+    with pytest.raises(ValueError, match="max_speed_m_s must be positive"):
+        process_tactical_influence(
+            tracking_table([{"object_id": "p", "x_m": 0.0, "y_m": 0.0}]),
+            parameters={"max_speed_m_s": 0},
+        )
