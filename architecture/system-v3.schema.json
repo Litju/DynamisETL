@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dynamisdata.local/architecture/system-v3.schema.json",
+  "title": "MatchLab V3 renderer contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema", "contract_id", "version", "status", "scope", "authorities",
+    "technology", "state_ownership", "match_frame_context", "pitch", "layers",
+    "source_alignment", "worker_data_plane", "scalar_fields", "interaction",
+    "migration", "acceptance", "adr_ids"
+  ],
+  "properties": {
+    "$schema": { "type": "string", "minLength": 1 },
+    "contract_id": { "type": "string", "enum": ["dynamisdata-matchlab-rendering"] },
+    "version": { "type": "string", "enum": ["3.0.0"] },
+    "status": { "type": "string", "enum": ["frozen"] },
+    "scope": { "type": "string", "minLength": 1 },
+    "authorities": {
+      "type": "object", "additionalProperties": false,
+      "required": ["scientific", "provenance_rights", "server_data", "transient_state", "frame_rendering"],
+      "properties": {
+        "scientific": { "type": "string", "minLength": 1 },
+        "provenance_rights": { "type": "string", "minLength": 1 },
+        "server_data": { "type": "string", "minLength": 1 },
+        "transient_state": { "type": "string", "minLength": 1 },
+        "frame_rendering": { "type": "string", "minLength": 1 }
+      }
+    },
+    "technology": {
+      "type": "object", "additionalProperties": false,
+      "required": ["engine", "react_binding", "helpers", "canvas_count", "multi_view", "initial_backend", "webgpu_gate", "prohibited"],
+      "properties": {
+        "engine": { "type": "string", "enum": ["Three.js"] },
+        "react_binding": { "type": "string", "enum": ["React Three Fiber"] },
+        "helpers": { "type": "string", "enum": ["Drei"] },
+        "canvas_count": { "type": "integer", "enum": [1] },
+        "multi_view": { "type": "string", "minLength": 1 },
+        "initial_backend": { "type": "string", "enum": ["WebGL2"] },
+        "webgpu_gate": { "type": "string", "minLength": 1 },
+        "prohibited": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "state_ownership": {
+      "type": "object", "additionalProperties": false,
+      "required": ["durable_context", "server_data", "transient_interaction", "frame_cadence", "context_role"],
+      "properties": {
+        "durable_context": { "type": "string", "minLength": 1 },
+        "server_data": { "type": "string", "minLength": 1 },
+        "transient_interaction": { "type": "string", "minLength": 1 },
+        "frame_cadence": { "type": "string", "minLength": 1 },
+        "context_role": { "type": "string", "minLength": 1 }
+      }
+    },
+    "match_frame_context": {
+      "type": "object", "additionalProperties": false,
+      "required": ["owns", "canonical_time", "player_identity", "tracking_resolution", "pose_resolution", "deep_link"],
+      "properties": {
+        "owns": { "$ref": "#/$defs/stringArray" },
+        "canonical_time": { "type": "string", "minLength": 1 },
+        "player_identity": { "type": "string", "minLength": 1 },
+        "tracking_resolution": { "type": "string", "minLength": 1 },
+        "pose_resolution": { "type": "string", "minLength": 1 },
+        "deep_link": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "pitch": {
+      "type": "object", "additionalProperties": false,
+      "required": ["geometry_source", "missing_geometry", "coordinate_frame", "markings"],
+      "properties": {
+        "geometry_source": { "type": "string", "minLength": 1 },
+        "missing_geometry": { "type": "string", "minLength": 1 },
+        "coordinate_frame": { "type": "string", "minLength": 1 },
+        "markings": { "type": "string", "minLength": 1 }
+      }
+    },
+    "layers": {
+      "type": "array", "minItems": 5,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "responsibility", "independently_toggleable"],
+        "properties": {
+          "id": { "type": "string", "enum": ["PitchLayer", "TrackingLayer", "TacticalLayer", "PoseLayer", "ContextLayer"] },
+          "responsibility": { "type": "string", "minLength": 1 },
+          "independently_toggleable": { "type": "boolean" }
+        }
+      }
+    },
+    "source_alignment": {
+      "type": "array", "minItems": 3,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["mode", "rule", "scientific_input_eligible"],
+        "properties": {
+          "mode": { "type": "string", "enum": ["source_native", "tracking_anchored_display", "display_grounded_vertical"] },
+          "rule": { "type": "string", "minLength": 1 },
+          "scientific_input_eligible": { "type": "boolean" }
+        }
+      }
+    },
+    "worker_data_plane": {
+      "type": "object", "additionalProperties": false,
+      "required": ["transport", "components", "prepared_outputs", "ownership", "rule"],
+      "properties": {
+        "transport": { "type": "string", "minLength": 1 },
+        "components": { "$ref": "#/$defs/stringArray" },
+        "prepared_outputs": { "$ref": "#/$defs/stringArray" },
+        "ownership": { "type": "string", "minLength": 1 },
+        "rule": { "type": "string", "minLength": 1 }
+      }
+    },
+    "scalar_fields": {
+      "type": "object", "additionalProperties": false,
+      "required": ["input", "gpu_representation", "color_domain", "metric_authority", "elevation"],
+      "properties": {
+        "input": { "$ref": "#/$defs/stringArray" },
+        "gpu_representation": { "$ref": "#/$defs/stringArray" },
+        "color_domain": { "type": "string", "minLength": 1 },
+        "metric_authority": { "type": "string", "minLength": 1 },
+        "elevation": { "type": "string", "minLength": 1 }
+      }
+    },
+    "interaction": {
+      "type": "object", "additionalProperties": false,
+      "required": ["selection_authority", "identity_mapping", "absence", "hover", "accessibility"],
+      "properties": {
+        "selection_authority": { "type": "string", "minLength": 1 },
+        "identity_mapping": { "type": "string", "minLength": 1 },
+        "absence": { "type": "string", "minLength": 1 },
+        "hover": { "type": "string", "minLength": 1 },
+        "accessibility": { "type": "string", "minLength": 1 }
+      }
+    },
+    "migration": {
+      "type": "object", "additionalProperties": false,
+      "required": ["entry_sha", "single_worktree", "atomic_commits", "steps", "stop_rule"],
+      "properties": {
+        "entry_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "single_worktree": { "type": "boolean", "enum": [true] },
+        "atomic_commits": { "type": "boolean", "enum": [true] },
+        "steps": {
+          "type": "array", "minItems": 12,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["id", "gate"],
+            "properties": {
+              "id": { "type": "integer", "exclusiveMinimum": 0 },
+              "gate": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "stop_rule": { "type": "string", "minLength": 1 }
+      }
+    },
+    "acceptance": {
+      "type": "object", "additionalProperties": false,
+      "required": ["contract", "fixture", "real_skillcorner", "parity", "benchmark", "user_review"],
+      "properties": {
+        "contract": { "type": "string", "minLength": 1 },
+        "fixture": { "type": "string", "minLength": 1 },
+        "real_skillcorner": { "type": "string", "minLength": 1 },
+        "parity": { "type": "string", "minLength": 1 },
+        "benchmark": { "type": "string", "minLength": 1 },
+        "user_review": { "type": "string", "minLength": 1 }
+      }
+    },
+    "adr_ids": { "$ref": "#/$defs/stringArray" }
+  },
+  "$defs": {
+    "stringArray": {
+      "type": "array", "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  }
+}
