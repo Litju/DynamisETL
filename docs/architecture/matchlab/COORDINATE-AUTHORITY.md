@@ -6,6 +6,8 @@ Tracking and Body Pose are independent SkillCorner model products. Both retain M
 
 Their shared player ID and canonical match clock permit identity/time joins. They do not establish equal coordinates, identical sample rates or a zero residual. Never snap Pose to tracking, scale or rotate a source frame, interpolate an absent scientific sample, or remove an alignment residual.
 
+Each view presents the latest real source frame at or before the shared playhead only while its age is no greater than 1.5 nominal sample intervals. This is a display-validity limit, not a resampling operation. A larger gap shows no current sample and reports the neighboring source times.
+
 ## Display modes
 
 | Mode | Allowed display operation | Scientific eligibility |

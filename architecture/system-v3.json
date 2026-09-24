@@ -32,8 +32,8 @@
     "owns": ["dataset_id", "session_id and match identity", "period/trial identity", "canonical t_ns", "selected and hovered player", "selected team", "selected tactical object", "tracking frame identity and availability", "pose frame identity and availability", "per-source measurement class and quality"],
     "canonical_time": "Signed BigInt nanoseconds stay exact through context, routing and worker handoff; conversion to renderer units occurs only at the display boundary. Source frame resolution is independent and never uses frame-index equality.",
     "player_identity": "A registered session participant subject_id is the canonical player identity. For SkillCorner it exactly matches tracking subject_id/object_id and Pose subject_id. Other sources need an explicit registered identity mapping; coordinates and proximity never establish identity.",
-    "tracking_resolution": "Resolve the latest real tracking frame at or before canonical t_ns only when it is within the declared source-rate tolerance; preserve its exact source timestamp, is_detected, extrapolation and gaps.",
-    "pose_resolution": "Resolve the latest real Pose sample at or before canonical t_ns only when its age is within the declared source-rate tolerance. Preserve its exact source timestamp; otherwise report absence and the previous/next observed time without changing player or playhead. Never interpolate.",
+    "tracking_resolution": "Resolve the latest real tracking frame at or before canonical t_ns only when its age is at most 1.5 nominal sample intervals; preserve its exact source timestamp, is_detected, extrapolation and gaps.",
+    "pose_resolution": "Resolve the latest real Pose sample at or before canonical t_ns only when its age is at most 1.5 nominal sample intervals. Preserve its exact source timestamp; otherwise report absence and the previous/next observed time without changing player or playhead. Never interpolate.",
     "deep_link": ["dataset_id", "session_id", "period/trial_id", "subject_id", "t_ns", "MatchLab view mode"]
   },
   "pitch": {
