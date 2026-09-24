@@ -3,16 +3,14 @@ import {
   TrackingLayer,
   type TrackingLayerPalette,
 } from "@/components/matchlab/TrackingLayer";
-import { trackingBuffersFromFrames } from "@/components/matchlab/frame-buffers";
+import type { TrackingWindowBuffers } from "@/components/matchlab/frame-buffers";
 import { ContextLayer, type ContextSubject, type SourceAlignmentDisplay } from "@/components/matchlab/ContextLayer";
 import { TacticalLayer, type TacticalLayerPalette } from "@/components/matchlab/TacticalLayer";
 import type { PitchEvent, TacticalOverlay } from "@/components/matchlab/render-types";
 import type { PoseLayerProps } from "@/components/pose/PoseScene";
 import type { MatchFrameContextValue } from "@/lib/match-frame-context";
-import type { TrackingFrame } from "@/components/pitch/pitch-model";
 import type { TrailPoint } from "@/components/pitch/pitch-model";
 import { PoseLayer } from "@/components/pose/PoseScene";
-import { useMemo } from "react";
 
 export interface MatchLayerVisibility {
   readonly pitch: boolean;
@@ -25,7 +23,7 @@ export interface MatchLayerVisibility {
 export interface MatchWorldProps {
   readonly matchFrame: MatchFrameContextValue;
   readonly visibility: MatchLayerVisibility;
-  readonly trackingFrames: readonly TrackingFrame[];
+  readonly trackingBuffers: TrackingWindowBuffers | null;
   readonly trackingMaxAgeNs: number;
   readonly teamOrder: readonly string[];
   readonly trackingPalette: TrackingLayerPalette;
@@ -46,7 +44,7 @@ export interface MatchWorldProps {
 export function MatchWorld({
   matchFrame,
   visibility,
-  trackingFrames,
+  trackingBuffers,
   trackingMaxAgeNs,
   teamOrder,
   trackingPalette,
@@ -56,10 +54,6 @@ export function MatchWorld({
   poseLayer,
   context,
 }: MatchWorldProps) {
-  const trackingBuffers = useMemo(
-    () => trackingBuffersFromFrames(trackingFrames),
-    [trackingFrames],
-  );
   const poseMaxAgeNs = matchFrame.poseSource?.nominalRateHz
     ? 1.5 * (1e9 / matchFrame.poseSource.nominalRateHz)
     : 0;

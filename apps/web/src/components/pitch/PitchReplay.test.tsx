@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { AnalysisContext, type AnalysisContextValue } from "@/lib/analysis-context";
 import { MatchFrameContextProvider } from "@/lib/match-frame-context";
+import type { TrackingWindowBuffers } from "@/components/matchlab/frame-buffers";
 import { PitchReplay, sessionTeams, shirtLabels } from "@/components/pitch/PitchReplay";
 import { useAnalysisStore } from "@/lib/state/analysis";
 
@@ -218,11 +219,17 @@ it("renders an exact tracking window and drives the renderer imperatively", asyn
   await waitFor(() => expect(createPitchRenderer).toHaveBeenCalled());
   await waitFor(() => expect(setFrame).toHaveBeenCalled());
   const call = setFrame.mock.calls[0] as
-    | [Array<{ objectId: string }>, unknown, string | null]
+    | [TrackingWindowBuffers, number, string | null, readonly string[]]
     | undefined;
   expect(call).toBeDefined();
-  const entities = call?.[0] ?? [];
-  expect(entities.map((entity) => entity.objectId).sort()).toEqual(["ball", "p1", "p2"]);
+  const buffers = call?.[0];
+  const frameIndex = call?.[1] ?? -1;
+  const entities = buffers && frameIndex >= 0
+    ? Array.from({ length: buffers.frameOffsets[frameIndex + 1]! - buffers.frameOffsets[frameIndex]! }, (_, offset) =>
+        buffers.entityIds[buffers.entityIndexes[buffers.frameOffsets[frameIndex]! + offset]!] ?? "",
+      )
+    : [];
+  expect(entities.sort()).toEqual(["ball", "p1", "p2"]);
   expect(call?.[2]).toBeNull();
   expect(screen.getByText(/2 players · 1 extrapolated/)).toBeInTheDocument();
   expect(screen.getByText(/Ball detected/)).toBeInTheDocument();
@@ -259,8 +266,10 @@ it("keeps one renderer across playback and draws the exact frame imperatively", 
   const created = createPitchRenderer.mock.calls.length;
   setFrame.mockClear();
   act(() => useAnalysisStore.getState().setPlayhead(100_000_000n));
-  const call = setFrame.mock.calls.at(-1) as [Array<{ objectId: string }>, unknown, string | null];
-  expect(call[0].map((entity) => entity.objectId)).toEqual(["p1"]);
+  const call = setFrame.mock.calls.at(-1) as [TrackingWindowBuffers, number, string | null, readonly string[]];
+  const start = call[0].frameOffsets[call[1]]!;
+  const end = call[0].frameOffsets[call[1] + 1]!;
+  expect(Array.from({ length: end - start }, (_, offset) => call[0].entityIds[call[0].entityIndexes[start + offset]!])).toEqual(["p1"]);
   // A playhead inside the same frame is not redrawn.
   setFrame.mockClear();
   act(() => useAnalysisStore.getState().setPlayhead(100_000_010n));
@@ -276,8 +285,8 @@ it("draws no frame for a time outside the loaded window instead of reusing its l
   await waitFor(() => expect(setFrame).toHaveBeenCalled());
   setFrame.mockClear();
   act(() => useAnalysisStore.getState().setPlayhead(900_000_000n));
-  const call = setFrame.mock.calls.at(-1) as [unknown[], unknown, string | null];
-  expect(call[0]).toEqual([]);
+  const call = setFrame.mock.calls.at(-1) as [TrackingWindowBuffers, number, string | null, readonly string[]];
+  expect(call[1]).toBe(-1);
 });
 
 it("selects a tracked player through the shared MatchFrameContext", async () => {

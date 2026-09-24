@@ -6,10 +6,10 @@ import { MeasurementClassBadge, ModalityBadge } from "@/components/common/Badges
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
 import {
   CAMERA_MODES,
-  extractFrames,
   groupFramesBySubject,
   nextFrameIndexAt,
   poseFrameIndexAt,
+  poseFramesFromBuffers,
   NO_OVERLAYS,
   overlaysFromParameters,
   summarizeFrame,
@@ -155,6 +155,7 @@ export function PoseViewer() {
     enabled: subjectPlaybackEnabled,
     artifactId,
     entityId: sceneSubjectId,
+    jointNames: stream?.skeleton_joint_names ?? [],
     canonicalMinNs: canonical?.minNs ?? null,
     canonicalMaxNs: canonical?.maxNs ?? null,
     chunkSpanNs,
@@ -205,19 +206,7 @@ export function PoseViewer() {
 
   const frames = useMemo(
     () =>
-      extractFrames(
-        (window.data?.rows ?? []) as Array<{
-          t_rel_ns?: unknown;
-          subject_id?: unknown;
-          joint_name?: unknown;
-          is_available?: unknown;
-          x_m?: unknown;
-          y_m?: unknown;
-          z_m?: unknown;
-          error_m?: unknown;
-        }>,
-        sceneSubjectId,
-      ),
+      poseFramesFromBuffers(window.data?.prepared, sceneSubjectId),
     [sceneSubjectId, window.data],
   );
   const subjectFrames = useMemo<PoseSubjectFrames[]>(

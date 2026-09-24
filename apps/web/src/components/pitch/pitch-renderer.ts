@@ -14,8 +14,9 @@
 import type { Application, Container, Graphics, Text } from "pixi.js";
 
 import type { PitchEvent, TacticalOverlay, TacticalRole } from "@/components/matchlab/render-types";
-import { pitchToScreen, screenToPitch, type EntityGroup } from "@/components/pitch/pitch-model";
-import { DEFAULT_PITCH, type EntityFrame, type TrailPoint, type Viewport } from "@/components/pitch/pitch-model";
+import { pitchToScreen, screenToPitch, teamRole } from "@/components/pitch/pitch-model";
+import { DEFAULT_PITCH, type TrailPoint, type Viewport } from "@/components/pitch/pitch-model";
+import { TRACKING_KIND, type TrackingWindowBuffers } from "@/components/matchlab/frame-buffers";
 
 export {
   EMPTY_TACTICAL_OVERLAY,
@@ -64,15 +65,12 @@ export const DEFAULT_PITCH_LAYERS: PitchLayers = {
 
 export interface PitchRendererHandle {
   setFrame(
-    entities: readonly EntityFrame[],
-    groups: ReadonlyMap<string, EntityGroup>,
+    buffers: TrackingWindowBuffers,
+    frameIndex: number,
     selectedId: string | null,
+    teamOrder: readonly string[],
   ): void;
-  setTrail(
-    trail: readonly TrailPoint[],
-    groups: ReadonlyMap<string, EntityGroup>,
-    selectedId: string | null,
-  ): void;
+  setTrail(trail: readonly TrailPoint[], selectedId: string | null): void;
   setEvents(events: readonly PitchEvent[]): void;
   /** Registered short labels (e.g. shirt numbers) by object id. */
   setEntityLabels?(labels: ReadonlyMap<string, string>): void;
@@ -203,8 +201,9 @@ export async function createPitchRenderer(
   drawPitch(staticPitch, colors.pitchLine, colors.surface);
   applyViewport(world, viewport.current);
 
-  let lastEntities: readonly EntityFrame[] = [];
-  let lastGroups: ReadonlyMap<string, EntityGroup> = new Map();
+  let lastTrackingBuffers: TrackingWindowBuffers | null = null;
+  let lastFrameIndex = -1;
+  let lastTeamOrder: readonly string[] = [];
   let lastSelected: string | null = null;
   let lastTrail: readonly TrailPoint[] = [];
   let lastEvents: readonly PitchEvent[] = [];
@@ -234,49 +233,81 @@ export async function createPitchRenderer(
     return created;
   }
 
+  function drawEntityRow(row: number, pass: "base" | "ball" | "selected" = "base") {
+    const buffers = lastTrackingBuffers;
+    if (!buffers) return;
+    const objectId = buffers.entityIds[buffers.entityIndexes[row]!] ?? "";
+    const kind = buffers.objectKinds[row] ?? TRACKING_KIND.other;
+    const isBall = kind === TRACKING_KIND.ball;
+    const selected = objectId === lastSelected;
+    if (
+      (pass === "base" && (selected || isBall)) ||
+      (pass === "ball" && (!isBall || selected)) ||
+      (pass === "selected" && !selected)
+    ) return;
+    const xM = buffers.positionsXY[row * 2] ?? Number.NaN;
+    const yM = buffers.positionsXY[row * 2 + 1] ?? Number.NaN;
+    if (!Number.isFinite(xM) || !Number.isFinite(yM)) return;
+    const groupIndex = buffers.teamIndexes[row] ?? -1;
+    const groupId = groupIndex < 0 ? null : (buffers.teamIds[groupIndex] ?? null);
+    const role =
+      kind === TRACKING_KIND.ball
+        ? "ball"
+        : kind === TRACKING_KIND.official
+          ? "official"
+          : groupId === null
+            ? "other"
+            : teamRole(groupId, lastTeamOrder);
+    const color =
+      role === "home"
+        ? colors.home
+        : role === "away"
+          ? colors.away
+          : role === "ball"
+            ? colors.ball
+            : role === "official"
+              ? colors.official
+              : colors.extrapolated;
+    const point = pitchToScreen(xM, yM, viewport.current, DEFAULT_PITCH);
+    const radius = isBall ? 4 : 6;
+    if (isBall) {
+      entityLayer.circle(point.x, point.y, radius + 2).fill({ color: colors.halo, alpha: 0.85 });
+    }
+    if (buffers.detectionState[row] !== 0) {
+      entityLayer.circle(point.x, point.y, radius).fill({ color });
+    } else {
+      entityLayer.circle(point.x, point.y, radius).stroke({ width: 1.5, color });
+    }
+    if (selected) {
+      entityLayer
+        .circle(point.x, point.y, radius + 4)
+        .stroke({ width: 2, color: colors.selection });
+      entityLayer
+        .moveTo(point.x - radius - 8, point.y)
+        .lineTo(point.x + radius + 8, point.y)
+        .moveTo(point.x, point.y - radius - 8)
+        .lineTo(point.x, point.y + radius + 8)
+        .stroke({ width: 1, color: colors.selection });
+    }
+  }
+
   function drawEntities() {
     entityLayer.clear();
-    // Players first, then the ball with a halo, then the selection, so neither
-    // the ball nor the selected entity is ever hidden under a neighbour.
-    const ordered = [...lastEntities].sort((left, right) => {
-      const rank = (entity: EntityFrame) =>
-        entity.objectId === lastSelected ? 2 : entity.isBall ? 1 : 0;
-      return rank(left) - rank(right);
-    });
-    for (const entity of ordered) {
-      if (!Number.isFinite(entity.xM) || !Number.isFinite(entity.yM)) continue;
-      const point = pitchToScreen(entity.xM, entity.yM, viewport.current, DEFAULT_PITCH);
-      const group = lastGroups.get(entity.objectId) ?? "other";
-      const color =
-        group === "home"
-          ? colors.home
-          : group === "away"
-            ? colors.away
-            : group === "ball"
-              ? colors.ball
-              : group === "official"
-                ? colors.official
-                : colors.extrapolated;
-      const radius = entity.isBall ? 4 : 6;
-      if (entity.isBall) {
-        entityLayer.circle(point.x, point.y, radius + 2).fill({ color: colors.halo, alpha: 0.85 });
-      }
-      const filled = entity.detected !== false;
-      if (filled) {
-        entityLayer.circle(point.x, point.y, radius).fill({ color });
-      } else {
-        entityLayer.circle(point.x, point.y, radius).stroke({ width: 1.5, color });
-      }
-      if (entity.objectId === lastSelected) {
-        entityLayer
-          .circle(point.x, point.y, radius + 4)
-          .stroke({ width: 2, color: colors.selection });
-        entityLayer
-          .moveTo(point.x - radius - 8, point.y)
-          .lineTo(point.x + radius + 8, point.y)
-          .moveTo(point.x, point.y - radius - 8)
-          .lineTo(point.x, point.y + radius + 8)
-          .stroke({ width: 1, color: colors.selection });
+    const buffers = lastTrackingBuffers;
+    if (!buffers || lastFrameIndex < 0) return;
+    const start = buffers.frameOffsets[lastFrameIndex]!;
+    const end = buffers.frameOffsets[lastFrameIndex + 1]!;
+    // Draw field players first, then the ball, then the selected identity.
+    for (let row = start; row < end; row += 1) drawEntityRow(row, "base");
+    for (let row = start; row < end; row += 1) {
+      if ((buffers.objectKinds[row] ?? TRACKING_KIND.other) === TRACKING_KIND.ball) drawEntityRow(row, "ball");
+    }
+    if (lastSelected !== null) {
+      for (let row = start; row < end; row += 1) {
+        if (
+          (buffers.objectKinds[row] ?? TRACKING_KIND.other) !== TRACKING_KIND.ball &&
+          buffers.entityIds[buffers.entityIndexes[row]!] === lastSelected
+        ) drawEntityRow(row, "selected");
       }
     }
   }
@@ -293,23 +324,20 @@ export async function createPitchRenderer(
   function drawLabels() {
     for (const label of labelPool) label.visible = false;
     if (!layers.labels) return;
+    const buffers = lastTrackingBuffers;
+    if (!buffers || lastFrameIndex < 0) return;
     const legible = viewport.current.scale >= 6;
-    const ordered = [...lastEntities].sort((left, right) => {
-      const leftRank = left.objectId === lastSelected ? 0 : left.isBall ? 1 : 2;
-      const rightRank = right.objectId === lastSelected ? 0 : right.isBall ? 1 : 2;
-      if (leftRank !== rightRank) return leftRank - rightRank;
-      return left.objectId < right.objectId ? -1 : 1;
-    });
-
     const placed: Array<{ x: number; y: number; width: number; height: number }> = [];
     let slot = 0;
-    for (const entity of ordered) {
-      const isFocus = entity.objectId === lastSelected;
-      if (!legible && !isFocus) continue;
-      if (!Number.isFinite(entity.xM) || !Number.isFinite(entity.yM)) continue;
-      const point = pitchToScreen(entity.xM, entity.yM, viewport.current, DEFAULT_PITCH);
+    const placeLabel = (row: number, isFocus: boolean) => {
+      const objectId = buffers.entityIds[buffers.entityIndexes[row]!] ?? "";
+      if (!legible && !isFocus) return;
+      const xM = buffers.positionsXY[row * 2] ?? Number.NaN;
+      const yM = buffers.positionsXY[row * 2 + 1] ?? Number.NaN;
+      if (!Number.isFinite(xM) || !Number.isFinite(yM)) return;
+      const point = pitchToScreen(xM, yM, viewport.current, DEFAULT_PITCH);
       const label = labelAt(slot);
-      label.text = entityLabels.get(entity.objectId) ?? shortEntityLabel(entity.objectId);
+      label.text = entityLabels.get(objectId) ?? shortEntityLabel(objectId);
       label.style.fill = isFocus ? colors.selection : colors.label;
       const box = {
         x: point.x + 8,
@@ -324,11 +352,35 @@ export async function createPitchRenderer(
           box.y < other.y + other.height &&
           box.y + box.height > other.y,
       );
-      if (collides && !isFocus) continue;
+      if (collides && !isFocus) return;
       label.position.set(box.x, box.y);
       label.visible = true;
       placed.push(box);
       slot += 1;
+    };
+
+    const start = buffers.frameOffsets[lastFrameIndex]!;
+    const end = buffers.frameOffsets[lastFrameIndex + 1]!;
+    if (lastSelected !== null) {
+      for (let row = start; row < end; row += 1) {
+        if (buffers.entityIds[buffers.entityIndexes[row]!] === lastSelected) {
+          placeLabel(row, true);
+          break;
+        }
+      }
+    }
+    for (let row = start; row < end; row += 1) {
+      if ((buffers.objectKinds[row] ?? TRACKING_KIND.other) === TRACKING_KIND.ball) {
+        if (buffers.entityIds[buffers.entityIndexes[row]!] !== lastSelected) placeLabel(row, false);
+        break;
+      }
+    }
+    for (let row = start; row < end; row += 1) {
+      const objectId = buffers.entityIds[buffers.entityIndexes[row]!] ?? "";
+      if (objectId === lastSelected || (buffers.objectKinds[row] ?? TRACKING_KIND.other) === TRACKING_KIND.ball) {
+        continue;
+      }
+      placeLabel(row, false);
     }
   }
 
@@ -411,9 +463,20 @@ export async function createPitchRenderer(
   function drawTrail() {
     trailLayer.clear();
     if (!layers.trails || lastTrail.length < 2) return;
-    const group = lastGroups.get(lastTrail[0]!.objectId) ?? "other";
+    const buffers = lastTrackingBuffers;
+    const entityIndex = buffers?.entityIds.indexOf(lastTrail[0]!.objectId) ?? -1;
+    let role: "home" | "away" | "other" = "other";
+    if (buffers && entityIndex >= 0) {
+      for (let row = 0; row < buffers.entityIndexes.length; row += 1) {
+        if (buffers.entityIndexes[row] !== entityIndex) continue;
+        const groupIndex = buffers.teamIndexes[row] ?? -1;
+        const groupId = groupIndex < 0 ? null : (buffers.teamIds[groupIndex] ?? null);
+        if (groupId !== null) role = teamRole(groupId, lastTeamOrder);
+        break;
+      }
+    }
     const color =
-      group === "home" ? colors.home : group === "away" ? colors.away : colors.trail;
+      role === "home" ? colors.home : role === "away" ? colors.away : colors.trail;
     const first = pitchToScreen(lastTrail[0]!.xM, lastTrail[0]!.yM, viewport.current);
     trailLayer.moveTo(first.x, first.y);
     for (const point of lastTrail.slice(1)) {
@@ -431,11 +494,32 @@ export async function createPitchRenderer(
       event.clientY - rect.top,
       viewport.current,
     );
+    const buffers = lastTrackingBuffers;
+    if (!buffers || lastFrameIndex < 0) return;
     let best: { id: string; objectType: string; distance: number } | null = null;
-    for (const entity of lastEntities) {
-      const distance = Math.hypot(entity.xM - pitch.xM, entity.yM - pitch.yM);
+    const start = buffers.frameOffsets[lastFrameIndex]!;
+    const end = buffers.frameOffsets[lastFrameIndex + 1]!;
+    for (let row = start; row < end; row += 1) {
+      const xM = buffers.positionsXY[row * 2] ?? Number.NaN;
+      const yM = buffers.positionsXY[row * 2 + 1] ?? Number.NaN;
+      const distance = Math.hypot(xM - pitch.xM, yM - pitch.yM);
       if (distance <= 1.5 && (best === null || distance < best.distance)) {
-        best = { id: entity.objectId, objectType: entity.objectType, distance };
+        const entityIndex = buffers.entityIndexes[row]!;
+        const kind = buffers.objectKinds[row] ?? TRACKING_KIND.other;
+        best = {
+          id: buffers.entityIds[entityIndex] ?? "",
+          objectType:
+            kind === TRACKING_KIND.player
+              ? "player"
+              : kind === TRACKING_KIND.goalkeeper
+                ? "goalkeeper"
+                : kind === TRACKING_KIND.ball
+                  ? "ball"
+                  : kind === TRACKING_KIND.official
+                    ? "official"
+                    : "other",
+          distance,
+        };
       }
     }
     if (best) onSelect(best.id, best.objectType);
@@ -517,16 +601,16 @@ export async function createPitchRenderer(
   resizeObserver.observe(host);
 
   return {
-    setFrame(entities, groups, selectedId) {
-      lastEntities = entities;
-      lastGroups = groups;
+    setFrame(buffers, frameIndex, selectedId, teamOrder) {
+      lastTrackingBuffers = buffers;
+      lastFrameIndex = frameIndex;
+      lastTeamOrder = teamOrder;
       lastSelected = selectedId;
       drawEntities();
       drawLabels();
     },
-    setTrail(trail, groups, selectedId) {
+    setTrail(trail, selectedId) {
       lastTrail = trail;
-      lastGroups = groups;
       lastSelected = selectedId;
       drawTrail();
       drawEntities();

@@ -4,16 +4,22 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 import { MeasurementClassBadge, ModalityBadge } from "@/components/common/Badges";
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
 import {
-  assignGroups,
-  buildFrames,
-  exactFrameIndex,
   isTrackingStream,
-  summarizeFrame,
   teamRole,
-  trailForRange,
-  type EntityGroup,
-  type TrackingFrame,
 } from "@/components/pitch/pitch-model";
+import {
+  trackingEntityAt,
+  trackingFrameIndexAt,
+  trackingFrameSummaryAt,
+  tacticalOverlayAtBuffers,
+  trailPointsForTrackingBuffer,
+} from "@/components/matchlab/frame-buffers";
+import type {
+  EventWindowBuffers,
+  TacticalGridWindowBuffers,
+  TacticalPolygonWindowBuffers,
+  TrackingWindowBuffers,
+} from "@/components/matchlab/frame-buffers";
 import {
   createPitchRenderer,
   DEFAULT_PITCH_LAYERS,
@@ -22,23 +28,26 @@ import {
   type PitchPalette,
   type PitchRendererHandle,
 } from "@/components/pitch/pitch-renderer";
-import {
-  EMPTY_INDEX,
-  indexTacticalRows,
-  tacticalOverlayAt,
-  type TacticalFrameIndex,
-} from "@/components/pitch/tactical-overlay";
 import { eventStreams } from "@/lib/capabilities";
-import type { ArtifactRef, DenseWindow, SessionDetail, StreamView } from "@/api/types";
+import type { ArtifactRef, SessionDetail, StreamView } from "@/api/types";
 import { useAnalysisContext } from "@/lib/analysis-context";
 import { useMatchFrameContext } from "@/lib/match-frame-context";
 import { ApiError } from "@/lib/api/client";
 import {
+  eventFrameWindowQuery,
+  tacticalGridWindowQuery,
+  tacticalPolygonWindowQuery,
+  trackingFrameWindowQuery,
+} from "@/lib/api/match-frame-windows";
+import type {
+  PreparedTacticalGridWindow,
+  PreparedTacticalPolygonWindow,
+  PreparedTrackingWindow,
+} from "@/lib/api/match-frame-windows";
+import {
   artifactQuery,
   sessionQuery,
   tacticalArtifactsQuery,
-  tacticalSeriesQuery,
-  windowQuery,
   type WindowQuery,
 } from "@/lib/api/queries";
 import { readPalette } from "@/lib/chart-palette";
@@ -64,6 +73,26 @@ const INFLUENCE_MAX_AGE_NS = 1_500_000_000;
 const HULL_COLUMNS = ["t_rel_ns", "group_id", "hull_polygon_json"] as const;
 const TERRITORY_COLUMNS = ["t_rel_ns", "entity_id", "group_id", "cell_polygon_json"] as const;
 const INFLUENCE_COLUMNS = ["t_rel_ns", "x_m", "y_m", "owner_group_id", "arrival_time_s"] as const;
+const EMPTY_POLYGONS: TacticalPolygonWindowBuffers = {
+  frameTimesNs: new BigInt64Array(),
+  framePolygonOffsets: new Uint32Array([0]),
+  polygonPointOffsets: new Uint32Array([0]),
+  positionsXY: new Float32Array(),
+  objectIds: [],
+  objectIndexes: new Uint32Array(),
+  groupIds: [],
+  groupIndexes: new Int32Array(),
+};
+const EMPTY_GRID: TacticalGridWindowBuffers = {
+  gridTimesNs: new BigInt64Array(),
+  gridOffsets: new Uint32Array([0]),
+  positionsXY: new Float32Array(),
+  values: new Float32Array(),
+  groupIds: [],
+  groupIndexes: new Int32Array(),
+  cellWidthM: new Float32Array(),
+  cellHeightM: new Float32Array(),
+};
 
 /** Shape served event rows into renderer marks, dropping unplaceable ones. */
 export function toPitchEvents(rows: ReadonlyArray<Record<string, unknown>>): PitchEvent[] {
@@ -88,6 +117,19 @@ export function toPitchEvents(rows: ReadonlyArray<Record<string, unknown>>): Pit
     });
   }
   return events;
+}
+
+/** The worker filters unplaceable events and transfers the numeric columns. */
+export function pitchEventsFromBuffers(buffers: EventWindowBuffers | undefined): PitchEvent[] {
+  if (buffers === undefined) return [];
+  return Array.from(buffers.timeNs, (timeNs, index) => ({
+    eventId: buffers.eventIds[index] ?? "",
+    tRelNs: Number(timeNs),
+    type: buffers.eventTypes[index] ?? "event",
+    subtype: buffers.eventSubtypes[index] ?? null,
+    xM: buffers.positionsXY[index * 2] ?? Number.NaN,
+    yM: buffers.positionsXY[index * 2 + 1] ?? Number.NaN,
+  }));
 }
 
 /**
@@ -183,14 +225,14 @@ export function PitchReplay() {
     [artifactId],
   );
   const queryOptionsFor = useCallback(
-    (chunk: DenseChunkBounds): PlaybackChunkQueryOptions<DenseWindow> =>
-      windowQuery({
+    (chunk: DenseChunkBounds): PlaybackChunkQueryOptions<PreparedTrackingWindow> =>
+      trackingFrameWindowQuery({
         ...trackingRequest,
         fromNs: Number(chunk.fromNs),
         toNs: Number(chunk.toNs),
         cacheScope: "dense-chunk",
         chunkId: chunk.id,
-      }) as unknown as PlaybackChunkQueryOptions<DenseWindow>,
+      }) as unknown as PlaybackChunkQueryOptions<PreparedTrackingWindow>,
     [trackingRequest],
   );
   const queryScope = useMemo(
@@ -206,7 +248,7 @@ export function PitchReplay() {
     [fromNs, toNs],
   );
   const isReady = useCallback(
-    (data: DenseWindow | undefined) => data?.meta.reduction === null,
+    (data: PreparedTrackingWindow | undefined) => data?.meta.reduction === null,
     [],
   );
   const matchesQuery = useCallback(
@@ -222,7 +264,7 @@ export function PitchReplay() {
     (key: readonly unknown[]) => (typeof key[3] === "string" ? key[3] : null),
     [],
   );
-  const playback = usePlaybackChunkCoordinator<DenseWindow>({
+  const playback = usePlaybackChunkCoordinator<PreparedTrackingWindow>({
     enabled: explicitBounds === null,
     canonicalMinNs: canonical?.minNs ?? null,
     canonicalMaxNs: canonical?.maxNs ?? null,
@@ -238,7 +280,7 @@ export function PitchReplay() {
   const activeWindowBounds = activeChunk ?? explicitBounds;
   const activeQuery = useMemo(() => {
     if (activeChunk !== null) {
-      return windowQuery({
+      return trackingFrameWindowQuery({
         ...trackingRequest,
         fromNs: Number(activeChunk.fromNs),
         toNs: Number(activeChunk.toNs),
@@ -246,7 +288,7 @@ export function PitchReplay() {
         chunkId: activeChunk.id,
       });
     }
-    return windowQuery({
+    return trackingFrameWindowQuery({
       ...trackingRequest,
       ...(explicitBounds !== null
         ? { fromNs: Number(explicitBounds.fromNs), toNs: Number(explicitBounds.toNs) }
@@ -261,8 +303,8 @@ export function PitchReplay() {
     [session.data],
   );
   const eventArtifactId = eventStream?.sample_artifact_ids[0] ?? null;
-  const eventWindow = useQuery({
-    ...windowQuery({
+  const eventRequest = useMemo<WindowQuery>(
+    () => ({
       artifactId: eventArtifactId ?? "",
       ...(activeWindowBounds
         ? { fromNs: Number(activeWindowBounds.fromNs), toNs: Number(activeWindowBounds.toNs) }
@@ -270,10 +312,14 @@ export function PitchReplay() {
       columns: ["t_rel_ns", "event_id", "event_type", "event_subtype", "x_m", "y_m"],
       maxPoints: MAX_EVENT_POINTS,
     }),
+    [activeWindowBounds, eventArtifactId],
+  );
+  const eventWindow = useQuery({
+    ...eventFrameWindowQuery(eventRequest),
     enabled: Boolean(eventArtifactId) && activeWindowBounds !== null,
   });
   const events = useMemo(
-    () => toPitchEvents(eventWindow.data?.rows ?? []),
+    () => pitchEventsFromBuffers(eventWindow.data?.prepared),
     [eventWindow.data],
   );
 
@@ -387,7 +433,7 @@ export function PitchReplay() {
   return (
     <PitchView
       stream={stream}
-      rows={window.data.rows}
+      trackingBuffers={window.data.prepared}
       loadingWindow={window.isPlaceholderData}
       events={events}
       explicitRange={explicitBounds !== null}
@@ -456,7 +502,7 @@ function readTeamPalette(): { teamA: string; teamB: string; halo: string } {
 
 function PitchView({
   stream,
-  rows,
+  trackingBuffers,
   loadingWindow,
   events,
   explicitRange,
@@ -469,7 +515,7 @@ function PitchView({
   onSelectEntity,
 }: {
   stream: StreamView;
-  rows: Array<Record<string, unknown>>;
+  trackingBuffers: TrackingWindowBuffers;
   loadingWindow: boolean;
   events: readonly PitchEvent[];
   explicitRange: boolean;
@@ -496,24 +542,8 @@ function PitchView({
   const committedRangeNs = useAnalysisStore((state) => state.committedRangeNs);
   const [rendererReady, setRendererReady] = useState(false);
   const [layers, setLayers] = useState<PitchLayers>(DEFAULT_PITCH_LAYERS);
-  const [influenceGridTimeNs, setInfluenceGridTimeNs] = useState<number | null>(null);
+  const [influenceGridTimeNs, setInfluenceGridTimeNs] = useState<bigint | null>(null);
 
-  const frames = useMemo(
-    () =>
-      buildFrames(
-        rows as Array<{
-          t_rel_ns?: unknown;
-          object_id?: unknown;
-          object_type?: unknown;
-          group_id?: unknown;
-          x_m?: unknown;
-          y_m?: unknown;
-          is_detected?: unknown;
-        }>,
-      ),
-    [rows],
-  );
-  const groups = useMemo(() => assignGroups(frames, teamOrder), [frames, teamOrder]);
   const maxGapNs = useMemo(
     () => 1.5 * (1e9 / (stream.nominal_sampling_rate_hz && stream.nominal_sampling_rate_hz > 0 ? stream.nominal_sampling_rate_hz : 25)),
     [stream.nominal_sampling_rate_hz],
@@ -530,9 +560,9 @@ function PitchView({
   const teamArtifact = seriesArtifact(tacticalArtifacts.data, "team_geometry");
   const territoryArtifact = seriesArtifact(tacticalArtifacts.data, "player_territory");
   const influenceArtifact = seriesArtifact(tacticalArtifacts.data, "influence_grid");
-  // Overlays read only the columns they draw: a full territory chunk is
-  // ~5 MB of JSON, the projected one ~1.5 MB (RES-112 performance audit).
-  const tacticalWindow = (artifactId: string | null, columns: readonly string[]) => tacticalSeriesQuery({
+  // Worker parses processor polygon JSON and groups exact frames before the
+  // data reaches this view. Reduced windows are never treated as exact.
+  const tacticalRequest = (artifactId: string | null, columns: readonly string[]) => ({
     artifactId: artifactId ?? "",
     fromNs: Number(tacticalBounds.fromNs),
     toNs: Number(tacticalBounds.toNs),
@@ -540,37 +570,39 @@ function PitchView({
     columns,
   });
   const teamTactical = useQuery({
-    ...tacticalWindow(teamArtifact?.artifact_id ?? null, HULL_COLUMNS),
+    ...tacticalPolygonWindowQuery(
+      tacticalRequest(teamArtifact?.artifact_id ?? null, HULL_COLUMNS),
+      "group_id",
+      "hull_polygon_json",
+    ),
     enabled: Boolean(teamArtifact && layers.geometry),
   });
   const territoryTactical = useQuery({
-    ...tacticalWindow(territoryArtifact?.artifact_id ?? null, TERRITORY_COLUMNS),
+    ...tacticalPolygonWindowQuery(
+      tacticalRequest(territoryArtifact?.artifact_id ?? null, TERRITORY_COLUMNS),
+      "entity_id",
+      "cell_polygon_json",
+    ),
     enabled: Boolean(territoryArtifact && layers.territory),
   });
   const influenceTactical = useQuery({
-    ...tacticalWindow(influenceArtifact?.artifact_id ?? null, INFLUENCE_COLUMNS),
+    ...tacticalGridWindowQuery(tacticalRequest(influenceArtifact?.artifact_id ?? null, INFLUENCE_COLUMNS)),
     enabled: Boolean(influenceArtifact && layers.influence),
   });
-  // A display-reduced tactical response is a subset of frames; it is never
-  // drawn as if it were the current geometry.
-  const exactRows = (data: { rows: unknown[]; meta: { returned_rows: number; source_rows: number } } | undefined) =>
-    data && data.meta.returned_rows === data.meta.source_rows ? (data.rows as Record<string, unknown>[]) : null;
-  // A hidden layer contributes nothing to the drawn overlay.
-  const geometryRows = layers.geometry ? exactRows(teamTactical.data) : null;
-  const territoryRows = layers.territory ? exactRows(territoryTactical.data) : null;
-  const influenceRows = layers.influence ? exactRows(influenceTactical.data) : null;
+  const exactPrepared = <T,>(data: { meta: { reduction: unknown }; prepared: T } | undefined) =>
+    data?.meta.reduction === null ? data.prepared : null;
+  const geometryBuffers = layers.geometry ? exactPrepared<PreparedTacticalPolygonWindow["prepared"]>(teamTactical.data) : null;
+  const territoryBuffers = layers.territory ? exactPrepared<PreparedTacticalPolygonWindow["prepared"]>(territoryTactical.data) : null;
+  const influenceBuffers = layers.influence ? exactPrepared<PreparedTacticalGridWindow["prepared"]>(influenceTactical.data) : null;
   const reducedOverlay =
-    (layers.geometry && teamTactical.data !== undefined && geometryRows === null) ||
-    (layers.territory && territoryTactical.data !== undefined && territoryRows === null) ||
-    (layers.influence && influenceTactical.data !== undefined && influenceRows === null);
-  const indexes = useMemo(
-    () => ({
-      geometry: geometryRows ? indexTacticalRows(geometryRows) : EMPTY_INDEX,
-      territory: territoryRows ? indexTacticalRows(territoryRows) : EMPTY_INDEX,
-      influence: influenceRows ? indexTacticalRows(influenceRows) : EMPTY_INDEX,
-    }),
-    [geometryRows, territoryRows, influenceRows],
-  );
+    (layers.geometry && teamTactical.data !== undefined && geometryBuffers === null) ||
+    (layers.territory && territoryTactical.data !== undefined && territoryBuffers === null) ||
+    (layers.influence && influenceTactical.data !== undefined && influenceBuffers === null);
+  const indexes = useMemo(() => ({
+    geometry: geometryBuffers ?? EMPTY_POLYGONS,
+    territory: territoryBuffers ?? EMPTY_POLYGONS,
+    influence: influenceBuffers ?? EMPTY_GRID,
+  }), [geometryBuffers, territoryBuffers, influenceBuffers]);
 
   const palette = useMemo<PitchPalette>(() => {
     void theme;
@@ -595,18 +627,20 @@ function PitchView({
   // Everything the imperative renderer reads lives in refs, so the renderer is
   // created once per mount (and per theme), never per window or per frame.
   const sceneRef = useRef<{
-    frames: readonly TrackingFrame[];
-    groups: ReadonlyMap<string, EntityGroup>;
-    indexes: { geometry: TacticalFrameIndex; territory: TacticalFrameIndex; influence: TacticalFrameIndex };
+    trackingBuffers: TrackingWindowBuffers;
+    indexes: {
+      geometry: TacticalPolygonWindowBuffers;
+      territory: TacticalPolygonWindowBuffers;
+      influence: TacticalGridWindowBuffers;
+    };
     teamOrder: readonly string[];
     maxGapNs: number;
     layers: PitchLayers;
     events: readonly PitchEvent[];
-    drawnFrameTime: number | null | undefined;
-    influenceGridTimeNs: number | null;
+    drawnFrameTime: bigint | null | undefined;
+    influenceGridTimeNs: bigint | null;
   }>({
-    frames,
-    groups,
+    trackingBuffers,
     indexes,
     teamOrder,
     maxGapNs,
@@ -620,9 +654,8 @@ function PitchView({
     const renderer = rendererRef.current;
     if (!renderer) return;
     const scene = sceneRef.current;
-    const index = exactFrameIndex(scene.frames, timeNs, scene.maxGapNs);
-    const frame = index >= 0 ? scene.frames[index]! : null;
-    const frameTime = frame?.tRelNs ?? null;
+    const index = trackingFrameIndexAt(scene.trackingBuffers.frameTimesNs, timeNs, scene.maxGapNs);
+    const frameTime = index >= 0 ? scene.trackingBuffers.frameTimesNs[index]! : null;
     const host = hostRef.current;
     if (host) host.dataset.canonicalTimeNs = timeNs === null ? "" : timeNs.toString();
     if (!force && frameTime === scene.drawnFrameTime) return;
@@ -632,17 +665,17 @@ function PitchView({
         ? null
         : (currentMatchFrame.trackingSource?.artifactId ?? currentMatchFrame.trackingSource?.streamId ?? "tracking") +
           ":" + frameTime;
-      const availability = frame === null ? "absent" : "available";
+      const availability = frameTime === null ? "absent" : "available";
       currentMatchFrame.reportResolvedFrame("tracking", {
         identity,
-        canonicalTimeNs: frameTime === null ? null : BigInt(Math.trunc(frameTime)),
+        canonicalTimeNs: frameTime,
         availability,
       });
     }
     scene.drawnFrameTime = frameTime;
     const selected = selectedEntityRef.current;
-    renderer.setFrame(frame?.entities ?? [], scene.groups, selected);
-    const overlay = tacticalOverlayAt(
+    renderer.setFrame(scene.trackingBuffers, index, selected, scene.teamOrder);
+    const overlay = tacticalOverlayAtBuffers(
       scene.indexes,
       frameTime,
       (groupId) => teamRole(groupId, scene.teamOrder),
@@ -653,8 +686,8 @@ function PitchView({
     // Machine-readable evidence of what the canvas shows: the drawn entity
     // frame and the overlay's frame are the same canonical time by construction.
     if (host) {
-      host.dataset.drawnFrameNs = frameTime === null ? "" : String(frameTime);
-      host.dataset.sourceFrameNs = frameTime === null ? "" : String(frameTime);
+      host.dataset.drawnFrameNs = frameTime === null ? "" : frameTime.toString();
+      host.dataset.sourceFrameNs = frameTime === null ? "" : frameTime.toString();
       host.dataset.overlayHulls = String(overlay.overlay.hulls.length);
       host.dataset.overlayTerritoryCells = String(overlay.overlay.territoryCells.length);
       host.dataset.overlayInfluenceCells = String(overlay.overlay.influenceCells.length);
@@ -684,8 +717,11 @@ function PitchView({
       created.setEvents(sceneRef.current.events);
       const current = useAnalysisStore.getState();
       created.setTrail(
-        trailForRange(sceneRef.current.frames, current.committedRangeNs, selectedEntityRef.current),
-        sceneRef.current.groups,
+        trailPointsForTrackingBuffer(
+          sceneRef.current.trackingBuffers,
+          current.committedRangeNs,
+          selectedEntityRef.current,
+        ),
         selectedEntityRef.current,
       );
       drawAt(effectiveTimeNs(current), true);
@@ -703,14 +739,13 @@ function PitchView({
   // current frame imperatively.
   useEffect(() => {
     const scene = sceneRef.current;
-    scene.frames = frames;
-    scene.groups = groups;
+    scene.trackingBuffers = trackingBuffers;
     scene.indexes = indexes;
     scene.teamOrder = teamOrder;
     scene.maxGapNs = maxGapNs;
     drawAt(effectiveTimeNs(useAnalysisStore.getState()), true);
     setInfluenceGridTimeNs(scene.influenceGridTimeNs);
-  }, [drawAt, frames, groups, indexes, maxGapNs, teamOrder]);
+  }, [drawAt, indexes, maxGapNs, teamOrder, trackingBuffers]);
 
   // Per-frame path: a store subscription, never a React render.
   useEffect(() => {
@@ -722,11 +757,10 @@ function PitchView({
 
   useEffect(() => {
     rendererRef.current?.setTrail(
-      trailForRange(frames, committedRangeNs, selectedEntityId),
-      groups,
+      trailPointsForTrackingBuffer(trackingBuffers, committedRangeNs, selectedEntityId),
       selectedEntityId,
     );
-  }, [committedRangeNs, frames, groups, selectedEntityId]);
+  }, [committedRangeNs, selectedEntityId, trackingBuffers]);
 
   // Layer visibility is renderer-local presentation state: it changes nothing
   // about the data and never belongs in the durable URL.
@@ -759,13 +793,9 @@ function PitchView({
   }, []);
 
   const currentTimeNs = effectiveTimeNs(useAnalysisStore.getState());
-  const currentFrameIndex = exactFrameIndex(frames, currentTimeNs, maxGapNs);
-  const currentFrame = currentFrameIndex >= 0 ? frames[currentFrameIndex]! : null;
-  const summary = summarizeFrame(currentFrame);
-  const selectedEntity =
-    selectedEntityId === null
-      ? null
-      : (currentFrame?.entities.find((entity) => entity.objectId === selectedEntityId) ?? null);
+  const currentFrameIndex = trackingFrameIndexAt(trackingBuffers.frameTimesNs, currentTimeNs, maxGapNs);
+  const summary = trackingFrameSummaryAt(trackingBuffers, currentFrameIndex);
+  const selectedEntity = trackingEntityAt(trackingBuffers, currentFrameIndex, selectedEntityId);
   const teamLabel = (groupId: string | null) =>
     groupId === null ? null : (teamLabels.get(groupId) ?? groupId);
   const tacticalLoading =
@@ -966,12 +996,12 @@ function PitchView({
         {influenceArtifact && layers.influence ? (
           <span>
             Influence: MODEL_ESTIMATED tiles
-            {influenceGridTimeNs !== null ? ` · grid @ ${formatClockNs(BigInt(influenceGridTimeNs))}` : " · no grid within 1.5 s"}
+          {influenceGridTimeNs !== null ? ` · grid @ ${formatClockNs(influenceGridTimeNs)}` : " · no grid within 1.5 s"}
           </span>
         ) : null}
         <span>Trails: committed range</span>
         <span className="mono ml-auto tabular">
-          frame {currentFrameIndex >= 0 ? currentFrameIndex + 1 : "—"} / {frames.length}
+          frame {currentFrameIndex >= 0 ? currentFrameIndex + 1 : "—"} / {trackingBuffers.frameTimesNs.length}
         </span>
       </footer>
     </div>

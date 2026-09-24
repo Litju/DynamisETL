@@ -1,3 +1,5 @@
+import type { PoseWindowBuffers } from "@/components/matchlab/frame-buffers";
+
 /**
  * Pose viewer model.
  *
@@ -16,7 +18,6 @@ export interface PoseLandmark {
   /** Provider p90 predicted error radius, in metres; null when unavailable. */
   readonly errorM: number | null;
 }
-
 export interface PoseFrame {
   readonly tRelNs: number;
   readonly subjectId: string | null;
@@ -42,6 +43,52 @@ export interface PoseRow {
   readonly y_m?: unknown;
   readonly z_m?: unknown;
   readonly error_m?: unknown;
+}
+
+/** Materialize view frames from worker-prepared columns, without regrouping Arrow rows on the UI thread. */
+export function poseFramesFromBuffers(
+  buffers: PoseWindowBuffers | undefined,
+  subjectId: string | null = null,
+): PoseFrame[] {
+  if (buffers === undefined) return [];
+  const frames: PoseFrame[] = [];
+  for (let subjectIndex = 0; subjectIndex < buffers.subjectIds.length; subjectIndex += 1) {
+    const currentSubjectId = buffers.subjectIds[subjectIndex]!;
+    if (subjectId !== null && currentSubjectId !== subjectId) continue;
+    for (let frameIndex = buffers.subjectFrameOffsets[subjectIndex]!;
+      frameIndex < buffers.subjectFrameOffsets[subjectIndex + 1]!;
+      frameIndex += 1) {
+      const landmarks: PoseLandmark[] = [];
+      const unavailableJoints: string[] = [];
+      const base = frameIndex * buffers.jointNames.length;
+      for (let jointIndex = 0; jointIndex < buffers.jointNames.length; jointIndex += 1) {
+        const name = buffers.jointNames[jointIndex]!;
+        const valueIndex = base + jointIndex;
+        if (buffers.availability[valueIndex] !== 1) {
+          if (buffers.present[valueIndex] === 1) unavailableJoints.push(name);
+          continue;
+        }
+        const xM = buffers.positionsXYZ[valueIndex * 3]!;
+        const yM = buffers.positionsXYZ[valueIndex * 3 + 1]!;
+        const zM = buffers.positionsXYZ[valueIndex * 3 + 2]!;
+        landmarks.push({
+          jointName: name,
+          xM,
+          yM,
+          zM,
+          errorM: Number.isFinite(buffers.errorM[valueIndex]!) ? buffers.errorM[valueIndex]! : null,
+        });
+      }
+      frames.push({
+        tRelNs: Number(buffers.frameTimesNs[frameIndex]!),
+        subjectId: currentSubjectId,
+        landmarks,
+        unavailableJoints,
+        observed: buffers.frameObserved[frameIndex] === 1,
+      });
+    }
+  }
+  return frames;
 }
 
 export interface DisplayConnectionDefinition {

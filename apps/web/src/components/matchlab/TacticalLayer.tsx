@@ -33,7 +33,7 @@ function TacticalPolygon({
   readonly objectId: string;
   readonly matchFrame: MatchFrameContextValue;
 }) {
-  // ponytail: ShapeGeometry adapts current row overlays; gate 6 will supply worker-prepared geometry buffers.
+  // Worker parses polygon rows once per window; this adapter builds only the currently drawn geometry.
   const shape = useMemo(() => {
     const value = new Shape();
     const first = points[0];

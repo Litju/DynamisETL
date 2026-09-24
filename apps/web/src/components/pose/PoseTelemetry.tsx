@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
-import { extractFrames, frameIndexAt, nextFrameIndexAt, poseFrameIndexAt, summarizeFrame } from "@/components/pose/pose-model";
+import { frameIndexAt, nextFrameIndexAt, poseFrameIndexAt, poseFramesFromBuffers, summarizeFrame } from "@/components/pose/pose-model";
 import { poseSubjectObservations, stablePoseSubjects } from "@/components/pose/use-pose-subjects";
 import { useAnalysisContext } from "@/lib/analysis-context";
 import { useMatchFrameContext } from "@/lib/match-frame-context";
@@ -69,6 +69,7 @@ export function PoseTelemetry() {
   const playback = usePosePlaybackWindow({
     artifactId,
     entityId: subjectId,
+    jointNames: stream?.skeleton_joint_names ?? [],
     canonicalMinNs: canonical?.minNs ?? null,
     canonicalMaxNs: canonical?.maxNs ?? null,
     chunkSpanNs,
@@ -78,17 +79,14 @@ export function PoseTelemetry() {
   const { window } = playback;
   const frames = useMemo(
     () =>
-      extractFrames(
-        (window.data?.rows ?? []) as Array<{ [key: string]: unknown }>,
-        subjectId,
-      ),
+      poseFramesFromBuffers(window.data?.prepared, subjectId),
     [subjectId, window.data],
   );
   const frameIndex = poseFrameIndexAt(frames, effective, maxGapNs);
   const currentFrame = frameIndex >= 0 ? frames[frameIndex] ?? null : null;
   const landmarks = currentFrame?.landmarks ?? [];
   const byName = new Map(landmarks.map((landmark) => [landmark.jointName, landmark]));
-  const jointNames = stream?.skeleton_joint_names ?? landmarks.map((landmark) => landmark.jointName);
+  const jointNames = stream?.skeleton_joint_names ?? window.data?.prepared.jointNames ?? landmarks.map((landmark) => landmark.jointName);
   const previousFrameIndex = effective === null ? -1 : frameIndexAt(frames, effective);
   const nextIndex = effective === null ? -1 : nextFrameIndexAt(frames, effective);
   const previousFrame = previousFrameIndex >= 0 ? frames[previousFrameIndex] ?? null : null;
