@@ -197,6 +197,7 @@ export function MatchFrameContextProvider({
       if (playerId !== selectedPlayerId) sourceFramesRef.current.pose = EMPTY_FRAME;
       if (
         playerId !== selectedPlayerId &&
+        selectedPlayerId !== null &&
         (options?.origin === "pose" || poseVisible) &&
         pair.pose !== null &&
         targetTimeNs !== null

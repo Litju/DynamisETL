@@ -69,7 +69,10 @@ async function fetchArrowPayload(
     },
   );
   if (!response.ok) {
-    if (response.status === 406 || response.status === 415) {
+    // Older serving deployments expose only the JSON window route and answer
+    // an Arrow-format request with 404; the JSON retry will preserve real
+    // artifact errors while keeping this transport fallback compatible.
+    if (response.status === 404 || response.status === 406 || response.status === 415) {
       throw new ArrowTransportUnsupportedError(
         "Arrow window transport is unsupported (" + response.status + ")",
       );

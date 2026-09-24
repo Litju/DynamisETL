@@ -283,6 +283,7 @@ describe("workbench shell", () => {
 
   it("opens a non-overview view from the deep link without inventing results", async () => {
     renderAt("/lab/skillcorner-opendata/1925299?stream=pose-period-1&view=pose");
+    await screen.findByRole("tab", { name: "pose" });
     // The stub session declares no canonical pose artifact, so the pose viewer
     // must say so explicitly instead of rendering an empty scene.
     expect(

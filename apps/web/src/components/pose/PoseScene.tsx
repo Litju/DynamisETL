@@ -1,5 +1,5 @@
-import { CameraControls, Grid } from "@react-three/drei";
-import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
+import { CameraControls, Grid, View } from "@react-three/drei";
+import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   BufferAttribute,
@@ -574,13 +574,20 @@ export function arcPoints(vertex: PoseLandmark, first: PoseLandmark, second: Pos
   return points;
 }
 
-export function PoseCanvas({ playing, onReady, ...scene }: PoseSceneProps & {
-  readonly playing: boolean;
+export function PoseCanvas({ onReady, ...scene }: PoseSceneProps & {
   readonly onReady?: () => void;
 }) {
-  return <Canvas frameloop={playing ? "always" : "demand"} camera={{ fov: 40, near: 0.01, far: 100 }} dpr={[1, 2]} gl={{ antialias: true }} onCreated={() => onReady?.()}>
-    <PoseScene {...scene} />
-  </Canvas>;
+  return (
+    <View className="absolute inset-0" style={{ width: "100%", height: "100%" }} index={1}>
+      <PoseReady onReady={onReady} />
+      <PoseScene {...scene} />
+    </View>
+  );
+}
+
+function PoseReady({ onReady }: { readonly onReady?: (() => void) | undefined }) {
+  useEffect(() => onReady?.(), [onReady]);
+  return null;
 }
 
 export default PoseCanvas;

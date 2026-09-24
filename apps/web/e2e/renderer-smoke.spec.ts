@@ -7,6 +7,7 @@ type RendererCase = {
   readonly route: string;
   readonly host: string;
   readonly renderer: string;
+  readonly canvasHost?: string;
 };
 
 const CASES: readonly RendererCase[] = [
@@ -27,6 +28,7 @@ const CASES: readonly RendererCase[] = [
     route: "/lab/skillcorner-opendata/1925299?stream=pose-1&view=pose&t_ns=0",
     host: "pose-canvas",
     renderer: "r3f",
+    canvasHost: "matchlab-canvas",
   },
 ];
 
@@ -53,7 +55,7 @@ for (const candidate of CASES) {
     const host = page.getByTestId(candidate.host);
     await expect(host).toHaveAttribute("data-renderer", candidate.renderer);
     await expect(host).toHaveAttribute("data-renderer-ready", "true");
-    const canvas = host.locator("canvas").first();
+    const canvas = page.getByTestId(candidate.canvasHost ?? candidate.host).locator("canvas").first();
     await expect(canvas).toBeVisible();
 
     const details = await canvas.evaluate((node) => {
@@ -80,3 +82,21 @@ for (const candidate of CASES) {
     expect(consoleErrors, consoleMessages.join("\n")).toEqual([]);
   });
 }
+
+test("keeps one MatchLab Canvas mounted across Field and Pose modes", async ({ page }) => {
+  await page.goto("/lab/skillcorner-opendata/1925299?stream=pose-1&view=pose&t_ns=0");
+  const canvas = page.getByTestId("matchlab-canvas").locator("canvas");
+  await expect(canvas).toHaveCount(1);
+  const originalCanvas = await canvas.elementHandle();
+  await expect(page.getByTestId("pose-canvas")).toHaveAttribute("data-renderer-ready", "true");
+
+  await page.getByRole("tab", { name: "field", exact: true }).click();
+  await expect(page.getByTestId("pitch-canvas")).toHaveAttribute("data-renderer-ready", "true");
+  await expect(page.getByTestId("matchlab-canvas").locator("canvas")).toHaveCount(1);
+  expect(await originalCanvas?.evaluate((element) => element.isConnected)).toBe(true);
+
+  await page.getByRole("tab", { name: "pose", exact: true }).click();
+  await expect(page.getByTestId("pose-canvas")).toHaveAttribute("data-renderer-ready", "true");
+  const currentCanvas = await page.getByTestId("matchlab-canvas").locator("canvas").elementHandle();
+  expect(await currentCanvas?.evaluate((element, original) => element === original, originalCanvas)).toBe(true);
+});

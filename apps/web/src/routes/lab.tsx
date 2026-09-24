@@ -9,6 +9,7 @@ import {
 import { useCallback, useEffect, useMemo } from "react";
 
 import { LabOverview } from "@/components/lab/LabOverview";
+import { MatchLabCanvasRoot } from "@/components/matchlab/MatchLabCanvasRoot";
 import { SignalLaboratory } from "@/components/lab/SignalLaboratory";
 import { PitchReplay } from "@/components/pitch/PitchReplay";
 import { lazy, Suspense } from "react";
@@ -129,7 +130,13 @@ export function LabPage() {
     ),
   ];
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <MatchLabCanvasRoot
+      enabled={
+        (view === "field" || view === "pose") &&
+        Boolean(selectedStream?.sample_artifact_ids[0])
+      }
+    >
+      <div className="relative z-10 flex h-full min-h-0 flex-col">
         <div
           role="tablist"
           aria-label="Laboratory views"
@@ -205,5 +212,6 @@ export function LabPage() {
           )}
         </div>
       </div>
+    </MatchLabCanvasRoot>
   );
 }

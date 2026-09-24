@@ -609,7 +609,6 @@ export function PoseViewer() {
               onManualCamera={() => dispatchView({ type: "manual" })}
               selectedSubjectId={subjectId}
               onSelectSubject={(nextSubjectId) => void handleSubjectChange(nextSubjectId)}
-              playing={playing}
               showProviderSkeleton={showProviderSkeleton}
               showTorsoCue={showTorsoCue}
               showFootContact={showFootContact}
