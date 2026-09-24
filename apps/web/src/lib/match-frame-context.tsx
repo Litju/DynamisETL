@@ -56,6 +56,7 @@ export interface MatchFrameContextValue {
     options?: SubjectSelectionOptions & { origin?: "field" | "pose" },
   ) => void;
   readonly selectTrackingObject: (objectId: string | null, objectType?: string | null) => void;
+  readonly hoverTrackingObject: (objectId: string | null) => void;
   readonly selectTeam: (teamId: string | null) => void;
   readonly selectTacticalObject: (objectId: string | null) => void;
   readonly hoverTacticalObject: (objectId: string | null) => void;
@@ -224,6 +225,10 @@ export function MatchFrameContextProvider({
     },
     [durable, participantIds, selectPlayer, sourceFramesRef],
   );
+  const hoverTrackingObject = useCallback(
+    (objectId: string | null) => useAnalysisStore.getState().hoverEntity(objectId),
+    [],
+  );
   const selectTeam = useCallback(
     (teamId: string | null) => useAnalysisStore.getState().selectTeam(teamId),
     [],
@@ -260,6 +265,7 @@ export function MatchFrameContextProvider({
       seekCanonicalTime,
       selectPlayer,
       selectTrackingObject,
+      hoverTrackingObject,
       selectTeam,
       selectTacticalObject,
       hoverTacticalObject,
@@ -269,6 +275,7 @@ export function MatchFrameContextProvider({
     getResolvedFrame,
     getCurrentTimeNs,
     hoveredEntityId,
+    hoverTrackingObject,
     hoverTacticalObject,
     hoveredTacticalObjectId,
     pair.pose,

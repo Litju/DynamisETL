@@ -13,7 +13,7 @@
 import type {
   TacticalOverlay,
   TacticalRole,
-} from "@/components/pitch/pitch-renderer";
+} from "@/components/matchlab/render-types";
 
 export type TacticalRow = Readonly<Record<string, unknown>>;
 

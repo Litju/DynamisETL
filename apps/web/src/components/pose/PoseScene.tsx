@@ -117,8 +117,8 @@ export interface PoseSceneProps {
   /** Clicking a subject in the all-subject world selects it as the subject. */
   readonly onSelectSubject?: (subjectId: string) => void;
   readonly maxFrameGapNs?: number;
-  readonly sourceStreamId?: string;
-  readonly sourceArtifactId?: string | null;
+  readonly sourceStreamId?: string | undefined;
+  readonly sourceArtifactId?: string | null | undefined;
   readonly reportResolvedFrame?: ((kind: MatchFrameSourceKind, frame: ResolvedMatchFrame) => void) | undefined;
 }
 
@@ -240,15 +240,18 @@ function PoseStage({ subjects, bounds, ...props }: PoseSceneProps & {
       <directionalLight position={[2, 4, 3]} intensity={1.1} />
       <Grid args={[bounds.radius * 2.6, bounds.radius * 2.6]} position={[bounds.center[0], bounds.min[1], bounds.center[2]]} cellSize={bounds.radius / 8} cellColor="#242c37" sectionSize={bounds.radius / 2} sectionColor="#33404f" fadeDistance={bounds.radius * 14} fadeStrength={1.5} />
       <CameraControls ref={controlsRef} makeDefault onStart={handleControlStart} />
-      <PoseHotPath subjects={subjects} sceneRadius={bounds.radius} {...props} />
+      <PoseLayer subjects={subjects} sceneRadius={bounds.radius} {...props} />
     </>
   );
 }
 
-function PoseHotPath({ subjects, overlays, providerConnections, showProviderSkeleton, showTorsoCue, showFootContact, showHandContact, showHeadNeck, showArticulationAngles, showSegments, showAngles, showErrorRadii, coordinateMode, selectedSubjectId = null, onSelectSubject, maxFrameGapNs, sourceStreamId, sourceArtifactId, reportResolvedFrame, sceneRadius }: PoseSceneProps & {
+export interface PoseLayerProps extends PoseSceneProps {
   readonly subjects: readonly PoseSubjectFrames[];
   readonly sceneRadius: number;
-}) {
+}
+
+/** Reusable Pose geometry layer; camera and Canvas ownership stay with the viewport. */
+export function PoseLayer({ subjects, overlays, providerConnections, showProviderSkeleton, showTorsoCue, showFootContact, showHandContact, showHeadNeck, showArticulationAngles, showSegments, showAngles, showErrorRadii, coordinateMode, selectedSubjectId = null, onSelectSubject, maxFrameGapNs, sourceStreamId, sourceArtifactId, reportResolvedFrame, sceneRadius }: PoseLayerProps) {
   // In the all-subject world the camera frames the whole group, so a 3 cm
   // glyph is sub-pixel; joints scale with the scene so every figure stays
   // readable. A single subject keeps its true glyph size.

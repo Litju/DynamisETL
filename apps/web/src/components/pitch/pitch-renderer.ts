@@ -13,8 +13,19 @@
 
 import type { Application, Container, Graphics, Text } from "pixi.js";
 
+import type { PitchEvent, TacticalOverlay, TacticalRole } from "@/components/matchlab/render-types";
 import { pitchToScreen, screenToPitch, type EntityGroup } from "@/components/pitch/pitch-model";
 import { DEFAULT_PITCH, type EntityFrame, type TrailPoint, type Viewport } from "@/components/pitch/pitch-model";
+
+export {
+  EMPTY_TACTICAL_OVERLAY,
+  type PitchEvent,
+  type TacticalHull,
+  type TacticalInfluenceCell,
+  type TacticalOverlay,
+  type TacticalRole,
+  type TacticalTerritoryCell,
+} from "@/components/matchlab/render-types";
 
 export interface PitchPalette {
   readonly surface: string;
@@ -30,16 +41,6 @@ export interface PitchPalette {
   readonly event: string;
   /** Dark (or light, in Report Light) halo that keeps the ball above overlays. */
   readonly halo: string;
-}
-
-/** One discrete source event placed on the pitch. */
-export interface PitchEvent {
-  readonly eventId: string;
-  readonly tRelNs: number;
-  readonly type: string;
-  readonly subtype: string | null;
-  readonly xM: number;
-  readonly yM: number;
 }
 
 /** Which scene layers are visible. Detection semantics are never optional. */
@@ -59,47 +60,6 @@ export const DEFAULT_PITCH_LAYERS: PitchLayers = {
   geometry: true,
   territory: false,
   influence: false,
-};
-
-/**
- * Team role of an overlay item, resolved from the same group assignment the
- * entity markers use, so a hull or cell is always drawn in its team's colour.
- */
-export type TacticalRole = "home" | "away" | "other";
-
-export interface TacticalHull {
-  readonly groupId: string;
-  readonly role: TacticalRole;
-  readonly points: readonly [number, number][];
-}
-
-export interface TacticalTerritoryCell {
-  readonly entityId: string;
-  readonly groupId: string;
-  readonly role: TacticalRole;
-  readonly points: readonly [number, number][];
-}
-
-export interface TacticalInfluenceCell {
-  readonly xM: number;
-  readonly yM: number;
-  readonly widthM: number;
-  readonly heightM: number;
-  readonly groupId: string;
-  readonly role: TacticalRole;
-  readonly arrivalTimeS: number;
-}
-
-export interface TacticalOverlay {
-  readonly hulls: readonly TacticalHull[];
-  readonly territoryCells: readonly TacticalTerritoryCell[];
-  readonly influenceCells: readonly TacticalInfluenceCell[];
-}
-
-export const EMPTY_TACTICAL_OVERLAY: TacticalOverlay = {
-  hulls: [],
-  territoryCells: [],
-  influenceCells: [],
 };
 
 export interface PitchRendererHandle {
