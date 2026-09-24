@@ -141,6 +141,11 @@ test("real SkillCorner split Field and Pose views share one scissored Canvas and
   await expect(poseView).toHaveAttribute("data-canonical-time-ns", initialTimeNs.toString());
   await expect(poseView).toHaveAttribute("data-selected-player-id", selected.entity_id);
   await expect(page.getByTestId("matchlab-canvas").locator("canvas")).toHaveCount(1);
+  const fieldCameraId = await field.getAttribute("data-view-camera-id");
+  const poseCameraId = await poseView.getAttribute("data-view-camera-id");
+  expect(fieldCameraId).toBeTruthy();
+  expect(poseCameraId).toBeTruthy();
+  expect(fieldCameraId).not.toBe(poseCameraId);
 
   const initialTrackingFrameNs = BigInt((await field.getAttribute("data-drawn-frame-ns"))!);
   const initialPoseFrameNs = BigInt((await poseView.getAttribute("data-source-frame-ns"))!);

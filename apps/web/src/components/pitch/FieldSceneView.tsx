@@ -1,4 +1,4 @@
-import { CameraControls, Html, View } from "@react-three/drei";
+import { CameraControls, Html, PerspectiveCamera, View } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, forwardRef } from "react";
 
@@ -139,6 +139,7 @@ export const FieldSceneView = forwardRef<FieldSceneViewHandle, FieldSceneViewPro
   useImperativeHandle(ref, () => ({ resetView: () => cameraRef.current?.resetView() }), []);
   return (
     <View className="absolute inset-0" style={{ width: "100%", height: "100%" }} index={2}>
+      <PerspectiveCamera makeDefault />
       <color attach="background" args={["#111820"]} />
       <ambientLight intensity={1.25} />
       <directionalLight position={[0, cameraDistance, 0]} intensity={1.1} />
@@ -209,9 +210,10 @@ function FieldFrameEvidence({
   readonly territoryCellCount: number;
   readonly influenceCellCount: number;
 }) {
-  useFrame(() => {
+  useFrame(({ camera }) => {
     const host = hostRef.current;
     if (!host) return;
+    host.dataset.viewCameraId = camera.uuid;
     const canonicalTimeNs = effectiveTimeNs(useAnalysisStore.getState());
     host.dataset.canonicalTimeNs = canonicalTimeNs?.toString() ?? "";
     host.dataset.drawnFrameNs = sourceFrameNs?.toString() ?? "";

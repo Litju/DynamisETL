@@ -18,7 +18,7 @@
       "buttonCount": 0,
       "sourceEvents": "4 source events in window",
       "forwardDeltaNs": "1649800000",
-      "reverseDeltaNs": "-1583300000"
+      "reverseDeltaNs": "-1599900000"
     },
     "r3f": {
       "renderer": "r3f",
@@ -36,8 +36,8 @@
       "trailsVisible": "true",
       "buttonCount": 0,
       "sourceEvents": "4 source events in window",
-      "forwardDeltaNs": "2250002000",
-      "reverseDeltaNs": "-2150000000"
+      "forwardDeltaNs": "2199868000",
+      "reverseDeltaNs": "-2133200000"
     }
   },
   "criteria": [

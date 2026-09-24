@@ -1,4 +1,4 @@
-import { CameraControls, View } from "@react-three/drei";
+import { CameraControls, PerspectiveCamera, View } from "@react-three/drei";
 import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
@@ -587,19 +587,30 @@ export function arcPoints(vertex: PoseLandmark, first: PoseLandmark, second: Pos
   return points;
 }
 
-export function PoseCanvas({ onReady, ...scene }: PoseSceneProps & {
+export function PoseCanvas({ onReady, evidenceHostRef, ...scene }: PoseSceneProps & {
   readonly onReady?: () => void;
+  readonly evidenceHostRef?: React.RefObject<HTMLDivElement | null>;
 }) {
   return (
     <View className="absolute inset-0" style={{ width: "100%", height: "100%" }} index={1}>
-      <PoseReady onReady={onReady} />
+      <PerspectiveCamera makeDefault position={[0, 0, 5]} />
+      <PoseReady onReady={onReady} evidenceHostRef={evidenceHostRef} />
       <PoseScene {...scene} />
     </View>
   );
 }
 
-function PoseReady({ onReady }: { readonly onReady?: (() => void) | undefined }) {
+function PoseReady({
+  onReady,
+  evidenceHostRef,
+}: {
+  readonly onReady?: (() => void) | undefined;
+  readonly evidenceHostRef?: React.RefObject<HTMLDivElement | null> | undefined;
+}) {
   useEffect(() => onReady?.(), [onReady]);
+  useFrame(({ camera }) => {
+    if (evidenceHostRef?.current) evidenceHostRef.current.dataset.viewCameraId = camera.uuid;
+  });
   return null;
 }
 

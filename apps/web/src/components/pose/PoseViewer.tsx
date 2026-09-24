@@ -65,6 +65,7 @@ export function PoseViewer() {
   const selectedJoint = useAnalysisStore((state) => state.selectedJoint);
   const hoveredJoint = useAnalysisStore((state) => state.hoveredJoint);
   const [rendererReady, setRendererReady] = useState(false);
+  const rendererHostRef = useRef<HTMLDivElement | null>(null);
   const [view, dispatchView] = useReducer(poseViewReducer, INITIAL_POSE_VIEW);
   const allSubjects = view.scope === "all";
   const coordinateMode = view.frame;
@@ -589,6 +590,7 @@ export function PoseViewer() {
       ) : null}
       <div className="flex min-h-0 flex-1">
         <div
+          ref={rendererHostRef}
           className="relative min-h-0 flex-1"
           data-testid="pose-canvas"
           data-renderer="r3f"
@@ -606,6 +608,7 @@ export function PoseViewer() {
         >
           <Suspense fallback={<LoadingPanel label="Loading 3D renderer" />}>
             <PoseCanvas
+              evidenceHostRef={rendererHostRef}
               frames={frames}
               subjectFrames={subjectFrames}
               allSubjects={allSubjects}

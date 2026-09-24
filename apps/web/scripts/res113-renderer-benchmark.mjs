@@ -74,6 +74,7 @@ async function measure(page) {
     const usedHeapBytes = performance.memory?.usedJSHeapSize ?? null;
     const canvas = document.querySelector("[data-testid='matchlab-canvas'] canvas");
     const renderSamples = [...window.__dynamisMatchLabFrameStats];
+    const drawStatsAvailable = renderSamples.length > 0;
     const drawCalls = renderSamples
       .map((frame) => frame.drawCalls ?? frame.calls ?? 0)
       .filter((value) => typeof value === "number");
@@ -102,17 +103,18 @@ async function measure(page) {
         worst: Math.round(Math.max(...frameTimes) * 100) / 100,
       },
       draw: {
-        renderPassesPerFrame: Math.round(drawCalls.length / displayFrames * 100) / 100,
-        meanDrawCallsPerFrame: Math.round(drawCalls.reduce((sum, value) => sum + value, 0) / displayFrames),
+        renderStatsSamples: renderSamples.length,
+        renderPassesPerFrame: drawStatsAvailable ? Math.round(drawCalls.length / displayFrames * 100) / 100 : null,
+        meanDrawCallsPerFrame: drawStatsAvailable ? Math.round(drawCalls.reduce((sum, value) => sum + value, 0) / displayFrames) : null,
         drawCallsPerRenderPassP50: drawCalls.length ? percentile(drawCalls, 0.5) : null,
         drawCallsPerRenderPassP95: drawCalls.length ? percentile(drawCalls, 0.95) : null,
-        meanTrianglesPerFrame: Math.round(triangles.reduce((sum, value) => sum + value, 0) / displayFrames),
+        meanTrianglesPerFrame: drawStatsAvailable ? Math.round(triangles.reduce((sum, value) => sum + value, 0) / displayFrames) : null,
         trianglesPerRenderPassP50: triangles.length ? percentile(triangles, 0.5) : null,
       },
       rendererResources: {
-        geometries: memory.geometries ?? null,
-        textures: memory.textures ?? null,
-        allocatedBytes: memory.total ?? null,
+        geometries: drawStatsAvailable ? memory.geometries ?? null : null,
+        textures: drawStatsAvailable ? memory.textures ?? null : null,
+        allocatedBytes: drawStatsAvailable ? memory.total ?? null : null,
       },
       jsHeapBytes: usedHeapBytes,
     };
@@ -257,6 +259,7 @@ const report = {
     scenes: "Field includes territory and influence overlays; Pose and split use the all-subjects scope, with each run recording the source subjects available in its bounded window.",
     resolution: "The requested viewport sizes are recorded separately from the responsive canvas backing size.",
     memory: "Records JS heap, renderer resource counts, and WebGPU-reported allocated bytes. WebGL2 does not expose comparable allocated bytes, so cross-backend GPU memory comparison is unavailable.",
+    drawCalls: "Samples Three renderer statistics after each render pass and records their per-animation-frame aggregate; missing pass instrumentation is null rather than zero.",
     repeatCount: 1,
     concurrentSplit: "Field and Pose are mounted simultaneously as two Drei View panels in one Canvas; the shared canonical playhead drives both.",
   },
@@ -264,7 +267,7 @@ const report = {
     run.status === "ok" && run.measurement?.isWebGPURenderer === true,
   ) ? "passed all real Field/Pose scenes without renderer or console errors" : "failed one or more real scenes",
   recommendedBackend: "WebGL2",
-  decision: "WebGPU rendered all tested scenes without errors but showed no benefit. Standalone Field was tied and Pose was 1–2 FPS slower; the split scene was 8–10 FPS on WebGPU versus 40–45 FPS on WebGL2, with p95 frame intervals of roughly 183–217 ms versus 50–67 ms. Keep WebGL2 as the production backend.",
+  decision: "WebGPU rendered all tested scenes without errors but showed no benefit. Standalone Field was within 1 FPS and Pose was 1–3 FPS slower; the split scene was 8–9 FPS on WebGPU versus 43–46 FPS on WebGL2, with p95 frame intervals of 200–217 ms versus 50 ms. Keep WebGL2 as the production backend.",
   runs,
 };
 await mkdir(path.dirname(output), { recursive: true });
