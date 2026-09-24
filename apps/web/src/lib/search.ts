@@ -11,7 +11,7 @@ import { z } from "zod";
 /** Canonical time is signed; see `lib/time.ts` for why. */
 export const DECIMAL_NS = /^-?\d+$/;
 
-export const WORKBENCH_VIEWS = ["overview", "signals", "field", "pose", "provenance"] as const;
+export const WORKBENCH_VIEWS = ["overview", "signals", "field", "pose", "split", "provenance"] as const;
 export type WorkbenchView = (typeof WORKBENCH_VIEWS)[number];
 export const TACTICAL_VIEWS = ["live", "space", "shape", "range", "events", "report"] as const;
 export type TacticalView = (typeof TACTICAL_VIEWS)[number];

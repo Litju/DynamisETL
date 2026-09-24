@@ -1,8 +1,8 @@
 import { useEffect, useMemo } from "react";
-import { Line } from "@react-three/drei";
 import type { ThreeEvent } from "@react-three/fiber";
 import { Shape, ShapeGeometry, DoubleSide } from "three";
 
+import { Polyline } from "@/components/matchlab/Polyline";
 import type { PitchEvent, TacticalOverlay, TacticalRole } from "@/components/matchlab/render-types";
 import type { MatchFrameContextValue } from "@/lib/match-frame-context";
 
@@ -73,10 +73,9 @@ function TacticalPolygon({
         </mesh>
       ) : null}
       {linePoints.length > 1 ? (
-        <Line
+        <Polyline
           points={linePoints}
           color={colorValue}
-          lineWidth={selected ? 2 : 1}
           onClick={select}
           onPointerOver={() => matchFrame.hoverTacticalObject(objectId)}
           onPointerOut={() => matchFrame.hoverTacticalObject(null)}

@@ -271,7 +271,7 @@ function FieldEntityLabels({
     });
   }
   return items.map((item) => (
-    <Html key={item.id} position={[item.xM, 0.38, -item.yM]} center distanceFactor={90}>
+    <Html key={item.id} position={[item.xM, 0.38, -item.yM]} center distanceFactor={90} zIndexRange={[9, 9]}>
       <button
         type="button"
         aria-label={`Select ${item.kind} ${item.id}`}

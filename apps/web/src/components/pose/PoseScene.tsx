@@ -1,4 +1,4 @@
-import { CameraControls, Grid, View } from "@react-three/drei";
+import { CameraControls, View } from "@react-three/drei";
 import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
@@ -6,6 +6,7 @@ import {
   BufferGeometry,
   Color,
   DynamicDrawUsage,
+  GridHelper,
   InstancedMesh,
   LineBasicMaterial,
   LineSegments,
@@ -230,6 +231,18 @@ function PoseStage({ subjects, bounds, ...props }: PoseSceneProps & {
   const handleControlStart = useCallback(() => {
     if (cameraMode !== "manual") onManualCamera?.();
   }, [cameraMode, onManualCamera]);
+  const grid = useMemo(() => {
+    const size = bounds.radius * 2.6;
+    const divisions = Math.max(2, Math.round(size / (bounds.radius / 8)));
+    const value = new GridHelper(size, divisions, "#33404f", "#242c37");
+    value.position.set(bounds.center[0], bounds.min[1], bounds.center[2]);
+    return value;
+  }, [bounds.center, bounds.min, bounds.radius]);
+  useEffect(() => () => {
+    grid.geometry.dispose();
+    if (Array.isArray(grid.material)) grid.material.forEach((material) => material.dispose());
+    else grid.material.dispose();
+  }, [grid]);
   return (
     <>
       <color attach="background" args={["#12161c"]} />
@@ -238,7 +251,7 @@ function PoseStage({ subjects, bounds, ...props }: PoseSceneProps & {
       <fog attach="fog" args={["#12161c", bounds.radius * 6, bounds.radius * 18]} />
       <ambientLight intensity={0.9} />
       <directionalLight position={[2, 4, 3]} intensity={1.1} />
-      <Grid args={[bounds.radius * 2.6, bounds.radius * 2.6]} position={[bounds.center[0], bounds.min[1], bounds.center[2]]} cellSize={bounds.radius / 8} cellColor="#242c37" sectionSize={bounds.radius / 2} sectionColor="#33404f" fadeDistance={bounds.radius * 14} fadeStrength={1.5} />
+      <primitive object={grid} />
       <CameraControls ref={controlsRef} makeDefault onStart={handleControlStart} />
       <PoseLayer subjects={subjects} sceneRadius={bounds.radius} {...props} />
     </>

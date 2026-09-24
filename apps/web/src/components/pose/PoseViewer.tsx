@@ -54,7 +54,7 @@ export function PoseViewer() {
   const queryClient = useQueryClient();
   const datasetId = context?.datasetId ?? null;
   const sessionId = context?.sessionId ?? null;
-  const streamId = context?.streamId ?? null;
+  const requestedStreamId = context?.streamId ?? null;
   const committedTimeNs = useAnalysisStore((state) => state.committedTimeNs);
   // Read-outs follow a throttled playhead; the 3D hot path reads the store
   // directly, so playback never re-renders this component per frame.
@@ -83,8 +83,16 @@ export function PoseViewer() {
   });
   const stream: StreamView | null = useMemo(() => {
     const streams = session.data?.streams ?? [];
-    return streams.find((candidate) => candidate.stream_id === streamId) ?? null;
-  }, [session.data, streamId]);
+    const requested = streams.find((candidate) => candidate.stream_id === requestedStreamId) ?? null;
+    if (requested === null) return null;
+    if (requested?.modality === "pose") return requested;
+    if (requested.modality !== "tracking") return null;
+    const trialId = context?.trialId ?? requested?.trial_id ?? null;
+    return streams.find((candidate) =>
+      candidate.modality === "pose" && (trialId === null || candidate.trial_id === trialId),
+    ) ?? null;
+  }, [context?.trialId, requestedStreamId, session.data]);
+  const streamId = stream?.stream_id ?? null;
   const maxPoseFrameGapNs = useMemo(() => {
     const rate = stream?.nominal_sampling_rate_hz;
     return rate !== null && rate !== undefined && Number.isFinite(rate) && rate > 0

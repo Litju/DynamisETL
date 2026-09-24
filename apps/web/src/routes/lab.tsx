@@ -99,7 +99,7 @@ export function LabPage() {
   // Canonical time authority: a renderer view always has a committed frame that
   // lies inside the selected stream's canonical span (RES-112 F-01/F-08/P-01).
   const rendererView =
-    durableView === "signals" || durableView === "field" || durableView === "pose";
+    durableView === "signals" || durableView === "field" || durableView === "pose" || durableView === "split";
   const timeArtifactId = rendererView ? (selectedStream?.sample_artifact_ids[0] ?? null) : null;
   const timeArtifact = useQuery({
     ...artifactQuery(timeArtifactId ?? ""),
@@ -150,13 +150,16 @@ export function LabPage() {
     ...WORKBENCH_VIEWS.filter(
       (candidate): candidate is WorkbenchView =>
         candidate !== "overview" &&
-        (candidate === "provenance" || candidate === view || surfaces.includes(candidate as never)),
+        (candidate === "provenance" || candidate === view ||
+          (candidate === "split"
+            ? surfaces.includes("field") && surfaces.includes("pose")
+            : surfaces.includes(candidate as never))),
     ),
   ];
   return (
     <MatchLabCanvasRoot
       enabled={
-        (view === "field" || view === "pose") &&
+        (view === "field" || view === "pose" || view === "split") &&
         Boolean(selectedStream?.sample_artifact_ids[0])
       }
     >
@@ -223,6 +226,17 @@ export function LabPage() {
             <Suspense fallback={<LoadingPanel label="Loading 3D laboratory" />}>
               <PoseViewer />
             </Suspense>
+          ) : view === "split" ? (
+            <div className="grid h-full min-h-0 grid-cols-2 gap-2">
+              <section className="min-h-0 min-w-0 overflow-hidden rounded-panel border border-border-subtle">
+                <PitchReplay />
+              </section>
+              <section className="min-h-0 min-w-0 overflow-hidden rounded-panel border border-border-subtle">
+                <Suspense fallback={<LoadingPanel label="Loading Pose view" />}>
+                  <PoseViewer />
+                </Suspense>
+              </section>
+            </div>
           ) : (
             <StatePanel
               state="empty"

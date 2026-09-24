@@ -82,7 +82,7 @@ export function AnalysisContextProvider({ children }: { children: ReactNode }) {
 
   return (
     <AnalysisContext.Provider value={value}>
-      <MatchFrameContextProvider poseVisible={search.view === "pose"}>
+      <MatchFrameContextProvider poseVisible={search.view === "pose" || search.view === "split"}>
         {children}
       </MatchFrameContextProvider>
     </AnalysisContext.Provider>

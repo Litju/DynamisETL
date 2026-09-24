@@ -28,10 +28,15 @@ export function PoseTelemetry() {
   });
   const stream = useMemo(() => {
     const streams = session.data?.streams ?? [];
-    return streams.find((candidate) => candidate.stream_id === context?.streamId && candidate.modality === "pose") ??
-      streams.find((candidate) => candidate.modality === "pose") ??
-      null;
-  }, [context?.streamId, session.data?.streams]);
+    const requested = streams.find((candidate) => candidate.stream_id === context?.streamId) ?? null;
+    if (requested === null) return null;
+    if (requested?.modality === "pose") return requested;
+    if (requested.modality !== "tracking") return null;
+    const trialId = context?.trialId ?? requested?.trial_id ?? null;
+    return streams.find((candidate) =>
+      candidate.modality === "pose" && (trialId === null || candidate.trial_id === trialId),
+    ) ?? null;
+  }, [context?.streamId, context?.trialId, session.data?.streams]);
   const maxGapNs =
     stream?.nominal_sampling_rate_hz !== null &&
     stream?.nominal_sampling_rate_hz !== undefined &&

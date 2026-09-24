@@ -855,7 +855,7 @@ function PitchView({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="shrink-0 border-b border-border-subtle bg-surface-1 px-4 py-2">
+      <header className="relative z-20 shrink-0 border-b border-border-subtle bg-surface-1 px-4 py-2">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <h2 className="t-analysis-title">
             Pitch tracking

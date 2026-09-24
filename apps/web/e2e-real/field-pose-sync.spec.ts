@@ -123,3 +123,37 @@ test("real SkillCorner Pose-origin subject selection updates Field identity and 
   await expect(page.getByTestId("pitch-selection")).toContainText(to!.entity_id);
   await expectCleanConsole(console);
 });
+
+test("real SkillCorner split Field and Pose views share one scissored Canvas and canonical clock", async ({ page }) => {
+  const console = probe(page);
+  const { tracking, pose, subjects } = await matchSubjects(page);
+  const selected = subjects[0]!;
+  const poseRateHz = pose.nominal_sampling_rate_hz ?? 25;
+  const trackingRateHz = tracking.nominal_sampling_rate_hz ?? 10;
+  const initialTimeNs = 1_000_000_000n;
+
+  await page.goto(`${SC}?view=split&stream=${tracking.stream_id}&subject=${selected.entity_id}&t_ns=${initialTimeNs}`);
+  const field = await waitForPitch(page);
+  await waitForPose(page);
+  const poseView = page.getByTestId("pose-canvas");
+  await expect(field).toHaveAttribute("data-renderer", "r3f");
+  await expect(field).toHaveAttribute("data-canonical-time-ns", initialTimeNs.toString());
+  await expect(poseView).toHaveAttribute("data-canonical-time-ns", initialTimeNs.toString());
+  await expect(poseView).toHaveAttribute("data-selected-player-id", selected.entity_id);
+  await expect(page.getByTestId("matchlab-canvas").locator("canvas")).toHaveCount(1);
+
+  const initialTrackingFrameNs = BigInt((await field.getAttribute("data-drawn-frame-ns"))!);
+  const initialPoseFrameNs = BigInt((await poseView.getAttribute("data-source-frame-ns"))!);
+  expect(initialTimeNs - initialTrackingFrameNs).toBeLessThanOrEqual(BigInt(Math.ceil(1.5e9 / trackingRateHz)));
+  expect(initialTimeNs - initialPoseFrameNs).toBeLessThanOrEqual(BigInt(Math.ceil(1.5e9 / poseRateHz)));
+
+  await page.getByRole("button", { name: "Play", exact: true }).first().click();
+  const playback = await measurePlayback(page, 1_000);
+  await page.getByRole("button", { name: "Pause playback" }).first().click();
+  expect(playback.distinctCanvases).toBe(1);
+  const canonicalTimeNs = (await playheadNs(page))!;
+  expect(canonicalTimeNs).toBeGreaterThan(initialTimeNs + 500_000_000n);
+  await expect(field).toHaveAttribute("data-canonical-time-ns", canonicalTimeNs.toString());
+  await expect(poseView).toHaveAttribute("data-canonical-time-ns", canonicalTimeNs.toString());
+  await expectCleanConsole(console);
+});

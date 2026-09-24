@@ -1,5 +1,6 @@
-import { Html, Line } from "@react-three/drei";
+import { Html } from "@react-three/drei";
 
+import { Polyline } from "@/components/matchlab/Polyline";
 import type { TrailPoint } from "@/components/pitch/pitch-model";
 
 export interface ContextSubject {
@@ -40,7 +41,7 @@ export function ContextLayer({
   return (
     <group name="ContextLayer" visible={visible}>
       {trailPoints.length > 1 ? (
-        <Line points={trailPoints} color="#d9e1df" lineWidth={1.25} transparent opacity={0.72} />
+        <Polyline points={trailPoints} color="#d9e1df" transparent opacity={0.72} />
       ) : null}
       {selected ? (
         <group>
@@ -67,7 +68,7 @@ export function ContextLayer({
       ) : null}
       {alignment ? (
         <>
-          <Line points={alignmentPoints} color="#f4f7f6" lineWidth={1.4} dashed dashSize={0.2} gapSize={0.12} />
+          <Polyline points={alignmentPoints} color="#f4f7f6" dashed dashSize={0.2} gapSize={0.12} />
           <Html
             position={[
               (alignment.trackingXY[0] + alignment.poseRootXY[0]) / 2,

@@ -17,6 +17,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:real": "playwright test -c playwright.real.config.ts",
+    "benchmark:res113": "node scripts/res113-renderer-benchmark.mjs",
     "test:e2e:install": "playwright install chromium",
     "api:generate": "node scripts/generate-api.mjs --write",
     "api:check": "node scripts/generate-api.mjs --check"
