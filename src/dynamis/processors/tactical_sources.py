@@ -28,6 +28,8 @@ _POSSESSION_SCHEMA = pa.schema(
         pa.field("measurement_class", pa.string(), nullable=False),
     ]
 )
+
+
 @dataclass(frozen=True, slots=True)
 class TacticalSourceAuthority:
     role_by_player: dict[str, str]
