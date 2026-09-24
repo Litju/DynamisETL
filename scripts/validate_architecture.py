@@ -179,6 +179,11 @@ def _check_matchlab_v3_invariants(contract: dict[str, Any]) -> None:
         raise ContractError("V3 source-frame age tolerance must remain explicit")
     if "Never interpolate" not in context["pose_resolution"]:
         raise ContractError("MatchFrameContext must not fabricate Pose samples")
+    selection = contract["interaction"]["selection_authority"]
+    if "Field-origin player picks commit the player and current canonical time" not in selection:
+        raise ContractError("Field-origin selection must preserve canonical time")
+    if "retain RES-109 section 12" not in selection:
+        raise ContractError("Pose-origin selection must preserve the RES-109 subject transition")
     if "coordinates and proximity never establish identity" not in context["player_identity"]:
         raise ContractError("player identity must come from a registered identity mapping")
     if "structured" not in contract["pitch"]["geometry_source"]:

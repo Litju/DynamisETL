@@ -69,7 +69,7 @@
     "elevation": "Always label analytical elevation as NOT PHYSICAL PITCH HEIGHT; never imply it is a measured surface."
   },
   "interaction": {
-    "selection_authority": "One MatchFrameContext selection snapshot; player changes commit subject identity and any exact target time together through the durable router context.",
+    "selection_authority": "One MatchFrameContext selection action. Field-origin player picks commit the player and current canonical time without moving it when Pose is absent; the Pose view reports absence and the next sample. Pose-origin player switches retain RES-109 section 12 by resolving the first valid observation in the active range. Both commit player and target time together through the durable router context.",
     "identity_mapping": "Picking returns typed canonical player, Pose subject/joint, tactical-object or event identity; color alone never carries selection.",
     "absence": "Unavailable observations are explicit, never substituted with another player or fabricated at the requested time.",
     "hover": "Transient only; hover cannot change durable selection, time or scientific results.",
