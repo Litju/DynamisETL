@@ -24,6 +24,7 @@ export interface MatchFrameSource {
   readonly measurementClass: string;
   readonly coordinateFrameId: string | null;
   readonly nominalRateHz: number | null;
+  readonly pitchDimensionsM: { readonly lengthM: number; readonly widthM: number } | null;
 }
 
 export interface ResolvedMatchFrame {
@@ -96,6 +97,12 @@ function sourceFor(stream: StreamView | null): MatchFrameSource | null {
     measurementClass: stream.measurement_class,
     coordinateFrameId: stream.coordinate_frame_id,
     nominalRateHz: stream.nominal_sampling_rate_hz,
+    pitchDimensionsM: stream.pitch_dimensions_m
+      ? {
+          lengthM: stream.pitch_dimensions_m.length_m,
+          widthM: stream.pitch_dimensions_m.width_m,
+        }
+      : null,
   };
 }
 

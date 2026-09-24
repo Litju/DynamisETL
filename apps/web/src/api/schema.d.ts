@@ -853,6 +853,13 @@ export interface components {
             /** Value Num */
             value_num: number | null;
         };
+        /** PitchDimensionsView */
+        PitchDimensionsView: {
+            /** Length M */
+            length_m: number;
+            /** Width M */
+            width_m: number;
+        };
         /** ProvenanceEdge */
         ProvenanceEdge: {
             /** Id */
@@ -1098,6 +1105,7 @@ export interface components {
             modality: string;
             /** Nominal Sampling Rate Hz */
             nominal_sampling_rate_hz: number | null;
+            pitch_dimensions_m?: components["schemas"]["PitchDimensionsView"] | null;
             /** Sample Artifact Ids */
             sample_artifact_ids: string[];
             /** Sample Row Count */

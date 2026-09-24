@@ -455,7 +455,7 @@ def session_detail(
                 """SELECT st.stream_id, st.modality, st.measurement_class, st.subject_id,
             st.trial_id, st.device_id, st.nominal_sampling_rate_hz, st.si_units,
             st.source_unit, st.coordinate_frame_id, st.synchronization_spec_id,
-            st.clock_id, st.skeleton_id,
+            st.clock_id, st.skeleton_id, st.stream_metadata,
             COALESCE((SELECT sum(a.row_count) FROM sample_artifact a
                 WHERE a.dataset_id = st.dataset_id AND a.stream_id = st.stream_id), 0)
                 AS sample_row_count,
@@ -538,6 +538,9 @@ def session_detail(
                     if row["skeleton_id"] is not None
                     else []
                 ),
+                pitch_dimensions_m=(
+                    row.get("stream_metadata") or {}
+                ).get("pitch_dimensions_m"),
                 sample_artifact_ids=[str(item) for item in _list(row["artifact_ids"])],
                 sample_row_count=int(row["sample_row_count"]),
             )

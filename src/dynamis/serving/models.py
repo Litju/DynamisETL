@@ -87,6 +87,13 @@ class SkeletonDisplayConnectionView(BaseModel):
     end_joint_name: str
 
 
+class PitchDimensionsView(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    length_m: float = Field(gt=0, allow_inf_nan=False)
+    width_m: float = Field(gt=0, allow_inf_nan=False)
+
+
 class StreamView(BaseModel):
     stream_id: str
     modality: str
@@ -104,6 +111,7 @@ class StreamView(BaseModel):
     skeleton_topology: str | None = None
     skeleton_joint_names: list[str] = Field(default_factory=list)
     skeleton_display_connections: list[SkeletonDisplayConnectionView] = Field(default_factory=list)
+    pitch_dimensions_m: PitchDimensionsView | None = None
     sample_artifact_ids: list[str]
     sample_row_count: int
 

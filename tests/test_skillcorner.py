@@ -91,6 +91,14 @@ def test_adapter_domain_declares_pose_skeleton_and_sync_alignments(bundle: dict[
     pose_streams = [stream for stream in domain.streams if stream.modality is Modality.POSE]
     tracking_streams = [stream for stream in domain.streams if stream.modality is Modality.TRACKING]
     assert len(pose_streams) == 2 and len(tracking_streams) == 2
+    assert tracking_streams[0].stream_metadata["pitch_dimensions_m"] == {
+        "length_m": adapter.metadata.pitch_length_m,
+        "width_m": adapter.metadata.pitch_width_m,
+    }
+    assert tracking_streams[0].stream_metadata["pitch_dimensions_m"] == {
+        "length_m": adapter.metadata.pitch_length_m,
+        "width_m": adapter.metadata.pitch_width_m,
+    }
     assert all(stream.skeleton_id == POSE_SKELETON_ID for stream in pose_streams)
     assert all(
         stream.measurement_class is MeasurementClass.MODEL_ESTIMATED for stream in domain.streams
