@@ -276,7 +276,7 @@ it("keeps one renderer across playback and draws the exact frame imperatively", 
   setFrame.mockClear();
   act(() => useAnalysisStore.getState().setPlayhead(100_000_010n));
   expect(setFrame).not.toHaveBeenCalled();
-  // RES-112 F-03: playback never rebuilds the Pixi application.
+  // RES-112 F-03: the parity renderer stays mounted during playback.
   expect(createPitchRenderer.mock.calls.length).toBe(created);
   expect(destroy).not.toHaveBeenCalled();
 });

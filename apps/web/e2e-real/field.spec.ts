@@ -37,11 +37,11 @@ test.describe("SkillCorner Field", () => {
     expect(drawn).toBe("0");
 
     const before = console.api.length;
-    await page.getByRole("button", { name: "Play" }).click();
+    await page.getByRole("button", { name: "Play", exact: true }).click();
     const playback = await measurePlayback(page, 5_000);
     await page.getByRole("button", { name: "Pause playback" }).click();
     const during = console.api.slice(before);
-    // F-03: one Pixi application for the whole playback.
+    // F-03: one shared renderer canvas for the whole playback.
     expect(playback.distinctCanvases).toBe(1);
     // T-02 / F-04: tactical reads follow chunk handoffs, never animation frames.
     const tacticalReads = during.filter((line) => line.includes("/api/tactical/series/"));
@@ -97,13 +97,14 @@ test.describe("SkillCorner Field", () => {
     await page.getByRole("button", { name: /Territory/ }).click();
     await expect.poll(async () => Number(await canvas.getAttribute("data-overlay-territory-cells"))).toBeGreaterThan(10);
     const cells = await canvas.getAttribute("data-overlay-territory-cells");
-    const element = canvas.locator("canvas");
-    const box = (await element.boundingBox())!;
+    const element = page.getByTestId("matchlab-canvas").locator("canvas");
+    const viewport = canvas;
     const before = await element.elementHandle();
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    const viewBox = (await viewport.boundingBox())!;
+    await page.mouse.move(viewBox.x + viewBox.width / 2, viewBox.y + viewBox.height / 2);
     await page.mouse.wheel(0, -600);
     await page.mouse.down();
-    await page.mouse.move(box.x + box.width / 2 + 120, box.y + box.height / 2 + 40, { steps: 8 });
+    await page.mouse.move(viewBox.x + viewBox.width / 2 + 120, viewBox.y + viewBox.height / 2 + 40, { steps: 8 });
     await page.mouse.up();
     await page.getByRole("button", { name: "Reset view" }).click();
     // Viewport changes are renderer-local: same canvas, same frame, same overlay.
@@ -119,7 +120,7 @@ test.describe("SkillCorner Field", () => {
     await waitForPitch(page);
     await expect(page.getByTestId("pitch-selection")).toContainText("Ball");
     const history = await page.evaluate(() => window.history.length);
-    await page.getByRole("button", { name: "Play" }).click();
+    await page.getByRole("button", { name: "Play", exact: true }).click();
     await page.waitForTimeout(3_000);
     await page.getByRole("button", { name: "Pause playback" }).click();
     expect(await playheadNs(page)).toBeGreaterThan(27_481_000_000n);
@@ -138,7 +139,7 @@ test.describe("DFL Field", () => {
     const canvas = await waitForPitch(page);
     await expect(page).toHaveURL(/t_ns=1020000000(&|$)/);
     await expect(canvas).toHaveAttribute("data-drawn-frame-ns", "1020000000");
-    await page.getByRole("button", { name: "Play" }).click();
+    await page.getByRole("button", { name: "Play", exact: true }).click();
     await page.waitForTimeout(3_000);
     await page.getByRole("button", { name: "Pause playback" }).click();
     expect(await playheadNs(page)).toBeGreaterThan(3_000_000_000n);

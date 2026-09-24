@@ -1,5 +1,5 @@
 import { CameraControls, Html, View } from "@react-three/drei";
-import { useThree } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, forwardRef } from "react";
 
 import { MatchWorld } from "@/components/matchlab/MatchWorld";
@@ -42,6 +42,7 @@ interface FieldCameraHandle {
 }
 
 interface FieldSceneViewProps {
+  readonly hostRef: React.RefObject<HTMLDivElement | null>;
   readonly matchFrame: MatchFrameContextValue;
   readonly trackingBuffers: TrackingWindowBuffers;
   readonly geometryBuffers: TacticalPolygonWindowBuffers;
@@ -61,6 +62,7 @@ interface FieldSceneViewProps {
 }
 
 export const FieldSceneView = forwardRef<FieldSceneViewHandle, FieldSceneViewProps>(function FieldSceneView({
+  hostRef,
   matchFrame,
   trackingBuffers,
   geometryBuffers,
@@ -119,6 +121,12 @@ export const FieldSceneView = forwardRef<FieldSceneViewHandle, FieldSceneViewPro
     ),
     [frameTimeNs, geometryBuffers, influenceBuffers, influenceMaxAgeNs, roleOf, territoryBuffers],
   );
+  const scalarGridIndex = layers.influence && frameTimeNs !== null
+    ? trackingFrameIndexAt(influenceBuffers.gridTimesNs, frameTimeNs, influenceMaxAgeNs)
+    : -1;
+  const scalarGridCellCount = scalarGridIndex < 0
+    ? 0
+    : influenceBuffers.gridOffsets[scalarGridIndex + 1]! - influenceBuffers.gridOffsets[scalarGridIndex]!;
   useEffect(
     () => onInfluenceGridTime(tacticalOverlay.influenceGridTimeNs),
     [onInfluenceGridTime, tacticalOverlay.influenceGridTimeNs],
@@ -161,18 +169,61 @@ export const FieldSceneView = forwardRef<FieldSceneViewHandle, FieldSceneViewPro
         poseLayer={null}
         context={{ selected, hovered, trail }}
       />
+      <FieldFrameEvidence
+        hostRef={hostRef}
+        sourceFrameNs={frameTimeNs}
+        sourceId={matchFrame.trackingSource?.artifactId ?? matchFrame.trackingSource?.streamId ?? "tracking"}
+        selectedPlayerId={matchFrame.selectedPlayerId}
+        hullCount={tacticalOverlay.overlay.hulls.length}
+        territoryCellCount={tacticalOverlay.overlay.territoryCells.length}
+        influenceCellCount={scalarGridCellCount}
+      />
       {layers.labels ? (
         <FieldEntityLabels
           buffers={trackingBuffers}
           frameIndex={frameIndex}
           labels={entityLabels}
           selectedId={matchFrame.selectedTrackingObjectId}
+          matchFrame={matchFrame}
         />
       ) : null}
       <SceneReady onReady={onReady} />
     </View>
   );
 });
+
+function FieldFrameEvidence({
+  hostRef,
+  sourceFrameNs,
+  sourceId,
+  selectedPlayerId,
+  hullCount,
+  territoryCellCount,
+  influenceCellCount,
+}: {
+  readonly hostRef: React.RefObject<HTMLDivElement | null>;
+  readonly sourceFrameNs: bigint | null;
+  readonly sourceId: string;
+  readonly selectedPlayerId: string | null;
+  readonly hullCount: number;
+  readonly territoryCellCount: number;
+  readonly influenceCellCount: number;
+}) {
+  useFrame(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    const canonicalTimeNs = effectiveTimeNs(useAnalysisStore.getState());
+    host.dataset.canonicalTimeNs = canonicalTimeNs?.toString() ?? "";
+    host.dataset.drawnFrameNs = sourceFrameNs?.toString() ?? "";
+    host.dataset.sourceFrameNs = sourceFrameNs?.toString() ?? "";
+    host.dataset.sourceFrameIdentity = sourceFrameNs === null ? "" : sourceId + ":" + sourceFrameNs;
+    host.dataset.selectedPlayerId = selectedPlayerId ?? "";
+    host.dataset.overlayHulls = String(hullCount);
+    host.dataset.overlayTerritoryCells = String(territoryCellCount);
+    host.dataset.overlayInfluenceCells = String(influenceCellCount);
+  });
+  return null;
+}
 
 function contextSubject(
   entity: EntityFrame | null,
@@ -194,11 +245,13 @@ function FieldEntityLabels({
   frameIndex,
   labels,
   selectedId,
+  matchFrame,
 }: {
   readonly buffers: TrackingWindowBuffers;
   readonly frameIndex: number;
   readonly labels: ReadonlyMap<string, string>;
   readonly selectedId: string | null;
+  readonly matchFrame: MatchFrameContextValue;
 }) {
   if (frameIndex < 0) return null;
   const start = buffers.frameOffsets[frameIndex]!;
@@ -213,18 +266,38 @@ function FieldEntityLabels({
       xM: buffers.positionsXY[row * 2]!,
       yM: buffers.positionsXY[row * 2 + 1]!,
       selected: entityId === selectedId,
+      kind: trackingKindName(buffers.objectKinds[row] ?? TRACKING_KIND.other),
       text: labels.get(entityId) ?? (entityId.length > 8 ? entityId.slice(-5) : entityId),
     });
   }
   return items.map((item) => (
     <Html key={item.id} position={[item.xM, 0.38, -item.yM]} center distanceFactor={90}>
-      <span className={item.selected
-        ? "pointer-events-none rounded bg-black/85 px-1 py-0.5 text-[10px] font-semibold text-white"
-        : "pointer-events-none rounded bg-black/65 px-1 py-0.5 text-[9px] text-white/85"}>
+      <button
+        type="button"
+        aria-label={`Select ${item.kind} ${item.id}`}
+        aria-pressed={item.selected}
+        onClick={(event) => {
+          event.stopPropagation();
+          matchFrame.selectTrackingObject(item.id, item.kind);
+        }}
+        onMouseEnter={() => matchFrame.hoverTrackingObject(item.id)}
+        onMouseLeave={() => matchFrame.hoverTrackingObject(null)}
+        className={item.selected
+          ? "rounded bg-black/85 px-1 py-0.5 text-[10px] font-semibold text-white"
+          : "rounded bg-black/65 px-1 py-0.5 text-[9px] text-white/85"}
+      >
         {item.text}
-      </span>
+      </button>
     </Html>
   ));
+}
+
+function trackingKindName(kind: number): string {
+  if (kind === TRACKING_KIND.player) return "player";
+  if (kind === TRACKING_KIND.goalkeeper) return "goalkeeper";
+  if (kind === TRACKING_KIND.ball) return "ball";
+  if (kind === TRACKING_KIND.official) return "official";
+  return "other";
 }
 
 function SceneReady({ onReady }: { readonly onReady: () => void }) {

@@ -6,7 +6,7 @@ import {
   useParams,
   useSearch,
 } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { LabOverview } from "@/components/lab/LabOverview";
 import { MatchLabCanvasRoot } from "@/components/matchlab/MatchLabCanvasRoot";
@@ -46,6 +46,14 @@ export function LabPage() {
   const durableTimeNs = tryParseNs(search.t_ns);
   const durableSubject = search.subject ?? null;
   const durableView = search.view ?? "overview";
+  const previousRendererContext = useRef({
+    datasetId,
+    sessionId,
+    view: durableView,
+    trialId: search.trial ?? null,
+    timeText: search.t_ns ?? null,
+  });
+  const preserveCanonicalTime = useRef(false);
   useEffect(() => {
     hydrate({
       committedTimeNs: durableTimeNs,
@@ -99,6 +107,22 @@ export function LabPage() {
   });
   const awaitingPoseSubject = durableView === "pose" && search.subject === undefined;
   useEffect(() => {
+    const previous = previousRendererContext.current;
+    const periodChanged = previous.datasetId !== datasetId ||
+      previous.sessionId !== sessionId ||
+      previous.trialId !== (search.trial ?? null);
+    if (periodChanged) preserveCanonicalTime.current = false;
+    else if (previous.view !== durableView && previous.timeText === (search.t_ns ?? null) && search.t_ns !== undefined) {
+      preserveCanonicalTime.current = true;
+    }
+    previousRendererContext.current = {
+      datasetId,
+      sessionId,
+      view: durableView,
+      trialId: search.trial ?? null,
+      timeText: search.t_ns ?? null,
+    };
+    if (preserveCanonicalTime.current) return;
     if (!timeArtifact.data || awaitingPoseSubject) return;
     const target = canonicalTimeDefault(timeArtifact.data, {
       currentNs: durableTimeNs,
@@ -107,7 +131,7 @@ export function LabPage() {
     });
     if (target === null) return;
     updateSearch({ t_ns: formatNsDecimal(target) });
-  }, [awaitingPoseSubject, durableSubject, durableTimeNs, durableView, timeArtifact.data, updateSearch]);
+  }, [awaitingPoseSubject, datasetId, durableSubject, durableTimeNs, durableView, search.t_ns, search.trial, sessionId, timeArtifact.data, updateSearch]);
 
   if (session.isPending) return <LoadingPanel label="Loading laboratory session" />;
   if (session.isError) {

@@ -787,6 +787,7 @@ function PitchView({
   // New window / tactical data / team order: update the scene and redraw the
   // current frame imperatively.
   useEffect(() => {
+    if (!pixiParityOracle) return;
     const scene = sceneRef.current;
     scene.trackingBuffers = trackingBuffers;
     scene.indexes = indexes;
@@ -794,7 +795,7 @@ function PitchView({
     scene.maxGapNs = maxGapNs;
     drawAt(effectiveTimeNs(useAnalysisStore.getState()), true);
     setInfluenceGridTimeNs(scene.influenceGridTimeNs);
-  }, [drawAt, indexes, maxGapNs, teamOrder, trackingBuffers]);
+  }, [drawAt, indexes, maxGapNs, pixiParityOracle, teamOrder, trackingBuffers]);
 
   // Per-frame path: a store subscription, never a React render.
   useEffect(() => {
@@ -836,10 +837,10 @@ function PitchView({
       const now = performance.now();
       if (now - lastEmit < 200) return;
       lastEmit = now;
-      setInfluenceGridTimeNs(sceneRef.current.influenceGridTimeNs);
+      if (pixiParityOracle) setInfluenceGridTimeNs(sceneRef.current.influenceGridTimeNs);
       bumpHeader();
     });
-  }, []);
+  }, [pixiParityOracle]);
 
   const currentTimeNs = effectiveTimeNs(useAnalysisStore.getState());
   const currentFrameIndex = trackingFrameIndexAt(trackingBuffers.frameTimesNs, currentTimeNs, maxGapNs);
@@ -968,6 +969,7 @@ function PitchView({
           {pixiParityOracle ? null : (
             <FieldSceneView
               ref={fieldSceneRef}
+              hostRef={hostRef}
               matchFrame={matchFrame!}
               trackingBuffers={trackingBuffers}
               geometryBuffers={indexes.geometry}

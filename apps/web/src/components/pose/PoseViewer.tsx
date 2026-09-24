@@ -152,7 +152,7 @@ export function PoseViewer() {
     [artifactData, sceneSubjectId],
   );
   const playback = usePosePlaybackWindow({
-    enabled: subjectPlaybackEnabled,
+    enabled: subjectPlaybackEnabled && stream?.modality === "pose",
     artifactId,
     entityId: sceneSubjectId,
     jointNames: stream?.skeleton_joint_names ?? [],

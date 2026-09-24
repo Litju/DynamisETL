@@ -28,7 +28,7 @@ export function PoseTelemetry() {
   });
   const stream = useMemo(() => {
     const streams = session.data?.streams ?? [];
-    return streams.find((candidate) => candidate.stream_id === context?.streamId) ??
+    return streams.find((candidate) => candidate.stream_id === context?.streamId && candidate.modality === "pose") ??
       streams.find((candidate) => candidate.modality === "pose") ??
       null;
   }, [context?.streamId, session.data?.streams]);
@@ -67,6 +67,7 @@ export function PoseTelemetry() {
     [artifact.data, subjectId],
   );
   const playback = usePosePlaybackWindow({
+    enabled: stream?.modality === "pose",
     artifactId,
     entityId: subjectId,
     jointNames: stream?.skeleton_joint_names ?? [],

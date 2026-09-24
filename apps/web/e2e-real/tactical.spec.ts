@@ -88,7 +88,7 @@ test("DFL: overlays for all three tactical layers are the drawn frame", async ({
   await expect.poll(async () => Number(await canvas.getAttribute("data-overlay-territory-cells"))).toBeGreaterThan(15);
   await page.getByRole("button", { name: /Influence/ }).click();
   await expect.poll(async () => Number(await canvas.getAttribute("data-overlay-influence-cells"))).toBeGreaterThan(100);
-  await expect(page.getByText(/Influence: MODEL_ESTIMATED tiles · grid @ 00:0[45]:[05]\d/)).toBeVisible();
+  await expect(page.getByText(/Influence: MODEL_ESTIMATED · fixed color domain 0–5 s · grid @ 00:0[45]:[05]\d/)).toBeVisible();
   await evidence(page, "field-dfl-all-layers");
   await expectCleanConsole(console);
 });
