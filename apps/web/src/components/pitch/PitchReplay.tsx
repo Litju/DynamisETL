@@ -101,6 +101,12 @@ function pixiParityOracleEnabled(): boolean {
     window.localStorage.getItem("dynamis-matchlab-pixi-parity") === "1";
 }
 
+function loadPixiPitchRenderer() {
+  if (import.meta.env.MODE === "test") return import("@/components/pitch/pitch-renderer");
+  const moduleUrl = new URL("/src/components/pitch/pitch-renderer.ts", window.location.origin).href;
+  return import(/* @vite-ignore */ moduleUrl);
+}
+
 /** Shape served event rows into renderer marks, dropping unplaceable ones. */
 export function toPitchEvents(rows: ReadonlyArray<Record<string, unknown>>): PitchEvent[] {
   const events: PitchEvent[] = [];
@@ -751,9 +757,9 @@ function PitchView({
     let disposed = false;
     let renderer: PitchRendererHandle | null = null;
     setRendererReady(false);
-    void import("@/components/pitch/pitch-renderer")
+    void loadPixiPitchRenderer()
       .then(({ createPitchRenderer }) =>
-        createPitchRenderer(host, palette, (objectId, objectType) => onSelectEntity(objectId, objectType)),
+        createPitchRenderer(host, palette, (objectId: string, objectType?: string | null) => onSelectEntity(objectId, objectType)),
       )
       .then((created) => {
         if (disposed) {

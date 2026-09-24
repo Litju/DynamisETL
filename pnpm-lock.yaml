@@ -61,9 +61,6 @@ importers:
       openapi-fetch:
         specifier: ^0.17.0
         version: 0.17.0
-      pixi.js:
-        specifier: ^8.21.0
-        version: 8.21.0
       react:
         specifier: ^19.3.0
         version: 19.3.0
@@ -140,6 +137,9 @@ importers:
       openapi-typescript:
         specifier: ^7.13.0
         version: 7.13.0(typescript@5.9.3)
+      pixi.js:
+        specifier: ^8.21.0
+        version: 8.21.0
       tailwindcss:
         specifier: ^4.3.3
         version: 4.3.3
