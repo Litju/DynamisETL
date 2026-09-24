@@ -2,106 +2,108 @@
   "field-dfl": {
     "base-replay-hull-default": {
       "fps": 47,
-      "worstFrameMs": 33,
+      "worstFrameMs": 34,
       "longTasks": 0,
       "longTaskMs": 0,
-      "heapMb": 25,
+      "heapMb": 78,
       "requests": 0,
-      "advancedS": 5.3164
+      "advancedS": 5.4331
     },
     "with-territory": {
-      "fps": 35,
-      "worstFrameMs": 67,
-      "longTasks": 1,
-      "longTaskMs": 62,
-      "heapMb": 25,
+      "fps": 34,
+      "worstFrameMs": 83,
+      "longTasks": 2,
+      "longTaskMs": 135,
+      "heapMb": 78,
       "requests": 4,
-      "advancedS": 5.4665
+      "advancedS": 5.5165
     },
     "with-influence": {
-      "fps": 30,
+      "fps": 27,
       "worstFrameMs": 50,
-      "longTasks": 0,
-      "longTaskMs": 0,
-      "heapMb": 25,
+      "longTasks": 2,
+      "longTaskMs": 103,
+      "heapMb": 78,
       "requests": 0,
-      "advancedS": 5.6164
+      "advancedS": 5.6998
     },
     "combined-across-chunk-boundary": {
-      "fps": 31,
-      "worstFrameMs": 67,
-      "longTasks": 2,
-      "longTaskMs": 109,
-      "heapMb": 25,
-      "requests": 8,
-      "advancedS": 10.4663
+      "fps": 30,
+      "worstFrameMs": 83,
+      "longTasks": 3,
+      "longTaskMs": 198,
+      "heapMb": 78,
+      "requests": 9,
+      "advancedS": 10.5662
     },
-    "inPlaybackWindowP95Ms": 317,
-    "duplicateRequests": []
+    "inPlaybackWindowP95Ms": 385,
+    "duplicateRequests": [
+      "2x /api/tactical/series/proc-run-1656b832a0feafef-team_geometry?from_ns=1020000000&to_ns=9715526387&max_points=100000&columns=t_rel_ns%2Cgroup_id%2Chull_polygon_json"
+    ]
   },
   "playback-chunk": {
     "samples": [
-      109,
-      93,
-      82,
-      89,
-      84,
+      138,
       87,
+      83,
       88,
       82,
-      78,
-      75,
-      82,
-      76,
-      77,
-      79,
       81,
-      78,
-      80,
+      83,
+      87,
+      79,
+      84,
+      84,
       78,
       83,
-      83
+      78,
+      85,
+      88,
+      83,
+      82,
+      89,
+      78
     ],
-    "p95Ms": 93,
+    "p95Ms": 89,
     "budgetMs": 250
   },
   "pose-sc": {
     "one-subject-all-layers": {
-      "fps": 53,
+      "fps": 56,
+      "worstFrameMs": 50,
+      "longTasks": 0,
+      "longTaskMs": 0,
+      "heapMb": 104,
+      "requests": 0,
+      "advancedS": 5.316468
+    },
+    "follow-camera": {
+      "fps": 59,
       "worstFrameMs": 33,
       "longTasks": 0,
       "longTaskMs": 0,
-      "heapMb": 21,
+      "heapMb": 104,
       "requests": 0,
-      "advancedS": 5.1498
-    },
-    "follow-camera": {
-      "fps": 54,
-      "worstFrameMs": 34,
-      "longTasks": 0,
-      "longTaskMs": 0,
-      "heapMb": 21,
-      "requests": 0,
-      "advancedS": 5.066434
+      "advancedS": 5.199868
     },
     "all-subjects": {
-      "fps": 21,
-      "worstFrameMs": 100,
-      "longTasks": 33,
-      "longTaskMs": 1826,
-      "heapMb": 21,
+      "fps": 23,
+      "worstFrameMs": 150,
+      "longTasks": 37,
+      "longTaskMs": 2398,
+      "heapMb": 104,
       "requests": 7,
-      "advancedS": 5.583
+      "advancedS": 6.016468
     },
-    "subjectSwitchMs": 458,
+    "subjectSwitchMs": 436,
     "duplicateRequests": []
   },
   "routes": {
     "readyMs": {
-      "catalog": 721,
-      "overview": 766,
-      "field": 1145,
-      "pose": 1574
+      "catalog": 1224,
+      "overview": 1307,
+      "field": 1525,
+      "pose": 2701
     },
     "poseRendererLoadedLazily": true
   }
