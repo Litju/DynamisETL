@@ -1,22 +1,24 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { AnalysisContext, type AnalysisContextValue } from "@/lib/analysis-context";
-import { PitchReplay } from "@/components/pitch/PitchReplay";
+import { PitchReplay, sessionTeams, shirtLabels } from "@/components/pitch/PitchReplay";
 import { useAnalysisStore } from "@/lib/state/analysis";
 
 const setFrame = vi.fn();
 const setTrail = vi.fn();
 const setEvents = vi.fn();
 const setLayers = vi.fn();
+const setTacticalOverlay = vi.fn();
 const resetView = vi.fn();
 const destroy = vi.fn();
-const createPitchRenderer = vi.fn(async () => ({
+const createPitchRenderer = vi.fn(async (..._args: unknown[]) => ({
   setFrame,
   setTrail,
   setEvents,
   setLayers,
+  setTacticalOverlay,
   resetView,
   destroy,
 }));
@@ -24,8 +26,8 @@ const createPitchRenderer = vi.fn(async () => ({
 // The mock replaces the whole module, so the layer defaults the component
 // reads as a value have to come with it.
 vi.mock("@/components/pitch/pitch-renderer", () => ({
-  createPitchRenderer: (...args: unknown[]) => createPitchRenderer(...(args as [])),
-  DEFAULT_PITCH_LAYERS: { trails: true, labels: true, events: true },
+  createPitchRenderer: (...args: unknown[]) => createPitchRenderer(...args),
+  DEFAULT_PITCH_LAYERS: { trails: true, labels: true, events: true, geometry: true, territory: false, influence: false },
   shortEntityLabel: (objectId: string) => objectId,
 }));
 
@@ -189,9 +191,11 @@ beforeEach(() => {
   setTrail.mockClear();
   destroy.mockClear();
   createPitchRenderer.mockClear();
+  setTacticalOverlay.mockClear();
+  // The laboratory route owns the canonical default time (first frame).
   useAnalysisStore.setState({
-    playheadNs: null,
-    committedTimeNs: null,
+    playheadNs: 0n,
+    committedTimeNs: 0n,
     selectedEntityId: null,
     committedRangeNs: null,
   });
@@ -218,9 +222,9 @@ it("renders an exact tracking window and drives the renderer imperatively", asyn
   expect(screen.getByText(/Ball detected/)).toBeInTheDocument();
   // Detection state is carried by a legend with a shape cue, not by colour
   // alone, and the trail's temporal scope stays stated.
-  expect(screen.getByText("Detected")).toBeInTheDocument();
+  expect(screen.getByText("Detected (filled)")).toBeInTheDocument();
   expect(screen.getByText("Extrapolated (hollow)")).toBeInTheDocument();
-  expect(screen.getByText("Trails cover the committed range only")).toBeInTheDocument();
+  expect(screen.getByText("Trails: committed range")).toBeInTheDocument();
 });
 
 it("refuses a reduced window because replay needs exact entity frames", async () => {
@@ -240,4 +244,67 @@ it("requires an explicit stream and never invents one", async () => {
   installFetch();
   renderPitch({ streamId: null });
   expect(await screen.findByText("No stream selected.")).toBeInTheDocument();
+});
+
+it("keeps one renderer across playback and draws the exact frame imperatively", async () => {
+  installFetch();
+  renderPitch();
+  await waitFor(() => expect(setFrame).toHaveBeenCalled());
+  const created = createPitchRenderer.mock.calls.length;
+  setFrame.mockClear();
+  act(() => useAnalysisStore.getState().setPlayhead(100_000_000n));
+  const call = setFrame.mock.calls.at(-1) as [Array<{ objectId: string }>, unknown, string | null];
+  expect(call[0].map((entity) => entity.objectId)).toEqual(["p1"]);
+  // A playhead inside the same frame is not redrawn.
+  setFrame.mockClear();
+  act(() => useAnalysisStore.getState().setPlayhead(100_000_010n));
+  expect(setFrame).not.toHaveBeenCalled();
+  // RES-112 F-03: playback never rebuilds the Pixi application.
+  expect(createPitchRenderer.mock.calls.length).toBe(created);
+  expect(destroy).not.toHaveBeenCalled();
+});
+
+it("draws no frame for a time outside the loaded window instead of reusing its last frame", async () => {
+  installFetch();
+  renderPitch();
+  await waitFor(() => expect(setFrame).toHaveBeenCalled());
+  setFrame.mockClear();
+  act(() => useAnalysisStore.getState().setPlayhead(900_000_000n));
+  const call = setFrame.mock.calls.at(-1) as [unknown[], unknown, string | null];
+  expect(call[0]).toEqual([]);
+});
+
+it("selects a pitch entity on its own durable key, never the Pose subject", async () => {
+  installFetch();
+  const context = renderPitch({ selectEntity: vi.fn() });
+  await waitFor(() => expect(createPitchRenderer).toHaveBeenCalled());
+  const onSelect = createPitchRenderer.mock.calls[0]?.[2] as (objectId: string) => void;
+  act(() => onSelect("p2"));
+  expect(context.selectEntity).toHaveBeenCalledWith("p2");
+  expect(context.selectSubject).not.toHaveBeenCalled();
+  expect(useAnalysisStore.getState().selectedEntityId).toBe("p2");
+});
+
+it("derives a session-stable team order with registered labels", () => {
+  const teams = sessionTeams({
+    ...SESSION,
+    participants: [
+      { subject_id: "a", role: "player", group_label: "871", cohort: "Perth Glory Football Club" },
+      { subject_id: "b", role: "player", group_label: "1802", cohort: "Brisbane Roar FC" },
+    ],
+  } as never);
+  expect(teams.order).toEqual(["1802", "871"]);
+  expect(teams.labels.get("871")).toBe("Perth Glory Football Club");
+});
+
+it("labels pitch entities with registered shirt numbers only", () => {
+  const labels = shirtLabels({
+    ...SESSION,
+    participants: [
+      { subject_id: "p1", role: "player", group_label: "871", notes: "shirt 16 (C. Schindler)" },
+      { subject_id: "p2", role: "player", group_label: "871", notes: "unregistered note" },
+    ],
+  } as never);
+  expect(labels.get("p1")).toBe("16");
+  expect(labels.has("p2")).toBe(false);
 });

@@ -3,7 +3,12 @@ import { describe, expect, it } from "vitest";
 import type { SessionDetail, StreamView } from "@/api/types";
 import { datasetSurfaces, sessionSurfaces } from "@/lib/capabilities";
 import { affordableSpanNs, windowAround } from "@/lib/dense-window";
-import { defaultStreamFor, patchChangesSearch, resolveLabDefaults } from "@/lib/defaults";
+import {
+  canonicalTimeDefault,
+  defaultStreamFor,
+  patchChangesSearch,
+  resolveLabDefaults,
+} from "@/lib/defaults";
 
 function stream(overrides: Partial<StreamView> & Pick<StreamView, "stream_id" | "modality">) {
   return {
@@ -209,5 +214,36 @@ describe("dense window sizing", () => {
       maxPoints: 20_000,
     });
     expect(bounds).toEqual({ fromNs: 10n, toNs: 20n, explicit: true });
+  });
+});
+
+describe("canonicalTimeDefault (RES-112 F-01/F-08/P-01)", () => {
+  const span = {
+    canonical_time_min_ns: 1_020_000_000,
+    canonical_time_max_ns: 2_766_220_000_000,
+    entity_observations: [
+      { entity_id: "50999", first_observed_ns: 32_920_000_000, last_observed_ns: 90_000_000_000, observation_count: 12 },
+    ],
+  };
+
+  it("lands a field view without time on the first canonical frame", () => {
+    expect(canonicalTimeDefault(span, { currentNs: null, view: "field", subjectId: null })).toBe(1_020_000_000n);
+  });
+
+  it("keeps a committed time inside the stream span", () => {
+    expect(canonicalTimeDefault(span, { currentNs: 5_000_000_000n, view: "field", subjectId: null })).toBeNull();
+  });
+
+  it("replaces a time from another period that the stream cannot render", () => {
+    expect(canonicalTimeDefault(span, { currentNs: 3_721_660_000_000n, view: "field", subjectId: null })).toBe(1_020_000_000n);
+  });
+
+  it("lands Pose on the selected subject's first observation", () => {
+    expect(canonicalTimeDefault(span, { currentNs: null, view: "pose", subjectId: "50999" })).toBe(32_920_000_000n);
+    expect(canonicalTimeDefault(span, { currentNs: null, view: "pose", subjectId: "unknown" })).toBe(1_020_000_000n);
+  });
+
+  it("returns null for an artifact without a canonical span", () => {
+    expect(canonicalTimeDefault({ canonical_time_min_ns: null, canonical_time_max_ns: null, entity_observations: null }, { currentNs: null, view: "field", subjectId: null })).toBeNull();
   });
 });

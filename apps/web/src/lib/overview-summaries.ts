@@ -238,13 +238,15 @@ export interface HeadlineFact {
 export function leadingFact(
   summary: MetricSummary | null,
   format: (value: number, unit: string) => string,
+  labelFor?: (entityId: string) => string | undefined,
 ): HeadlineFact | null {
   const top = summary?.ranked[0];
   if (!summary || !top) return null;
+  const name = labelFor?.(top.entityId);
   return {
     label: `Highest ${summary.metricName.toLowerCase()}`,
     value: format(top.value, summary.siUnit),
-    detail: `${top.entityId} · highest of ${summary.ranked.length} served values`,
+    detail: `${name ? `${name} · ${top.entityId}` : top.entityId} · highest of ${summary.ranked.length} served values`,
     derivedMetricId: top.derivedMetricId,
     subjectId: top.subjectId,
     measurementClass: summary.measurementClass,

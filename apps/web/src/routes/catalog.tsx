@@ -48,6 +48,10 @@ function filterDatasets(
   });
 }
 
+function openableModalities(dataset: DatasetSummary): readonly string[] {
+  return dataset.ingested_modalities?.length ? dataset.ingested_modalities : dataset.modalities;
+}
+
 export interface PlatformScale {
   readonly datasets: number;
   readonly sessions: number;
@@ -269,8 +273,11 @@ function FilterSelect({
 
 /** Compact non-color-only capability marks for the catalog row. */
 function SurfaceMarks({ dataset }: { dataset: DatasetSummary }) {
-  const surfaces = datasetSurfaces(dataset.modalities, dataset.stream_count);
-  const events = datasetHasEvents(dataset.modalities, dataset.stream_count);
+  // Laboratories open only for modalities with registered streams; a declared
+  // but unacquired modality (SkillCorner events) never advertises a lab.
+  const openable = openableModalities(dataset);
+  const surfaces = datasetSurfaces(openable, dataset.stream_count);
+  const events = datasetHasEvents(openable, dataset.stream_count);
   if (surfaces.length === 0 && !events) {
     // No canonical stream exists, so no renderer can open. Derived metrics
     // still resolve through Compare and Methodology.
@@ -340,7 +347,7 @@ const CATALOG_COLUMNS: DataTableColumn<DatasetSummary>[] = [
     id: "surfaces",
     header: "Laboratories",
     size: 1.6,
-    accessor: (dataset) => datasetSurfaces(dataset.modalities, dataset.stream_count).join(","),
+    accessor: (dataset) => datasetSurfaces(openableModalities(dataset), dataset.stream_count).join(","),
     cell: (dataset) => <SurfaceMarks dataset={dataset} />,
   },
   {
@@ -425,7 +432,7 @@ function DatasetPane({ datasetId }: { datasetId: string }) {
     return <ErrorPanel error={dataset.error} onRetry={() => void dataset.refetch()} />;
   }
   const detail = dataset.data;
-  const surfaces = datasetSurfaces(detail.modalities, detail.stream_count);
+  const surfaces = datasetSurfaces(openableModalities(detail), detail.stream_count);
   const firstSession = sessions.data?.[0] ?? null;
 
   return (

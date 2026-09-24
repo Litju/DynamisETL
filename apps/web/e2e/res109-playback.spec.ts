@@ -48,8 +48,9 @@ test("RES-109 Pose crosses multiple exact chunks and keeps telemetry on the live
   await expect.poll(async () => Number(await playheadNs(page)), { timeout: 20_000 })
     .toBeGreaterThan(Number(before + 10_000_000_000n));
   const during = await playheadNs(page);
-  const pause = page.getByRole("button", { name: "Pause" });
-  if (await pause.count()) await pause.click();
+  // At 4x the fixture can reach its end (playback stops itself) between the
+  // count and the click; a pause that is no longer offered is not a failure.
+  await page.getByRole("button", { name: "Pause playback" }).click({ timeout: 2_000 }).catch(() => undefined);
   expect(during).toBeGreaterThan(before + 10_000_000_000n);
   expectContiguous(uniqueBounds(requests));
   expect(requests.filter((url) => new URL(url).searchParams.get("entity_id") === "SC-P1").length).toBeGreaterThan(0);
@@ -202,7 +203,8 @@ test("RES-109 §12 all-subject focus keeps the global exact query unscoped", asy
   await page.getByTestId("pose-all-subjects-toggle").click();
   await page.locator("#pose-subject").selectOption("SC-P2");
   await expect(page).toHaveURL(/subject=SC-P2/);
-  await expect(page.getByTestId("pose-all-subjects-toggle")).toHaveText("all subjects · fixed camera");
+  await expect(page.getByTestId("pose-all-subjects-toggle")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText(/all subjects · fixed camera/)).toBeVisible();
   expect(requests.some((url) => !new URL(url).searchParams.has("entity_id"))).toBe(true);
 });
 

@@ -69,6 +69,10 @@ def _result(*, value: float = 2.5) -> ProcessorResult:
     )
 
 
+def _dense_only_result() -> ProcessorResult:
+    return ProcessorResult(spec=_spec(), metrics=(), series=(_series(),))
+
+
 @pytest.mark.postgres
 def test_pipeline_metric_provenance_is_complete_and_idempotent(
     postgres_url: str,
@@ -145,6 +149,19 @@ def test_pipeline_metric_provenance_is_complete_and_idempotent(
         assert second["processing_artifact"] == 1
         assert second["metric_definition"] == 0
 
+        with control.begin() as connection:
+            dense_only = persist_processing_result(
+                connection,
+                dataset_id="white-cmj-acc-grf",
+                run_id="run-test-dense-only",
+                result=_dense_only_result(),
+                input_checksums=("h" * 64,),
+                computed_at=checked_at,
+                code_sha="f" * 40,
+            )
+        assert dense_only["metric_definition"] == 0
+        assert dense_only["derived_metric"] == 0
+
         with control.connect() as connection:
             rows = connection.execute(
                 text(
@@ -156,9 +173,14 @@ def test_pipeline_metric_provenance_is_complete_and_idempotent(
             run = connection.execute(
                 text(
                     "SELECT run_id, dataset_id, algorithm_id, status, code_git_sha, "
-                    "parameters_hash, input_checksums FROM processing_run"
+                    "parameters_hash, input_checksums FROM processing_run "
+                    "WHERE run_id = 'run-test'"
                 )
             ).fetchall()
+            # The dense-only run is persisted as a run with no scalar metrics.
+            dense_only_runs = connection.execute(
+                text("SELECT count(*) FROM processing_run WHERE run_id = 'run-test-dense-only'")
+            ).scalar_one()
             metric_rows = connection.execute(
                 text("SELECT count(*) FROM derived_metric")
             ).scalar_one()
@@ -170,6 +192,7 @@ def test_pipeline_metric_provenance_is_complete_and_idempotent(
         assert artifact_count == 1
         assert len(rows) == 1
         assert len(run) == 1
+        assert dense_only_runs == 1
         metric = rows[0]
         assert metric.dataset_id == "white-cmj-acc-grf"
         assert metric.metric_id == "test.persistence.scalar"

@@ -271,7 +271,7 @@ it("labels the local analytical frame and exposes provider error radius context"
     await screen.findByText(/1 segment\(s\), 1 angle\(s\) from processor parameters/),
   ).toBeInTheDocument();
   expect(
-    screen.getByRole("checkbox", { name: "provider p90 predicted error radius" }),
+    screen.getByRole("switch", { name: "p90 error radius (provider)" }),
   ).toBeInTheDocument();
 });
 
@@ -310,7 +310,7 @@ it("switches the subject with one exact target-time navigation transaction", asy
   installFetch();
   const selectSubject = vi.fn();
   renderViewer({ subjectId: "s1", selectSubject });
-  const picker = await screen.findByLabelText("subject");
+  const picker = await screen.findByLabelText("Pose subject");
   useAnalysisStore.getState().commitTime(50_000_000n);
   fireEvent.change(picker, { target: { value: "s2" } });
   expect(useAnalysisStore.getState().committedTimeNs).toBe(20_000_000n);

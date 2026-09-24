@@ -46,7 +46,10 @@ class DatasetSummary(BaseModel):
     domain: str
     doi: str | None
     upstream_urls: list[str]
+    #: Modalities the registry declares for the source.
     modalities: list[str]
+    #: Modalities with at least one registered canonical stream (what opens).
+    ingested_modalities: list[str] = []
     license: LicenseView
     version_count: int
     session_count: int
@@ -120,6 +123,10 @@ class SessionParticipantView(BaseModel):
     subject_id: str
     role: str
     group_label: str | None
+    #: Registered subject cohort (for football providers: the team name).
+    cohort: str | None = None
+    #: Registered human-readable subject note (for football: shirt and name).
+    notes: str | None = None
 
 
 class SessionDetail(BaseModel):
@@ -316,6 +323,11 @@ class ArtifactRefView(BaseModel):
     si_units: list[str]
     coordinate_frame_id: str | None
     synchronization_spec_id: str | None
+    algorithm_id: str | None = None
+    algorithm_version: str | None = None
+    parameters_hash: str | None = None
+    run_id: str | None = None
+    artifact_metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class EntityObservationView(BaseModel):
@@ -368,6 +380,101 @@ class DenseWindowMeta(BaseModel):
 class DenseWindow(BaseModel):
     meta: DenseWindowMeta
     rows: list[dict[str, Any]]
+
+
+class TacticalCapabilityLevels(BaseModel):
+    level_a_geometry: str
+    level_b_territory: str
+    level_c_influence: str
+    level_d_event_linked: str
+    level_e_shape_phase: str
+    matchlab_v3_functional_units: str
+    matchlab_v3_shape_graph: str
+    matchlab_v3_triangles: str
+    matchlab_v3_interactions: str
+    possession_context: str
+
+
+class TacticalCapabilityView(BaseModel):
+    dataset_id: str
+    accepted_slice: dict[str, Any]
+    semantics: dict[str, Any]
+    capabilities: TacticalCapabilityLevels
+    quality_evidence: dict[str, Any]
+    unavailable_reasons: list[str]
+
+
+class TacticalMetricMethodologyView(BaseModel):
+    metric_id: str
+    level: Literal["A", "B", "C", "D", "E", "V3"]
+    name: str
+    unit: str
+    kind: str
+    definition: str
+    measurement_class: str
+    algorithm_id: str | None = None
+    algorithm_version: str | None = None
+
+
+class TacticalMethodologyPage(BaseModel):
+    metrics: list[TacticalMetricMethodologyView]
+    authority: str
+
+
+class TacticalQualityView(BaseModel):
+    dataset_id: str
+    capabilities: TacticalCapabilityLevels
+    quality_evidence: dict[str, Any]
+    measurement_classes: dict[str, str]
+    unavailable_reasons: list[str]
+    disclosure: str
+
+
+class TacticalSeriesMeta(BaseModel):
+    artifact: ArtifactRefView
+    series_name: str
+    level: Literal["A", "B", "C", "D", "E", "V3"]
+    measurement_class: str
+    input_measurement_class: str | None
+    coordinate_frame_id: str | None
+    algorithm_id: str | None
+    algorithm_version: str | None
+    parameters_hash: str | None
+    from_ns: int
+    to_ns: int
+    source_rows: int
+    returned_rows: int
+    quality: dict[str, Any]
+    display_note: str
+
+
+class TacticalSeriesView(BaseModel):
+    meta: TacticalSeriesMeta
+    rows: list[dict[str, Any]]
+
+
+class TacticalEventView(BaseModel):
+    event_id: str
+    event_type: str
+    event_subtype: str | None
+    provider_team_id: str | None
+    provider_player_id: str | None
+    event_x_m: float | None
+    event_y_m: float | None
+    provider_context_json: str | None
+    t_rel_ns: int
+    tracking_t_rel_ns: int | None
+    tracking_player_count: int
+    tracking_team_count: int
+    ball_x_m: float | None
+    ball_y_m: float | None
+    event_ball_distance_m: float | None
+    quality_json: str
+
+
+class TacticalEventPage(BaseModel):
+    meta: TacticalSeriesMeta
+    rows: list[TacticalEventView]
 
 
 class ServingStatus(BaseModel):

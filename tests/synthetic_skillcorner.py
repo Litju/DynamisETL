@@ -51,7 +51,7 @@ def write_match_json(path: Path) -> Path:
         "home_team": {"id": HOME_TEAM_ID, "name": "Synthetic Home"},
         "away_team": {"id": AWAY_TEAM_ID, "name": "Synthetic Away"},
         "stadium": {"id": 1, "name": "Synthetic Park"},
-        "home_team_side": ["left_to_right"],
+        "home_team_side": ["left_to_right", "right_to_left"],
         "match_periods": [
             {
                 "period": period,
@@ -70,7 +70,21 @@ def write_match_json(path: Path) -> Path:
                 "number": number,
                 "short_name": name,
                 "trackable_object": 50000 + player_id,
-                "player_role": {"id": 1, "position_group": "Midfield", "name": "Central Midfield"},
+                "player_role": (
+                    {
+                        "id": 1,
+                        "position_group": "Other",
+                        "name": "Goalkeeper",
+                        "acronym": "GK",
+                    }
+                    if player_id == 101
+                    else {
+                        "id": 1,
+                        "position_group": "Midfield",
+                        "name": "Central Midfield",
+                        "acronym": "CM",
+                    }
+                ),
             }
             for player_id, team_id, number, name in PLAYERS
         ],

@@ -39,6 +39,10 @@ from dynamis.processors.acceptance import (
     process_corpus,
     white_cross_sensor_acceptance,
 )
+from dynamis.processors.tactical_corpus import dataset_event_runs
+from dynamis.processors.tactical_geometry import process_tactical_geometry
+from dynamis.processors.tactical_influence import process_tactical_influence
+from dynamis.processors.tactical_territory import process_tactical_territory
 from dynamis.storage.control_plane import control_plane_engine
 
 WHITE_DATASET_ID = "white-cmj-acc-grf"
@@ -164,6 +168,52 @@ def skillcorner_tracking_processing() -> dict:
 def skillcorner_pose_processing() -> dict:
     """Translation-invariant pose geometry for the SkillCorner pose product."""
     return _process(SKILLCORNER_DATASET_ID, "pose", _pose_processor)
+
+
+@asset(group_name="tactical_processors", compute_kind="python")
+def dfl_tactical_geometry_processing() -> dict:
+    """Level A deterministic geometry over accepted DFL/Sportec tracking."""
+    return _process(DFL_DATASET_ID, "tracking", process_tactical_geometry)
+
+
+@asset(group_name="tactical_processors", compute_kind="python")
+def dfl_tactical_territory_processing() -> dict:
+    """Level B clipped territory over accepted DFL/Sportec tracking."""
+    return _process(DFL_DATASET_ID, "tracking", process_tactical_territory)
+
+
+@asset(group_name="tactical_processors", compute_kind="python")
+def dfl_tactical_influence_processing() -> dict:
+    """Level C bounded influence over accepted DFL/Sportec tracking."""
+    return _process(DFL_DATASET_ID, "tracking", process_tactical_influence)
+
+
+@asset(group_name="tactical_processors", compute_kind="python")
+def skillcorner_tactical_geometry_processing() -> dict:
+    """Level A geometry over SkillCorner model-estimated tracking."""
+    return _process(SKILLCORNER_DATASET_ID, "tracking", process_tactical_geometry)
+
+
+@asset(group_name="tactical_processors", compute_kind="python")
+def skillcorner_tactical_territory_processing() -> dict:
+    """Level B territory over SkillCorner model-estimated tracking."""
+    return _process(SKILLCORNER_DATASET_ID, "tracking", process_tactical_territory)
+
+
+@asset(group_name="tactical_processors", compute_kind="python")
+def skillcorner_tactical_influence_processing() -> dict:
+    """Level C bounded influence over SkillCorner model-estimated tracking."""
+    return _process(SKILLCORNER_DATASET_ID, "tracking", process_tactical_influence)
+
+
+@asset(group_name="tactical_processors", compute_kind="python")
+def dfl_tactical_event_processing() -> dict:
+    """Level D source-event snapshots for DFL/Sportec's synchronized event slice."""
+    resolved, engine = _engine()
+    try:
+        return dataset_event_runs(resolved, engine, dataset_id=DFL_DATASET_ID)
+    finally:
+        engine.dispose()
 
 
 @asset(group_name="synthetic_processors", compute_kind="python")
@@ -341,11 +391,18 @@ def gold_marts_reconcile(gold_marts: dict) -> AssetCheckResult:
 
 
 __all__ = [
+    "dfl_tactical_event_processing",
+    "dfl_tactical_geometry_processing",
+    "dfl_tactical_influence_processing",
+    "dfl_tactical_territory_processing",
     "dfl_tracking_processing",
     "gold_marts",
     "gold_publish",
     "gold_serving_export",
     "skillcorner_pose_processing",
+    "skillcorner_tactical_geometry_processing",
+    "skillcorner_tactical_influence_processing",
+    "skillcorner_tactical_territory_processing",
     "skillcorner_tracking_processing",
     "synthetic_lpt_known_answer",
     "white_cmj_cross_sensor_processing",

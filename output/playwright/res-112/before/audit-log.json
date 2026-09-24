@@ -1,0 +1,510 @@
+{
+  "01-catalog": {
+    "url": "http://127.0.0.1:5180/catalog",
+    "console": [],
+    "pageErrors": [],
+    "failed": [],
+    "apiRequests": 2,
+    "apiSample": [
+      "200 /api/serving/status",
+      "200 /api/catalog/datasets"
+    ],
+    "overflow": {
+      "docScrollWidth": 1440,
+      "viewport": 1440,
+      "horizontalOverflow": false
+    },
+    "main": "Multimodal human performance data\n\nOpen scientific datasets ingested to canonical contracts, processed by versioned deterministic processors, and served with method, provenance, quality and rights attached to every value.\n\n5\nDATASETS\n7\nMODALITIES\n122\nSESSIONS\n1,320\nTRIALS\n76,908\nDERIVED METRICS\n\nLaboratories:\nSignals\nField\nPose\n·\nEvidence: methodology, provenance, quality, rights\n\nModality\nAll modalities\ngnss\nimu\nforce\nlpt\ntracking\nevent\npose\nRights\nAny rights\nNon-commercial only\nCommercial use allowed\n5 of 5 datasets\nDataset\n·\nModalities\n·\nLaboratories\n·\nRights\n·\nSessions\n·\nMetrics\n·\nDFL/Sportec IDSSE — integrated tracking and event data\nHugging Face (pysport)\nevent\ntracking\nField\nEvents\nCC-BY-4.0\n1\n6,930\nGymAware landmine press + vision agreement\nZenodo\nlpt\nmetrics only\nCC-BY-4.0\n52\n3,936\nSkillCorner Open Data — broadcast tracking, events, phases + body pose\nSkillCorner / PySport\nevent\npose\ntracking\nField\nPose\nEvents\nMIT\n1\n17,856\nWhite CMJ accelerometer + vGRF (preprocessed, Python format)\nZenodo\nforce\nimu\nSignals\nCC-BY-4.0\n67\n47,736\nWomen's Soccer Positioning — 2023/2024 Spanish third category\nZenodo\ngnss\nSignals\nCC-BY-NC-4.0\nnon-commercial\n1\n450"
+  },
+  "02-overview-dfl": {
+    "url": "http://127.0.0.1:5180/lab/dfl-sportec-idsse/DFL-MAT-J03WPY?view=overview&stream=tracking-period-1&trial=period-1",
+    "console": [],
+    "pageErrors": [],
+    "failed": [],
+    "apiRequests": 5,
+    "apiSample": [
+      "200 /api/catalog/datasets",
+      "200 /api/serving/status",
+      "200 /api/catalog/datasets/dfl-sportec-idsse/sessions/DFL-MAT-J03WPY",
+      "200 /api/metrics?dataset_id=dfl-sportec-idsse&session_id=DFL-MAT-J03WPY&limit=1000",
+      "200 /api/quality?dataset_id=dfl-sportec-idsse&session_id=DFL-MAT-J03WPY&limit=200"
+    ],
+    "overflow": {
+      "docScrollWidth": 1440,
+      "viewport": 1440,
+      "horizontalOverflow": false
+    },
+    "main": "Overview\nField\nProvenance\nTrial period-1\nFortuna Düsseldorf:1. FC Nürnberg\n\nMatch\n·\nevent\ntracking\n\n40\nPARTICIPANTS\n2\nTRIALS\n3\nSTREAMS\n1,155\nDERIVED METRICS\nHIGHEST TOTAL LOCOMOTOR DISTANCE\n14454.5 m\nDFL-OBJ-0000XT · highest of 55 served values\npipeline-derived\nTotal locomotor distance[m]\nTop 18 of 55 entities\npipeline-derived\nDistance by speed zone[m]\nlow · medium · high thresholds are processor parameters\npipeline-derived\nStream contracts\n3 streams · clock, frame and synchronization\n\nSynchronization is claimed only where a stream declares an explicit specification; streams without one are never force-aligned.\n\nDerived metrics\n1,000 of 1,155 (first page)\nMetric\n·\nEntity\n·\nValue\n·\nClass\n·\nTotal locomotor distance\nlocomotor.distance_total\nDFL-OBJ-00008F\n5096.7 m\npipeline-derived\nTotal locomotor distance\nlocomotor.distance_total\nDFL-OBJ-0000EJ\n5708.0 m\npipeline-derived\nTotal locomotor distance\nlocomotor.distance_total\nDFL-OBJ-0000F8\n5937.2 m\npipeline-derived\nTotal locomotor distance\nlocomotor.distance_total\nDFL-OBJ-0000NZ\n5270.3 m\npipeline-derived\nTotal locomotor distance\nlocomotor.distance_total\nDFL-OBJ-0000XT\n14454.5 m\npipeline-derived\nTotal locomotor distance\nlocomotor.distance_total\nDFL-OBJ-0001HW\n2966.0 m\npipeline-derived\nTotal locomotor distance\nlocomotor.distance_total\nDFL-OBJ-0001LJ\n5600.0 m\npipeline-derived\nTotal locomotor distance\nlocomotor.distance_total\nDFL-OBJ-00028V\n5713.2 m\npipeline-derived\nTotal locomotor distance\nlocomotor.distance_total\nDFL-OBJ-002595\n6591.1 m"
+  },
+  "03-signals-dfl": {
+    "url": "http://127.0.0.1:5180/lab/dfl-sportec-idsse/DFL-MAT-J03WPY?view=signals&trial=period-1",
+    "console": [],
+    "pageErrors": [],
+    "failed": [],
+    "apiRequests": 4,
+    "apiSample": [
+      "200 /api/quality?dataset_id=dfl-sportec-idsse&session_id=DFL-MAT-J03WPY&limit=200",
+      "200 /api/catalog/datasets/dfl-sportec-idsse/sessions/DFL-MAT-J03WPY",
+      "200 /api/serving/status",
+      "200 /api/catalog/datasets"
+    ],
+    "overflow": {
+      "docScrollWidth": 1440,
+      "viewport": 1440,
+      "horizontalOverflow": false
+    },
+    "main": "Overview\nField\nProvenance\nTrial period-1\nNO DATA\n\nNo stream selected.\n\nSelect a stream in the explorer to load its bounded signal window."
+  },
+  "10-compare": {
+    "url": "http://127.0.0.1:5180/compare?view=signals",
+    "console": [],
+    "pageErrors": [],
+    "failed": [],
+    "apiRequests": 2,
+    "apiSample": [
+      "200 /api/serving/status",
+      "200 /api/metrics/definitions"
+    ],
+    "overflow": {
+      "docScrollWidth": 1440,
+      "viewport": 1440,
+      "horizontalOverflow": false
+    },
+    "main": "Compare served values\nMetric\nCompare with (optional)\nGroup by\nDataset\nSession\nSubject\nTrial\nNO DATA\n\nChoose a metric to compare.\n\nDistributions are compared across datasets, sessions, subjects or trials. Adding a second metric compares the two on the same observation, where the rows genuinely pair."
+  },
+  "11-methods": {
+    "url": "http://127.0.0.1:5180/methods",
+    "console": [],
+    "pageErrors": [],
+    "failed": [],
+    "apiRequests": 2,
+    "apiSample": [
+      "200 /api/serving/status",
+      "200 /api/metrics/definitions"
+    ],
+    "overflow": {
+      "docScrollWidth": 1440,
+      "viewport": 1440,
+      "horizontalOverflow": false
+    },
+    "main": "Methodology and provenance\n\nWhat a metric means, how it was computed, and which exact run produced any one of its values.\n\nMetric\nNO DATA\n\nChoose a metric.\n\nIts definition, measurement class, algorithm revision and parameters appear immediately, together with the served results whose exact lineage you can open."
+  },
+  "12-quality": {
+    "url": "http://127.0.0.1:5180/quality",
+    "console": [],
+    "pageErrors": [],
+    "failed": [],
+    "apiRequests": 4,
+    "apiSample": [
+      "200 /api/serving/status",
+      "200 /api/rights",
+      "200 /api/quality?limit=200",
+      "200 /api/catalog/datasets"
+    ],
+    "overflow": {
+      "docScrollWidth": 1440,
+      "viewport": 1440,
+      "horizontalOverflow": false
+    },
+    "main": "Quality & rights\n\nWhat the validation rules recorded about the served data, and the licence terms that govern its use.\n\n5\nDATASETS\n76,908\nDERIVED METRICS\n10,078\nPROCESSING RUNS\n0\nQUALITY ISSUES\n\n●\nGold schema published: yes\n·\ncontrol schema dynamis\ngold schema gold\n\nRecorded quality issues\nAll severities\nINFO\nWARNING\nERROR\n●\nNo quality rule flagged any served record\n\nQuality issues are written by the validation rules that run during ingest and processing. An empty list means no rule flagged the scope in view — it is not a guarantee of validity, and it says nothing about a property no rule tests for.\n\nQuarantined records never reach the serving plane, so a value shown anywhere in this product has already passed the rules that were applied to it.\n\nRights by source\ndeclared licence terms that govern every value below them\nSOURCE\tLICENCE\tATTRIBUTION\tCOMMERCIAL\tSHARE-ALIKE\tREDISTRIBUTION\n\nDFL/Sportec IDSSE — integrated tracking and event data\ndfl-sportec-idsse\n\tCC-BY-4.0\t\n▲\nrequired\n\t\n●\npermitted\n\t\n●\nnot required\n\t\n▲\nconditional\n\n\nGymAware landmine press + vision agreement\ngymaware-landmine-vision\n\tCC-BY-4.0\t\n▲\nrequired\n\t\n●\npermitted\n\t\n●\nnot required\n\t\n▲\nconditional\n\n\nSkillCorner Open Data — broadcast tracking, events, phases + body pose\nskillcorner-opendata\n\tMIT\t\n▲\nrequired\n\t\n●\npermitted\n\t\n●\nnot required\n\t\n▲\nconditional\n\n\nWhite CMJ accelerometer + vGRF (preprocessed, Python format)\nwhite-cmj-acc-grf\n\tCC-BY-4.0\t\n▲\nrequired\n\t\n●\npermitted\n\t\n●\nnot required\n\t\n▲\nconditional\n\n\nWomen's S"
+  },
+  "13-runs": {
+    "url": "http://127.0.0.1:5180/runs",
+    "console": [],
+    "pageErrors": [],
+    "failed": [],
+    "apiRequests": 2,
+    "apiSample": [
+      "200 /api/serving/status",
+      "200 /api/runs?limit=500"
+    ],
+    "overflow": {
+      "docScrollWidth": 1440,
+      "viewport": 1440,
+      "horizontalOverflow": false
+    },
+    "main": "Processing runs\n\nEvery served value resolves to one of these runs, and through it to an exact code revision, parameter set and set of input checksums.\n\n10,078\nRUNS\n5\nPROCESSORS\n0\nUNKNOWN CODE REVISION\n500 of 10,078 runs\nProcessor\n·\nDataset\n·\nStatus\n·\nCode revision\n·\nMetrics\n·\nStarted\n·\nClipped player Voronoi territory\ntactical.spatial_territory@1\nskillcorner-opendata\n●\ncompleted\nee7b85e632\n0\n2026-09-23 03:59:06\nClipped player Voronoi territory\ntactical.spatial_territory@1\nskillcorner-opendata\n●\ncompleted\nee7b85e632\n0\n2026-09-23 03:57:21\nDeterministic team and interpersonal tactical geometry\ntactical.team_geometry@1\nskillcorner-opendata\n●\ncompleted\n176177de9e\n0\n2026-09-23 03:49:58\nDeterministic team and interpersonal tactical geometry\ntactical.team_geometry@1\nskillcorner-opendata\n●\ncompleted\n176177de9e\n0\n2026-09-23 03:49:22\nTranslation-invariant pose kinematics\npose.translation_invariant_kinematics@1.0.0\nskillcorner-opendata\n●\ncompleted\n514526f9a2\n1,240\n2026-09-19 01:43:47\nTranslation-invariant pose kinematics\npose.translation_invariant_kinematics@1.0.0\nskillcorner-opendata\n●\ncompleted\n514526f9a2\n920\n2026-09-19 01:43:23\nDeterministic locomotor speed/effort processor\nlocomotor.speed_effort_kinematics@1.0.0\nskillcorner-opendata\n●\ncompleted\n514526f9a2\n672\n2026-09-19 01:42:56\nDeterministic locomotor speed/effort processor\nlocomotor.speed_effort_kinematics@1.0.0\nskillcorner-opendata\n●\ncompleted\n514526f9a2\n504\n2026-09-19 01:42:53\nDeterministic locomotor speed/effort processor\nlocomo"
+  },
+  "04-field-dfl-live": {
+    "url": "http://127.0.0.1:5180/lab/dfl-sportec-idsse/DFL-MAT-J03WPY?view=field&stream=tracking-period-1&trial=period-1",
+    "console": [
+      "warning: [.WebGL-0x210c00423200]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "warning: [.WebGL-0x210c00423200]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "warning: [.WebGL-0x210c00423200]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "warning: [.WebGL-0x210c00423200]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"
+    ],
+    "pageErrors": [],
+    "failed": [],
+    "apiRequests": 11,
+    "apiSample": [
+      "200 /api/tactical/capabilities/dfl-sportec-idsse",
+      "200 /api/catalog/datasets/dfl-sportec-idsse/sessions/DFL-MAT-J03WPY",
+      "200 /api/serving/status",
+      "200 /api/tactical/artifacts?dataset_id=dfl-sportec-idsse&session_id=DFL-MAT-J03WPY",
+      "200 /api/catalog/datasets",
+      "200 /api/tactical/artifacts?dataset_id=dfl-sportec-idsse&session_id=DFL-MAT-J03WPY&stream_id=tracking-period-1",
+      "200 /api/artifacts/tracking-period-1-a1150b16850c",
+      "200 /api/artifacts/events-042946312287/window?from_ns=1020000000&to_ns=9715526387&columns=t_rel_ns%2Cevent_id%2Cevent_type%2Cevent_subtype%2Cx_m%2Cy_m&max_points=2000",
+      "200 /api/artifacts/tracking-period-1-a1150b16850c/window?from_ns=1020000000&to_ns=9715526387&columns=t_rel_ns%2Cobject_id%2Cobject_type%2Cgroup_id%2Cx_m%2Cy_m%2Cis_detected&max_points=20000",
+      "200 /api/artifacts/tracking-period-1-a1150b16850c/window?from_ns=9715526388&to_ns=18411052775&columns=t_rel_ns%2Cobject_id%2Cobject_type%2Cgroup_id%2Cx_m%2Cy_m%2Cis_detected&max_points=20000",
+      "200 /api/quality?dataset_id=dfl-sportec-idsse&session_id=DFL-MAT-J03WPY&limit=200"
+    ],
+    "pane": "TACTICAL ANALYSIS\nLive\nSpace\nShape\nRange\nEvents\nReport\npipeline-derived\nCanonical processor output; source capabilities govern availability.\nNO DATA\n\nNo tactical frame at the current time.\n\nSelect an exact tracking time or load a tactical processor artifact.\nMethod authority\nRuns / provenance\nQuality / rights",
+    "layers": "Trails\nLabels\nEvents\nReset view"
+  },
+  "05-field-dfl-space": {
+    "url": "http://127.0.0.1:5180/lab/dfl-sportec-idsse/DFL-MAT-J03WPY?view=field&stream=tracking-period-1&trial=period-1&tactical=space",
+    "console": [],
+    "pageErrors": [],
+    "failed": [],
+    "apiRequests": 0,
+    "apiSample": [],
+    "pane": "TACTICAL ANALYSIS\nLive\nSpace\nShape\nRange\nEvents\nReport\npipeline-derived\nCanonical processor output; source capabilities govern availability.\nSPACE · BOUNDED GEOMETRY AND INFLUENCE\n\nNo clipped territory rows are served for this range.\n\nVoronoi control is geometric territory, not possession probability. Influence is a model-estimated arrival surface with versioned assumptions.\n\nMethod authority\nRuns / provenance\nQuality / rights"
+  },
+  "05-field-dfl-shape": {
+    "url": "http://127.0.0.1:5180/lab/dfl-sportec-idsse/DFL-MAT-J03WPY?view=field&stream=tracking-period-1&trial=period-1&tactical=shape",
+    "console": [],
+    "pageErrors": [],
+    "failed": [],
+    "apiRequests": 0,
+    "apiSample": [],
+    "pane": "TACTICAL ANALYSIS\nLive\nSpace\nShape\nRange\nEvents\nReport\npipeline-derived\nCanonical processor output; source capabilities govern availability.\nUNAVAILABLE FOR THIS SOURCE\n\nUnavailable for this source\n\nThe accepted tracking slices do not pass the temporal shape/phase gate. No formation or phase label is inferred.\nMethod authority\nRuns / provenance\nQuality / rights"
+  },
+  "05-field-dfl-range": {
+    "url": "http://127.0.0.1:5180/lab/dfl-sportec-idsse/DFL-MAT-J03WPY?view=field&stream=tracking-period-1&trial=period-1&tactical=range",
+    "console": [],
+    "pageErrors": [],
+    "failed": [],
+    "apiRequests": 0,
+    "apiSample": [],
+    "pane": "TACTICAL ANALYSIS\nLive\nSpace\nShape\nRange\nEvents\nReport\npipeline-derived\nCanonical processor output; source capabilities govern availability.\nNO DATA\n\nNo tactical range rows.\n\nMethod authority\nRuns / provenance\nQuality / rights"
+  },
+  "05-field-dfl-events": {
+    "url": "http://127.0.0.1:5180/lab/dfl-sportec-idsse/DFL-MAT-J03WPY?view=field&stream=tracking-period-1&trial=period-1&tactical=events",
+    "console": [],
+    "pageErrors": [],
+    "failed": [],
+    "apiRequests": 0,
+    "apiSample": [],
+    "pane": "TACTICAL ANALYSIS\nLive\nSpace\nShape\nRange\nEvents\nReport\npipeline-derived\nCanonical processor output; source capabilities govern availability.\nNO DATA\n\nNo source events in the selected range.\n\nMethod authority\nRuns / provenance\nQuality / rights"
+  },
+  "05-field-dfl-report": {
+    "url": "http://127.0.0.1:5180/lab/dfl-sportec-idsse/DFL-MAT-J03WPY?view=field&stream=tracking-period-1&trial=period-1&tactical=report",
+    "console": [],
+    "pageErrors": [],
+    "failed": [],
+    "apiRequests": 0,
+    "apiSample": [],
+    "pane": "TACTICAL ANALYSIS\nLive\nSpace\nShape\nRange\nEvents\nReport\npipeline-derived\nCanonical processor output; source capabilities govern availability.\nDETERMINISTIC REPORT\n\nQuantitative rows, event counts, capability disclosure and provenance pointers only. No unsupported natural-language tactical conclusion is generated.\n\nDownload JSON report\n{\n  \"dataset_id\": \"dfl-sportec-idsse\",\n  \"session_id\": \"DFL-MAT-J03WPY\",\n  \"team_geometry_rows\": 0,\n  \"source_event_rows\": 0,\n  \"capability\": {\n    \"level_a_geometry\": \"supported\",\n    \"level_b_territory\": \"supported\",\n    \"level_c_influence\": \"supported_partial\",\n    \"level_d_event_linked\": \"supported_source_snapshots_only\",\n    \"level_e_shape_phase\": \"unavailable\"\n  },\n  \"unavailable_reasons\": [\n    \"attacking-direction normalized thirds and line-break direction cannot be asserted\",\n    \"current ball-carrier identity is not a canonical tracking field\",\n    \"formation/phase labels require a temporal model and direction authority not present in this slice\"\n  ],\n  \"conclusion_policy\": \"quantitative summary only; unsupported tactical conclusions are omitted\"\n}\nOpen quality and rights evidence →\nMethod authority\nRuns / provenance\nQuality / rights"
+  },
+  "06-field-dfl-after-play": {
+    "url": "http://127.0.0.1:5180/lab/dfl-sportec-idsse/DFL-MAT-J03WPY?view=field&stream=tracking-period-1&trial=period-1&tactical=live",
+    "console": [],
+    "pageErrors": [],
+    "failed": [],
+    "apiRequests": 0,
+    "apiSample": [],
+    "playhead": "1020000000 ns"
+  },
+  "07-field-sc-default": {
+    "url": "http://127.0.0.1:5180/lab/skillcorner-opendata/1925299?view=field&stream=tracking-period-1&trial=period_1",
+    "console": [],
+    "pageErrors": [],
+    "failed": [
+      "net::ERR_ABORTED http://127.0.0.1:5180/api/tactical/series/proc-run-89eeae69e1d828e6-team_geometry?from_ns=0&to_ns=27480959055&max_points=2000"
+    ],
+    "apiRequests": 11,
+    "apiSample": [
+      "200 /api/tactical/capabilities/skillcorner-opendata",
+      "200 /api/serving/status",
+      "200 /api/tactical/artifacts?dataset_id=skillcorner-opendata&session_id=1925299",
+      "200 /api/catalog/datasets",
+      "200 /api/catalog/datasets/skillcorner-opendata/sessions/1925299",
+      "200 /api/tactical/artifacts?dataset_id=skillcorner-opendata&session_id=1925299&stream_id=tracking-period-1",
+      "200 /api/artifacts/tracking-period-1-457d138baddf",
+      "200 /api/artifacts/tracking-period-1-457d138baddf/window?from_ns=27480959056&to_ns=54961918111&columns=t_rel_ns%2Cobject_id%2Cobject_type%2Cgroup_id%2Cx_m%2Cy_m%2Cis_detected&max_points=20000",
+      "200 /api/artifacts/tracking-period-1-457d138baddf/window?from_ns=0&to_ns=27480959055&columns=t_rel_ns%2Cobject_id%2Cobject_type%2Cgroup_id%2Cx_m%2Cy_m%2Cis_detected&max_points=20000",
+      "200 /api/quality?dataset_id=skillcorner-opendata&session_id=1925299&limit=200",
+      "200 /api/tactical/series/proc-run-89eeae69e1d828e6-team_geometry?from_ns=0&to_ns=27480959055&max_points=2000"
+    ],
+    "layers": "Trails\nLabels\nHull\nTerritory\nReset view",
+    "pane": "TACTICAL ANALYSIS\nLive\nSpace\nShape\nRange\nEvents\nReport\npipeline-derived\nCanonical processor output; source capabilities govern availability.\nNO DATA\n\nNo tactical frame at the current time.\n\nSelect an exact tracking time or load a tactical processor artifact.\nMethod authority\nRuns / provenance\nQuality / rights"
+  },
+  "07-field-sc-layer-hull": {
+    "url": "http://127.0.0.1:5180/lab/skillcorner-opendata/1925299?view=field&stream=tracking-period-1&trial=period_1",
+    "console": [],
+    "pageErrors": [],
+    "failed": [],
+    "apiRequests": 0,
+    "apiSample": [],
+    "pressed": "false"
+  },
+  "09-pose-default": {
+    "url": "http://127.0.0.1:5180/lab/skillcorner-opendata/1925299?view=pose&stream=pose-period-1&trial=period_1&subject=11897",
+    "console": [
+      "warning: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.",
+      "warning: [.WebGL-0x54ec012b6c00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "warning: [.WebGL-0x54ec012b6c00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "warning: [.WebGL-0x54ec012b6c00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "warning: [.WebGL-0x54ec012b6c00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"
+    ],
+    "pageErrors": [],
+    "failed": [],
+    "apiRequests": 9,
+    "apiSample": [
+      "200 /api/quality?dataset_id=skillcorner-opendata&session_id=1925299&limit=200",
+      "200 /api/catalog/datasets",
+      "200 /api/serving/status",
+      "200 /api/catalog/datasets/skillcorner-opendata/sessions/1925299",
+      "200 /api/metrics?subject_id=11897&stream_id=pose-period-1&limit=50",
+      "200 /api/metrics/methodology/pose.angular_rom.left_hip",
+      "200 /api/artifacts/pose-period-1-0bbe2b182716",
+      "200 /api/artifacts/pose-period-1-0bbe2b182716/window?from_ns=440000000&to_ns=16648173508&columns=t_rel_ns%2Csubject_id%2Cjoint_name%2Cis_available%2Cx_m%2Cy_m%2Cz_m%2Cerror_m&max_points=20000&entity_id=11897",
+      "200 /api/artifacts/pose-period-1-0bbe2b182716/window?from_ns=16648173509&to_ns=32856347017&columns=t_rel_ns%2Csubject_id%2Cjoint_name%2Cis_available%2Cx_m%2Cy_m%2Cz_m%2Cerror_m&max_points=20000&entity_id=11897"
+    ],
+    "telemetry": "LIVE POSE TELEMETRY\n\n11897\n\n29 observed · 0 unavailable\n\nlandmark\nx · y · z · p90 radius\nnose\n-22.732 · -9.785 · 1.641 · 0.0857 m\nneck\n-22.882 · -9.756 · 1.513 · 0.0496 m\nlEye\n-22.758 · -9.750 · 1.683 · 0.0972 m\nrEye\n-22.764 · -9.810 · 1.682 · 0.0684 m\nlEar\n-22.847 · -9.675 · 1.692 · 0.0785 m\nrEar\n-22.878 · -9.840 · 1.693 · 0.0671 m\nlShoulder\n-22.909 · -9.580 · 1.477 · 0.0546 m\nrShoulder\n-22.834 · -9.932 · 1.483 · 0.0556 m\nlElbow\n-22.867 · -9.514 · 1.194 · 0.0798 m\nrElbow\n-22.751 · -10.035 · 1.229 · 0.102 m\nlWrist\n-22.751 · -9.562 · 0.983 · 0.116 m\nrWrist\n-22.595 · -10.063 · 1.049 · 0.241 m\nlThumb\n-22.708 · -9.608 · 0.929 · 0.175 m\nrThumb\n-22.512 · -10.093 · 1.034 · 0.354 m\nlPinky\n-22.712 · -9.538 · 0.885 · 0.162 m\nrPinky\n-22.554 · -10.099 · 0.959 · 0.362 m\nmidHip\n-22.785 · -9.769 · 0.948 · 0.103 m\nlHip\n-22.777 · -9.665 · 0.935 · 0.0646 m\nrHip\n-22.765 · -9.872 · 0.943 · 0.0723 m\nlKnee\n-22.734 · -9.563 · 0.595 · 0.0946 m\nrKnee\n-22.736 · -9.860 · 0.584 · 0.140 m\nlAnkle\n-22.710 · -9.474 · 0.208 · 0.124 m\nrAnkle\n-22.758 · -9.833 · 0.187 · 0.181 m\nlHeel\n-22.746 · -9.499 · 0.129 · 0.149 m\nrHeel\n-22.791 · -9.835 · 0.110 · 0.190 m\nlBigToe\n-22.574 · -9.371 · 0.158 · 0.146 m\nrBigToe\n-22.573 · -9.776 · 0.138 · 0.194 m\nlSmallToe\n-22.625 · -9.344 · 0.157 · 0.142 m\nrSmallToe\n-22.602 · -9.841 · 0.124 · 0.198 m"
+  },
+  "09-pose-subject-switch": {
+    "url": "http://127.0.0.1:5180/lab/skillcorner-opendata/1925299?view=pose&stream=pose-period-1&trial=period_1&subject=50982&t_ns=440000000",
+    "console": [
+      "warning: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead."
+    ],
+    "pageErrors": [],
+    "failed": [],
+    "apiRequests": 3,
+    "apiSample": [
+      "200 /api/metrics?subject_id=50982&stream_id=pose-period-1&limit=50",
+      "200 /api/artifacts/pose-period-1-0bbe2b182716/window?from_ns=440000000&to_ns=16648173508&columns=t_rel_ns%2Csubject_id%2Cjoint_name%2Cis_available%2Cx_m%2Cy_m%2Cz_m%2Cerror_m&max_points=20000&entity_id=50982",
+      "200 /api/artifacts/pose-period-1-0bbe2b182716/window?from_ns=16648173509&to_ns=32856347017&columns=t_rel_ns%2Csubject_id%2Cjoint_name%2Cis_available%2Cx_m%2Cy_m%2Cz_m%2Cerror_m&max_points=20000&entity_id=50982"
+    ],
+    "options": [
+      "11897",
+      "287934",
+      "50982",
+      "50999",
+      "51002",
+      "51043",
+      "51050",
+      "51694",
+      "560882",
+      "560983",
+      "560984",
+      "560985",
+      "560986",
+      "560987",
+      "560989",
+      "69111",
+      "795530",
+      "795537",
+      "797298",
+      "809166",
+      "965697",
+      "966112",
+      "966114"
+    ],
+    "telemetry": "LIVE POSE TELEMETRY\n\n50982\n\n29 observed · 0 unavailable\n\nlandmark\nx · y · z · p90 radius\nnose\n-23.033 · 20.564 · 1.708 · 0.0857 m\nneck\n-23.116 · 20.715 · 1.573 · 0.0690 m\nlEye\n-23.018 · 20.604 · 1.751 · 0.0814 m\nrEye\n-23.080 · 20.569 · 1.748 · 0.0965 m\nlEar\n-23.028 · 20.733 · 1.768 · 0.110 m\nrEar\n-23.186 · 20.640 · 1.760 · 0.109 m\nlShoulder\n-22.941 · 20.774 · 1.553 · 0.0939 m\nrShoulder\n-23.296 · 20.681 · 1.518 · 0.0930 m\nlElbow\n-22.857 · 20.865 · 1.256 · 0.0871 m\nrElbow\n-23.342 · 20.668 · 1.198 · 0.108 m\nlWrist\n-22.900 · 20.755 · 1.017 · 0.160 m\nrWrist\n-23.188 · 20.585 · 0.997 · 0.148 m\nlThumb\n-22.953 · 20.712 · 0.963 · 0.185 m\nrThumb\n-23.108 · 20.583 · 0.964 · 0.192 m\nlPinky\n-22.887 · 20.732 · 0.907 · 0.217 m\nrPinky\n-23.156 · 20.552 · 0.891 · 0.223 m\nmidHip\n-23.091 · 20.756 · 0.945 · 0.103 m\nlHip\n-22.979 · 20.760 · 0.943 · 0.0727 m\nrHip\n-23.198 · 20.721 · 0.924 · 0.0723 m\nlKnee\n-22.875 · 20.621 · 0.603 · 0.114 m\nrKnee\n-23.198 · 20.719 · 0.553 · 0.103 m\nlAnkle\n-22.814 · 20.614 · 0.169 · 0.174 m\nrAnkle\n-23.191 · 20.851 · 0.145 · 0.124 m\nlHeel\n-22.834 · 20.646 · 0.086 · 0.175 m\nrHeel\n-23.194 · 20.879 · 0.067 · 0.151 m\nlBigToe\n-22.709 · 20.455 · 0.118 · 0.204 m\nrBigToe\n-23.116 · 20.655 · 0.085 · 0.150 m\nlSmallToe\n-22.679 · 20.520 · 0.112 · 0.199 m\nrSmallToe\n-23.193 · 20.674 · 0.079 · 0.148 m"
+  },
+  "09-pose-playing": {
+    "url": "http://127.0.0.1:5180/lab/skillcorner-opendata/1925299?view=pose&stream=pose-period-1&trial=period_1&subject=50982&t_ns=440000000",
+    "console": [],
+    "pageErrors": [],
+    "failed": [],
+    "apiRequests": 0,
+    "apiSample": [],
+    "telemetry": "LIVE POSE TELEMETRY\n\n50982\n\n29 observed · 0 unavailable\n\nlandmark\nx · y · z · p90 radius\nnose\n-26.647 · 23.308 · 1.572 · 0.102 m\nneck\n-26.695 · 23.485 · 1.471 · 0.0690 m\nlEye\n-26.625 · 23.335 · 1.621 · 0.0888 m\nrEye\n-26.693 · 23.316 · 1.613 · 0.0965 m\nlEar\n-26.614 · 23.450 · 1.658 · 0.0929 m\nrEar\n-26.774 · 23.395 · 1.637 · 0.109 m\nlShoulder\n-26.510 · 23.459 · 1.442 · 0.0629 m\nrShoulder\n-26.885 · 23.507 · 1.443 · 0.0648 m\nlElbow\n-26.370 · 23.574 · 1.191 · 0.0943 m\nrElbow\n-26.974 · 23.632 · 1.234 · 0.112 m\nlWrist\n-26.352 · 23.501 · 0.987 · 0.165 m\nrWrist\n-26.917 · 23.492 · 1.123 · 0.163 m\nlThumb\n-26.395 · 23.475 · 0.922 · 0.219 m\nrThumb\n-26.832 · 23.505 · 1.129 · 0.282 m\nlPinky\n-26.323 · 23.521 · 0.879 · 0.217 m\nrPinky\n-26.887 · 23.423 · 1.069 · 0.332 m\nmidHip\n-26.631 · 23.648 · 0.938 · 0.103 m\nlHip\n-26.523 · 23.634 · 0.936 · 0.101 m\nrHip\n-26.736 · 23.642 · 0.911 · 0.103 m\nlKnee\n-26.406 · 23.495 · 0.614 · 0.210 m\nrKnee\n-26.764 · 23.415 · 0.629 · 0.116 m\nlAnkle\n-26.278 · 23.744 · 0.257 · 0.217 m\nrAnkle\n-26.646 · 23.537 · 0.211 · 0.138 m\nlHeel\n-26.261 · 23.803 · 0.212 · 0.236 m\nrHeel\n-26.617 · 23.571 · 0.134 · 0.156 m\nlBigToe\n-26.304 · 23.645 · 0.099 · 0.301 m\nrBigToe\n-26.677 · 23.345 · 0.134 · 0.177 m\nlSmallToe\n-26.227 · 23.643 · 0.132 · 0.301 m\nrSmallToe\n-26.721 · 23.404 · 0.124 · 0.166 m"
+  },
+  "09-pose-switch-while-playing": {
+    "url": "http://127.0.0.1:5180/lab/skillcorner-opendata/1925299?view=pose&stream=pose-period-1&trial=period_1&subject=50999&t_ns=32920000000",
+    "console": [
+      "warning: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead."
+    ],
+    "pageErrors": [],
+    "failed": [
+      "net::ERR_ABORTED http://127.0.0.1:5180/api/artifacts/pose-period-1-0bbe2b182716/window?from_ns=32856347018&to_ns=49064520526&columns=t_rel_ns%2Csubject_id%2Cjoint_name%2Cis_available%2Cx_m%2Cy_m%2Cz_m%2Cerror_m&max_points=20000&entity_id=50982",
+      "net::ERR_ABORTED http://127.0.0.1:5180/api/artifacts/pose-period-1-0bbe2b182716/window?from_ns=49064520527&to_ns=65272694035&columns=t_rel_ns%2Csubject_id%2Cjoint_name%2Cis_available%2Cx_m%2Cy_m%2Cz_m%2Cerror_m&max_points=20000&entity_id=50982"
+    ],
+    "apiRequests": 4,
+    "apiSample": [
+      "200 /api/artifacts/pose-period-1-0bbe2b182716/window?from_ns=49064520527&to_ns=65272694035&columns=t_rel_ns%2Csubject_id%2Cjoint_name%2Cis_available%2Cx_m%2Cy_m%2Cz_m%2Cerror_m&max_points=20000&entity_id=50999",
+      "200 /api/artifacts/pose-period-1-0bbe2b182716/window?from_ns=16648173509&to_ns=32856347017&columns=t_rel_ns%2Csubject_id%2Cjoint_name%2Cis_available%2Cx_m%2Cy_m%2Cz_m%2Cerror_m&max_points=20000&entity_id=50999",
+      "200 /api/artifacts/pose-period-1-0bbe2b182716/window?from_ns=32856347018&to_ns=49064520526&columns=t_rel_ns%2Csubject_id%2Cjoint_name%2Cis_available%2Cx_m%2Cy_m%2Cz_m%2Cerror_m&max_points=20000&entity_id=50999",
+      "200 /api/metrics?subject_id=50999&stream_id=pose-period-1&limit=50"
+    ],
+    "telemetry": "LIVE POSE TELEMETRY\n\n50999\n\n29 observed · 0 unavailable\n\nlandmark\nx · y · z · p90 radius\nnose\n43.172 · -6.321 · 1.595 · 0.151 m\nneck\n43.248 · -6.113 · 1.522 · 0.0930 m\nlEye\n43.200 · -6.285 · 1.622 · 0.181 m\nrEye\n43.146 · -6.265 · 1.627 · 0.177 m\nlEar\n43.286 · -6.203 · 1.716 · 0.141 m\nrEar\n43.109 · -6.199 · 1.676 · 0.153 m\nlShoulder\n43.444 · -6.172 · 1.475 · 0.0823 m\nrShoulder\n43.064 · -6.054 · 1.508 · 0.0930 m\nlElbow\n43.592 · -6.043 · 1.214 · 0.0917 m\nrElbow\n43.019 · -5.908 · 1.244 · 0.277 m\nlWrist\n43.668 · -5.914 · 1.160 · 0.160 m\nrWrist\n43.064 · -6.167 · 1.300 · 0.338 m\nlThumb\n43.563 · -5.977 · 0.814 · 0.175 m\nrThumb\n43.128 · -6.226 · 1.334 · 0.372 m\nlPinky\n43.672 · -5.894 · 0.893 · 0.168 m\nrPinky\n43.056 · -6.300 · 1.303 · 0.389 m\nmidHip\n43.237 · -6.053 · 0.883 · 0.124 m\nlHip\n43.347 · -6.081 · 0.870 · 0.142 m\nrHip\n43.123 · -6.043 · 0.873 · 0.172 m\nlKnee\n43.344 · -6.035 · 0.573 · 0.285 m\nrKnee\n42.927 · -6.174 · 0.638 · 0.296 m\nlAnkle\n43.181 · -6.031 · 0.317 · 0.256 m\nrAnkle\n42.934 · -5.931 · 0.290 · 0.293 m\nlHeel\n43.159 · -5.985 · 0.266 · 0.269 m\nrHeel\n42.918 · -5.898 · 0.253 · 0.316 m\nlBigToe\n43.158 · -6.208 · 0.215 · 0.332 m\nrBigToe\n42.857 · -6.120 · 0.187 · 0.343 m\nlSmallToe\n43.220 · -6.174 · 0.216 · 0.330 m\nrSmallToe\n42.790 · -6.070 · 0.208 · 0.339 m"
+  },
+  "09-pose-world": {
+    "url": "http://127.0.0.1:5180/lab/skillcorner-opendata/1925299?view=pose&stream=pose-period-1&trial=period_1&subject=50999&t_ns=32920000000",
+    "console": [],
+    "pageErrors": [],
+    "failed": [],
+    "apiRequests": 0,
+    "apiSample": []
+  },
+  "09-pose-all-subjects": {
+    "url": "http://127.0.0.1:5180/lab/skillcorner-opendata/1925299?view=pose&stream=pose-period-1&trial=period_1&subject=50999&t_ns=32920000000",
+    "console": [],
+    "pageErrors": [],
+    "failed": [],
+    "apiRequests": 3,
+    "apiSample": [
+      "200 /api/artifacts/pose-period-1-0bbe2b182716/window?from_ns=32151643820&to_ns=32856347015&columns=t_rel_ns%2Csubject_id%2Cjoint_name%2Cis_available%2Cx_m%2Cy_m%2Cz_m%2Cerror_m&max_points=20000",
+      "200 /api/artifacts/pose-period-1-0bbe2b182716/window?from_ns=33561050212&to_ns=34265753407&columns=t_rel_ns%2Csubject_id%2Cjoint_name%2Cis_available%2Cx_m%2Cy_m%2Cz_m%2Cerror_m&max_points=20000",
+      "200 /api/artifacts/pose-period-1-0bbe2b182716/window?from_ns=32856347016&to_ns=33561050211&columns=t_rel_ns%2Csubject_id%2Cjoint_name%2Cis_available%2Cx_m%2Cy_m%2Cz_m%2Cerror_m&max_points=20000"
+    ],
+    "telemetry": "LIVE POSE TELEMETRY\n\n50999\n\n29 observed · 0 unavailable\n\nlandmark\nx · y · z · p90 radius\nnose\n43.172 · -6.321 · 1.595 · 0.151 m\nneck\n43.248 · -6.113 · 1.522 · 0.0930 m\nlEye\n43.200 · -6.285 · 1.622 · 0.181 m\nrEye\n43.146 · -6.265 · 1.627 · 0.177 m\nlEar\n43.286 · -6.203 · 1.716 · 0.141 m\nrEar\n43.109 · -6.199 · 1.676 · 0.153 m\nlShoulder\n43.444 · -6.172 · 1.475 · 0.0823 m\nrShoulder\n43.064 · -6.054 · 1.508 · 0.0930 m\nlElbow\n43.592 · -6.043 · 1.214 · 0.0917 m\nrElbow\n43.019 · -5.908 · 1.244 · 0.277 m\nlWrist\n43.668 · -5.914 · 1.160 · 0.160 m\nrWrist\n43.064 · -6.167 · 1.300 · 0.338 m\nlThumb\n43.563 · -5.977 · 0.814 · 0.175 m\nrThumb\n43.128 · -6.226 · 1.334 · 0.372 m\nlPinky\n43.672 · -5.894 · 0.893 · 0.168 m\nrPinky\n43.056 · -6.300 · 1.303 · 0.389 m\nmidHip\n43.237 · -6.053 · 0.883 · 0.124 m\nlHip\n43.347 · -6.081 · 0.870 · 0.142 m\nrHip\n43.123 · -6.043 · 0.873 · 0.172 m\nlKnee\n43.344 · -6.035 · 0.573 · 0.285 m\nrKnee\n42.927 · -6.174 · 0.638 · 0.296 m\nlAnkle\n43.181 · -6.031 · 0.317 · 0.256 m\nrAnkle\n42.934 · -5.931 · 0.290 · 0.293 m\nlHeel\n43.159 · -5.985 · 0.266 · 0.269 m\nrHeel\n42.918 · -5.898 · 0.253 · 0.316 m\nlBigToe\n43.158 · -6.208 · 0.215 · 0.332 m\nrBigToe\n42.857 · -6.120 · 0.187 · 0.343 m\nlSmallToe\n43.220 · -6.174 · 0.216 · 0.330 m\nrSmallToe\n42.790 · -6.070 · 0.208 · 0.339 m"
+  },
+  "14-1600x1000-field-dfl": {
+    "url": "http://127.0.0.1:5180/lab/dfl-sportec-idsse/DFL-MAT-J03WPY?view=field&stream=tracking-period-1&trial=period-1",
+    "console": [],
+    "pageErrors": [],
+    "failed": [],
+    "apiRequests": 11,
+    "apiSample": [
+      "200 /api/tactical/capabilities/dfl-sportec-idsse",
+      "200 /api/catalog/datasets",
+      "200 /api/tactical/artifacts?dataset_id=dfl-sportec-idsse&session_id=DFL-MAT-J03WPY",
+      "200 /api/catalog/datasets/dfl-sportec-idsse/sessions/DFL-MAT-J03WPY",
+      "200 /api/serving/status",
+      "200 /api/tactical/artifacts?dataset_id=dfl-sportec-idsse&session_id=DFL-MAT-J03WPY&stream_id=tracking-period-1",
+      "200 /api/artifacts/tracking-period-1-a1150b16850c",
+      "200 /api/artifacts/events-042946312287/window?from_ns=1020000000&to_ns=9715526387&columns=t_rel_ns%2Cevent_id%2Cevent_type%2Cevent_subtype%2Cx_m%2Cy_m&max_points=2000",
+      "200 /api/artifacts/tracking-period-1-a1150b16850c/window?from_ns=1020000000&to_ns=9715526387&columns=t_rel_ns%2Cobject_id%2Cobject_type%2Cgroup_id%2Cx_m%2Cy_m%2Cis_detected&max_points=20000",
+      "200 /api/artifacts/tracking-period-1-a1150b16850c/window?from_ns=9715526388&to_ns=18411052775&columns=t_rel_ns%2Cobject_id%2Cobject_type%2Cgroup_id%2Cx_m%2Cy_m%2Cis_detected&max_points=20000",
+      "200 /api/quality?dataset_id=dfl-sportec-idsse&session_id=DFL-MAT-J03WPY&limit=200"
+    ],
+    "overflow": {
+      "docScrollWidth": 1600,
+      "viewport": 1600,
+      "horizontalOverflow": false
+    }
+  },
+  "14-1600x1000-field-sc": {
+    "url": "http://127.0.0.1:5180/lab/skillcorner-opendata/1925299?view=field&stream=tracking-period-1&trial=period_1",
+    "console": [],
+    "pageErrors": [],
+    "failed": [
+      "net::ERR_ABORTED http://127.0.0.1:5180/api/tactical/series/proc-run-89eeae69e1d828e6-team_geometry?from_ns=0&to_ns=27480959055&max_points=2000"
+    ],
+    "apiRequests": 11,
+    "apiSample": [
+      "200 /api/tactical/capabilities/skillcorner-opendata",
+      "200 /api/serving/status",
+      "200 /api/tactical/artifacts?dataset_id=skillcorner-opendata&session_id=1925299",
+      "200 /api/quality?dataset_id=skillcorner-opendata&session_id=1925299&limit=200",
+      "200 /api/catalog/datasets/skillcorner-opendata/sessions/1925299",
+      "200 /api/tactical/artifacts?dataset_id=skillcorner-opendata&session_id=1925299&stream_id=tracking-period-1",
+      "200 /api/artifacts/tracking-period-1-457d138baddf",
+      "200 /api/artifacts/tracking-period-1-457d138baddf/window?from_ns=0&to_ns=27480959055&columns=t_rel_ns%2Cobject_id%2Cobject_type%2Cgroup_id%2Cx_m%2Cy_m%2Cis_detected&max_points=20000",
+      "200 /api/catalog/datasets",
+      "200 /api/artifacts/tracking-period-1-457d138baddf/window?from_ns=27480959056&to_ns=54961918111&columns=t_rel_ns%2Cobject_id%2Cobject_type%2Cgroup_id%2Cx_m%2Cy_m%2Cis_detected&max_points=20000",
+      "200 /api/tactical/series/proc-run-89eeae69e1d828e6-team_geometry?from_ns=0&to_ns=27480959055&max_points=2000"
+    ],
+    "overflow": {
+      "docScrollWidth": 1600,
+      "viewport": 1600,
+      "horizontalOverflow": false
+    }
+  },
+  "14-1600x1000-pose-sc": {
+    "url": "http://127.0.0.1:5180/lab/skillcorner-opendata/1925299?view=pose&stream=pose-period-1&trial=period_1&subject=11897",
+    "console": [
+      "warning: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead."
+    ],
+    "pageErrors": [],
+    "failed": [],
+    "apiRequests": 9,
+    "apiSample": [
+      "200 /api/quality?dataset_id=skillcorner-opendata&session_id=1925299&limit=200",
+      "200 /api/serving/status",
+      "200 /api/catalog/datasets",
+      "200 /api/catalog/datasets/skillcorner-opendata/sessions/1925299",
+      "200 /api/metrics?subject_id=11897&stream_id=pose-period-1&limit=50",
+      "200 /api/metrics/methodology/pose.angular_rom.left_hip",
+      "200 /api/artifacts/pose-period-1-0bbe2b182716",
+      "200 /api/artifacts/pose-period-1-0bbe2b182716/window?from_ns=440000000&to_ns=16648173508&columns=t_rel_ns%2Csubject_id%2Cjoint_name%2Cis_available%2Cx_m%2Cy_m%2Cz_m%2Cerror_m&max_points=20000&entity_id=11897",
+      "200 /api/artifacts/pose-period-1-0bbe2b182716/window?from_ns=16648173509&to_ns=32856347017&columns=t_rel_ns%2Csubject_id%2Cjoint_name%2Cis_available%2Cx_m%2Cy_m%2Cz_m%2Cerror_m&max_points=20000&entity_id=11897"
+    ],
+    "overflow": {
+      "docScrollWidth": 1600,
+      "viewport": 1600,
+      "horizontalOverflow": false
+    }
+  },
+  "14-1366x768-field-dfl": {
+    "url": "http://127.0.0.1:5180/lab/dfl-sportec-idsse/DFL-MAT-J03WPY?view=field&stream=tracking-period-1&trial=period-1",
+    "console": [],
+    "pageErrors": [],
+    "failed": [],
+    "apiRequests": 11,
+    "apiSample": [
+      "200 /api/tactical/capabilities/dfl-sportec-idsse",
+      "200 /api/tactical/artifacts?dataset_id=dfl-sportec-idsse&session_id=DFL-MAT-J03WPY",
+      "200 /api/serving/status",
+      "200 /api/catalog/datasets",
+      "200 /api/catalog/datasets/dfl-sportec-idsse/sessions/DFL-MAT-J03WPY",
+      "200 /api/tactical/artifacts?dataset_id=dfl-sportec-idsse&session_id=DFL-MAT-J03WPY&stream_id=tracking-period-1",
+      "200 /api/artifacts/tracking-period-1-a1150b16850c",
+      "200 /api/artifacts/tracking-period-1-a1150b16850c/window?from_ns=9715526388&to_ns=18411052775&columns=t_rel_ns%2Cobject_id%2Cobject_type%2Cgroup_id%2Cx_m%2Cy_m%2Cis_detected&max_points=20000",
+      "200 /api/quality?dataset_id=dfl-sportec-idsse&session_id=DFL-MAT-J03WPY&limit=200",
+      "200 /api/artifacts/tracking-period-1-a1150b16850c/window?from_ns=1020000000&to_ns=9715526387&columns=t_rel_ns%2Cobject_id%2Cobject_type%2Cgroup_id%2Cx_m%2Cy_m%2Cis_detected&max_points=20000",
+      "200 /api/artifacts/events-042946312287/window?from_ns=1020000000&to_ns=9715526387&columns=t_rel_ns%2Cevent_id%2Cevent_type%2Cevent_subtype%2Cx_m%2Cy_m&max_points=2000"
+    ],
+    "overflow": {
+      "docScrollWidth": 1366,
+      "viewport": 1366,
+      "horizontalOverflow": false
+    }
+  },
+  "14-1366x768-field-sc": {
+    "url": "http://127.0.0.1:5180/lab/skillcorner-opendata/1925299?view=field&stream=tracking-period-1&trial=period_1",
+    "console": [],
+    "pageErrors": [],
+    "failed": [
+      "net::ERR_ABORTED http://127.0.0.1:5180/api/tactical/series/proc-run-89eeae69e1d828e6-team_geometry?from_ns=0&to_ns=27480959055&max_points=2000"
+    ],
+    "apiRequests": 11,
+    "apiSample": [
+      "200 /api/tactical/capabilities/skillcorner-opendata",
+      "200 /api/serving/status",
+      "200 /api/tactical/artifacts?dataset_id=skillcorner-opendata&session_id=1925299",
+      "200 /api/catalog/datasets",
+      "200 /api/catalog/datasets/skillcorner-opendata/sessions/1925299",
+      "200 /api/tactical/artifacts?dataset_id=skillcorner-opendata&session_id=1925299&stream_id=tracking-period-1",
+      "200 /api/artifacts/tracking-period-1-457d138baddf",
+      "200 /api/artifacts/tracking-period-1-457d138baddf/window?from_ns=0&to_ns=27480959055&columns=t_rel_ns%2Cobject_id%2Cobject_type%2Cgroup_id%2Cx_m%2Cy_m%2Cis_detected&max_points=20000",
+      "200 /api/artifacts/tracking-period-1-457d138baddf/window?from_ns=27480959056&to_ns=54961918111&columns=t_rel_ns%2Cobject_id%2Cobject_type%2Cgroup_id%2Cx_m%2Cy_m%2Cis_detected&max_points=20000",
+      "200 /api/quality?dataset_id=skillcorner-opendata&session_id=1925299&limit=200",
+      "200 /api/tactical/series/proc-run-89eeae69e1d828e6-team_geometry?from_ns=0&to_ns=27480959055&max_points=2000"
+    ],
+    "overflow": {
+      "docScrollWidth": 1366,
+      "viewport": 1366,
+      "horizontalOverflow": false
+    }
+  },
+  "14-1366x768-pose-sc": {
+    "url": "http://127.0.0.1:5180/lab/skillcorner-opendata/1925299?view=pose&stream=pose-period-1&trial=period_1&subject=11897",
+    "console": [
+      "warning: THREE.Clock: This module has been deprecated. Please use THREE.Timer instead."
+    ],
+    "pageErrors": [],
+    "failed": [],
+    "apiRequests": 9,
+    "apiSample": [
+      "200 /api/catalog/datasets",
+      "200 /api/quality?dataset_id=skillcorner-opendata&session_id=1925299&limit=200",
+      "200 /api/catalog/datasets/skillcorner-opendata/sessions/1925299",
+      "200 /api/serving/status",
+      "200 /api/metrics?subject_id=11897&stream_id=pose-period-1&limit=50",
+      "200 /api/metrics/methodology/pose.angular_rom.left_hip",
+      "200 /api/artifacts/pose-period-1-0bbe2b182716",
+      "200 /api/artifacts/pose-period-1-0bbe2b182716/window?from_ns=440000000&to_ns=16648173508&columns=t_rel_ns%2Csubject_id%2Cjoint_name%2Cis_available%2Cx_m%2Cy_m%2Cz_m%2Cerror_m&max_points=20000&entity_id=11897",
+      "200 /api/artifacts/pose-period-1-0bbe2b182716/window?from_ns=16648173509&to_ns=32856347017&columns=t_rel_ns%2Csubject_id%2Cjoint_name%2Cis_available%2Cx_m%2Cy_m%2Cz_m%2Cerror_m&max_points=20000&entity_id=11897"
+    ],
+    "overflow": {
+      "docScrollWidth": 1366,
+      "viewport": 1366,
+      "horizontalOverflow": false
+    }
+  }
+}

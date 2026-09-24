@@ -135,6 +135,23 @@ export function frameIndexAt(frames: readonly TrackingFrame[], tRelNs: bigint): 
   return result;
 }
 
+/**
+ * Index of the frame drawn at `tRelNs`: the frame at or before it, but only
+ * when that frame is within `maxGapNs`. A playhead that has moved past the
+ * loaded window (a seek into a chunk still loading) resolves to no frame
+ * instead of silently reusing the window's last frame.
+ */
+export function exactFrameIndex(
+  frames: readonly TrackingFrame[],
+  tRelNs: bigint | null,
+  maxGapNs: number,
+): number {
+  if (tRelNs === null) return -1;
+  const index = frameIndexAt(frames, tRelNs);
+  if (index < 0) return -1;
+  return Number(tRelNs) - frames[index]!.tRelNs <= maxGapNs ? index : -1;
+}
+
 /** Entities of the frame nearest to a canonical time. */
 export function entitiesAt(
   frames: readonly TrackingFrame[],
@@ -209,6 +226,7 @@ export type EntityGroup = "home" | "away" | "ball" | "official" | "other";
  */
 export function assignGroups(
   frames: readonly TrackingFrame[],
+  teamOrder: readonly string[] = [],
 ): Map<string, EntityGroup> {
   const groupIds = new Set<string>();
   for (const frame of frames) {
@@ -216,7 +234,9 @@ export function assignGroups(
       if (entity.groupId !== null) groupIds.add(entity.groupId);
     }
   }
-  const ordered = Array.from(groupIds).sort();
+  // A session-level team order (from the served participants) keeps colours
+  // stable across windows; the window's own groups are the fallback.
+  const ordered = teamOrder.length >= 2 ? [...teamOrder] : Array.from(groupIds).sort();
   const homeId = ordered[0] ?? null;
   const awayId = ordered[1] ?? null;
   const assignment = new Map<string, EntityGroup>();
@@ -232,4 +252,14 @@ export function assignGroups(
     }
   }
   return assignment;
+}
+
+/** Home/away colour role of a provider team id under the same ordering. */
+export function teamRole(
+  groupId: string,
+  teamOrder: readonly string[],
+): "home" | "away" | "other" {
+  if (teamOrder[0] === groupId) return "home";
+  if (teamOrder[1] === groupId) return "away";
+  return "other";
 }

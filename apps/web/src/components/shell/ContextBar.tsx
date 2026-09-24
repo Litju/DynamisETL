@@ -41,6 +41,7 @@ export function contextCrumbs(
     readonly dataset?: string | undefined;
     readonly session?: string | undefined;
     readonly trial?: string | undefined;
+    readonly subject?: string | undefined;
   } = {},
 ): ContextCrumb[] {
   const parts = pathname.split("/").filter(Boolean);
@@ -75,7 +76,12 @@ export function contextCrumbs(
   }
   const subject = params.get("subject");
   if (subject) {
-    crumbs.push({ key: "subject", label: `Subject ${subject}`, id: subject, idLabel: "subject id" });
+    crumbs.push({
+      key: "subject",
+      label: names.subject ?? `Subject ${subject}`,
+      id: subject,
+      idLabel: "subject id",
+    });
   }
   return crumbs;
 }
@@ -92,6 +98,7 @@ function useContextNames(datasetId: string | null, sessionId: string | null) {
     dataset: dataset?.name,
     session: session.data?.session.label ?? undefined,
     trials: session.data?.trials ?? [],
+    participants: session.data?.participants ?? [],
   };
 }
 
@@ -110,8 +117,12 @@ export function ContextBar() {
   const searchStr = location.searchStr ?? "";
   const trialId = new URLSearchParams(searchStr).get("trial");
   const trialLabel = names.trials.find((trial) => trial.trial_id === trialId)?.label ?? undefined;
+  const subjectId = new URLSearchParams(searchStr).get("subject");
+  const subjectNote = names.participants.find((item) => item.subject_id === subjectId)?.notes ?? undefined;
   const crumbs = contextCrumbs(location.pathname, searchStr, {
-    dataset: names.dataset,
+    // The short provider name leads; the full descriptive name is the tooltip.
+    dataset: names.dataset?.split(" — ")[0],
+    subject: subjectNote,
     session: names.session,
     // Trial labels carry the provider's condition/index detail, which is long;
     // the readable trial id is the better spine label.
@@ -139,7 +150,17 @@ export function ContextBar() {
         className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden"
       >
         {crumbs.map((crumb, index) => (
-          <span key={crumb.key} className="flex min-w-0 items-center gap-1">
+          <span
+            key={crumb.key}
+            className={cn(
+              "flex min-w-0 items-center gap-1",
+              // What changes while analysing (period, subject) never truncates;
+              // long provider/session names yield space first.
+              crumb.key === "dataset" && "min-w-16 shrink-[3]",
+              crumb.key === "session" && "min-w-20 shrink-[2]",
+              (crumb.key === "trial" || crumb.key === "subject" || crumb.key === "surface") && "shrink-0",
+            )}
+          >
             <ChevronRight
               size={12}
               aria-hidden="true"
@@ -159,7 +180,7 @@ export function ContextBar() {
                     "t-context truncate",
                     index === crumbs.length - 1 ? "text-text-primary" : "text-text-secondary",
                   )}
-                  title={crumb.label}
+                  title={crumb.key === "dataset" ? (names.dataset ?? crumb.label) : crumb.label}
                 >
                   {crumb.label}
                 </span>

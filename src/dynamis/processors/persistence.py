@@ -323,15 +323,16 @@ def persist_processing_result(
                 f"conflicting definitions for metric {declaration.metric_id!r} in one result"
             )
         definitions[declaration.metric_id] = definition
-    _assert_existing_definitions_match(connection, definitions)
-    written["metric_definition"] = len(
-        connection.execute(
-            pg_insert(METRIC_DEFINITION_TABLE)
-            .values(list(definitions.values()))
-            .on_conflict_do_nothing(index_elements=["metric_id"])
-            .returning(METRIC_DEFINITION_TABLE.c.metric_id)
-        ).fetchall()
-    )
+    if definitions:
+        _assert_existing_definitions_match(connection, definitions)
+        written["metric_definition"] = len(
+            connection.execute(
+                pg_insert(METRIC_DEFINITION_TABLE)
+                .values(list(definitions.values()))
+                .on_conflict_do_nothing(index_elements=["metric_id"])
+                .returning(METRIC_DEFINITION_TABLE.c.metric_id)
+            ).fetchall()
+        )
 
     # A rerun of the same deterministic identity replaces the current values of
     # that run, so a corrected re-execution cannot leave stale rows behind.

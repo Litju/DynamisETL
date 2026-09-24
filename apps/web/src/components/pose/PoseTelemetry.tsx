@@ -7,6 +7,7 @@ import { useAnalysisContext } from "@/lib/analysis-context";
 import { artifactQuery, sessionQuery } from "@/lib/api/queries";
 import { affordableSpanNs, canonicalSpan } from "@/lib/dense-window";
 import { usePosePlaybackWindow } from "@/components/pose/use-pose-playback";
+import { useThrottledPlayhead } from "@/hooks/useThrottledPlayhead";
 import { formatMetricValue } from "@/lib/measurement";
 import { useAnalysisStore } from "@/lib/state/analysis";
 import { formatClockNs } from "@/lib/time";
@@ -14,7 +15,9 @@ import { formatClockNs } from "@/lib/time";
 /** Full live landmark telemetry for the Pose route's right-hand evidence pane. */
 export function PoseTelemetry() {
   const context = useAnalysisContext();
-  const playheadNs = useAnalysisStore((state) => state.playheadNs);
+  // 29 rows of text: refreshed at most five times per second during playback.
+  const effective = useThrottledPlayhead(200);
+  const selectedJoint = useAnalysisStore((state) => state.selectedJoint);
   const committedTimeNs = useAnalysisStore((state) => state.committedTimeNs);
   const subjectSwitching = useAnalysisStore((state) => state.subjectSwitching);
   const session = useQuery({
@@ -44,7 +47,7 @@ export function PoseTelemetry() {
   const observations = useMemo(() => poseSubjectObservations(artifact.data), [artifact.data]);
   const subjectId = context?.subjectId ?? subjects[0] ?? stream?.subject_id ?? null;
   const subjectObservation = observations.find((item) => item.entityId === subjectId);
-  const effective = playheadNs ?? committedTimeNs;
+  const participant = session.data?.participants.find((item) => item.subject_id === subjectId) ?? null;
   const canonical = canonicalSpan(artifact.data);
   const chunkSpanNs = useMemo(
     () => affordableSpanNs(artifact.data, {
@@ -100,7 +103,12 @@ export function PoseTelemetry() {
     <aside aria-label="Live pose telemetry" data-testid="pose-telemetry" className="flex h-full min-h-0 flex-col bg-surface-1">
       <header className="shrink-0 border-b border-border-subtle px-3 py-2">
         <h2 className="t-section text-text-muted">Live pose telemetry</h2>
-        <p className="mono mt-1 text-[12px] text-text-primary">{subjectId ?? "not scoped"}</p>
+        <p className="mt-1 text-[12px] text-text-primary">
+          {participant?.notes ?? subjectId ?? "not scoped"}
+          {participant?.notes ? <span className="mono ml-1.5 text-[10px] text-text-muted">{subjectId}</span> : null}
+        </p>
+        {participant?.cohort ? <p className="text-[10px] text-text-muted">{participant.cohort}</p> : null}
+        <p className="mono mt-0.5 text-[10px] tabular text-text-muted">{effective === null ? "—" : formatClockNs(effective)}</p>
         {status ? (
           <p data-testid="pose-telemetry-status" className="mt-1 text-[10px] text-quality-warning">
             {status}
@@ -126,14 +134,19 @@ export function PoseTelemetry() {
           <>
             <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 border-b border-border-subtle px-1.5 py-1 text-[10px] text-text-muted">
               <span>landmark</span>
-              <span>x · y · z · p90 radius</span>
+              <span title="Provider source frame, metres; Z is player-centroid-relative">source x · y · z · p90 (m)</span>
             </div>
             {jointNames.map((jointName) => {
               const landmark = byName.get(jointName);
               return (
                 <div
                   key={jointName}
-                  className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 border-b border-border-subtle px-1.5 py-1.5 last:border-b-0"
+                  aria-current={selectedJoint === jointName ? "true" : undefined}
+                  className={
+                    selectedJoint === jointName
+                      ? "grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 border-b border-l-2 border-border-subtle border-l-accent bg-surface-3 px-1.5 py-1.5 last:border-b-0"
+                      : "grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 border-b border-border-subtle px-1.5 py-1.5 last:border-b-0"
+                  }
                 >
                   <span className="mono truncate text-[11px] text-text-secondary">{jointName}</span>
                   {landmark ? (

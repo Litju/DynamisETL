@@ -51,12 +51,15 @@ class MatchPlayer:
     shirt_number: int | None
     position_group: str | None
     position_name: str | None
+    position_acronym: str | None
     short_name: str | None
     trackable_object: str | None
 
     @property
     def is_goalkeeper(self) -> bool:
-        return (self.position_group or "").strip().lower() == "goalkeeper"
+        return (self.position_acronym or "").strip().upper() == "GK" or (
+            (self.position_group or "").strip().lower() == "goalkeeper"
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,6 +95,7 @@ class SkillCornerMatchMetadata:
     home_score: int | None
     away_score: int | None
     stadium: str | None
+    home_team_side: tuple[str | None, str | None]
     periods: tuple[MatchPeriod, ...]
     players: tuple[MatchPlayer, ...]
 
@@ -110,6 +114,22 @@ class SkillCornerMatchMetadata:
             if candidate.period == period:
                 return candidate
         return None
+
+    def attacking_direction(self, team_id: str, period: int) -> str | None:
+        """Source-declared team direction for a period, when present."""
+        if period not in {1, 2}:
+            return None
+        direction = self.home_team_side[period - 1]
+        if direction is None:
+            return None
+        if team_id == self.home_team_id:
+            return direction
+        if team_id == self.away_team_id:
+            return {
+                "left_to_right": "right_to_left",
+                "right_to_left": "left_to_right",
+            }[direction]
+        raise KeyError(f"team {team_id!r} is not in match {self.match_id}")
 
 
 def parse_match_metadata(path: Path) -> SkillCornerMatchMetadata:
@@ -154,6 +174,17 @@ def parse_match_metadata(path: Path) -> SkillCornerMatchMetadata:
     if not periods:
         raise MatchMetadataError("match metadata declares no period")
 
+    side_value = document.get("home_team_side")
+    if side_value is None:
+        home_team_side: tuple[str | None, str | None] = (None, None)
+    else:
+        sides = _sequence(side_value, what="home_team_side")
+        if len(sides) != 2 or any(side not in {"left_to_right", "right_to_left"} for side in sides):
+            raise MatchMetadataError(
+                "home_team_side must declare left_to_right/right_to_left for both halves"
+            )
+        home_team_side = (str(sides[0]), str(sides[1]))
+
     raw_players = _sequence(document.get("players"), what="players")
     players: list[MatchPlayer] = []
     seen: set[str] = set()
@@ -196,6 +227,11 @@ def parse_match_metadata(path: Path) -> SkillCornerMatchMetadata:
                 position_name=(
                     str(role_mapping.get("name")) if role_mapping.get("name") is not None else None
                 ),
+                position_acronym=(
+                    str(role_mapping.get("acronym"))
+                    if role_mapping.get("acronym") is not None
+                    else None
+                ),
                 short_name=(
                     str(entry.get("short_name")) if entry.get("short_name") is not None else None
                 ),
@@ -224,6 +260,7 @@ def parse_match_metadata(path: Path) -> SkillCornerMatchMetadata:
         home_score=int(home_score) if isinstance(home_score, (int, float)) else None,
         away_score=int(away_score) if isinstance(away_score, (int, float)) else None,
         stadium=stadium_name,
+        home_team_side=home_team_side,
         periods=tuple(periods),
         players=tuple(players),
     )

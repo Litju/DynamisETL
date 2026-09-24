@@ -9,6 +9,11 @@ test.beforeEach(async ({ page }) => {
   await installApiMocks(page);
 });
 
+test("0. root opens the catalog instead of the not-found surface", async ({ page }) => {
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/catalog$/);
+});
+
 test("1. deep link loads deterministic analytical context and survives reload", async ({ page }) => {
   await page.goto(DEEP_LINK);
   await expect(page.getByText("skillcorner-opendata").first()).toBeVisible();
@@ -89,7 +94,7 @@ test("1d. Pose telemetry lists every provider landmark in the inspector", async 
   await expect(telemetry.getByText("rPinky")).toBeVisible();
 });
 
-test("2. selecting a player on the pitch updates the durable subject context", async ({ page }) => {
+test("2. selecting a player on the pitch updates the durable entity context", async ({ page }) => {
   await page.goto("/lab/skillcorner-opendata/1925299?stream=tracking-1&view=field");
   const host = page.getByTestId("pitch-canvas");
   await expect(host).toBeVisible();
@@ -101,9 +106,25 @@ test("2. selecting a player on the pitch updates the durable subject context", a
   const scale = Math.min(box.width / 120, box.height / 80);
   // p1 sits at (-5 m, 2 m) with the pitch origin at the canvas centre.
   await page.mouse.click(box.x + box.width / 2 - 5 * scale, box.y + box.height / 2 - 2 * scale);
-  await expect(page).toHaveURL(/subject=p1/);
-  await expect(page.getByText(/p1 · player/)).toBeVisible();
-  await expect(page.getByText(/detected$|extrapolated$/).last()).toBeVisible();
+  // RES-112 F-06: the Field entity has its own durable key; the Pose subject
+  // key is never overwritten by a pitch click.
+  await expect(page).toHaveURL(/entity=p1/);
+  await expect(page).not.toHaveURL(/subject=p1/);
+  const selection = page.getByTestId("pitch-selection");
+  await expect(selection).toContainText("p1");
+  await expect(selection).toContainText(/detected position|extrapolated position/);
+});
+
+test("2b. field uses the Tactical Analysis pane with explicit unavailable states", async ({ page }) => {
+  await page.goto("/lab/skillcorner-opendata/1925299?stream=tracking-1&view=field&t_ns=0");
+  const pane = page.getByRole("region", { name: "Tactical Analysis" });
+  await expect(pane).toBeVisible();
+  await expect(pane.getByRole("tab", { name: "Live" })).toBeVisible();
+  await expect(pane.getByRole("tab", { name: "Shape" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Inspector" })).toHaveCount(0);
+  await pane.getByRole("tab", { name: "Shape" }).click();
+  // RES-112 T-01: the unsupported state names the capability authority.
+  await expect(pane.getByText("Unsupported by this source").last()).toBeVisible();
 });
 
 test("3/4. committed time propagates from the keyboard to the transport and pose view", async ({

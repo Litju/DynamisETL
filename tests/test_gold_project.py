@@ -119,6 +119,19 @@ def _synthetic_serving(root: Path) -> None:
         },
         sort_keys=True,
     )
+    # The older run also emitted an entity (the ball) that the corrected newer
+    # run of the same algorithm over the same scope no longer emits.
+    superseded_entity_provenance = json.dumps(
+        {
+            "origin": "pipeline-computed",
+            "algorithm_id": "locomotor.speed_effort_kinematics",
+            "algorithm_version": "1.0.0",
+            "parameters_hash": "a" * 64,
+            "code_git_sha": "c" * 40,
+            "entity_id": "ball",
+        },
+        sort_keys=True,
+    )
     cmj_provenance = json.dumps(
         {
             "origin": "pipeline-computed",
@@ -156,6 +169,22 @@ def _synthetic_serving(root: Path) -> None:
             "computed_at": "2026-01-01T00:00:00+00:00",
             "input_checksums": '["aa"]',
             "provenance": stale_provenance,
+        },
+        {
+            "derived_metric_id": "dm-loco-distance-ball-old",
+            "dataset_id": "womens-soccer-positioning",
+            "metric_id": "locomotor.distance_total",
+            "run_id": "run-loco-old",
+            "subject_id": "P1",
+            "session_id": "J01",
+            "trial_id": None,
+            "stream_id": "gnss-1",
+            "si_unit": "m",
+            "measurement_class": "PIPELINE_DERIVED",
+            "value_num": 14000.0,
+            "computed_at": "2026-01-01T00:00:00+00:00",
+            "input_checksums": '["aa"]',
+            "provenance": superseded_entity_provenance,
         },
         {
             "derived_metric_id": "dm-loco-distance",
@@ -273,7 +302,7 @@ def test_gold_build_selects_current_revision_and_reconciles(tmp_settings: Settin
         stale = scalar(
             connection,
             "SELECT count(*) FROM gold_trial_metrics "
-            "WHERE derived_metric_id = 'dm-loco-distance-old'",
+            "WHERE derived_metric_id IN ('dm-loco-distance-old', 'dm-loco-distance-ball-old')",
         )
         distance = scalar(connection, "SELECT distance_total_m FROM gold_session_player_load")
         jump = scalar(connection, "SELECT jump_height_jhwd_m FROM gold_cmj_metrics")
@@ -281,7 +310,9 @@ def test_gold_build_selects_current_revision_and_reconciles(tmp_settings: Settin
         provenance = scalar(connection, "SELECT count(*) FROM gold_processing_provenance")
     finally:
         connection.close()
-    # The older revision of the same identity is historical, not served.
+    # The older revision of the same identity is historical, not served, and so
+    # is an identity the older run emitted but the newer run of the same scope no
+    # longer emits.
     assert trial_metrics == 4
     assert stale == 0
     assert distance == pytest.approx(5000.0)

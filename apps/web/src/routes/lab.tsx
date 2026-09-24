@@ -15,14 +15,14 @@ import { lazy, Suspense } from "react";
 
 const PoseViewer = lazy(() => import("@/components/pose/PoseViewer"));
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
-import { sessionQuery } from "@/lib/api/queries";
-import { patchChangesSearch, resolveLabDefaults } from "@/lib/defaults";
+import { artifactQuery, sessionQuery } from "@/lib/api/queries";
+import { canonicalTimeDefault, patchChangesSearch, resolveLabDefaults } from "@/lib/defaults";
 import { sessionSurfaces } from "@/lib/capabilities";
 import { cn } from "@/lib/cn";
 import { labSearchSchema, parseSearch, WORKBENCH_VIEWS } from "@/lib/search";
 import type { LabSearch, WorkbenchView } from "@/lib/search";
 import { useAnalysisStore } from "@/lib/state/analysis";
-import { tryParseNs } from "@/lib/time";
+import { formatNsDecimal, tryParseNs } from "@/lib/time";
 
 
 export function defineLabRoute(parent: AnyRoute) {
@@ -44,14 +44,15 @@ export function LabPage() {
 
   const durableTimeNs = tryParseNs(search.t_ns);
   const durableSubject = search.subject ?? null;
+  const durableEntity = search.entity ?? null;
   const durableView = search.view ?? "overview";
   useEffect(() => {
     hydrate({
       committedTimeNs: durableTimeNs,
-      selectedEntityId: durableSubject,
+      selectedEntityId: durableEntity,
       focusedPanel: durableView,
     });
-  }, [hydrate, durableSubject, durableTimeNs, durableView]);
+  }, [hydrate, durableEntity, durableTimeNs, durableView]);
   useEffect(() => () => {
     useAnalysisStore.getState().resetTransient();
   }, [datasetId, sessionId]);
@@ -88,6 +89,27 @@ export function LabPage() {
     updateSearch(patch);
   }, [detail, search, updateSearch]);
 
+  // Canonical time authority: a renderer view always has a committed frame that
+  // lies inside the selected stream's canonical span (RES-112 F-01/F-08/P-01).
+  const rendererView =
+    durableView === "signals" || durableView === "field" || durableView === "pose";
+  const timeArtifactId = rendererView ? (selectedStream?.sample_artifact_ids[0] ?? null) : null;
+  const timeArtifact = useQuery({
+    ...artifactQuery(timeArtifactId ?? ""),
+    enabled: Boolean(timeArtifactId),
+  });
+  const awaitingPoseSubject = durableView === "pose" && search.subject === undefined;
+  useEffect(() => {
+    if (!timeArtifact.data || awaitingPoseSubject) return;
+    const target = canonicalTimeDefault(timeArtifact.data, {
+      currentNs: durableTimeNs,
+      view: durableView,
+      subjectId: durableSubject,
+    });
+    if (target === null) return;
+    updateSearch({ t_ns: formatNsDecimal(target) });
+  }, [awaitingPoseSubject, durableSubject, durableTimeNs, durableView, timeArtifact.data, updateSearch]);
+
   if (session.isPending) return <LoadingPanel label="Loading laboratory session" />;
   if (session.isError) {
     return <ErrorPanel error={session.error} onRetry={() => void session.refetch()} />;
@@ -98,12 +120,14 @@ export function LabPage() {
   // open it, so the workbench never advertises an analysis the data cannot
   // render. Provenance follows the selected result and is always reachable.
   const surfaces = sessionSurfaces(session.data.streams);
+  // A deep link to a view this session offers no stream for keeps that view
+  // selected, so the laboratory itself can state why it is empty (RES-112 S-02).
   const availableViews: WorkbenchView[] = [
     "overview",
     ...WORKBENCH_VIEWS.filter(
       (candidate): candidate is WorkbenchView =>
         candidate !== "overview" &&
-        (candidate === "provenance" || surfaces.includes(candidate as never)),
+        (candidate === "provenance" || candidate === view || surfaces.includes(candidate as never)),
     ),
   ];
   return (

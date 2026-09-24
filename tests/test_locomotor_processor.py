@@ -323,6 +323,52 @@ def test_multi_object_stream_produces_per_entity_metrics() -> None:
     assert len({metric.entity_id for metric in result.metrics}) == 2
 
 
+def test_declared_entity_object_types_exclude_the_ball() -> None:
+    samples = 21
+    times = np.arange(samples) / 10.0
+    table = _tracking_table(
+        {
+            "player-a": (2.0 * times, np.zeros(samples)),
+            "goalkeeper-a": (3.0 * times, np.zeros(samples)),
+            "ball": (20.0 * times, np.zeros(samples)),
+        }
+    )
+    kinds = [
+        "ball" if value == "ball" else "goalkeeper" if value == "goalkeeper-a" else "player"
+        for value in table["object_id"].to_pylist()
+    ]
+    table = table.set_column(
+        table.schema.get_field_index("object_type"), "object_type", pa.array(kinds)
+    )
+    everything = process_locomotor(table, parameters=_planar_parameters())
+    assert {metric.entity_id for metric in everything.metrics} == {
+        "player-a",
+        "goalkeeper-a",
+        "ball",
+    }
+
+    athletes = process_locomotor(
+        table, parameters=_planar_parameters(entity_object_types=["player", "goalkeeper"])
+    )
+    assert {metric.entity_id for metric in athletes.metrics} == {"player-a", "goalkeeper-a"}
+    assert athletes.diagnostics["entity_object_types"] == ["player", "goalkeeper"]
+    assert athletes.spec.parameters_hash != everything.spec.parameters_hash
+    with pytest.raises(ValueError, match="no object of the declared"):
+        process_locomotor(table, parameters=_planar_parameters(entity_object_types=["official"]))
+    with pytest.raises(ValueError, match="entity_object_types"):
+        process_locomotor(table, parameters=_planar_parameters(entity_object_types=[]))
+
+
+def test_tracking_acceptance_parameters_are_athletes_only() -> None:
+    from dynamis.processors.acceptance import (
+        SKILLCORNER_ACCEPTANCE_PARAMETERS,
+        TRACKING_ACCEPTANCE_PARAMETERS,
+    )
+
+    assert TRACKING_ACCEPTANCE_PARAMETERS["entity_object_types"] == ["player", "goalkeeper"]
+    assert SKILLCORNER_ACCEPTANCE_PARAMETERS["entity_object_types"] == ["player", "goalkeeper"]
+
+
 def test_step_speed_gate_can_exclude_implausible_steps_from_distance() -> None:
     samples = 30
     x = np.arange(samples) * 0.5

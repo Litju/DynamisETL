@@ -102,6 +102,11 @@ DEFAULT_PARAMETERS: dict[str, Any] = {
     "earth_radius_m": WGS84_MEAN_RADIUS_M,
     "geodetic_origin": "first_sample_per_entity",
     "entity_grouping": ENTITY_GROUPING_OBJECT,
+    # Canonical ``object_type`` values that are locomotor entities. ``None``
+    # keeps every object (single-athlete streams carry no object_type). A
+    # multi-object tracking stream must name its athlete types explicitly: the
+    # ball is tracked with the players but its trajectory is not locomotion.
+    "entity_object_types": None,
     "derivative": {
         "filter": {
             "family": "none",
@@ -264,6 +269,13 @@ def _resolved(parameters: Mapping[str, Any] | None) -> dict[str, Any]:
         )
     if resolved["entity_grouping"] not in ENTITY_GROUPINGS:
         raise ValueError(f"unknown entity_grouping {resolved['entity_grouping']!r}")
+    object_types = resolved.get("entity_object_types")
+    if object_types is not None and (
+        not isinstance(object_types, list | tuple)
+        or not object_types
+        or not all(isinstance(item, str) and item for item in object_types)
+    ):
+        raise ValueError("entity_object_types must be null or a non-empty list of strings")
     if domain == POSITION_DOMAIN_PLANAR:
         if resolved["distance_method"] != DISTANCE_METHOD_PLANAR:
             raise ValueError(
@@ -366,7 +378,12 @@ def _scope(table: pa.Table) -> dict[str, str | None]:
     }
 
 
-def _entities(table: pa.Table, *, grouping: str) -> tuple[_EntityFrame, ...]:
+def _entities(
+    table: pa.Table,
+    *,
+    grouping: str,
+    object_types: tuple[str, ...] | None = None,
+) -> tuple[_EntityFrame, ...]:
     if table.num_rows == 0:
         raise ValueError(f"{ALGORITHM_ID}: the input stream is empty")
     scope = _scope(table)
@@ -387,11 +404,22 @@ def _entities(table: pa.Table, *, grouping: str) -> tuple[_EntityFrame, ...]:
             ),
         )
     object_ids = table.column("object_id").to_pylist()
+    if object_types is not None and "object_type" not in table.column_names:
+        raise ValueError(
+            f"{ALGORITHM_ID}: entity_object_types requires a canonical object_type column"
+        )
+    kinds = table.column("object_type").to_pylist() if object_types is not None else None
     seen: dict[str, list[int]] = {}
     for position, value in enumerate(object_ids):
         if value is None:
             continue
+        if kinds is not None and kinds[position] not in object_types:
+            continue
         seen.setdefault(str(value), []).append(position)
+    if not seen and object_types is not None:
+        raise ValueError(
+            f"{ALGORITHM_ID}: no object of the declared entity_object_types {list(object_types)}"
+        )
     if not seen:
         stream_id = scope["stream_id"] or "stream"
         return (
@@ -477,7 +505,12 @@ def process_locomotor(
     windows = tuple(float(item) for item in resolved.get("rolling_windows_s") or ())
     derivative_spec = DerivativeSpec.from_parameters(dict(resolved["derivative"]))
     radius = float(resolved["earth_radius_m"])
-    entities = _entities(table, grouping=str(resolved["entity_grouping"]))
+    declared_types = resolved.get("entity_object_types")
+    entities = _entities(
+        table,
+        grouping=str(resolved["entity_grouping"]),
+        object_types=tuple(declared_types) if declared_types is not None else None,
+    )
 
     series_parts: list[pa.Table] = []
     effort_rows: list[dict[str, Any]] = []
@@ -768,6 +801,7 @@ def process_locomotor(
         )
     diagnostics = {
         "entities": len(entities),
+        "entity_object_types": declared_types,
         "samples": total_samples,
         "position_domain": domain,
         "zones": [zone.parameters() for zone in zones],

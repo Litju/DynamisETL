@@ -213,6 +213,36 @@ def execute_processor(
 
     persisted: dict[str, int] = {}
     if persist and engine is not None:
+        series_by_name = {series.name: series for series in result.series}
+        tactical_level = result.diagnostics.get("level")
+        is_tactical = result.spec.algorithm_id.startswith("tactical.")
+        input_measurement_class = result.diagnostics.get("input_measurement_class")
+        if input_measurement_class is None and result.diagnostics.get("input_measurement_classes"):
+            input_measurement_class = json.dumps(
+                result.diagnostics["input_measurement_classes"],
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        elif input_measurement_class is not None and not isinstance(input_measurement_class, str):
+            input_measurement_class = json.dumps(
+                input_measurement_class, sort_keys=True, separators=(",", ":")
+            )
+
+        def first_value(series_name: str, column: str) -> Any:
+            table = series_by_name[series_name].table
+            if column not in table.column_names or table.num_rows == 0:
+                return None
+            return table.column(column)[0].as_py()
+
+        def series_measurement_class(series_name: str) -> str | None:
+            metadata = series_by_name[series_name].table.schema.metadata or {}
+            declared = metadata.get(b"dynamis.measurement_class")
+            if declared is not None:
+                return declared.decode("utf-8")
+            if not is_tactical:
+                return None
+            return "MODEL_ESTIMATED" if tactical_level == "C" else "PIPELINE_DERIVED"
+
         artifact_rows = tuple(
             {
                 "artifact_id": f"proc-{run_id}-{item.name}"[:128],
@@ -232,6 +262,14 @@ def execute_processor(
                     "code_git_sha": resolved_code_sha,
                     "series_name": item.name,
                     "series_key": series_key,
+                    "stream_id": series_key if is_tactical else None,
+                    "session_id": first_value(item.name, "session_id"),
+                    "trial_id": first_value(item.name, "trial_id"),
+                    "tactical_level": tactical_level if is_tactical else None,
+                    "measurement_class": series_measurement_class(item.name),
+                    "input_measurement_class": input_measurement_class,
+                    "coordinate_frame_id": result.diagnostics.get("coordinate_frame_id"),
+                    "quality": result.diagnostics.get("quality", {}),
                 },
             }
             for item in processed

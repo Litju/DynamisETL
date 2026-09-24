@@ -43,6 +43,22 @@ def test_match_time_parser_is_exact_and_strict() -> None:
         match_time_ns(None)
 
 
+def test_metadata_preserves_half_direction_and_goalkeeper_acronym(
+    bundle: dict[str, Path],
+) -> None:
+    from dynamis.adapters.skillcorner.metadata import parse_match_metadata
+
+    metadata = parse_match_metadata(bundle["match_json"])
+    assert metadata.attacking_direction(metadata.home_team_id, 1) == "left_to_right"
+    assert metadata.attacking_direction(metadata.away_team_id, 1) == "right_to_left"
+    assert metadata.attacking_direction(metadata.home_team_id, 2) == "right_to_left"
+    goalkeeper = metadata.player("101")
+    assert goalkeeper is not None
+    assert goalkeeper.position_group == "Other"
+    assert goalkeeper.position_acronym == "GK"
+    assert goalkeeper.is_goalkeeper
+
+
 def test_landmark_authority_is_the_documented_readme_order() -> None:
     from dynamis.adapters.skillcorner.authorities import pose_skeleton
 

@@ -77,6 +77,29 @@ describe("PlaybackChunkCoordinator", () => {
     expect(coordinator.allowAdvance(99n, 98n)).toBe(98n);
   });
 
+  it("does not end forward playback that starts at or before the canonical minimum", () => {
+    const ready = new Set<string>([id(1000, 1019), id(1020, 1039)]);
+    let ended = 0;
+    const coordinator = new PlaybackChunkCoordinator({
+      canonicalMinNs: 1000n,
+      canonicalMaxNs: 1099n,
+      chunkSpanNs: 20n,
+      anchorNs: null,
+      port: { isReady: (chunk) => ready.has(chunk.id), prefetch: () => undefined, evict: () => undefined },
+      onEnded: () => { ended += 1; },
+    });
+    // RES-112 F-02: DFL tracking starts at 1.02 s; a clock starting from 0 must
+    // clamp onto the first frame and keep playing, not report the end.
+    expect(coordinator.allowAdvance(0n, 16n)).toBe(1000n);
+    expect(coordinator.allowAdvance(1000n, 1005n)).toBe(1005n);
+    expect(coordinator.getSnapshot().status).toBe("ready");
+    expect(ended).toBe(0);
+    // Reverse playback reaching the minimum does end.
+    expect(coordinator.allowAdvance(1005n, 990n)).toBe(1000n);
+    expect(coordinator.getSnapshot().status).toBe("ended");
+    expect(ended).toBe(1);
+  });
+
   it("prefetches and retains only previous/active/next", () => {
     const { prefetched, evicted } = harness();
     expect(prefetched).toContain(id(0, 19));

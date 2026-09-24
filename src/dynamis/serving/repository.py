@@ -160,7 +160,41 @@ def _license_view(row: Any) -> LicenseView:
     )
 
 
-_DATASET_SELECT = """
+_CONTROL_CURRENT_METRIC_COUNT = """(SELECT count(*) FROM (
+        SELECT dm.run_id,
+            row_number() OVER (
+                PARTITION BY dm.metric_id, COALESCE(dm.subject_id, ''),
+                    COALESCE(dm.session_id, ''), COALESCE(dm.trial_id, ''),
+                    COALESCE(dm.stream_id, ''), COALESCE(dm.provenance ->> 'entity_id', '')
+                ORDER BY dm.computed_at DESC NULLS LAST, dm.run_id DESC
+            ) AS revision_rank,
+            first_value(dm.run_id) OVER (
+                PARTITION BY dm.provenance ->> 'algorithm_id', COALESCE(dm.subject_id, ''),
+                    COALESCE(dm.session_id, ''), COALESCE(dm.trial_id, ''),
+                    COALESCE(dm.stream_id, '')
+                ORDER BY dm.computed_at DESC NULLS LAST, dm.run_id DESC
+            ) AS scope_run_id
+        FROM derived_metric dm WHERE dm.dataset_id = s.dataset_id
+    ) current_metric
+    WHERE current_metric.revision_rank = 1
+        AND current_metric.run_id = current_metric.scope_run_id)"""
+
+
+def _dataset_select(connection: Connection, gold_schema: str | None) -> str:
+    """Dataset summaries with current-revision metric counts.
+
+    Published Gold is exactly the current revisions, so its mart is counted
+    directly; the control-plane rule (the same run-scoped current revision the
+    metric endpoint serves) is the fallback before Gold is published.
+    """
+    if gold_schema is not None and gold_published(connection, gold_schema):
+        metric_count = (
+            f'(SELECT count(*) FROM "{gold_schema}"."{TRIAL_METRICS_MART}" g '
+            "WHERE g.dataset_id = s.dataset_id)"
+        )
+    else:
+        metric_count = _CONTROL_CURRENT_METRIC_COUNT
+    return f"""
 SELECT
     s.dataset_id, s.name, s.provider, s.domain, s.doi, s.upstream_urls,
     s.v1_role, s.initial_scope, s.adapter_id,
@@ -168,12 +202,14 @@ SELECT
     l.noncommercial_only, l.share_alike, l.redistribution, l.local_only, l.restrictions,
     (SELECT json_agg(m.modality ORDER BY m.modality) FROM dataset_source_modality m
         WHERE m.dataset_id = s.dataset_id) AS modalities,
+    (SELECT json_agg(DISTINCT st.modality) FROM sensor_stream st
+        WHERE st.dataset_id = s.dataset_id) AS ingested_modalities,
     (SELECT count(*) FROM dataset_version v WHERE v.dataset_id = s.dataset_id) AS version_count,
     (SELECT count(*) FROM "session" se WHERE se.dataset_id = s.dataset_id) AS session_count,
     (SELECT count(*) FROM subject su WHERE su.dataset_id = s.dataset_id) AS subject_count,
     (SELECT count(*) FROM trial t WHERE t.dataset_id = s.dataset_id) AS trial_count,
     (SELECT count(*) FROM sensor_stream st WHERE st.dataset_id = s.dataset_id) AS stream_count,
-    (SELECT count(*) FROM derived_metric dm WHERE dm.dataset_id = s.dataset_id) AS metric_count,
+    {metric_count} AS metric_count,
     (SELECT count(*) FROM quality_issue q WHERE q.dataset_id = s.dataset_id) AS quality_issue_count
 FROM dataset_source s
 JOIN license_policy l ON l.policy_id = s.license_policy_id
@@ -189,6 +225,7 @@ def _dataset_summary(row: Any) -> DatasetSummary:
         doi=row["doi"],
         upstream_urls=[str(item) for item in _list(row["upstream_urls"])],
         modalities=[str(item) for item in _list(row["modalities"])],
+        ingested_modalities=sorted(str(item) for item in _list(row.get("ingested_modalities"))),
         license=_license_view(row),
         version_count=int(row["version_count"]),
         session_count=int(row["session_count"]),
@@ -200,15 +237,18 @@ def _dataset_summary(row: Any) -> DatasetSummary:
     )
 
 
-def list_datasets(connection: Connection) -> list[DatasetSummary]:
-    rows = connection.execute(sa.text(_DATASET_SELECT + " ORDER BY s.dataset_id")).mappings().all()
+def list_datasets(connection: Connection, gold_schema: str | None = None) -> list[DatasetSummary]:
+    query = _dataset_select(connection, gold_schema) + " ORDER BY s.dataset_id"
+    rows = connection.execute(sa.text(query)).mappings().all()
     return [_dataset_summary(row) for row in rows]
 
 
-def dataset_detail(connection: Connection, dataset_id: str) -> DatasetDetail | None:
+def dataset_detail(
+    connection: Connection, dataset_id: str, gold_schema: str | None = None
+) -> DatasetDetail | None:
     row = (
         connection.execute(
-            sa.text(_DATASET_SELECT + " WHERE s.dataset_id = :dataset_id"),
+            sa.text(_dataset_select(connection, gold_schema) + " WHERE s.dataset_id = :dataset_id"),
             {"dataset_id": dataset_id},
         )
         .mappings()
@@ -385,8 +425,12 @@ def session_detail(
     participants = (
         connection.execute(
             sa.text(
-                "SELECT subject_id, role, group_label FROM session_participant "
-                "WHERE dataset_id = :dataset_id AND session_id = :session_id ORDER BY subject_id"
+                "SELECT p.subject_id, p.role, p.group_label, s.cohort, s.notes "
+                "FROM session_participant p "
+                "LEFT JOIN subject s "
+                "ON s.dataset_id = p.dataset_id AND s.subject_id = p.subject_id "
+                "WHERE p.dataset_id = :dataset_id AND p.session_id = :session_id "
+                "ORDER BY p.subject_id"
             ),
             {"dataset_id": dataset_id, "session_id": session_id},
         )
@@ -448,6 +492,8 @@ def session_detail(
                 subject_id=row["subject_id"],
                 role=row["role"],
                 group_label=row["group_label"],
+                cohort=row["cohort"],
+                notes=row["notes"],
             )
             for row in participants
         ],
@@ -547,9 +593,18 @@ WITH ranked AS (
                 COALESCE(m.trial_id, ''), COALESCE(m.stream_id, ''),
                 COALESCE(m.provenance ->> 'entity_id', '')
             ORDER BY m.computed_at DESC NULLS LAST, m.run_id DESC
-        ) AS revision_rank
+        ) AS revision_rank,
+        first_value(m.run_id) OVER (
+            PARTITION BY
+                m.dataset_id, m.provenance ->> 'algorithm_id', COALESCE(m.subject_id, ''),
+                COALESCE(m.session_id, ''), COALESCE(m.trial_id, ''), COALESCE(m.stream_id, '')
+            ORDER BY m.computed_at DESC NULLS LAST, m.run_id DESC
+        ) AS scope_run_id
     FROM derived_metric m
     LEFT JOIN metric_definition d ON d.metric_id = m.metric_id
+),
+current_revision AS (
+    SELECT * FROM ranked WHERE revision_rank = 1 AND run_id = scope_run_id
 )
 """
 
@@ -617,13 +672,13 @@ def query_metrics(
             ],
         )
     total = connection.execute(
-        sa.text(f"{_CONTROL_METRIC_SELECT} SELECT count(*) FROM ranked{where}"),
+        sa.text(f"{_CONTROL_METRIC_SELECT} SELECT count(*) FROM current_revision{where}"),
         parameters,
     ).scalar_one()
     rows = (
         connection.execute(
             sa.text(
-                f"{_CONTROL_METRIC_SELECT} SELECT * FROM ranked{where} "
+                f"{_CONTROL_METRIC_SELECT} SELECT * FROM current_revision{where} "
                 "ORDER BY dataset_id, metric_id, COALESCE(session_id, ''), "
                 "COALESCE(subject_id, ''), COALESCE(trial_id, ''), COALESCE(stream_id, ''), "
                 "entity_key LIMIT :limit OFFSET :offset"
@@ -1029,7 +1084,13 @@ def _artifact_by_checksum(connection: Connection, checksum: str) -> ArtifactRefV
             sa.text(
                 """SELECT p.artifact_id, p.dataset_id, p.layer, p.relative_path,
                 p.checksum_sha256, p.row_count, p.byte_size, p.artifact_type,
-                p.artifact_metadata, r.algorithm_id, r.run_id
+                p.artifact_metadata, p.artifact_metadata->>'stream_id' AS stream_id,
+                p.artifact_metadata->>'measurement_class' AS measurement_class,
+                p.artifact_metadata->>'coordinate_frame_id' AS coordinate_frame_id,
+                p.artifact_metadata->>'input_measurement_class' AS input_measurement_class,
+                p.artifact_metadata->>'algorithm_version' AS algorithm_version,
+                p.artifact_metadata->>'parameters_hash' AS parameters_hash,
+                r.algorithm_id, r.run_id
                 FROM processing_artifact p
                 JOIN processing_run r ON r.run_id = p.run_id
                 WHERE p.checksum_sha256 = :checksum ORDER BY p.artifact_id LIMIT 1"""
@@ -1065,6 +1126,11 @@ def _artifact_view(row: Any, *, kind: Literal["sample", "processing"]) -> Artifa
         si_units=[str(item) for item in _list(row.get("si_units"))],
         coordinate_frame_id=row.get("coordinate_frame_id"),
         synchronization_spec_id=row.get("synchronization_spec_id"),
+        algorithm_id=row.get("algorithm_id"),
+        algorithm_version=row.get("algorithm_version"),
+        parameters_hash=row.get("parameters_hash"),
+        run_id=row.get("run_id"),
+        artifact_metadata=dict(row.get("artifact_metadata") or {}),
     )
 
 
@@ -1097,7 +1163,13 @@ def _artifact_by_id(connection: Connection, artifact_id: str) -> ArtifactRefView
             sa.text(
                 """SELECT p.artifact_id, p.dataset_id, p.layer, p.relative_path,
                 p.checksum_sha256, p.row_count, p.byte_size, p.artifact_type,
-                p.artifact_metadata, r.algorithm_id, r.run_id
+                p.artifact_metadata, p.artifact_metadata->>'stream_id' AS stream_id,
+                p.artifact_metadata->>'measurement_class' AS measurement_class,
+                p.artifact_metadata->>'coordinate_frame_id' AS coordinate_frame_id,
+                p.artifact_metadata->>'input_measurement_class' AS input_measurement_class,
+                p.artifact_metadata->>'algorithm_version' AS algorithm_version,
+                p.artifact_metadata->>'parameters_hash' AS parameters_hash,
+                r.algorithm_id, r.run_id
                 FROM processing_artifact p
                 JOIN processing_run r ON r.run_id = p.run_id
                 WHERE p.artifact_id = :artifact_id"""
@@ -1110,6 +1182,61 @@ def _artifact_by_id(connection: Connection, artifact_id: str) -> ArtifactRefView
     if processing is not None:
         return _artifact_view(processing, kind="processing")
     return None
+
+
+def list_tactical_artifacts(
+    connection: Connection,
+    *,
+    dataset_id: str,
+    session_id: str | None = None,
+    stream_id: str | None = None,
+    series_name: str | None = None,
+) -> list[ArtifactRefView]:
+    """List persisted tactical series without exposing non-tactical artifacts."""
+    clauses = [
+        "p.dataset_id = :dataset_id",
+        "p.artifact_metadata->>'tactical_level' IS NOT NULL",
+    ]
+    parameters: dict[str, Any] = {"dataset_id": dataset_id}
+    if session_id is not None:
+        clauses.append("p.artifact_metadata->>'session_id' = :session_id")
+        parameters["session_id"] = session_id
+    if stream_id is not None:
+        clauses.append("p.artifact_metadata->>'stream_id' = :stream_id")
+        parameters["stream_id"] = stream_id
+    if series_name is not None:
+        clauses.append("p.artifact_metadata->>'series_name' = :series_name")
+        parameters["series_name"] = series_name
+    # Only the current completed run of each algorithm over a session stream is
+    # served: a rerun (new code revision or parameters) supersedes the previous
+    # run's series instead of listing both, so a series name resolves to exactly
+    # one artifact.
+    query = f"""
+        WITH candidates AS (
+            SELECT p.artifact_id, p.dataset_id, p.layer, p.relative_path,
+                p.checksum_sha256, p.row_count, p.byte_size, p.artifact_type,
+                p.artifact_metadata, p.artifact_metadata->>'stream_id' AS stream_id,
+                p.artifact_metadata->>'measurement_class' AS measurement_class,
+                p.artifact_metadata->>'coordinate_frame_id' AS coordinate_frame_id,
+                p.artifact_metadata->>'algorithm_version' AS algorithm_version,
+                p.artifact_metadata->>'parameters_hash' AS parameters_hash,
+                r.algorithm_id, r.run_id,
+                first_value(r.run_id) OVER (
+                    PARTITION BY r.algorithm_id,
+                        COALESCE(p.artifact_metadata->>'session_id', ''),
+                        COALESCE(p.artifact_metadata->>'stream_id', '')
+                    ORDER BY r.completed_at DESC NULLS LAST, r.run_id DESC
+                ) AS current_run_id
+            FROM processing_artifact p
+            JOIN processing_run r ON r.run_id = p.run_id
+            WHERE r.status = 'completed' AND {" AND ".join(clauses)}
+        )
+        SELECT * FROM candidates
+        WHERE run_id = current_run_id
+        ORDER BY artifact_metadata->>'series_name', artifact_id
+    """
+    rows = connection.execute(sa.text(query), parameters).mappings().all()
+    return [_artifact_view(row, kind="processing") for row in rows]
 
 
 def list_quality_issues(

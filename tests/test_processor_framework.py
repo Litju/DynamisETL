@@ -175,6 +175,63 @@ def test_execute_processor_materializes_deterministic_series_and_receipt(
     assert receipt["series"][0]["checksum_sha256"] == first.series[0].artifact.checksum_sha256
 
 
+def test_persisted_tactical_artifacts_keep_each_series_measurement_class(
+    tmp_settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sqlalchemy import create_engine
+
+    from dynamis.processors import runtime
+
+    source = pa.table({"t_rel_ns": pa.array([0], type=pa.int64())}).replace_schema_metadata(
+        {b"dynamis.measurement_class": b"SOURCE_DERIVED"}
+    )
+    derived = pa.table({"t_rel_ns": pa.array([0], type=pa.int64())}).replace_schema_metadata(
+        {b"dynamis.measurement_class": b"PIPELINE_DERIVED"}
+    )
+    result = ProcessorResult(
+        spec=ProcessorSpec(
+            algorithm_id="tactical.matchlab_shape",
+            name="Tactical V3 fixture",
+            version="1",
+            description="Series class persistence check.",
+        ),
+        series=(
+            SeriesOutput(name="shape", table=derived),
+            SeriesOutput(name="source_possession_context", table=source),
+        ),
+        diagnostics={"level": "V3", "measurement_class": "PIPELINE_DERIVED"},
+    )
+    captured: list[dict] = []
+
+    def capture_artifacts(_connection, **kwargs):
+        captured.extend(kwargs["artifact_rows"])
+        return {}
+
+    monkeypatch.setattr(runtime, "persist_processing_result", capture_artifacts)
+    engine = create_engine("sqlite://")
+    try:
+        execute_processor(
+            tmp_settings,
+            result=result,
+            dataset_id="dfl-sportec-idsse",
+            inputs=(_input(tmp_settings),),
+            series_key="tracking-period-1",
+            engine=engine,
+            code_sha="a" * 40,
+        )
+    finally:
+        engine.dispose()
+
+    classes = {
+        row["artifact_metadata"]["series_name"]: row["artifact_metadata"]["measurement_class"]
+        for row in captured
+    }
+    assert classes == {
+        "shape": "PIPELINE_DERIVED",
+        "source_possession_context": "SOURCE_DERIVED",
+    }
+
+
 def test_serialization_descriptors_keep_their_required_keys() -> None:
     """Standalone strings inside a dict literal would corrupt these keys."""
     from dynamis.processors.acceptance import DatasetProcessing

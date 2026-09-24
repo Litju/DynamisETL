@@ -461,6 +461,26 @@ const STATUS = {
   quality_issue_count: 1,
 };
 
+const TACTICAL_CAPABILITY = {
+  dataset_id: "skillcorner-opendata",
+  accepted_slice: { match_id: "1925299" },
+  semantics: {
+    team_identity: "metadata team_id joined to tracking player_id",
+    attacking_direction: "unavailable",
+    event_semantics: "unavailable",
+    measurement_classes: { tracking: "MODEL_ESTIMATED" },
+  },
+  capabilities: {
+    level_a_geometry: "supported_with_model_input_quality",
+    level_b_territory: "supported_with_model_input_quality",
+    level_c_influence: "supported_partial_with_model_input_quality",
+    level_d_event_linked: "unavailable",
+    level_e_shape_phase: "unavailable",
+  },
+  quality_evidence: { tracking_rate_hz: 10, local_event_files: false, local_phase_files: false },
+  unavailable_reasons: ["no accepted local event or phase artifact"],
+};
+
 const RUNS = {
   total: 1,
   limit: 200,
@@ -501,6 +521,19 @@ function body(pathname: string): unknown | undefined {
   if (pathname === "/api/quality") return QUALITY;
   if (pathname === "/api/rights") return RIGHTS;
   if (pathname === "/api/runs") return RUNS;
+  if (pathname === "/api/tactical/capabilities/skillcorner-opendata") return TACTICAL_CAPABILITY;
+  if (pathname === "/api/tactical/quality/skillcorner-opendata") {
+    return {
+      dataset_id: "skillcorner-opendata",
+      capabilities: TACTICAL_CAPABILITY.capabilities,
+      quality_evidence: TACTICAL_CAPABILITY.quality_evidence,
+      measurement_classes: TACTICAL_CAPABILITY.semantics.measurement_classes,
+      unavailable_reasons: TACTICAL_CAPABILITY.unavailable_reasons,
+      disclosure: "PIPELINE_DERIVED is deterministic output; MODEL_ESTIMATED is assumption-bearing.",
+    };
+  }
+  if (pathname === "/api/tactical/methodology") return { metrics: [], authority: "RES-110" };
+  if (pathname === "/api/tactical/artifacts") return [];
   if (pathname === "/api/artifacts/tracking-sample") return TRACKING_ARTIFACT;
   if (pathname === "/api/artifacts/pose-sample") {
     return { ...POSE_ARTIFACT, entity_observations: poseObservationsInRange(Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY) };

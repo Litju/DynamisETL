@@ -16,6 +16,7 @@ import { metricsQuery, sessionQuery } from "@/lib/api/queries";
 import { readPalette } from "@/lib/chart-palette";
 import { cn } from "@/lib/cn";
 import { formatMetricValue } from "@/lib/measurement";
+import { participantLabels } from "@/lib/participants";
 import {
   entityKeyOf,
   headlineMetricId,
@@ -100,6 +101,7 @@ function OverviewBody({
   onSelectSubject: (subjectId: string) => void;
 }) {
   const palette = useMemo(() => readPalette(), []);
+  const labels = useMemo(() => participantLabels(session), [session]);
   const headlineId = useMemo(() => headlineMetricId(rows), [rows]);
   const summary = useMemo(
     () => (headlineId === null ? null : rankMetric(rows, headlineId)),
@@ -107,8 +109,8 @@ function OverviewBody({
   );
   const zones = useMemo(() => zoneBreakdown(rows), [rows]);
   const fact = useMemo(
-    () => leadingFact(summary, (value, unit) => formatMetricValue(value, unit).text),
-    [summary],
+    () => leadingFact(summary, (value, unit) => formatMetricValue(value, unit).text, (entityId) => labels.get(entityId)),
+    [labels, summary],
   );
 
   const selectRanked = (entityId: string) => {
@@ -148,7 +150,7 @@ function OverviewBody({
           >
             <EChart
               ariaLabel={`${summary.metricName} ranked by entity`}
-              option={rankedMetricOption(summary, palette)}
+              option={rankedMetricOption(summary, palette, (entityId) => labels.get(entityId))}
               onPointClick={(selection) => {
                 if (selection.seriesName === null) return;
                 const entries = [...summary.ranked.slice(0, MAX_RANKED_ENTITIES)].reverse();
@@ -167,7 +169,7 @@ function OverviewBody({
             >
               <EChart
                 ariaLabel="Distance by speed zone for each entity"
-                option={zoneBreakdownOption(zones, palette)}
+                option={zoneBreakdownOption(zones, palette, undefined, (entityId) => labels.get(entityId))}
               />
             </ChartCard>
           ) : (
@@ -189,6 +191,7 @@ function OverviewBody({
           />
         ) : null}
         <MetricTable
+          labels={labels}
           rows={rows}
           total={total}
           selectedResult={selectedResult}
@@ -242,10 +245,10 @@ function ContextStrip({
           onClick={onSelectFact}
           className="mt-3 flex w-full items-baseline gap-3 rounded-control border border-border-subtle bg-surface-0 px-3 py-2 text-left transition-colors duration-quick hover:border-border-strong hover:bg-surface-2"
         >
-          <span className="t-section text-text-muted">
+          <span className="t-section max-w-44 shrink-0 text-text-muted">
             {fact.label}
           </span>
-          <span className="t-value mono tabular">
+          <span className="t-value mono shrink-0 whitespace-nowrap tabular">
             {fact.value}
           </span>
           <span className="mono truncate text-[11px] text-text-muted">{fact.detail}</span>
@@ -379,11 +382,12 @@ function StreamContracts({
   );
 }
 
-const METRIC_COLUMNS: DataTableColumn<MetricValue>[] = [
+function metricColumns(labels: ReadonlyMap<string, string>): DataTableColumn<MetricValue>[] {
+  return [
   {
     id: "metric",
     header: "Metric",
-    size: 3,
+    size: 2.2,
     accessor: (metric) => metric.metric_name ?? metric.metric_id,
     cell: (metric) => (
       <span className="min-w-0">
@@ -402,18 +406,26 @@ const METRIC_COLUMNS: DataTableColumn<MetricValue>[] = [
   {
     id: "entity",
     header: "Entity",
-    size: 1.1,
-    accessor: (metric) => entityKeyOf(metric) ?? "",
-    cell: (metric) => (
-      <span className="mono truncate text-[11px] text-text-muted" title={entityKeyOf(metric) ?? ""}>
-        {entityKeyOf(metric) ?? "—"}
-      </span>
-    ),
+    size: 1.4,
+    accessor: (metric) => {
+      const key = entityKeyOf(metric) ?? "";
+      return labels.get(key) ?? key;
+    },
+    cell: (metric) => {
+      const key = entityKeyOf(metric);
+      const label = key === null ? undefined : labels.get(key);
+      return (
+        <span className="min-w-0" title={key ?? ""}>
+          <span className="block truncate text-[11px] text-text-secondary">{label ?? key ?? "—"}</span>
+          {label ? <span className="mono block truncate text-[10px] text-text-muted">{key}</span> : null}
+        </span>
+      );
+    },
   },
   {
     id: "value",
     header: "Value",
-    size: 1.3,
+    size: 1.2,
     align: "right",
     accessor: (metric) => metric.value_num ?? Number.NEGATIVE_INFINITY,
     cell: (metric) => (
@@ -432,13 +444,15 @@ const METRIC_COLUMNS: DataTableColumn<MetricValue>[] = [
   {
     id: "class",
     header: "Class",
-    size: 1.2,
+    size: 1.9,
     accessor: (metric) => metric.measurement_class,
     cell: (metric) => <MeasurementClassBadge measurementClass={metric.measurement_class} compact />,
   },
-];
+  ];
+}
 
 function MetricTable({
+  labels,
   rows,
   total,
   selectedResult,
@@ -446,6 +460,7 @@ function MetricTable({
   onSelectSubject,
   className,
 }: {
+  labels: ReadonlyMap<string, string>;
   rows: readonly MetricValue[];
   total: number;
   selectedResult: string | null;
@@ -454,10 +469,11 @@ function MetricTable({
   className?: string | undefined;
 }) {
   const [filter, setFilter] = useState("");
+  const columns = useMemo(() => metricColumns(labels), [labels]);
   const needle = filter.trim().toLowerCase();
   const visible = needle
     ? rows.filter((row) =>
-        `${row.metric_id} ${row.metric_name ?? ""} ${entityKeyOf(row) ?? ""}`
+        `${row.metric_id} ${row.metric_name ?? ""} ${entityKeyOf(row) ?? ""} ${labels.get(entityKeyOf(row) ?? "") ?? ""}`
           .toLowerCase()
           .includes(needle),
       )
@@ -483,7 +499,7 @@ function MetricTable({
         <DataTable
           ariaLabel="Derived metrics"
           rows={visible}
-          columns={METRIC_COLUMNS}
+          columns={columns}
           rowHeight={38}
           getRowId={(metric) => metric.derived_metric_id}
           selectedRowId={selectedResult}

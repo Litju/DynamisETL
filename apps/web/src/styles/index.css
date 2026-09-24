@@ -231,3 +231,41 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Transport timeline: a thin instrument track with a precise playhead thumb. */
+.t-timeline {
+  appearance: none;
+  height: 1.25rem;
+  background: transparent;
+  cursor: pointer;
+}
+
+.t-timeline::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--d-surface-3);
+}
+
+.t-timeline::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--d-surface-3);
+}
+
+.t-timeline::-webkit-slider-thumb {
+  appearance: none;
+  width: 4px;
+  height: 14px;
+  margin-top: -5px;
+  border-radius: 2px;
+  background: var(--d-accent);
+  box-shadow: 0 0 0 2px var(--d-surface-0);
+}
+
+.t-timeline::-moz-range-thumb {
+  width: 4px;
+  height: 14px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--d-accent);
+}

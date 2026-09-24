@@ -1,4 +1,4 @@
-import { createRootRoute, Outlet } from "@tanstack/react-router";
+import { createRootRoute, Outlet, redirect } from "@tanstack/react-router";
 import { useEffect } from "react";
 
 import { AppShell } from "@/components/shell/AppShell";
@@ -29,6 +29,11 @@ function RootLayout() {
  */
 export function defineRootRoute() {
   return createRootRoute({
+    beforeLoad: ({ location }) => {
+      if (location.pathname === "/") {
+        throw redirect({ to: "/catalog" });
+      }
+    },
     component: RootLayout,
     notFoundComponent: NotFoundPage,
   });

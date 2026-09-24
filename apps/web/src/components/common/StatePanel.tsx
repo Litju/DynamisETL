@@ -3,7 +3,21 @@ import type { ReactNode } from "react";
 import { ApiError } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 
-export type PanelStateKind = "loading" | "empty" | "error" | "unavailable" | "blocked";
+/**
+ * Distinct empty/unavailable causes (RES-112 UX §4): the system says *why*
+ * nothing is shown whenever it knows, never a generic "no data".
+ */
+export type PanelStateKind =
+  | "loading"
+  | "empty"
+  | "error"
+  | "unavailable"
+  | "blocked"
+  | "unsupported"
+  | "not_materialized"
+  | "no_frame"
+  | "filtered"
+  | "rights";
 
 const STATE_LABELS: Record<PanelStateKind, string> = {
   loading: "Loading",
@@ -11,6 +25,11 @@ const STATE_LABELS: Record<PanelStateKind, string> = {
   error: "API error",
   unavailable: "Unavailable for this source",
   blocked: "Quality-blocked",
+  unsupported: "Unsupported by this source",
+  not_materialized: "Not materialized",
+  no_frame: "No data at this time",
+  filtered: "Filtered out",
+  rights: "Rights-restricted",
 };
 
 export function StatePanel({

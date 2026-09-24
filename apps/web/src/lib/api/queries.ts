@@ -38,6 +38,22 @@ export interface WindowQuery {
   readonly chunkId?: string | undefined;
 }
 
+export interface TacticalArtifactQuery {
+  readonly datasetId: string;
+  readonly sessionId?: string | undefined;
+  readonly streamId?: string | undefined;
+  readonly seriesName?: string | undefined;
+}
+
+export interface TacticalSeriesQuery {
+  readonly artifactId: string;
+  readonly fromNs?: number | undefined;
+  readonly toNs?: number | undefined;
+  readonly maxPoints?: number | undefined;
+  /** Column projection; overlays read only what they draw. */
+  readonly columns?: readonly string[] | undefined;
+}
+
 function compact(params: Record<string, string | number | undefined>): Record<string, string> {
   const output: Record<string, string> = {};
   for (const [key, value] of Object.entries(params)) {
@@ -75,6 +91,11 @@ export const queryKeys = {
     query.maxPoints ?? null,
     query.entityId ?? null,
   ] as const,
+  tacticalCapabilities: (datasetId: string) => ["tactical", "capabilities", datasetId] as const,
+  tacticalQuality: (datasetId: string) => ["tactical", "quality", datasetId] as const,
+  tacticalMethodology: ["tactical", "methodology"] as const,
+  tacticalArtifacts: (query: TacticalArtifactQuery) => ["tactical", "artifacts", query] as const,
+  tacticalSeries: (query: TacticalSeriesQuery) => ["tactical", "series", query] as const,
 };
 
 export const servingStatusQuery = () =>
@@ -275,4 +296,79 @@ export const windowQuery = (query: WindowQuery) =>
         }),
       ),
     staleTime: 30_000,
+  });
+
+export const tacticalCapabilitiesQuery = (datasetId: string) =>
+  queryOptions({
+    queryKey: queryKeys.tacticalCapabilities(datasetId),
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/api/tactical/capabilities/{dataset_id}", {
+          params: { path: { dataset_id: datasetId } },
+        }),
+      ),
+    staleTime: 5 * 60_000,
+  });
+
+export const tacticalQualityQuery = (datasetId: string) =>
+  queryOptions({
+    queryKey: queryKeys.tacticalQuality(datasetId),
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/api/tactical/quality/{dataset_id}", {
+          params: { path: { dataset_id: datasetId } },
+        }),
+      ),
+    staleTime: 30_000,
+  });
+
+export const tacticalMethodologyQuery = () =>
+  queryOptions({
+    queryKey: queryKeys.tacticalMethodology,
+    queryFn: async () => unwrap(await api.GET("/api/tactical/methodology")),
+    staleTime: 5 * 60_000,
+  });
+
+export const tacticalArtifactsQuery = (query: TacticalArtifactQuery) =>
+  queryOptions({
+    queryKey: queryKeys.tacticalArtifacts(query),
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/api/tactical/artifacts", {
+          params: {
+            query: {
+              dataset_id: query.datasetId,
+              ...compact({
+                session_id: query.sessionId,
+                stream_id: query.streamId,
+                series_name: query.seriesName,
+              }),
+            },
+          },
+        }),
+      ),
+    staleTime: 30_000,
+  });
+
+export const tacticalSeriesQuery = (query: TacticalSeriesQuery) =>
+  queryOptions({
+    queryKey: queryKeys.tacticalSeries(query),
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/tactical/series/{artifact_id}", {
+          params: {
+            path: { artifact_id: query.artifactId },
+            query: compact({
+              from_ns: query.fromNs,
+              to_ns: query.toNs,
+              max_points: query.maxPoints,
+              columns: query.columns?.join(","),
+            }),
+          },
+          signal,
+        }),
+      ),
+    // A processing artifact id names immutable content (a rerun gets a new
+    // run/artifact identity), so a served window never goes stale.
+    staleTime: Number.POSITIVE_INFINITY,
   });
