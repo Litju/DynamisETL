@@ -13,7 +13,7 @@
 
 The canonical player is a registered participant subject_id. Field and Pose picking call the same MatchFrameContext action. A player switch writes durable player identity and any required exact target time together, stops playback under the existing subject-switch gate, and suppresses stale prior-subject rendering until the new exact window is ready.
 
-Live playback updates the shared Zustand playhead. A commit boundary writes canonical time to the router. Source frame selection is recomputed independently for each source; it is not converted to a shared frame index.
+Live playback updates the shared Zustand playhead. A commit boundary writes canonical time to the router. Each source resolves its latest real sample at or before that time within its own declared sampling tolerance. The source timestamp remains distinct from the playhead; missing samples are never interpolated and frame indexes are not shared.
 
 ## Query and worker ownership
 

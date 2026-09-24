@@ -173,6 +173,10 @@ def _check_matchlab_v3_invariants(contract: dict[str, Any]) -> None:
     context = contract["match_frame_context"]
     if "BigInt" not in context["canonical_time"]:
         raise ContractError("MatchFrameContext canonical time must remain BigInt-safe")
+    if "latest real Pose sample at or before" not in context["pose_resolution"]:
+        raise ContractError("Pose frames must resolve independently under their source-rate contract")
+    if "Never interpolate" not in context["pose_resolution"]:
+        raise ContractError("MatchFrameContext must not fabricate Pose samples")
     if "coordinates and proximity never establish identity" not in context["player_identity"]:
         raise ContractError("player identity must come from a registered identity mapping")
     if "structured" not in contract["pitch"]["geometry_source"]:

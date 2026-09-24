@@ -21,7 +21,7 @@ The context is an API over the existing state owners. It is not another store. P
 - Three.js, React Three Fiber and Drei; one Canvas and one WebGL renderer.
 - WebGL2 is the initial production backend. WebGPU is considered only after the final representative scene is complete and measured.
 - The registered source match dimensions determine the procedural pitch. Missing geometry is an explicit unavailable state.
-- Tracking/Pose frames resolve independently against one signed BigInt canonical time. Source frame indexes are never equated.
+- Tracking/Pose frames resolve independently against one signed BigInt canonical time. A source frame is the latest real sample at or before the playhead within the declared source-rate tolerance; its own timestamp stays visible. Source frame indexes are never equated and missing samples are never interpolated.
 - Scientific values, identity and provenance stay in their existing artifacts and processors.
 - Pixi is only a temporary parity oracle during migration. It is not a second production Field path.
 
