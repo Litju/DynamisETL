@@ -21,13 +21,15 @@ import type {
   TrackingWindowBuffers,
 } from "@/components/matchlab/frame-buffers";
 import {
-  createPitchRenderer,
+  type PitchPalette,
+  type PitchRendererHandle,
+} from "@/components/pitch/pitch-renderer-types";
+import {
   DEFAULT_PITCH_LAYERS,
   type PitchEvent,
   type PitchLayers,
-  type PitchPalette,
-  type PitchRendererHandle,
-} from "@/components/pitch/pitch-renderer";
+} from "@/components/matchlab/render-types";
+import { FieldSceneView, type FieldSceneViewHandle } from "@/components/pitch/FieldSceneView";
 import { eventStreams } from "@/lib/capabilities";
 import type { ArtifactRef, SessionDetail, StreamView } from "@/api/types";
 import { useAnalysisContext } from "@/lib/analysis-context";
@@ -93,6 +95,11 @@ const EMPTY_GRID: TacticalGridWindowBuffers = {
   cellWidthM: new Float32Array(),
   cellHeightM: new Float32Array(),
 };
+
+function pixiParityOracleEnabled(): boolean {
+  return (import.meta.env.DEV || import.meta.env.MODE === "test") && typeof window !== "undefined" &&
+    window.localStorage.getItem("dynamis-matchlab-pixi-parity") === "1";
+}
 
 /** Shape served event rows into renderer marks, dropping unplaceable ones. */
 export function toPitchEvents(rows: ReadonlyArray<Record<string, unknown>>): PitchEvent[] {
@@ -167,9 +174,8 @@ export function sessionTeams(session: SessionDetail | undefined): {
 }
 
 /**
- * Field laboratory: PixiJS pitch replay over canonical tracking windows.
- * MatchFrameContext owns shared identity; the renderer owns frame-rate updates
- * through the playhead subscription, so playback never triggers reconciliation.
+ * Field laboratory over exact canonical windows. R3F is the production view;
+ * Pixi remains reachable only as a development parity oracle.
  */
 export function PitchReplay() {
   const context = useAnalysisContext();
@@ -500,6 +506,28 @@ function readTeamPalette(): { teamA: string; teamB: string; halo: string } {
   };
 }
 
+function oklchToHex(value: string): string | null {
+  const match = /^oklch\(\s*([\d.]+)(%)?\s+([\d.]+)\s+([\d.]+)(?:deg)?\s*\)$/i.exec(value);
+  if (!match) return null;
+  const lightness = Number(match[1]) / (match[2] ? 100 : 1);
+  const chroma = Number(match[3]);
+  const hue = Number(match[4]) * Math.PI / 180;
+  const a = chroma * Math.cos(hue);
+  const b = chroma * Math.sin(hue);
+  const l = (lightness + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (lightness - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (lightness - 0.0894841775 * a - 1.291485548 * b) ** 3;
+  const channels = [
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+  ].map((linear) => {
+    const srgb = linear <= 0.0031308 ? 12.92 * linear : 1.055 * linear ** (1 / 2.4) - 0.055;
+    return Math.round(Math.max(0, Math.min(1, srgb)) * 255).toString(16).padStart(2, "0");
+  });
+  return "#" + channels.join("");
+}
+
 function PitchView({
   stream,
   trackingBuffers,
@@ -531,6 +559,8 @@ function PitchView({
   const theme = useUiStore((state) => state.theme);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const rendererRef = useRef<PitchRendererHandle | null>(null);
+  const fieldSceneRef = useRef<FieldSceneViewHandle | null>(null);
+  const pixiParityOracle = useMemo(() => pixiParityOracleEnabled(), []);
   const matchFrame = useMatchFrameContext();
   const matchFrameRef = useRef(matchFrame);
   useEffect(() => {
@@ -543,6 +573,10 @@ function PitchView({
   const [rendererReady, setRendererReady] = useState(false);
   const [layers, setLayers] = useState<PitchLayers>(DEFAULT_PITCH_LAYERS);
   const [influenceGridTimeNs, setInfluenceGridTimeNs] = useState<bigint | null>(null);
+  const handleInfluenceGridTime = useCallback((timeNs: bigint | null) => {
+    setInfluenceGridTimeNs((current) => current === timeNs ? current : timeNs);
+  }, []);
+  const handleSceneReady = useCallback(() => setRendererReady(true), []);
 
   const maxGapNs = useMemo(
     () => 1.5 * (1e9 / (stream.nominal_sampling_rate_hz && stream.nominal_sampling_rate_hz > 0 ? stream.nominal_sampling_rate_hz : 25)),
@@ -608,19 +642,29 @@ function PitchView({
     void theme;
     const tokens = readPalette();
     const team = readTeamPalette();
+    const colorContext = import.meta.env.MODE === "test"
+      ? null
+      : document.createElement("canvas").getContext("2d");
+    const resolve = (value: string) => {
+      const hex = oklchToHex(value);
+      if (hex !== null) return hex;
+      if (colorContext === null) return value;
+      colorContext.fillStyle = value;
+      return colorContext.fillStyle;
+    };
     return {
-      surface: tokens.surface,
-      pitchLine: tokens.grid,
-      home: team.teamA,
-      away: team.teamB,
-      ball: tokens.text,
-      official: tokens.measurement.PIPELINE_DERIVED ?? tokens.series[2]!,
-      extrapolated: tokens.textMuted,
-      selection: tokens.playhead,
-      trail: tokens.axis,
-      label: tokens.textMuted,
-      event: tokens.measurement.SOURCE_DERIVED ?? tokens.warning,
-      halo: team.halo,
+      surface: resolve(tokens.surface),
+      pitchLine: resolve(tokens.grid),
+      home: resolve(team.teamA),
+      away: resolve(team.teamB),
+      ball: resolve(tokens.text),
+      official: resolve(tokens.measurement.PIPELINE_DERIVED ?? tokens.series[2]!),
+      extrapolated: resolve(tokens.textMuted),
+      selection: resolve(tokens.playhead),
+      trail: resolve(tokens.axis),
+      label: resolve(tokens.textMuted),
+      event: resolve(tokens.measurement.SOURCE_DERIVED ?? tokens.warning),
+      halo: resolve(team.halo),
     };
   }, [theme]);
 
@@ -701,39 +745,44 @@ function PitchView({
   }, [drawAt, selectedEntityId]);
 
   useEffect(() => {
+    if (!pixiParityOracle) return;
     const host = hostRef.current;
     if (!host) return;
     let disposed = false;
     let renderer: PitchRendererHandle | null = null;
     setRendererReady(false);
-    void createPitchRenderer(host, palette, (objectId, objectType) => onSelectEntity(objectId, objectType)).then((created) => {
-      if (disposed) {
-        created.destroy();
-        return;
-      }
-      renderer = created;
-      rendererRef.current = created;
-      created.setLayers(sceneRef.current.layers);
-      created.setEvents(sceneRef.current.events);
-      const current = useAnalysisStore.getState();
-      created.setTrail(
-        trailPointsForTrackingBuffer(
-          sceneRef.current.trackingBuffers,
-          current.committedRangeNs,
+    void import("@/components/pitch/pitch-renderer")
+      .then(({ createPitchRenderer }) =>
+        createPitchRenderer(host, palette, (objectId, objectType) => onSelectEntity(objectId, objectType)),
+      )
+      .then((created) => {
+        if (disposed) {
+          created.destroy();
+          return;
+        }
+        renderer = created;
+        rendererRef.current = created;
+        created.setLayers(sceneRef.current.layers);
+        created.setEvents(sceneRef.current.events);
+        const current = useAnalysisStore.getState();
+        created.setTrail(
+          trailPointsForTrackingBuffer(
+            sceneRef.current.trackingBuffers,
+            current.committedRangeNs,
+            selectedEntityRef.current,
+          ),
           selectedEntityRef.current,
-        ),
-        selectedEntityRef.current,
-      );
-      drawAt(effectiveTimeNs(current), true);
-      setRendererReady(true);
-    });
+        );
+        drawAt(effectiveTimeNs(current), true);
+        setRendererReady(true);
+      });
     return () => {
       disposed = true;
       setRendererReady(false);
       renderer?.destroy();
       rendererRef.current = null;
     };
-  }, [drawAt, onSelectEntity, palette]);
+  }, [drawAt, onSelectEntity, palette, pixiParityOracle]);
 
   // New window / tactical data / team order: update the scene and redraw the
   // current frame imperatively.
@@ -887,7 +936,10 @@ function PitchView({
             ) : null}
             <button
               type="button"
-              onClick={() => rendererRef.current?.resetView()}
+              onClick={() => {
+                if (pixiParityOracle) rendererRef.current?.resetView();
+                else fieldSceneRef.current?.resetView();
+              }}
               title="Frame the whole pitch again"
               className="t-control-compact rounded-control border border-border-subtle px-2 text-[11px] text-text-muted transition-colors duration-quick hover:border-border-strong hover:text-text-secondary"
             >
@@ -906,11 +958,51 @@ function PitchView({
               : `Pitch replay for ${stream.stream_id} at ${formatClockNs(BigInt(summary.tRelNs))}: ${summary.players} players, ball ${summary.ballDetected === false ? "extrapolated" : "tracked"}`
           }
           data-testid="pitch-canvas"
-          data-renderer="pixi"
+          data-renderer={pixiParityOracle ? "pixi" : "r3f"}
           data-renderer-ready={rendererReady ? "true" : "false"}
           data-frame-ns={summary === null ? "" : String(summary.tRelNs)}
+          data-pitch-length-m={stream.pitch_dimensions_m?.length_m ?? ""}
+          data-pitch-width-m={stream.pitch_dimensions_m?.width_m ?? ""}
           className="h-full w-full"
-        />
+        >
+          {pixiParityOracle ? null : (
+            <FieldSceneView
+              ref={fieldSceneRef}
+              matchFrame={matchFrame!}
+              trackingBuffers={trackingBuffers}
+              geometryBuffers={indexes.geometry}
+              territoryBuffers={indexes.territory}
+              influenceBuffers={indexes.influence}
+              trackingMaxAgeNs={maxGapNs}
+              influenceMaxAgeNs={INFLUENCE_MAX_AGE_NS}
+              teamOrder={teamOrder}
+              teamLabels={teamLabels}
+              entityLabels={entityLabels}
+              trackingPalette={{
+                home: palette.home,
+                away: palette.away,
+                other: palette.extrapolated,
+                ball: palette.ball,
+              }}
+              tacticalPalette={{
+                home: palette.home,
+                away: palette.away,
+                other: palette.extrapolated,
+                event: palette.event,
+                selection: palette.selection,
+              }}
+              events={events}
+              layers={layers}
+              onReady={handleSceneReady}
+              onInfluenceGridTime={handleInfluenceGridTime}
+            />
+          )}
+          {!pixiParityOracle ? (
+            <div className="pointer-events-none absolute left-2 top-2 rounded bg-black/70 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-white">
+              Source native
+            </div>
+          ) : null}
+        </div>
         {loadingWindow || tacticalLoading ? (
           <div
             role="status"

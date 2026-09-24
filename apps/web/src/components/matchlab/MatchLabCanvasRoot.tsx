@@ -22,7 +22,8 @@ export function MatchLabCanvasRoot({
           camera={{ position: [0, 0, 5], near: 0.01, far: 100 }}
           dpr={[1, 2]}
           gl={{ antialias: true, powerPreference: "high-performance" }}
-          className="pointer-events-none absolute inset-0 z-0"
+          className="z-0"
+          style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
           data-testid="matchlab-canvas"
         >
           <View.Port />

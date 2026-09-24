@@ -6,7 +6,7 @@ import {
 import type { TrackingWindowBuffers } from "@/components/matchlab/frame-buffers";
 import { ContextLayer, type ContextSubject, type SourceAlignmentDisplay } from "@/components/matchlab/ContextLayer";
 import { TacticalLayer, type TacticalLayerPalette } from "@/components/matchlab/TacticalLayer";
-import type { PitchEvent, TacticalOverlay } from "@/components/matchlab/render-types";
+import type { PitchEvent, PitchLayers, TacticalOverlay } from "@/components/matchlab/render-types";
 import type { PoseLayerProps } from "@/components/pose/PoseScene";
 import type { MatchFrameContextValue } from "@/lib/match-frame-context";
 import type { TrailPoint } from "@/components/pitch/pitch-model";
@@ -28,6 +28,7 @@ export interface MatchWorldProps {
   readonly teamOrder: readonly string[];
   readonly trackingPalette: TrackingLayerPalette;
   readonly tacticalOverlay: TacticalOverlay;
+  readonly tacticalLayers: Pick<PitchLayers, "events" | "geometry" | "territory" | "influence">;
   readonly events: readonly PitchEvent[];
   readonly tacticalPalette: TacticalLayerPalette;
   readonly poseLayer: PoseLayerProps | null;
@@ -36,7 +37,6 @@ export interface MatchWorldProps {
     readonly hovered?: ContextSubject | null;
     readonly trail?: readonly TrailPoint[];
     readonly alignment?: SourceAlignmentDisplay | null;
-    readonly displayMode?: string;
   };
 }
 
@@ -49,6 +49,7 @@ export function MatchWorld({
   teamOrder,
   trackingPalette,
   tacticalOverlay,
+  tacticalLayers,
   events,
   tacticalPalette,
   poseLayer,
@@ -78,6 +79,7 @@ export function MatchWorld({
         events={events}
         matchFrame={matchFrame}
         palette={tacticalPalette}
+        layers={tacticalLayers}
         visible={visibility.tactical}
       />
       {visibility.pose && poseLayer !== null ? (

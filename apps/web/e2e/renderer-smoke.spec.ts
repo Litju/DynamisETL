@@ -18,10 +18,11 @@ const CASES: readonly RendererCase[] = [
     renderer: "uplot",
   },
   {
-    name: "Pixi field replay",
+    name: "R3F field replay",
     route: "/lab/skillcorner-opendata/1925299?stream=tracking-1&view=field",
     host: "pitch-canvas",
-    renderer: "pixi",
+    renderer: "r3f",
+    canvasHost: "matchlab-canvas",
   },
   {
     name: "R3F pose viewer",
@@ -54,10 +55,13 @@ for (const candidate of CASES) {
     await page.goto(candidate.route);
     const host = page.getByTestId(candidate.host);
     await expect(host).toHaveAttribute("data-renderer", candidate.renderer);
+    if (candidate.name === "R3F field replay") {
+      await expect(host).toHaveAttribute("data-pitch-length-m", "105");
+      await expect(host).toHaveAttribute("data-pitch-width-m", "68");
+    }
     await expect(host).toHaveAttribute("data-renderer-ready", "true");
     const canvas = page.getByTestId(candidate.canvasHost ?? candidate.host).locator("canvas").first();
     await expect(canvas).toBeVisible();
-
     const details = await canvas.evaluate((node) => {
       const element = node as HTMLCanvasElement;
       const context =
@@ -94,9 +98,15 @@ test("keeps one MatchLab Canvas mounted across Field and Pose modes", async ({ p
   await expect(page.getByTestId("pitch-canvas")).toHaveAttribute("data-renderer-ready", "true");
   await expect(page.getByTestId("matchlab-canvas").locator("canvas")).toHaveCount(1);
   expect(await originalCanvas?.evaluate((element) => element.isConnected)).toBe(true);
-
   await page.getByRole("tab", { name: "pose", exact: true }).click();
   await expect(page.getByTestId("pose-canvas")).toHaveAttribute("data-renderer-ready", "true");
   const currentCanvas = await page.getByTestId("matchlab-canvas").locator("canvas").elementHandle();
   expect(await currentCanvas?.evaluate((element, original) => element === original, originalCanvas)).toBe(true);
+});
+
+test("keeps Pixi reachable only through the development parity oracle", async ({ page }) => {
+  await page.addInitScript(() => window.localStorage.setItem("dynamis-matchlab-pixi-parity", "1"));
+  await page.goto("/lab/skillcorner-opendata/1925299?stream=tracking-1&view=field");
+  await expect(page.getByTestId("pitch-canvas")).toHaveAttribute("data-renderer", "pixi");
+  await expect(page.getByTestId("pitch-canvas").locator("canvas")).toBeVisible();
 });

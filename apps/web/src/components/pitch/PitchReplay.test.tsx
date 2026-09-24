@@ -195,6 +195,7 @@ function renderPitch(overrides: Partial<AnalysisContextValue> = {}) {
 }
 
 beforeEach(() => {
+  window.localStorage.setItem("dynamis-matchlab-pixi-parity", "1");
   setFrame.mockClear();
   setTrail.mockClear();
   destroy.mockClear();
@@ -209,6 +210,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  window.localStorage.removeItem("dynamis-matchlab-pixi-parity");
   vi.unstubAllGlobals();
 });
 

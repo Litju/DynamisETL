@@ -41,6 +41,25 @@ export interface TacticalOverlay {
   readonly influenceCells: readonly TacticalInfluenceCell[];
 }
 
+/** Presentation switches shared by the parity renderer and the R3F scene. */
+export interface PitchLayers {
+  readonly trails: boolean;
+  readonly labels: boolean;
+  readonly events: boolean;
+  readonly geometry: boolean;
+  readonly territory: boolean;
+  readonly influence: boolean;
+}
+
+export const DEFAULT_PITCH_LAYERS: PitchLayers = {
+  trails: true,
+  labels: true,
+  events: true,
+  geometry: true,
+  territory: false,
+  influence: false,
+};
+
 export const EMPTY_TACTICAL_OVERLAY: TacticalOverlay = {
   hulls: [],
   territoryCells: [],

@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import { BufferAttribute, BufferGeometry, CylinderGeometry } from "three";
+import { BufferAttribute, BufferGeometry, CylinderGeometry, DoubleSide } from "three";
 
 export interface PitchDimensionsM {
   readonly lengthM: number;
@@ -202,7 +202,7 @@ export function Pitch3D({ dimensions }: { readonly dimensions: PitchDimensionsM 
         <meshStandardMaterial color="#194234" roughness={0.94} />
       </mesh>
       <mesh geometry={lineGeometry}>
-        <meshBasicMaterial color="#e8eee9" />
+        <meshBasicMaterial color="#e8eee9" side={DoubleSide} />
       </mesh>
       <Goal xM={-lengthM / 2} postGeometry={postGeometry} crossbarGeometry={crossbarGeometry} />
       <Goal xM={lengthM / 2} postGeometry={postGeometry} crossbarGeometry={crossbarGeometry} />

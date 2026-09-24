@@ -13,73 +13,30 @@
 
 import type { Application, Container, Graphics, Text } from "pixi.js";
 
-import type { PitchEvent, TacticalOverlay, TacticalRole } from "@/components/matchlab/render-types";
+import {
+  DEFAULT_PITCH_LAYERS,
+  type PitchEvent,
+  type PitchLayers,
+  type TacticalOverlay,
+  type TacticalRole,
+} from "@/components/matchlab/render-types";
+import type { PitchPalette, PitchRendererHandle } from "@/components/pitch/pitch-renderer-types";
 import { pitchToScreen, screenToPitch, teamRole } from "@/components/pitch/pitch-model";
 import { DEFAULT_PITCH, type TrailPoint, type Viewport } from "@/components/pitch/pitch-model";
 import { TRACKING_KIND, type TrackingWindowBuffers } from "@/components/matchlab/frame-buffers";
 
 export {
+  DEFAULT_PITCH_LAYERS,
   EMPTY_TACTICAL_OVERLAY,
   type PitchEvent,
+  type PitchLayers,
   type TacticalHull,
   type TacticalInfluenceCell,
   type TacticalOverlay,
   type TacticalRole,
   type TacticalTerritoryCell,
 } from "@/components/matchlab/render-types";
-
-export interface PitchPalette {
-  readonly surface: string;
-  readonly pitchLine: string;
-  readonly home: string;
-  readonly away: string;
-  readonly ball: string;
-  readonly official: string;
-  readonly extrapolated: string;
-  readonly selection: string;
-  readonly trail: string;
-  readonly label: string;
-  readonly event: string;
-  /** Dark (or light, in Report Light) halo that keeps the ball above overlays. */
-  readonly halo: string;
-}
-
-/** Which scene layers are visible. Detection semantics are never optional. */
-export interface PitchLayers {
-  readonly trails: boolean;
-  readonly labels: boolean;
-  readonly events: boolean;
-  readonly geometry: boolean;
-  readonly territory: boolean;
-  readonly influence: boolean;
-}
-
-export const DEFAULT_PITCH_LAYERS: PitchLayers = {
-  trails: true,
-  labels: true,
-  events: true,
-  geometry: true,
-  territory: false,
-  influence: false,
-};
-
-export interface PitchRendererHandle {
-  setFrame(
-    buffers: TrackingWindowBuffers,
-    frameIndex: number,
-    selectedId: string | null,
-    teamOrder: readonly string[],
-  ): void;
-  setTrail(trail: readonly TrailPoint[], selectedId: string | null): void;
-  setEvents(events: readonly PitchEvent[]): void;
-  /** Registered short labels (e.g. shirt numbers) by object id. */
-  setEntityLabels?(labels: ReadonlyMap<string, string>): void;
-  setTacticalOverlay(overlay: TacticalOverlay): void;
-  setLayers(layers: PitchLayers): void;
-  /** Frame the whole pitch again after a zoom or pan. */
-  resetView(): void;
-  destroy(): void;
-}
+export type { PitchPalette, PitchRendererHandle } from "@/components/pitch/pitch-renderer-types";
 
 const FALLBACK_HEX: Record<string, number> = {
   surface: 0x12161c,

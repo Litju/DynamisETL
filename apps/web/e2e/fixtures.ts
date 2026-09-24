@@ -49,6 +49,7 @@ const TRACKING_STREAM = {
   si_units: ["m"],
   source_unit: "m",
   coordinate_frame_id: "skillcorner-pitch-m",
+  pitch_dimensions_m: { length_m: 105, width_m: 68 },
   synchronization_spec_id: "skillcorner-source-provided-match-clock",
   clock_id: "skillcorner-match-clock",
   skeleton_id: null,

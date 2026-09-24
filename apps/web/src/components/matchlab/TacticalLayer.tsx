@@ -165,17 +165,24 @@ export function TacticalLayer({
   events,
   matchFrame,
   palette,
+  layers = { geometry: true, territory: true, influence: true, events: true },
   visible = true,
 }: {
   readonly overlay: TacticalOverlay;
   readonly events: readonly PitchEvent[];
   readonly matchFrame: MatchFrameContextValue;
   readonly palette: TacticalLayerPalette;
+  readonly layers?: {
+    readonly geometry: boolean;
+    readonly territory: boolean;
+    readonly influence: boolean;
+    readonly events: boolean;
+  };
   readonly visible?: boolean;
 }) {
   return (
     <group name="TacticalLayer" visible={visible}>
-      {overlay.hulls.map((hull) => {
+      {layers.geometry ? overlay.hulls.map((hull) => {
         const objectId = "team-shape:" + hull.groupId;
         return (
           <TacticalPolygon
@@ -188,8 +195,8 @@ export function TacticalLayer({
             matchFrame={matchFrame}
           />
         );
-      })}
-      {overlay.territoryCells.map((cell) => {
+      }) : null}
+      {layers.territory ? overlay.territoryCells.map((cell) => {
         const objectId = "territory:" + cell.entityId;
         return (
           <TacticalPolygon
@@ -202,8 +209,8 @@ export function TacticalLayer({
             matchFrame={matchFrame}
           />
         );
-      })}
-      {overlay.influenceCells.map((cell) => {
+      }) : null}
+      {layers.influence ? overlay.influenceCells.map((cell) => {
         const objectId = "influence:" + cell.groupId + ":" + cell.xM + ":" + cell.yM;
         return (
           <InfluenceCell
@@ -215,10 +222,10 @@ export function TacticalLayer({
             matchFrame={matchFrame}
           />
         );
-      })}
-      {events.map((event) => (
+      }) : null}
+      {layers.events ? events.map((event) => (
         <SourceEventMark key={event.eventId} event={event} matchFrame={matchFrame} color={palette.event} />
-      ))}
+      )) : null}
     </group>
   );
 }

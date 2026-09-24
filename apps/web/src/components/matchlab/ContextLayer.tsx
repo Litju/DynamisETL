@@ -21,14 +21,12 @@ export function ContextLayer({
   hovered,
   trail = [],
   alignment = null,
-  displayMode = "SOURCE NATIVE",
   visible = true,
 }: {
   readonly selected: ContextSubject | null;
   readonly hovered?: ContextSubject | null;
   readonly trail?: readonly TrailPoint[];
   readonly alignment?: SourceAlignmentDisplay | null;
-  readonly displayMode?: string;
   readonly visible?: boolean;
 }) {
   const trailPoints = trail.map((point) => [point.xM, 0.035, -point.yM] as const);
@@ -50,7 +48,7 @@ export function ContextLayer({
             <ringGeometry args={[0.45, 0.58, 36]} />
             <meshBasicMaterial color="#f4f7f6" transparent opacity={0.95} />
           </mesh>
-          <Html position={[selected.xM, 0.75, -selected.yM]} center distanceFactor={24}>
+          <Html position={[selected.xM, 0.75, -selected.yM]} center distanceFactor={100}>
             <span
               role="note"
               aria-label={"Selected player " + selected.label + " " + selected.id}
@@ -77,7 +75,7 @@ export function ContextLayer({
               -(alignment.trackingXY[1] + alignment.poseRootXY[1]) / 2,
             ]}
             center
-            distanceFactor={30}
+            distanceFactor={100}
           >
             <span role="note" className="pointer-events-none whitespace-nowrap rounded bg-black/75 px-1.5 py-0.5 text-[9px] text-white">
               ΔXY {alignment.deltaXYM[0].toFixed(2)} m, {alignment.deltaXYM[1].toFixed(2)} m · {alignment.sourceModelIdentity}
@@ -85,11 +83,6 @@ export function ContextLayer({
           </Html>
         </>
       ) : null}
-      <Html fullscreen pointerEvents="none">
-        <div className="absolute left-2 top-2 pointer-events-none rounded bg-black/70 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-white">
-          {displayMode}
-        </div>
-      </Html>
     </group>
   );
 }
