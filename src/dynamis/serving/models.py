@@ -433,7 +433,7 @@ class TacticalQualityView(BaseModel):
 class TacticalSeriesMeta(BaseModel):
     artifact: ArtifactRefView
     series_name: str
-    level: Literal["A", "B", "C", "D", "E"]
+    level: Literal["A", "B", "C", "D", "E", "V3"]
     measurement_class: str
     input_measurement_class: str | None
     coordinate_frame_id: str | None

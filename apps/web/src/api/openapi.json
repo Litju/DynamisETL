@@ -2456,6 +2456,26 @@
           "level_e_shape_phase": {
             "title": "Level E Shape Phase",
             "type": "string"
+          },
+          "matchlab_v3_functional_units": {
+            "title": "Matchlab V3 Functional Units",
+            "type": "string"
+          },
+          "matchlab_v3_interactions": {
+            "title": "Matchlab V3 Interactions",
+            "type": "string"
+          },
+          "matchlab_v3_shape_graph": {
+            "title": "Matchlab V3 Shape Graph",
+            "type": "string"
+          },
+          "matchlab_v3_triangles": {
+            "title": "Matchlab V3 Triangles",
+            "type": "string"
+          },
+          "possession_context": {
+            "title": "Possession Context",
+            "type": "string"
           }
         },
         "required": [
@@ -2463,7 +2483,12 @@
           "level_b_territory",
           "level_c_influence",
           "level_d_event_linked",
-          "level_e_shape_phase"
+          "level_e_shape_phase",
+          "matchlab_v3_functional_units",
+          "matchlab_v3_shape_graph",
+          "matchlab_v3_triangles",
+          "matchlab_v3_interactions",
+          "possession_context"
         ],
         "title": "TacticalCapabilityLevels",
         "type": "object"
@@ -2748,7 +2773,8 @@
               "B",
               "C",
               "D",
-              "E"
+              "E",
+              "V3"
             ],
             "title": "Level",
             "type": "string"
@@ -2889,7 +2915,8 @@
               "B",
               "C",
               "D",
-              "E"
+              "E",
+              "V3"
             ],
             "title": "Level",
             "type": "string"

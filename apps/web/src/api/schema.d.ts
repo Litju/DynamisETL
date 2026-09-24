@@ -1135,6 +1135,16 @@ export interface components {
             level_d_event_linked: string;
             /** Level E Shape Phase */
             level_e_shape_phase: string;
+            /** Matchlab V3 Functional Units */
+            matchlab_v3_functional_units: string;
+            /** Matchlab V3 Interactions */
+            matchlab_v3_interactions: string;
+            /** Matchlab V3 Shape Graph */
+            matchlab_v3_shape_graph: string;
+            /** Matchlab V3 Triangles */
+            matchlab_v3_triangles: string;
+            /** Possession Context */
+            possession_context: string;
         };
         /** TacticalCapabilityView */
         TacticalCapabilityView: {
@@ -1218,7 +1228,7 @@ export interface components {
              * Level
              * @enum {string}
              */
-            level: "A" | "B" | "C" | "D" | "E";
+            level: "A" | "B" | "C" | "D" | "E" | "V3";
             /** Measurement Class */
             measurement_class: string;
             /** Metric Id */
@@ -1265,7 +1275,7 @@ export interface components {
              * Level
              * @enum {string}
              */
-            level: "A" | "B" | "C" | "D" | "E";
+            level: "A" | "B" | "C" | "D" | "E" | "V3";
             /** Measurement Class */
             measurement_class: string;
             /** Parameters Hash */

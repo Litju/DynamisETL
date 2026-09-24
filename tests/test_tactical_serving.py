@@ -36,6 +36,9 @@ class TacticalBackend:
         },
     )
 
+    def __init__(self) -> None:
+        self.window_calls = 0
+
     def tactical_capability(self, dataset_id: str):
         return authority.tactical_capability(dataset_id)
 
@@ -52,6 +55,7 @@ class TacticalBackend:
         return self.artifact_ref if artifact_id == "tactical-1" else None
 
     def window(self, artifact_id, *, from_ns, to_ns, columns, max_points, entity_id=None):
+        self.window_calls += 1
         table = pa.table(
             {
                 "t_rel_ns": pa.array([0], type=pa.int64()),
@@ -127,3 +131,30 @@ def test_tactical_series_returns_json_and_preserves_etag() -> None:
     etag = response.headers["etag"]
     cached = client.get("/api/tactical/series/tactical-1", headers={"if-none-match": etag})
     assert cached.status_code == 304
+
+
+def test_tactical_series_accepts_v3_level_metadata() -> None:
+    backend = TacticalBackend()
+    backend.artifact_ref = backend.artifact_ref.model_copy(
+        update={
+            "algorithm_id": "tactical.matchlab_shape",
+            "artifact_metadata": {
+                **backend.artifact_ref.artifact_metadata,
+                "tactical_level": "V3",
+                "series_name": "functional_unit_geometry",
+            },
+        }
+    )
+    response = TestClient(create_app(backend=backend)).get("/api/tactical/series/tactical-1")
+
+    assert response.status_code == 200
+    assert response.json()["meta"]["level"] == "V3"
+
+
+def test_tactical_events_rejects_non_event_artifacts_before_window_read() -> None:
+    backend = TacticalBackend()
+    response = TestClient(create_app(backend=backend)).get("/api/tactical/events/tactical-1")
+
+    assert response.status_code == 400
+    assert "must be Level D" in response.json()["detail"]
+    assert backend.window_calls == 0

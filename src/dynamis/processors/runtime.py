@@ -234,6 +234,15 @@ def execute_processor(
                 return None
             return table.column(column)[0].as_py()
 
+        def series_measurement_class(series_name: str) -> str | None:
+            metadata = series_by_name[series_name].table.schema.metadata or {}
+            declared = metadata.get(b"dynamis.measurement_class")
+            if declared is not None:
+                return declared.decode("utf-8")
+            if not is_tactical:
+                return None
+            return "MODEL_ESTIMATED" if tactical_level == "C" else "PIPELINE_DERIVED"
+
         artifact_rows = tuple(
             {
                 "artifact_id": f"proc-{run_id}-{item.name}"[:128],
@@ -257,13 +266,7 @@ def execute_processor(
                     "session_id": first_value(item.name, "session_id"),
                     "trial_id": first_value(item.name, "trial_id"),
                     "tactical_level": tactical_level if is_tactical else None,
-                    "measurement_class": (
-                        "MODEL_ESTIMATED"
-                        if is_tactical and tactical_level == "C"
-                        else "PIPELINE_DERIVED"
-                        if is_tactical
-                        else None
-                    ),
+                    "measurement_class": series_measurement_class(item.name),
                     "input_measurement_class": input_measurement_class,
                     "coordinate_frame_id": result.diagnostics.get("coordinate_frame_id"),
                     "quality": result.diagnostics.get("quality", {}),

@@ -632,11 +632,23 @@ def create_app(
         to_ns: int | None,
         columns: str | None,
         max_points: int | None,
+        required_level: str | None = None,
     ) -> tuple[TacticalSeriesView | None, dict[str, str] | Response | None]:
         ref = service.artifact(artifact_id)
         if ref is None:
             raise HTTPException(
                 status_code=404, detail=f"artifact {artifact_id!r} is not registered"
+            )
+        metadata = ref.artifact_metadata
+        level_value = str(metadata.get("tactical_level") or "A")
+        if level_value not in {"A", "B", "C", "D", "E", "V3"}:
+            raise HTTPException(
+                status_code=500, detail="tactical artifact has invalid level metadata"
+            )
+        if required_level is not None and level_value != required_level:
+            raise HTTPException(
+                status_code=400,
+                detail=f"artifact {artifact_id!r} must be Level {required_level} for this endpoint",
             )
         parsed_columns = _parse_columns(columns)
         etag = window_etag(
@@ -657,13 +669,7 @@ def create_app(
             columns=parsed_columns,
             max_points=max_points,
         )
-        metadata = ref.artifact_metadata
-        level_value = str(metadata.get("tactical_level") or "A")
-        if level_value not in {"A", "B", "C", "D", "E"}:
-            raise HTTPException(
-                status_code=500, detail="tactical artifact has invalid level metadata"
-            )
-        level = cast(Literal["A", "B", "C", "D", "E"], level_value)
+        level = cast(Literal["A", "B", "C", "D", "E", "V3"], level_value)
         tactical_meta = TacticalSeriesMeta(
             artifact=ref,
             series_name=str(metadata.get("series_name") or "unknown"),
@@ -687,6 +693,8 @@ def create_app(
                 "Authoritative processor output; MODEL_ESTIMATED means an assumption-bearing "
                 "model, not measured territory."
                 if ref.measurement_class == "MODEL_ESTIMATED"
+                else "Provider source context preserved without tactical relabeling."
+                if ref.measurement_class == "SOURCE_DERIVED"
                 else "Authoritative deterministic processor output."
             ),
         )
@@ -745,6 +753,7 @@ def create_app(
             to_ns=to_ns,
             columns=None,
             max_points=max_points,
+            required_level="D",
         )
         if payload is None:
             assert isinstance(response, Response)
