@@ -49,7 +49,7 @@ async function expectRouteReady(page: Page, label: string) {
       await expect(page.getByLabel("Filter quality issues by dataset")).toBeVisible();
       break;
     case "runs":
-      await expect(page.getByText(/^\d+ of \d+ runs$/)).toBeVisible();
+      await expect(page.getByText(/^[\d,]+ of [\d,]+ runs$/)).toBeVisible();
       break;
   }
 }
