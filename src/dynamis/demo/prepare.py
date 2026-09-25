@@ -371,6 +371,11 @@ def _tactical_steps(
                 from dynamis.processors.tactical_shape import process_tactical_shape
                 from dynamis.processors.tactical_sources import load_tactical_source_authority
 
+                if ref.trial_id is None:
+                    raise PreparationError(
+                        f"{flagship.dataset_id}/{ref.stream_id}: MatchLab V3 requires a declared "
+                        "trial to load source-authorized tactical context"
+                    )
                 probe_source = load_tactical_source_authority(
                     resolved,
                     dataset_id=flagship.dataset_id,

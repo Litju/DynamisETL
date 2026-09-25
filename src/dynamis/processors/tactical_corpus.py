@@ -165,6 +165,11 @@ def materialize_matchlab_v3(
     code_sha: str | None = None,
 ) -> ProcessorRunResult:
     """Run source-authorized MatchLab V3 geometry for one canonical stream."""
+    if ref.trial_id is None:
+        raise ValueError(
+            f"{dataset_id}/{ref.stream_id}: MatchLab V3 requires a declared trial "
+            "to load source-authorized tactical context"
+        )
     source = load_tactical_source_authority(
         settings,
         dataset_id=dataset_id,

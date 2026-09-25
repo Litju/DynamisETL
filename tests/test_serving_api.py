@@ -451,7 +451,7 @@ def test_pitch_dimensions_require_positive_finite_source_metres() -> None:
     with pytest.raises(ValueError):
         PitchDimensionsView(length_m=float("nan"), width_m=68.0)
     with pytest.raises(ValueError):
-        PitchDimensionsView(length_m="105.0", width_m=68.0)
+        PitchDimensionsView.model_validate({"length_m": "105.0", "width_m": 68.0})
 
 
 def test_metrics_route_passes_filters_and_exposes_provenance(client: TestClient) -> None:
