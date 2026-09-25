@@ -96,16 +96,20 @@ async function captureRenderer(page: Page, mode: "pixi" | "r3f", player: { reado
   expect(snapshot.selection).toContain(player.id);
   await host.screenshot({ path: path.resolve(process.cwd(), `../../output/playwright/res-113/parity-${mode}.png`) });
 
-  const beforeForward = await playheadNs(page);
   await page.getByRole("button", { name: "Play", exact: true }).click();
-  await page.waitForTimeout(1_000);
+  await expect(page.getByRole("button", { name: "Pause playback", exact: true })).toBeVisible();
+  const beforeForward = await playheadNs(page);
+  await expect.poll(async () => (await playheadNs(page))!, { timeout: 5_000 })
+    .toBeGreaterThan(beforeForward + 500_000_000n);
   await page.getByRole("button", { name: "Pause playback" }).click();
   const afterForward = (await playheadNs(page))!;
   await expect(host).toHaveAttribute("data-drawn-frame-ns", (await host.getAttribute("data-drawn-frame-ns"))!);
 
   await page.getByRole("button", { name: "Reverse", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Pause playback", exact: true })).toBeVisible();
   const beforeReverse = await playheadNs(page);
-  await page.waitForTimeout(1_000);
+  await expect.poll(async () => (await playheadNs(page))!, { timeout: 5_000 })
+    .toBeLessThan(beforeReverse - 500_000_000n);
   await page.getByRole("button", { name: "Pause playback" }).click();
   const afterReverse = (await playheadNs(page))!;
   await expectCleanConsole(errors);
