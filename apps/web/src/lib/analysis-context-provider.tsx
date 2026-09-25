@@ -44,6 +44,7 @@ export function AnalysisContextProvider({ children }: { children: ReactNode }) {
       toNs: tryParseNs(search.to_ns),
       metricId: search.metric ?? null,
       derivedMetricId: search.result ?? null,
+      view: search.view ?? "overview",
       tacticalView: search.tactical ?? "live",
       commitTime: (tNs) =>
         update({ t_ns: tNs === null ? undefined : formatNsDecimal(tNs) }),
@@ -78,7 +79,7 @@ export function AnalysisContextProvider({ children }: { children: ReactNode }) {
         update({ result: derivedMetricId === null ? undefined : derivedMetricId }),
       selectTacticalView: (view: TacticalView) => update({ tactical: view }),
     };
-  }, [datasetId, navigate, search.result, search.stream, search.subject, search.t_ns, search.to_ns, search.from_ns, search.metric, search.tactical, search.trial, search.entity, sessionId]);
+  }, [datasetId, navigate, search.result, search.stream, search.subject, search.t_ns, search.to_ns, search.from_ns, search.metric, search.tactical, search.trial, search.entity, search.view, sessionId]);
 
   return (
     <AnalysisContext.Provider value={value}>

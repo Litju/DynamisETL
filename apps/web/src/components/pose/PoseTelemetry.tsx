@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
-import { frameIndexAt, nextFrameIndexAt, poseFrameIndexAt, poseFramesFromBuffers, summarizeFrame } from "@/components/pose/pose-model";
+import { EMPTY_JOINT_NAMES, nextFrameIndexAt, poseFrameIndexAt, poseFramesFromBuffers, summarizeFrame } from "@/components/pose/pose-model";
+import { maximumFrameAgeNs } from "@/components/pitch/pitch-model";
 import { poseSubjectObservations, stablePoseSubjects } from "@/components/pose/use-pose-subjects";
 import { useAnalysisContext } from "@/lib/analysis-context";
 import { useMatchFrameContext } from "@/lib/match-frame-context";
@@ -37,13 +38,7 @@ export function PoseTelemetry() {
       candidate.modality === "pose" && (trialId === null || candidate.trial_id === trialId),
     ) ?? null;
   }, [context?.streamId, context?.trialId, session.data?.streams]);
-  const maxGapNs =
-    stream?.nominal_sampling_rate_hz !== null &&
-    stream?.nominal_sampling_rate_hz !== undefined &&
-    Number.isFinite(stream.nominal_sampling_rate_hz) &&
-    stream.nominal_sampling_rate_hz > 0
-      ? 1.5 * (1e9 / stream.nominal_sampling_rate_hz)
-      : 0;
+  const maxGapNs = maximumFrameAgeNs(stream?.nominal_sampling_rate_hz);
   const artifactId = stream?.sample_artifact_ids[0] ?? null;
   const artifact = useQuery({
     ...artifactQuery(artifactId ?? ""),
@@ -75,7 +70,7 @@ export function PoseTelemetry() {
     enabled: stream?.modality === "pose",
     artifactId,
     entityId: subjectId,
-    jointNames: stream?.skeleton_joint_names ?? [],
+    jointNames: stream?.skeleton_joint_names ?? EMPTY_JOINT_NAMES,
     canonicalMinNs: canonical?.minNs ?? null,
     canonicalMaxNs: canonical?.maxNs ?? null,
     chunkSpanNs,
@@ -93,7 +88,9 @@ export function PoseTelemetry() {
   const landmarks = currentFrame?.landmarks ?? [];
   const byName = new Map(landmarks.map((landmark) => [landmark.jointName, landmark]));
   const jointNames = stream?.skeleton_joint_names ?? window.data?.prepared.jointNames ?? landmarks.map((landmark) => landmark.jointName);
-  const previousFrameIndex = effective === null ? -1 : frameIndexAt(frames, effective);
+  const previousFrameIndex = effective === null
+    ? -1
+    : poseFrameIndexAt(frames, effective, Number.POSITIVE_INFINITY);
   const nextIndex = effective === null ? -1 : nextFrameIndexAt(frames, effective);
   const previousFrame = previousFrameIndex >= 0 ? frames[previousFrameIndex] ?? null : null;
   const nextFrame = nextIndex >= 0 ? frames[nextIndex] ?? null : null;

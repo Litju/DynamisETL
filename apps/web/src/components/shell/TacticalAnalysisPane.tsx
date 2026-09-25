@@ -10,7 +10,7 @@ import { MeasurementClassBadge } from "@/components/common/Badges";
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
 import { SectionTitle } from "@/components/common/Panel";
 import { ARRIVAL_TIME_ELEVATION_SPEC, describeElevationSpec } from "@/components/matchlab/elevation-specs";
-import { sessionTeams } from "@/components/pitch/pitch-model";
+import { maximumFrameAgeNs, sessionTeams } from "@/components/pitch/pitch-model";
 import {
   ALGORITHMS,
   LEVEL_NAMES,
@@ -26,7 +26,7 @@ import {
   type TacticalLevel,
 } from "@/components/shell/tactical-pane-model";
 import type { TacticalRow } from "@/components/pitch/tactical-overlay";
-import { jsonIds, tacticalRowsAtFrame } from "@/components/pitch/tactical-v3";
+import { jsonIds } from "@/components/pitch/tactical-v3";
 import { useThrottledPlayhead } from "@/hooks/useThrottledPlayhead";
 import { useAnalysisContext } from "@/lib/analysis-context";
 import { useMatchFrameContext } from "@/lib/match-frame-context";
@@ -224,7 +224,7 @@ export function TacticalAnalysisPane({ onCollapse }: { onCollapse?: () => void }
   });
   const view: TacticalView = context?.tacticalView ?? "live";
   const stream = session.data?.streams.find((item) => item.stream_id === context?.streamId) ?? null;
-  const frameAgeNs = 1.5 * (1e9 / (stream?.nominal_sampling_rate_hz && stream.nominal_sampling_rate_hz > 0 ? stream.nominal_sampling_rate_hz : 25));
+  const frameAgeNs = maximumFrameAgeNs(stream?.nominal_sampling_rate_hz);
   const teams = useMemo(() => sessionTeams(session.data), [session.data]);
   const statuses = useMemo(() => {
     if (!capabilities.data) return null;
@@ -274,11 +274,11 @@ export function TacticalAnalysisPane({ onCollapse }: { onCollapse?: () => void }
   const liveInfluence = useQuery(seriesQuery(teamInfluence, liveWindow, view === "space"));
   const rangeGeometry = useQuery(seriesQuery(teamGeometry, range, (view === "range" || view === "report") && !rangeTooLong));
   const events = useQuery(seriesQuery(eventSnapshots, eventWindow, view === "events" || view === "report"));
-  const exactUnits = tacticalRowsAtFrame(liveUnits.data?.rows as TacticalRow[] | undefined, timeNs);
-  const exactSourceContext = tacticalRowsAtFrame(liveSourceContext.data?.rows as TacticalRow[] | undefined, timeNs);
-  const exactEdges = tacticalRowsAtFrame(liveEdges.data?.rows as TacticalRow[] | undefined, timeNs);
-  const exactTriangles = tacticalRowsAtFrame(liveTriangles.data?.rows as TacticalRow[] | undefined, timeNs);
-  const exactInteractions = tacticalRowsAtFrame(liveInteractions.data?.rows as TacticalRow[] | undefined, timeNs);
+  const exactUnits = rowsAtFrame(liveUnits.data?.rows as TacticalRow[] | undefined, timeNs, frameAgeNs);
+  const exactSourceContext = rowsAtFrame(liveSourceContext.data?.rows as TacticalRow[] | undefined, timeNs, frameAgeNs);
+  const exactEdges = rowsAtFrame(liveEdges.data?.rows as TacticalRow[] | undefined, timeNs, frameAgeNs);
+  const exactTriangles = rowsAtFrame(liveTriangles.data?.rows as TacticalRow[] | undefined, timeNs, frameAgeNs);
+  const exactInteractions = rowsAtFrame(liveInteractions.data?.rows as TacticalRow[] | undefined, timeNs, frameAgeNs);
 
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const onTabKey = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {

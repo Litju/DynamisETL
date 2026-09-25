@@ -51,6 +51,10 @@ export function LabPage() {
     sessionId,
     view: durableView,
     trialId: search.trial ?? null,
+    streamId: search.stream ?? null,
+    modality: null as string | null,
+    synchronizationSpecId: null as string | null,
+    subjectId: search.subject ?? null,
     timeText: search.t_ns ?? null,
   });
   const preserveCanonicalTime = useRef(false);
@@ -108,10 +112,35 @@ export function LabPage() {
   const awaitingPoseSubject = durableView === "pose" && search.subject === undefined;
   useEffect(() => {
     const previous = previousRendererContext.current;
+    const trialId = search.trial ?? selectedStream?.trial_id ?? null;
+    const streamId = search.stream ?? null;
+    const subjectId = search.subject ?? null;
     const periodChanged = previous.datasetId !== datasetId ||
       previous.sessionId !== sessionId ||
-      previous.trialId !== (search.trial ?? null);
+      previous.trialId !== trialId;
+    // A linked Field/Pose view change shares canonical time even when the Pose
+    // artifact has no exact sample at that instant.
+    const explicitPoseTime =
+      durableView === "pose" &&
+      search.t_ns !== undefined &&
+      durableTimeNs !== null &&
+      !periodChanged;
+    const streamChanged = previous.streamId !== streamId;
+    const subjectChanged = previous.subjectId !== subjectId;
+    const pairedFieldPoseSwitch =
+      previous.view !== durableView &&
+      previous.timeText === (search.t_ns ?? null) &&
+      search.t_ns !== undefined &&
+      previous.trialId !== null &&
+      previous.trialId === trialId &&
+      previous.subjectId === subjectId &&
+      previous.synchronizationSpecId !== null &&
+      previous.synchronizationSpecId === selectedStream?.synchronization_spec_id &&
+      ((previous.modality === "tracking" && selectedStream?.modality === "pose") ||
+        (previous.modality === "pose" && selectedStream?.modality === "tracking"));
     if (periodChanged) preserveCanonicalTime.current = false;
+    else if (pairedFieldPoseSwitch) preserveCanonicalTime.current = true;
+    else if (streamChanged || subjectChanged) preserveCanonicalTime.current = false;
     else if (previous.view !== durableView && previous.timeText === (search.t_ns ?? null) && search.t_ns !== undefined) {
       preserveCanonicalTime.current = true;
     }
@@ -119,10 +148,24 @@ export function LabPage() {
       datasetId,
       sessionId,
       view: durableView,
-      trialId: search.trial ?? null,
+      trialId,
+      streamId,
+      modality: selectedStream?.modality ?? null,
+      synchronizationSpecId: selectedStream?.synchronization_spec_id ?? null,
+      subjectId,
       timeText: search.t_ns ?? null,
     };
-    if (preserveCanonicalTime.current) return;
+    // An explicit Pose time is query state. Preserve gaps so Pose can report
+    // observation bounds instead of moving the global playhead.
+    if (explicitPoseTime) {
+      preserveCanonicalTime.current = false;
+      return;
+    }
+    if (preserveCanonicalTime.current) {
+      if (!timeArtifact.data || awaitingPoseSubject) return;
+      preserveCanonicalTime.current = false;
+      return;
+    }
     if (!timeArtifact.data || awaitingPoseSubject) return;
     const target = canonicalTimeDefault(timeArtifact.data, {
       currentNs: durableTimeNs,
@@ -131,7 +174,7 @@ export function LabPage() {
     });
     if (target === null) return;
     updateSearch({ t_ns: formatNsDecimal(target) });
-  }, [awaitingPoseSubject, datasetId, durableSubject, durableTimeNs, durableView, search.t_ns, search.trial, sessionId, timeArtifact.data, updateSearch]);
+  }, [awaitingPoseSubject, datasetId, durableSubject, durableTimeNs, durableView, search.stream, search.subject, search.t_ns, search.trial, selectedStream, sessionId, timeArtifact.data, updateSearch]);
 
   if (session.isPending) return <LoadingPanel label="Loading laboratory session" />;
   if (session.isError) {

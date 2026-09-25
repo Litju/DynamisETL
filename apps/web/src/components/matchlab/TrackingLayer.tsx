@@ -37,9 +37,19 @@ function kindName(kind: number): string {
 function markerMesh(geometry: CircleGeometry | RingGeometry, capacity: number): InstancedMesh {
   return new InstancedMesh(
     geometry,
-    new MeshBasicMaterial({ color: "#ffffff", vertexColors: true, side: DoubleSide }),
+    new MeshBasicMaterial({ color: "#ffffff", side: DoubleSide }),
     capacity,
   );
+}
+
+interface TrackingDrawIdentity {
+  readonly frameKey: string;
+  readonly buffers: TrackingWindowBuffers | null;
+  readonly detected: InstancedMesh;
+  readonly extrapolated: InstancedMesh;
+  readonly unknown: InstancedMesh;
+  readonly teamOrder: readonly string[];
+  readonly otherColor: string;
 }
 
 export function TrackingLayer({
@@ -92,7 +102,7 @@ export function TrackingLayer({
   const matrix = useMemo(() => new Matrix4(), []);
   const marker = useMemo(() => new Object3D(), []);
   const color = useMemo(() => new Color(), []);
-  const lastDrawKey = useRef("unknown");
+  const lastDrawKey = useRef<TrackingDrawIdentity | null>(null);
 
   useEffect(
     () => () => {
@@ -122,8 +132,25 @@ export function TrackingLayer({
         : sourceId + ":" + sourceTimeNs + ":" + String(visible) + ":" +
           (matchFrame.selectedTrackingObjectId ?? "") + ":" + (matchFrame.hoveredPlayerId ?? "") +
           ":" + palette.home + ":" + palette.away;
-    if (frameKey === lastDrawKey.current) return;
-    lastDrawKey.current = frameKey;
+    const lastDraw = lastDrawKey.current;
+    if (
+      lastDraw?.frameKey === frameKey &&
+      lastDraw.buffers === buffers &&
+      lastDraw.detected === detected &&
+      lastDraw.extrapolated === extrapolated &&
+      lastDraw.unknown === unknown &&
+      lastDraw.teamOrder === teamOrder &&
+      lastDraw.otherColor === palette.other
+    ) return;
+    lastDrawKey.current = {
+      frameKey,
+      buffers,
+      detected,
+      extrapolated,
+      unknown,
+      teamOrder,
+      otherColor: palette.other,
+    };
 
     if (sourceTimeNs === null || buffers === null) {
       detected.count = 0;

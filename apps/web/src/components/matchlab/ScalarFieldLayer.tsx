@@ -349,7 +349,7 @@ export function ScalarFieldLayer({
   const meshRef = useRef<InstancedMesh | null>(null);
   const geometry = useMemo(() => new PlaneGeometry(1, 1), []);
   const material = useMemo(
-    () => new MeshBasicMaterial({ color: "#ffffff", vertexColors: true, transparent: true, opacity: 0.62, depthWrite: false, side: DoubleSide }),
+    () => new MeshBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.62, depthWrite: false, side: DoubleSide }),
     [],
   );
   const mesh = useMemo(() => new InstancedMesh(geometry, material, capacity), [capacity, geometry, material]);

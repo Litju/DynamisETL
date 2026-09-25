@@ -9,7 +9,8 @@ capability matrix, never from what happens to be on disk.
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+import math
+from collections.abc import Callable, Mapping
 from functools import lru_cache
 from typing import Any
 
@@ -49,6 +50,33 @@ LEVEL_SERIES: dict[str, tuple[str, ...]] = {
         "source_possession_context",
     ),
 }
+
+
+def matchlab_v3_parameters(ref: SilverStreamRef) -> dict[str, float]:
+    """Use registered pitch metres for MatchLab V3; never assume a default pitch."""
+    dimensions = ref.stream_metadata.get("pitch_dimensions_m")
+    if not isinstance(dimensions, dict):
+        raise ValueError(
+            f"{ref.dataset_id}/{ref.stream_id}: MatchLab V3 requires registered pitch_dimensions_m"
+        )
+    length_m = dimensions.get("length_m")
+    width_m = dimensions.get("width_m")
+    if (
+        isinstance(length_m, bool)
+        or not isinstance(length_m, (int, float))
+        or not math.isfinite(float(length_m))
+        or length_m <= 0
+        or isinstance(width_m, bool)
+        or not isinstance(width_m, (int, float))
+        or not math.isfinite(float(width_m))
+        or width_m <= 0
+    ):
+        raise ValueError(
+            f"{ref.dataset_id}/{ref.stream_id}: registered pitch dimensions must be finite "
+            "positive metres"
+        )
+    return {"pitch_length_m": float(length_m), "pitch_width_m": float(width_m)}
+
 
 LEVEL_ALGORITHMS: dict[str, str] = {
     "A": "tactical.team_geometry",
@@ -162,6 +190,7 @@ def materialize_matchlab_v3(
     ref: SilverStreamRef,
     table: pa.Table,
     tracking_input: Any,
+    parameters: Mapping[str, float] | None = None,
     code_sha: str | None = None,
 ) -> ProcessorRunResult:
     """Run source-authorized MatchLab V3 geometry for one canonical stream."""
@@ -170,6 +199,12 @@ def materialize_matchlab_v3(
             f"{dataset_id}/{ref.stream_id}: MatchLab V3 requires a declared trial "
             "to load source-authorized tactical context"
         )
+    registered_parameters = matchlab_v3_parameters(ref)
+    if parameters is not None and dict(parameters) != registered_parameters:
+        raise ValueError(
+            f"{dataset_id}/{ref.stream_id}: MatchLab V3 parameters must use registered pitch metres"
+        )
+    resolved_parameters = registered_parameters
     source = load_tactical_source_authority(
         settings,
         dataset_id=dataset_id,
@@ -183,6 +218,7 @@ def materialize_matchlab_v3(
         possession=source.possession,
         role_authority=source.role_authority,
         direction_authority=source.direction_authority,
+        parameters=resolved_parameters,
     )
     return execute_processor(
         settings,
@@ -236,6 +272,7 @@ __all__ = [
     "TRACKING_LEVELS",
     "dataset_event_runs",
     "event_snapshot_result",
+    "matchlab_v3_parameters",
     "materialize_event_level",
     "materialize_matchlab_v3",
     "materialize_tracking_level",

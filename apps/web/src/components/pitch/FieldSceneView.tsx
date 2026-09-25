@@ -699,6 +699,10 @@ const FieldCamera = forwardRef<FieldCameraHandle, {
   const [orthographicCamera, setOrthographicCamera] = useState<OrthographicCameraType | null>(null);
   const invalidate = useThree((state) => state.invalidate);
   const controlsRef = useRef<React.ElementRef<typeof CameraControls> | null>(null);
+  const resetViewRef = useRef<(() => void) | null>(null);
+  const currentFitZoomRef = useRef<number | null>(null);
+  const previousFitZoomRef = useRef<number | null>(null);
+  const lastCameraPresetKey = useRef<string | null>(null);
   const activeCamera = mode === "perspective" ? perspectiveCamera : orthographicCamera;
   useEffect(() => {
     const host = hostRef.current;
@@ -716,6 +720,8 @@ const FieldCamera = forwardRef<FieldCameraHandle, {
     return () => observer.disconnect();
   }, [hostRef]);
   const viewportAspect = viewportSize.width / Math.max(viewportSize.height, 1);
+  const pitchLengthM = dimensions?.lengthM ?? null;
+  const pitchWidthM = dimensions?.widthM ?? null;
   const mapFitHeightM = dimensions === null
     ? cameraDistance * 0.72
     : Math.max(dimensions.widthM * 1.08, dimensions.lengthM / Math.max(0.1, viewportAspect) * 1.08);
@@ -740,8 +746,8 @@ const FieldCamera = forwardRef<FieldCameraHandle, {
     const isTacticalMap = nextMode === "tactical-map";
     const camera = isOrthographic ? orthographicCamera : perspectiveCamera;
     if (camera === null) return;
-    const lengthM = dimensions?.lengthM ?? cameraDistance;
-    const widthM = dimensions?.widthM ?? cameraDistance / 1.5;
+    const lengthM = pitchLengthM ?? cameraDistance;
+    const widthM = pitchWidthM ?? cameraDistance / 1.5;
     const perspectiveScale = perspectiveFitScale;
     const cameraX = isTacticalMap
       ? targetX
@@ -771,17 +777,53 @@ const FieldCamera = forwardRef<FieldCameraHandle, {
     camera.updateProjectionMatrix();
     void controlsRef.current?.setLookAt(cameraX, cameraY, cameraZ, targetX, 0, targetZ, false);
     invalidate();
-  }, [cameraDistance, dimensions, invalidate, orthographicCamera, perspectiveCamera, perspectiveFitScale, structureLiftZoom, topDownZoom, viewportAspect]);
+  }, [cameraDistance, invalidate, orthographicCamera, perspectiveCamera, perspectiveFitScale, pitchLengthM, pitchWidthM, structureLiftZoom, topDownZoom, viewportAspect]);
   /* eslint-enable react-hooks/immutability */
   const resetView = useCallback(() => viewPose(mode), [mode, viewPose]);
   const setCameraMode = useCallback((nextMode: FieldCameraMode) => onModeChange(nextMode), [onModeChange]);
   const focusAt = useCallback((xM: number, zM: number) => viewPose(mode, xM, zM), [mode, viewPose]);
   useImperativeHandle(ref, () => ({ resetView, setCameraMode, focusAt, getCamera: () => activeCamera }), [activeCamera, focusAt, resetView, setCameraMode]);
-  useEffect(() => resetView(), [resetView]);
+  const orthographicFitZoom = mode === "tactical-map"
+    ? topDownZoom
+    : mode === "structure-lift"
+      ? structureLiftZoom
+      : null;
+  const cameraPresetKey = `${mode}:${pitchLengthM ?? "unregistered"}:${pitchWidthM ?? "unregistered"}`;
+  useEffect(() => {
+    resetViewRef.current = resetView;
+  }, [resetView]);
+  useEffect(() => {
+    currentFitZoomRef.current = orthographicFitZoom;
+  }, [orthographicFitZoom]);
+  useEffect(() => {
+    if (activeCamera === null || lastCameraPresetKey.current === cameraPresetKey) return;
+    lastCameraPresetKey.current = cameraPresetKey;
+    resetViewRef.current?.();
+    previousFitZoomRef.current = currentFitZoomRef.current;
+  }, [activeCamera, cameraPresetKey]);
+  /* eslint-disable react-hooks/immutability -- R3F camera zoom/projection are mutable renderer state updated only to preserve the current pose across viewport changes. */
+  useEffect(() => {
+    if (activeCamera === null) return;
+    if ("isPerspectiveCamera" in activeCamera) {
+      activeCamera.aspect = viewportAspect;
+    } else if ("isOrthographicCamera" in activeCamera) {
+      const nextFitZoom = currentFitZoomRef.current;
+      const previousFitZoom = previousFitZoomRef.current;
+      if (nextFitZoom !== null && previousFitZoom !== null && previousFitZoom > 0) {
+        const userZoomFactor = activeCamera.zoom / previousFitZoom;
+        activeCamera.zoom = nextFitZoom * userZoomFactor;
+        void controlsRef.current?.zoomTo(activeCamera.zoom, false);
+      }
+      previousFitZoomRef.current = nextFitZoom;
+    }
+    activeCamera.updateProjectionMatrix();
+    invalidate();
+  }, [activeCamera, invalidate, orthographicFitZoom, viewportAspect, viewportSize.height]);
+  /* eslint-enable react-hooks/immutability */
   return (
     <>
       <PerspectiveCamera ref={setPerspectiveCamera} position={[0, cameraDistance, 0]} aspect={viewportAspect} fov={42} near={0.1} far={cameraDistance * 6} />
-      <OrthographicCamera ref={setOrthographicCamera} position={[0, cameraDistance, 0]} up={[0, 0, -1]} zoom={topDownZoom} near={0.1} far={cameraDistance * 6} />
+      <OrthographicCamera ref={setOrthographicCamera} position={[0, cameraDistance, 0]} up={[0, 0, -1]} near={0.1} far={cameraDistance * 6} />
       {activeCamera !== null ? (
         <CameraControls
           ref={controlsRef}

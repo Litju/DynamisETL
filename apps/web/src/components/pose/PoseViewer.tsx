@@ -6,6 +6,7 @@ import { MeasurementClassBadge, ModalityBadge } from "@/components/common/Badges
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
 import {
   CAMERA_MODES,
+  EMPTY_JOINT_NAMES,
   groupFramesBySubject,
   nextFrameIndexAt,
   poseFrameIndexAt,
@@ -17,6 +18,7 @@ import {
   type PoseSubjectFrames,
   type PoseLandmark,
 } from "@/components/pose/pose-model";
+import { maximumFrameAgeNs } from "@/components/pitch/pitch-model";
 import type { StreamView } from "@/api/types";
 import { useAnalysisContext } from "@/lib/analysis-context";
 import { useMatchFrameContext } from "@/lib/match-frame-context";
@@ -82,9 +84,13 @@ export function PoseViewer() {
     ...sessionQuery(datasetId ?? "", sessionId ?? ""),
     enabled: Boolean(datasetId && sessionId),
   });
+  const requestedStream = useMemo(
+    () => session.data?.streams.find((candidate) => candidate.stream_id === requestedStreamId) ?? null,
+    [requestedStreamId, session.data?.streams],
+  );
   const stream: StreamView | null = useMemo(() => {
     const streams = session.data?.streams ?? [];
-    const requested = streams.find((candidate) => candidate.stream_id === requestedStreamId) ?? null;
+    const requested = requestedStream;
     if (requested === null) return null;
     if (requested?.modality === "pose") return requested;
     if (requested.modality !== "tracking") return null;
@@ -92,14 +98,9 @@ export function PoseViewer() {
     return streams.find((candidate) =>
       candidate.modality === "pose" && (trialId === null || candidate.trial_id === trialId),
     ) ?? null;
-  }, [context?.trialId, requestedStreamId, session.data]);
+  }, [context?.trialId, requestedStream, session.data?.streams]);
   const streamId = stream?.stream_id ?? null;
-  const maxPoseFrameGapNs = useMemo(() => {
-    const rate = stream?.nominal_sampling_rate_hz;
-    return rate !== null && rate !== undefined && Number.isFinite(rate) && rate > 0
-      ? 1.5 * (1e9 / rate)
-      : 0;
-  }, [stream?.nominal_sampling_rate_hz]);
+  const maxPoseFrameGapNs = maximumFrameAgeNs(stream?.nominal_sampling_rate_hz);
 
   const artifactId = stream?.sample_artifact_ids[0] ?? null;
   const artifact = useQuery({ ...artifactQuery(artifactId ?? ""), enabled: Boolean(artifactId) });
@@ -164,7 +165,7 @@ export function PoseViewer() {
     enabled: subjectPlaybackEnabled && stream?.modality === "pose",
     artifactId,
     entityId: sceneSubjectId,
-    jointNames: stream?.skeleton_joint_names ?? [],
+    jointNames: stream?.skeleton_joint_names ?? EMPTY_JOINT_NAMES,
     canonicalMinNs: canonical?.minNs ?? null,
     canonicalMaxNs: canonical?.maxNs ?? null,
     chunkSpanNs,
@@ -312,14 +313,19 @@ export function PoseViewer() {
   // and the inspector follow the same durable player identity.
   const selectSubject = context?.selectSubject;
   useEffect(() => {
-    if (selectedSubject === null && subjectId !== null) {
+    if (
+      selectedSubject === null &&
+      subjectId !== null &&
+      context?.entityId == null &&
+      context?.view !== "split"
+    ) {
       if (matchFrame) {
         matchFrame.selectPlayer(subjectId, { replace: true, origin: "pose" });
       } else {
         selectSubject?.(subjectId, { replace: true });
       }
     }
-  }, [matchFrame, selectSubject, selectedSubject, subjectId]);
+  }, [context?.entityId, context?.view, matchFrame, selectSubject, selectedSubject, subjectId]);
 
   const handleSubjectChange = async (nextSubjectId: string) => {
     if (nextSubjectId === subjectId) return;
@@ -382,7 +388,7 @@ export function PoseViewer() {
   if (session.isError) {
     return <ErrorPanel error={session.error} onRetry={() => void session.refetch()} />;
   }
-  if (streamId === null) {
+  if (requestedStreamId === null) {
     return (
       <StatePanel
         state="empty"
@@ -391,9 +397,27 @@ export function PoseViewer() {
       />
     );
   }
-  if (stream === null) {
+  if (requestedStream === null) {
     return (
       <StatePanel state="unavailable" title="Stream is not part of this session." />
+    );
+  }
+  if (requestedStream.modality === "tracking" && stream === null) {
+    return (
+      <StatePanel
+        state="unavailable"
+        title="No paired Pose stream is registered."
+        detail="Select a tracking stream with a declared Pose pairing to open the landmark viewer."
+      />
+    );
+  }
+  if (stream === null) {
+    return (
+      <StatePanel
+        state="unavailable"
+        title="This stream is not a Pose stream."
+        detail={`The 3D laboratory renders Pose landmarks only; ${requestedStream.stream_id} is ${requestedStream.modality}.`}
+      />
     );
   }
   if (stream.modality !== "pose") {

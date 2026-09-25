@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 import { MeasurementClassBadge, ModalityBadge } from "@/components/common/Badges";
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
 import {
+  maximumFrameAgeNs,
   isTrackingStream,
   sessionTeams,
   teamRole,
@@ -588,10 +589,7 @@ function PitchView({
   }, []);
   const handleSceneReady = useCallback(() => setRendererReady(true), []);
 
-  const maxGapNs = useMemo(
-    () => 1.5 * (1e9 / (stream.nominal_sampling_rate_hz && stream.nominal_sampling_rate_hz > 0 ? stream.nominal_sampling_rate_hz : 25)),
-    [stream.nominal_sampling_rate_hz],
-  );
+  const maxGapNs = maximumFrameAgeNs(stream.nominal_sampling_rate_hz);
 
   const tacticalArtifacts = useQuery({
     ...tacticalArtifactsQuery({

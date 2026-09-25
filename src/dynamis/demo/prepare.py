@@ -51,6 +51,7 @@ from dynamis.processors.tactical_corpus import (
     LEVEL_SERIES,
     TRACKING_LEVELS,
     event_snapshot_result,
+    matchlab_v3_parameters,
     materialize_event_level,
     materialize_matchlab_v3,
     materialize_tracking_level,
@@ -376,6 +377,7 @@ def _tactical_steps(
                         f"{flagship.dataset_id}/{ref.stream_id}: MatchLab V3 requires a declared "
                         "trial to load source-authorized tactical context"
                     )
+                v3_parameters = matchlab_v3_parameters(ref)
                 probe_source = load_tactical_source_authority(
                     resolved,
                     dataset_id=flagship.dataset_id,
@@ -389,6 +391,7 @@ def _tactical_steps(
                     possession=probe_source.possession,
                     role_authority=probe_source.role_authority,
                     direction_authority=probe_source.direction_authority,
+                    parameters=v3_parameters,
                 )
                 parameters_hash = probe_result.spec.parameters_hash
                 checksums = tuple(
@@ -399,6 +402,7 @@ def _tactical_steps(
                     ref: SilverStreamRef = ref,
                     table: pa.Table = table,
                     tracking_input: Any = tracking_input,
+                    parameters: dict[str, float] = v3_parameters,
                 ) -> str:
                     return materialize_matchlab_v3(
                         resolved,
@@ -407,6 +411,7 @@ def _tactical_steps(
                         ref=ref,
                         table=table,
                         tracking_input=tracking_input,
+                        parameters=parameters,
                         code_sha=code_sha,
                     ).run_id
 

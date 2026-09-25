@@ -16,6 +16,15 @@ export interface PitchGeometry {
 
 /** SkillCorner pitch is 105 × 68 m with the origin at the centre. */
 export const DEFAULT_PITCH: PitchGeometry = { lengthM: 105, widthM: 68 };
+export const DEFAULT_NOMINAL_RATE_HZ = 25;
+
+export function maximumFrameAgeNs(nominalRateHz: number | null | undefined): number {
+  const rateHz = nominalRateHz !== null && nominalRateHz !== undefined &&
+    Number.isFinite(nominalRateHz) && nominalRateHz > 0
+    ? nominalRateHz
+    : DEFAULT_NOMINAL_RATE_HZ;
+  return 1.5 * (1e9 / rateHz);
+}
 
 /**
  * Session-stable team order and labels from served participants. Kept in this

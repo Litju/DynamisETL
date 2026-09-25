@@ -7,6 +7,7 @@ import {
   entitiesAt,
   frameIndexAt,
   isTrackingStream,
+  maximumFrameAgeNs,
   pitchToScreen,
   screenToPitch,
   summarizeFrame,
@@ -57,6 +58,11 @@ describe("pitch geometry", () => {
     expect(isTrackingStream("tracking")).toBe(true);
     expect(isTrackingStream("pose")).toBe(false);
     expect(isTrackingStream("event")).toBe(false);
+  });
+
+  it("uses a finite shared frame-age allowance when a provider omits its sample rate", () => {
+    expect(maximumFrameAgeNs(undefined)).toBe(60_000_000);
+    expect(maximumFrameAgeNs(10)).toBe(150_000_000);
   });
 });
 

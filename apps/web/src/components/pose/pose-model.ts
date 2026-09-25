@@ -1,5 +1,7 @@
 import type { PoseWindowBuffers } from "@/components/matchlab/frame-buffers";
 
+export const EMPTY_JOINT_NAMES: readonly string[] = [];
+
 /**
  * Pose viewer model.
  *

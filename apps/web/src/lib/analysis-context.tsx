@@ -9,7 +9,7 @@
 
 import { createContext, useContext } from "react";
 
-import type { TacticalView } from "@/lib/search";
+import type { TacticalView, WorkbenchView } from "@/lib/search";
 
 export interface DurableRange {
   readonly fromNs: bigint;
@@ -35,6 +35,7 @@ export interface AnalysisContextValue {
   readonly toNs: bigint | null;
   readonly metricId: string | null;
   readonly derivedMetricId: string | null;
+  readonly view?: WorkbenchView;
   readonly tacticalView?: TacticalView;
   /** Commit a playhead selection; serialized as decimal `t_ns` text. */
   readonly commitTime: (tNs: bigint | null) => void;
