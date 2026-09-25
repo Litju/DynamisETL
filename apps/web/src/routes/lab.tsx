@@ -233,12 +233,12 @@ export function LabPage() {
     ),
   ];
   const viewLabels: Record<WorkbenchView, string> = {
-    overview: "Overview",
-    signals: "Signals",
-    field: "Field",
-    pose: "Pose",
+    overview: "overview",
+    signals: "signals",
+    field: "field",
+    pose: "pose",
     matchlab: "MatchLab",
-    provenance: "Provenance",
+    provenance: "provenance",
   };
   return (
     <Suspense fallback={<LoadingPanel label="Opening laboratory" />}>
@@ -262,7 +262,7 @@ export function LabPage() {
               aria-selected={view === candidate}
               onClick={() => updateSearch({ view: candidate })}
               className={cn(
-                "t-context relative rounded-control px-2.5 py-1 transition-colors duration-quick",
+                "t-context relative rounded-control px-2.5 py-1 capitalize transition-colors duration-quick",
                 view === candidate
                   ? "bg-surface-3 font-medium text-text-primary"
                   : "text-text-muted hover:bg-surface-2 hover:text-text-secondary",
