@@ -17,13 +17,13 @@ async function openTab(page: Page, name: string) {
 
 test("DFL: every RES-113 tactical tab shows its real output or an explicit availability state", async ({ page }) => {
   const console = probe(page);
-  await page.goto(`${DFL}?view=field&stream=tracking-period-1&t_ns=300000000000`);
+  await page.goto(`${DFL}?view=field&stream=tracking-period-1&t_ns=300020000000`);
   await waitForPitch(page);
   const panel = page.getByTestId("tactical-tabpanel");
-  await expect(page.getByTestId("tactical-context")).toContainText("00:05:00.000");
+  await expect(page.getByTestId("tactical-context")).toContainText("00:05:00.020");
 
   // Live: source possession/ball context and V3 functional structure.
-  await expect(panel).toContainText("POSSESSION AND BALL CONTEXT");
+  await expect(panel).toContainText("Possession and ball context");
   await expect(panel).toContainText("DEF / MID / ATT");
   await expect(panel).toContainText("1. FC Nürnberg");
   await expect(panel).toContainText("Fortuna Düsseldorf");
@@ -50,8 +50,8 @@ test("DFL: every RES-113 tactical tab shows its real output or an explicit avail
   await openTab(page, "Range");
   await expect(panel).toContainText("No range is committed.");
   await panel.getByRole("button", { name: "Commit playhead ± 15 s" }).click();
-  await expect(page).toHaveURL(/from_ns=285000000000/);
-  await expect(page).toHaveURL(/to_ns=315000000000/);
+  await expect(page).toHaveURL(/from_ns=285020000000/);
+  await expect(page).toHaveURL(/to_ns=315020000000/);
   await expect(panel.getByRole("table", { name: /Length and width statistics per team/ })).toBeVisible();
   await expect(panel).toContainText(/\d+ exact rows/);
   await panel.getByRole("button", { name: "Clear range" }).click();
@@ -85,6 +85,7 @@ test("DFL: overlays for all three tactical layers are the drawn frame", async ({
   const console = probe(page);
   await page.goto(`${DFL}?view=field&stream=tracking-period-1&t_ns=300020000000`);
   const canvas = await waitForPitch(page);
+  await page.getByRole("button", { name: /Occupied area/ }).click();
   // 300.020 s is on the DFL 40 ms frame grid (1.02 s + k * 40 ms).
   await expect(canvas).toHaveAttribute("data-drawn-frame-ns", "300020000000");
   await expect(canvas).toHaveAttribute("data-overlay-hulls", "2");

@@ -60,7 +60,7 @@ async function expectTacticalTabReady(page: Page, tab: string) {
   await expect(panel.getByText("Loading tactical capability")).toHaveCount(0);
   await expect(panel.getByText("Loading tactical series")).toHaveCount(0);
   const readyText: Record<string, RegExp> = {
-    Live: /POSSESSION AND BALL CONTEXT|No source possession context/,
+    Live: /POSSESSION AND BALL CONTEXT|No source possession context/i,
     Structure: /DEF \/ MID \/ ATT|No functional-unit geometry/,
     Relations: /Choose a relation|Local relations/,
     Space: /Occupied area|Territory · clipped Voronoi/,

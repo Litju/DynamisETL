@@ -426,6 +426,44 @@ interface FieldEntityLabelPosition {
   readonly top: number;
 }
 
+const FIELD_LABEL_TARGET_SIZE_PX = 24;
+const FIELD_LABEL_LAYOUT_STEP_PX = 30;
+
+function layoutFieldEntityLabels(
+  items: readonly FieldEntityLabelPosition[],
+  width: number,
+  height: number,
+): FieldEntityLabelPosition[] {
+  const offsets: Array<readonly [number, number]> = [[0, 0]];
+  for (let ring = 1; ring <= 8; ring += 1) {
+    const distance = ring * FIELD_LABEL_LAYOUT_STEP_PX;
+    offsets.push(
+      [0, -distance], [distance, 0], [0, distance], [-distance, 0],
+      [distance, -distance], [distance, distance], [-distance, distance], [-distance, -distance],
+    );
+  }
+  const placed: Array<{ readonly item: FieldEntityLabelPosition; readonly width: number }> = [];
+  const priority = [...items].sort((left, right) =>
+    Number(right.selected) - Number(left.selected) || left.id.localeCompare(right.id),
+  );
+  for (const item of priority) {
+    const targetWidth = Math.max(FIELD_LABEL_TARGET_SIZE_PX, item.text.length * 6 + 8);
+    const offset = offsets.find(([x, y]) => {
+      const left = item.left + x;
+      const top = item.top + y;
+      if (left < targetWidth / 2 || left > width - targetWidth / 2 ||
+        top < FIELD_LABEL_TARGET_SIZE_PX / 2 || top > height - FIELD_LABEL_TARGET_SIZE_PX / 2) return false;
+      return placed.every(({ item: other, width: otherWidth }) =>
+        Math.abs(left - other.left) >= (targetWidth + otherWidth) / 2 + 2 ||
+        Math.abs(top - other.top) >= FIELD_LABEL_TARGET_SIZE_PX + 2,
+      );
+    });
+    const [offsetX, offsetY] = offset ?? [0, 0];
+    placed.push({ item: { ...item, left: item.left + offsetX, top: item.top + offsetY }, width: targetWidth });
+  }
+  return placed.map(({ item }) => item);
+}
+
 function FieldEntityLabels({
   hostRef,
   cameraRef,
@@ -476,10 +514,11 @@ function FieldEntityLabels({
             top: Math.round(((1 - position.y) * bounds.height / 2) * 10) / 10,
           });
         }
-        setItems((current) => current.length === next.length && current.every((item, index) => {
-          const candidate = next[index];
+        const laidOut = layoutFieldEntityLabels(next, bounds.width, bounds.height);
+        setItems((current) => current.length === laidOut.length && current.every((item, index) => {
+          const candidate = laidOut[index];
           return candidate !== undefined && item.id === candidate.id && item.selected === candidate.selected && item.left === candidate.left && item.top === candidate.top;
-        }) ? current : next);
+        }) ? current : laidOut);
       } else {
         setItems((current) => current.length === 0 ? current : []);
       }
@@ -506,8 +545,8 @@ function FieldEntityLabels({
           onMouseEnter={() => matchFrame.hoverTrackingObject(item.id)}
           onMouseLeave={() => matchFrame.hoverTrackingObject(null)}
           className={item.selected
-            ? "pointer-events-auto absolute rounded bg-black/85 px-1 py-0.5 text-[10px] font-semibold text-white"
-            : "pointer-events-auto absolute rounded bg-black/65 px-1 py-0.5 text-[9px] text-white/85"}
+            ? "pointer-events-auto absolute inline-flex min-h-6 min-w-6 items-center justify-center rounded bg-black/85 px-1 py-0.5 text-[10px] font-semibold text-white"
+            : "pointer-events-auto absolute inline-flex min-h-6 min-w-6 items-center justify-center rounded bg-black/65 px-1 py-0.5 text-[9px] text-white/85"}
           style={{ left: item.left, top: item.top, transform: "translate(-50%, -50%)" }}
         >
           {item.text}

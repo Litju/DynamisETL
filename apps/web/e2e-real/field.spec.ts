@@ -32,6 +32,7 @@ test.describe("SkillCorner Field", () => {
     const console = probe(page);
     await page.goto(`${SC}?view=field`);
     const canvas = await waitForPitch(page);
+    await page.getByRole("button", { name: /Occupied area/ }).click();
     await expect(canvas).toHaveAttribute("data-overlay-hulls", "2");
     const drawn = await canvas.getAttribute("data-drawn-frame-ns");
     expect(drawn).toBe("0");
@@ -106,7 +107,7 @@ test.describe("SkillCorner Field", () => {
     await page.mouse.down();
     await page.mouse.move(viewBox.x + viewBox.width / 2 + 120, viewBox.y + viewBox.height / 2 + 40, { steps: 8 });
     await page.mouse.up();
-    await page.getByRole("button", { name: "Reset view" }).click();
+    await page.getByRole("button", { name: "Reset camera" }).click();
     // Viewport changes are renderer-local: same canvas, same frame, same overlay.
     expect(await (await element.elementHandle())!.evaluate((node, original) => node === original, before)).toBe(true);
     await expect(canvas).toHaveAttribute("data-drawn-frame-ns", "120000000000");

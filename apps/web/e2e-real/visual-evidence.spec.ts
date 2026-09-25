@@ -6,7 +6,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { DFL, SC, expectCleanConsole, probe } from "./helpers";
 
 /**
- * RES-112 §14 fixed-viewport visual evidence against the real API. Each
+ * RES-113 hybrid Field fixed-viewport visual evidence against the real API. Each
  * screenshot is taken only after the surface is demonstrably populated, and the
  * run fails on any console error. Output: output/playwright/res-112/final/.
  */
@@ -51,7 +51,8 @@ for (const [width, height] of [[1440, 900], [1600, 1000], [1366, 768]] as const)
 
     await page.goto(`${DFL}?view=field&stream=tracking-period-1&t_ns=300020000000&tactical=live`);
     await pitchReady(page);
-    await expect(page.getByTestId("tactical-tabpanel").getByRole("table")).toBeVisible();
+    await expect(page.getByTestId("tactical-tabpanel")).toContainText("Possession and ball context");
+    await expect(page.getByTestId("tactical-tabpanel")).toContainText("DEF / MID / ATT");
     await shoot(page, `04-field-dfl-live-${tag}`);
 
     if (primary) {
@@ -70,7 +71,8 @@ for (const [width, height] of [[1440, 900], [1600, 1000], [1366, 768]] as const)
 
     await page.goto(`${SC}?view=field&stream=tracking-period-1&t_ns=120000000000&tactical=live`);
     await pitchReady(page);
-    await expect(page.getByTestId("tactical-tabpanel").getByRole("table")).toBeVisible();
+    await expect(page.getByTestId("tactical-tabpanel")).toContainText("Possession and ball context");
+    await expect(page.getByTestId("tactical-tabpanel")).toContainText("DEF / MID / ATT");
     await shoot(page, `07-field-skillcorner-${tag}`);
 
     await page.goto(`${SC}?view=pose&stream=pose-period-1`);
