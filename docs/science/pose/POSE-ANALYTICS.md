@@ -44,6 +44,11 @@ descriptors. Dense series remain external Parquet; Gold serves bounded scalar
 and range summaries. Layer C is a separate experiment and will not be inferred
 from the existence of 29 landmarks.
 
+The accepted SkillCorner run currently precomputes six lower-limb landmarks
+relative to the observed `midHip` anchor. The processor contract accepts any
+registered landmark selection; raw source coordinates for the complete
+29-landmark set remain separately accessible.
+
 The machine-readable definitions are in
 [`metric-definitions.json`](metric-definitions.json); the source/model gate is
 in [`skillcorner-capability-matrix.json`](skillcorner-capability-matrix.json).

@@ -37,16 +37,23 @@
     },
     {
       "algorithm_id": "pose.landmark_kinematics",
-      "version": "planned",
-      "status": "not_implemented",
+      "version": "1.0.0",
+      "status": "implemented",
       "measurement_class": "PIPELINE_DERIVED",
       "metrics": [
-        {"id_pattern": "pose.landmark_relative_position.{landmark}.{component}", "layer": "A", "unit": "m", "status": "planned", "definition": "Named landmark minus an explicitly named same-frame body anchor; unavailable when either landmark is absent."},
-        {"id_pattern": "pose.landmark_displacement.{landmark}", "layer": "A", "unit": "m", "status": "planned", "definition": "Relative-position change from selected-range start on exact observations."},
-        {"id_pattern": "pose.landmark_path_length.{landmark}", "layer": "A", "unit": "m", "status": "planned", "definition": "Sum of consecutive eligible observed displacement magnitudes within each contiguous segment."},
-        {"id_pattern": "pose.landmark_speed.{landmark}", "layer": "B", "unit": "m/s", "status": "planned_quality_gated", "definition": "Versioned derivative only in coordinate components whose temporal frame semantics are valid."},
-        {"id_pattern": "pose.landmark_acceleration.{landmark}", "layer": "B", "unit": "m/s^2", "status": "planned_fail_closed", "definition": "Versioned second derivative; emitted only when the configured quality, cadence, and minimum-segment gates pass."}
-      ]
+        {"id_pattern": "pose.landmark.coverage.{landmark}", "layer": "D", "unit": "1", "status": "implemented", "definition": "Fraction of source frames where the named landmark and explicit body anchor are both available."},
+        {"id_pattern": "pose.landmark.displacement_from_range_start.{landmark}", "layer": "A", "unit": "m", "status": "implemented_when_observed", "definition": "Distance at the last available observation from the first available body-anchor-relative point in the processor range."},
+        {"id_pattern": "pose.landmark.path_length.{landmark}", "layer": "A", "unit": "m", "status": "implemented_when_observed", "definition": "Sum of consecutive body-anchor-relative displacement magnitudes within valid temporal segments; resets across gaps."},
+        {"id_pattern": "pose.landmark.speed_mean.{landmark}", "layer": "B", "unit": "m/s", "status": "implemented_when_valid", "definition": "Mean norm of the configured derivative of body-anchor-relative XYZ in the provider hybrid axes; not global landmark speed."},
+        {"id_pattern": "pose.landmark.speed_peak.{landmark}", "layer": "B", "unit": "m/s", "status": "implemented_when_valid", "definition": "Peak norm of the configured derivative of body-anchor-relative XYZ in the provider hybrid axes."},
+        {"id_pattern": "pose.landmark.acceleration_peak.{landmark}", "layer": "B", "unit": "m/s^2", "status": "disabled_by_default", "definition": "Peak norm of the second derivative; requires explicit provider-radius and minimum-segment gates."}
+      ],
+      "current_acceptance_landmarks": ["lHip", "rHip", "lKnee", "rKnee", "lAnkle", "rAnkle"],
+      "body_anchor_landmark": "midHip",
+      "acceleration_default": "disabled",
+      "coordinate_semantics": "body-anchor-relative coordinates in the SkillCorner hybrid axes; not global displacement, global speed, or absolute vertical motion",
+      "series_name": "pose_landmark_kinematics",
+      "series_columns_per_landmark": ["relative_position_x_{landmark}_m", "relative_position_y_{landmark}_m", "relative_position_z_{landmark}_m", "displacement_from_range_start_{landmark}_m", "path_length_{landmark}_m", "body_relative_speed_{landmark}_m_s", "available_{landmark}"]
     },
     {
       "algorithm_id": "pose.analysis_quality",
