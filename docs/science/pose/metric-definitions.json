@@ -1,0 +1,81 @@
+{
+  "schema_version": "1.0.0",
+  "source_authority": {
+    "dataset": "SkillCorner Open Data Body Pose",
+    "measurement_class": "MODEL_ESTIMATED",
+    "sample_rate_hz": 25,
+    "provider_error_field": "p90_mae_cm",
+    "provider_error_unit": "cm",
+    "provider_error_semantics": "90th-percentile predicted error radius relative to the player's pose; not probability, confidence, or a confidence interval",
+    "coordinate_frame": "skillcorner-pose-hybrid-m",
+    "coordinate_semantics": "pitch-global X/Y and player-centroid-relative Z; not a globally registered 3D pitch frame"
+  },
+  "algorithms": [
+    {
+      "algorithm_id": "pose.translation_invariant_kinematics",
+      "version": "1.0.0",
+      "status": "implemented",
+      "measurement_class": "PIPELINE_DERIVED",
+      "sampling_rate": "read from source stream metadata",
+      "gap_policy": {
+        "strategy": "contiguous_segments",
+        "default_max_gap_factor": 1.5,
+        "interpolation": "none",
+        "filter_and_derivative_state": "reset at every temporal segment"
+      },
+      "metrics": [
+        {"id_pattern": "pose.segment_length_mean.{segment}", "layer": "A", "unit": "m", "status": "implemented", "definition": "Mean Euclidean distance between explicitly named available landmarks."},
+        {"id_pattern": "pose.segment_length_error_bound.{segment}", "layer": "A", "unit": "m", "status": "implemented_optional", "definition": "Maximum named worst-case additive endpoint provider-radius bound e_start + e_end; not a confidence interval."},
+        {"id_pattern": "pose.angular_rom.{angle}", "layer": "D", "unit": "rad", "status": "implemented", "definition": "Maximum minus minimum of an explicitly named three-landmark included-angle series."},
+        {"id_pattern": "pose.angular_velocity_peak.{angle}", "layer": "B", "unit": "rad/s", "status": "implemented", "definition": "Maximum absolute derivative of the filtered angle series within valid contiguous segments."},
+        {"id_pattern": "pose.angular_velocity_rms.{angle}", "layer": "B", "unit": "rad/s", "status": "implemented", "definition": "Root-mean-square angle derivative over valid samples in contiguous segments."},
+        {"id_pattern": "pose.availability.{landmark}", "layer": "0/D", "unit": "1", "status": "implemented", "definition": "Fraction of entity frames where the named landmark is available and finite."},
+        {"id_pattern": "pose.error_radius_mean.{landmark}", "layer": "0", "unit": "m", "status": "implemented", "definition": "Mean provider p90 predicted error radius over available observations; retains provider semantics."}
+      ],
+      "series_columns": ["entity_id", "t_rel_ns", "segment_index", "segment_{name}_length_m", "angle_{name}_rad", "angular_velocity_{name}_rad_s"],
+      "provenance_required": ["subject_id", "session_id", "trial_id", "stream_id", "source_checksum", "coordinate_frame_id", "measurement_class", "algorithm_id", "algorithm_version", "parameters", "code_sha", "segment_index", "gap_policy"]
+    },
+    {
+      "algorithm_id": "pose.landmark_kinematics",
+      "version": "planned",
+      "status": "not_implemented",
+      "measurement_class": "PIPELINE_DERIVED",
+      "metrics": [
+        {"id_pattern": "pose.landmark_relative_position.{landmark}.{component}", "layer": "A", "unit": "m", "status": "planned", "definition": "Named landmark minus an explicitly named same-frame body anchor; unavailable when either landmark is absent."},
+        {"id_pattern": "pose.landmark_displacement.{landmark}", "layer": "A", "unit": "m", "status": "planned", "definition": "Relative-position change from selected-range start on exact observations."},
+        {"id_pattern": "pose.landmark_path_length.{landmark}", "layer": "A", "unit": "m", "status": "planned", "definition": "Sum of consecutive eligible observed displacement magnitudes within each contiguous segment."},
+        {"id_pattern": "pose.landmark_speed.{landmark}", "layer": "B", "unit": "m/s", "status": "planned_quality_gated", "definition": "Versioned derivative only in coordinate components whose temporal frame semantics are valid."},
+        {"id_pattern": "pose.landmark_acceleration.{landmark}", "layer": "B", "unit": "m/s^2", "status": "planned_fail_closed", "definition": "Versioned second derivative; emitted only when the configured quality, cadence, and minimum-segment gates pass."}
+      ]
+    },
+    {
+      "algorithm_id": "pose.analysis_quality",
+      "version": "planned",
+      "status": "not_implemented",
+      "measurement_class": "PIPELINE_DERIVED",
+      "metrics": [
+        {"id_pattern": "pose.quality.coverage.{metric}", "layer": "D", "unit": "1", "status": "planned", "definition": "Usable exact-observation fraction for a named metric and selected range."},
+        {"id_pattern": "pose.quality.dropout_count.{landmark}", "layer": "D", "unit": "1", "status": "planned", "definition": "Count of unavailable temporal intervals under explicit cadence/gap policy."},
+        {"id_pattern": "pose.quality.longest_dropout.{landmark}", "layer": "D", "unit": "s", "status": "planned", "definition": "Longest unavailable interval under explicit cadence/gap policy."},
+        {"id_pattern": "pose.quality.provider_error_radius_p95.{landmark}", "layer": "0", "unit": "m", "status": "planned", "definition": "95th percentile of provider p90 error-radius samples; retain provider p90-radius label."}
+      ]
+    },
+    {
+      "algorithm_id": "pose.bilateral_geometry",
+      "version": "planned",
+      "status": "not_implemented",
+      "measurement_class": "PIPELINE_DERIVED",
+      "metrics": [
+        {"id_pattern": "pose.bilateral.angle_difference.{homologous_angle}", "layer": "D", "unit": "rad", "status": "planned", "definition": "Right-minus-left geometric included-angle difference at matched exact subject/time observations."},
+        {"id_pattern": "pose.bilateral.waveform_similarity.{homologous_metric}", "layer": "D", "unit": "1", "status": "planned_quality_gated", "definition": "Explicitly named similarity statistic on legitimately aligned common valid samples; reports both-side quality separately."}
+      ]
+    },
+    {
+      "algorithm_id": "pose.biomechanical_ik",
+      "version": "blocked_by_sufficiency_gate",
+      "status": "unavailable",
+      "measurement_class": "MODEL_ESTIMATED",
+      "reason": "Current 29-landmark source evidence does not identify supported anatomical joint coordinate systems or validated model residuals/DOFs."
+    }
+  ]
+}
