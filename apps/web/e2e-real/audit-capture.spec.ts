@@ -112,7 +112,7 @@ test("DFL field and tactical pane", async ({ page }) => {
     pane: await text(page, "[aria-label='Tactical analysis views'] >> xpath=ancestor::section[1]"),
     layers: await text(page, "[aria-label='Scene layers']"),
   });
-  for (const tab of ["Space", "Shape", "Range", "Events", "Report"]) {
+  for (const tab of ["Structure", "Relations", "Space", "Range", "Events", "Report"]) {
     const control = page.getByRole("tab", { name: tab, exact: true });
     if (await control.count()) {
       await control.click();
@@ -123,7 +123,7 @@ test("DFL field and tactical pane", async ({ page }) => {
     });
   }
   await page.getByRole("tab", { name: "Live", exact: true }).click().catch(() => undefined);
-  const play = page.getByRole("button", { name: "Play" });
+  const play = page.getByRole("button", { name: "Play", exact: true });
   await play.click();
   await page.waitForTimeout(4_000);
   await page.getByRole("button", { name: "Pause playback" }).click().catch(() => undefined);
@@ -141,7 +141,7 @@ test("SkillCorner field, overlays and playback", async ({ page }) => {
     layers: await text(page, "[aria-label='Scene layers']"),
     pane: await text(page, "[aria-label='Tactical analysis views'] >> xpath=ancestor::section[1]"),
   });
-  for (const layer of ["Hull", "Territory", "Influence"]) {
+  for (const layer of ["Occupied area", "Territory", "Influence"]) {
     const name = layer === "Influence" ? /Influence.*model/i : layer;
     const toggle = page.getByRole("button", { name });
     await expect(toggle).toBeVisible();
@@ -151,21 +151,22 @@ test("SkillCorner field, overlays and playback", async ({ page }) => {
       pressed: await toggle.getAttribute("aria-pressed"),
     });
   }
-  const pixiMarker = await page.evaluate(() => document.querySelectorAll("[data-testid='pitch-canvas'] canvas").length);
+  const canvasSelector = "[data-testid='matchlab-canvas'] canvas, [data-testid='pitch-canvas'] canvas";
+  const canvasCountBeforePlay = await page.evaluate((selector) => document.querySelectorAll(selector).length, canvasSelector);
   const before = probe.api.length;
-  const perf = await page.evaluate(() => {
+  const perf = await page.evaluate((selector) => {
     const counts = { frames: 0, canvases: new Set<HTMLCanvasElement>() };
     const tick = () => {
       counts.frames += 1;
-      document.querySelectorAll<HTMLCanvasElement>("[data-testid='pitch-canvas'] canvas").forEach((canvas) => counts.canvases.add(canvas));
+      document.querySelectorAll<HTMLCanvasElement>(selector).forEach((canvas) => counts.canvases.add(canvas));
       if (counts.frames < 10_000) requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
     (window as unknown as { __res112?: typeof counts }).__res112 = counts;
     return true;
-  });
+  }, canvasSelector);
   expect(perf).toBe(true);
-  await page.getByRole("button", { name: "Play" }).click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
   await page.waitForTimeout(5_000);
   const during = await page.evaluate(() => {
     const counts = (window as unknown as { __res112?: { frames: number; canvases: Set<HTMLCanvasElement> } }).__res112;
@@ -174,11 +175,11 @@ test("SkillCorner field, overlays and playback", async ({ page }) => {
   await page.getByRole("button", { name: "Pause playback" }).click().catch(() => undefined);
   await settle(page, 1_000);
   await shot(page, "07-field-sc-after-play", probe, {
-    canvasesBeforePlay: pixiMarker,
+    canvasesBeforePlay: canvasCountBeforePlay,
     during,
     apiRequestsDuringPlay: probe.api.length - before,
   });
-  for (const tab of ["Space", "Shape", "Range", "Events", "Report"]) {
+  for (const tab of ["Structure", "Relations", "Space", "Range", "Events", "Report"]) {
     await page.getByRole("tab", { name: tab, exact: true }).click();
     await settle(page, 1_500);
     await shot(page, `08-field-sc-${tab.toLowerCase()}`, probe, {
@@ -206,7 +207,7 @@ test("SkillCorner pose", async ({ page }) => {
       telemetry: await text(page, "[data-testid='pose-telemetry']"),
     });
   }
-  await page.getByRole("button", { name: "Play" }).click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
   await page.waitForTimeout(4_000);
   await shot(page, "09-pose-playing", probe, { telemetry: await text(page, "[data-testid='pose-telemetry']") });
   if (values.length > 3) {

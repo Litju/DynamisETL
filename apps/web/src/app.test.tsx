@@ -269,7 +269,7 @@ describe("workbench shell", () => {
     expect(screen.getAllByText("00:49:47.480").length).toBeGreaterThan(0);
     expect(screen.getAllByText("2987480000000 ns").length).toBeGreaterThan(0);
     // Derived metric with its measurement class is listed in the overview.
-    expect(await screen.findByText("pose.angular_rom.left_knee")).toBeInTheDocument();
+    expect(await screen.findByText("pose.angular_rom.left_knee", {}, { timeout: 5_000 })).toBeInTheDocument();
     expect(screen.getAllByText("pipeline-derived").length).toBeGreaterThan(0);
     // Stream contracts are subordinate to the analysis but stay one click
     // away, and the synchronization specification remains explicit.
@@ -283,6 +283,7 @@ describe("workbench shell", () => {
 
   it("opens a non-overview view from the deep link without inventing results", async () => {
     renderAt("/lab/skillcorner-opendata/1925299?stream=pose-period-1&view=pose");
+    await screen.findByRole("tab", { name: "pose" });
     // The stub session declares no canonical pose artifact, so the pose viewer
     // must say so explicitly instead of rendering an empty scene.
     expect(

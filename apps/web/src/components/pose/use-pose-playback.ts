@@ -1,8 +1,8 @@
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
 
-import type { DenseWindow } from "@/api/types";
-import { windowQuery, type WindowQuery } from "@/lib/api/queries";
+import { poseFrameWindowQuery, type PreparedPoseWindow } from "@/lib/api/match-frame-windows";
+import type { WindowQuery } from "@/lib/api/queries";
 import type { DenseChunkBounds, DenseChunkPlan } from "@/lib/dense-chunks";
 import {
   usePlaybackChunkCoordinator,
@@ -24,6 +24,7 @@ export interface PosePlaybackWindowOptions {
   readonly enabled?: boolean;
   readonly artifactId: string | null;
   readonly entityId: string | null;
+  readonly jointNames: readonly string[];
   readonly canonicalMinNs: bigint | null;
   readonly canonicalMaxNs: bigint | null;
   readonly chunkSpanNs: bigint | null;
@@ -34,7 +35,7 @@ export interface PosePlaybackWindowOptions {
 }
 
 export interface PosePlaybackWindowResult {
-  readonly window: ReturnType<typeof useQuery<DenseWindow>>;
+  readonly window: ReturnType<typeof useQuery<PreparedPoseWindow>>;
   readonly chunkPlan: DenseChunkPlan | null;
   readonly activeWindowBounds: DenseChunkBounds | { readonly fromNs: bigint; readonly toNs: bigint } | null;
   readonly playbackStatus: "idle" | "ready" | "buffering" | "ended";
@@ -72,15 +73,15 @@ export function usePosePlaybackWindow(options: PosePlaybackWindowOptions): PoseP
     [options.artifactId, options.entityId, options.maxPoints],
   );
   const queryOptionsFor = useCallback(
-    (chunk: DenseChunkBounds): PlaybackChunkQueryOptions<DenseWindow> =>
-      windowQuery({
+    (chunk: DenseChunkBounds): PlaybackChunkQueryOptions<PreparedPoseWindow> =>
+      poseFrameWindowQuery({
         ...request,
         fromNs: Number(chunk.fromNs),
         toNs: Number(chunk.toNs),
         cacheScope: "dense-chunk",
         chunkId: chunk.id,
-      }) as unknown as PlaybackChunkQueryOptions<DenseWindow>,
-    [request],
+      }, options.jointNames) as unknown as PlaybackChunkQueryOptions<PreparedPoseWindow>,
+    [options.jointNames, request],
   );
   const queryScope = useMemo(
     () => ({
@@ -101,7 +102,7 @@ export function usePosePlaybackWindow(options: PosePlaybackWindowOptions): PoseP
   );
   const enabled = options.enabled ?? true;
   const isReady = useCallback(
-    (data: DenseWindow | undefined) => data?.meta.reduction === null,
+    (data: PreparedPoseWindow | undefined) => data?.meta.reduction === null,
     [],
   );
   const matchesQuery = useCallback(
@@ -117,7 +118,7 @@ export function usePosePlaybackWindow(options: PosePlaybackWindowOptions): PoseP
     (key: readonly unknown[]) => (typeof key[3] === "string" ? key[3] : null),
     [],
   );
-  const playback = usePlaybackChunkCoordinator<DenseWindow>({
+  const playback = usePlaybackChunkCoordinator<PreparedPoseWindow>({
     enabled: enabled && explicit === null,
     coordinatorKey: `pose:${queryScope.artifactId}:${queryScope.entityId ?? "*"}:${queryScope.columns}:${queryScope.maxPoints}`,
     canonicalMinNs: options.canonicalMinNs,
@@ -133,19 +134,19 @@ export function usePosePlaybackWindow(options: PosePlaybackWindowOptions): PoseP
   const activeChunk = playback.plan?.active ?? null;
   const activeQuery = useMemo(() => {
     if (activeChunk !== null) {
-      return windowQuery({
+      return poseFrameWindowQuery({
         ...request,
         fromNs: Number(activeChunk.fromNs),
         toNs: Number(activeChunk.toNs),
         cacheScope: "dense-chunk",
         chunkId: activeChunk.id,
-      });
+      }, options.jointNames);
     }
-    return windowQuery({
+    return poseFrameWindowQuery({
       ...request,
       ...(explicit !== null ? { fromNs: Number(explicit.fromNs), toNs: Number(explicit.toNs) } : {}),
-    });
-  }, [activeChunk, explicit, request]);
+    }, options.jointNames);
+  }, [activeChunk, explicit, options.jointNames, request]);
   const window = useQuery({
     ...activeQuery,
     placeholderData: (previous) => previous,

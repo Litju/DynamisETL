@@ -6,7 +6,7 @@ turns the flagship Field and Pose routes from "implemented" into "ready":
 1. verify every required accepted local source is registered, present on disk
    and matches its registered checksum (fail loudly otherwise);
 2. materialize the processors the capability authority declares supported
-   (athlete locomotor metrics, tactical Levels A-D, Pose kinematics), skipping a
+   (athlete locomotor metrics, tactical Levels A-D and MatchLab V3, Pose kinematics), skipping a
    stream whose current completed run already has the same algorithm,
    parameters hash and input checksums;
 3. rebuild and publish Gold when the served marts disagree with the control
@@ -51,7 +51,9 @@ from dynamis.processors.tactical_corpus import (
     LEVEL_SERIES,
     TRACKING_LEVELS,
     event_snapshot_result,
+    matchlab_v3_parameters,
     materialize_event_level,
+    materialize_matchlab_v3,
     materialize_tracking_level,
     supported_levels,
 )
@@ -366,7 +368,55 @@ def _tactical_steps(
         table, tracking_input = load_silver(resolved, ref)
         probe = table.slice(0, min(table.num_rows, PROBE_ROWS))
         for level in levels:
-            if level == "D":
+            if level == "V3":
+                from dynamis.processors.tactical_shape import process_tactical_shape
+                from dynamis.processors.tactical_sources import load_tactical_source_authority
+
+                if ref.trial_id is None:
+                    raise PreparationError(
+                        f"{flagship.dataset_id}/{ref.stream_id}: MatchLab V3 requires a declared "
+                        "trial to load source-authorized tactical context"
+                    )
+                v3_parameters = matchlab_v3_parameters(ref)
+                probe_source = load_tactical_source_authority(
+                    resolved,
+                    dataset_id=flagship.dataset_id,
+                    trial_id=ref.trial_id,
+                    tracking=probe,
+                )
+                probe_result = process_tactical_shape(
+                    probe,
+                    role_by_player=probe_source.role_by_player,
+                    attacking_direction_by_team=probe_source.attacking_direction_by_team,
+                    possession=probe_source.possession,
+                    role_authority=probe_source.role_authority,
+                    direction_authority=probe_source.direction_authority,
+                    parameters=v3_parameters,
+                )
+                parameters_hash = probe_result.spec.parameters_hash
+                checksums = tuple(
+                    [item.checksum_sha256 for item in probe_source.inputs] + [ref.checksum_sha256]
+                )
+
+                def run_v3(
+                    ref: SilverStreamRef = ref,
+                    table: pa.Table = table,
+                    tracking_input: Any = tracking_input,
+                    parameters: dict[str, float] = v3_parameters,
+                ) -> str:
+                    return materialize_matchlab_v3(
+                        resolved,
+                        engine,
+                        dataset_id=flagship.dataset_id,
+                        ref=ref,
+                        table=table,
+                        tracking_input=tracking_input,
+                        parameters=parameters,
+                        code_sha=code_sha,
+                    ).run_id
+
+                runner: Callable[[], str | None] = run_v3
+            elif level == "D":
                 assert event_table is not None
                 probe_result = event_snapshot_result(event_table, ref, probe)
                 if probe_result is None:
@@ -669,7 +719,7 @@ def main(argv: list[str] | None = None) -> int:
         "--skip-level",
         action="append",
         default=[],
-        choices=("A", "B", "C", "D"),
+        choices=("A", "B", "C", "D", "V3"),
         help="do not materialize this tactical level (verification still reports it)",
     )
     parser.add_argument(

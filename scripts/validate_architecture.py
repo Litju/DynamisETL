@@ -157,13 +157,137 @@ def _check_project_invariants(root: Path, contract: dict[str, Any]) -> None:
                 raise ContractError(f"forbidden architecture dependency in {path}")
 
 
+def _check_matchlab_v3_invariants(contract: dict[str, Any]) -> None:
+    if contract["contract_id"] != "dynamisdata-matchlab-rendering":
+        raise ContractError("V3 contract must be scoped to MatchLab rendering")
+    if "outside this boundary" not in contract["scope"]:
+        raise ContractError("V3 must leave V2 contracts outside MatchLab intact")
+    technology = contract["technology"]
+    if technology["canvas_count"] != 1 or technology["initial_backend"] != "WebGL2":
+        raise ContractError("MatchLab requires one Canvas and WebGL2 as its initial backend")
+    if "Drei View" not in technology["multi_view"]:
+        raise ContractError("MatchLab multi-view must use Drei View")
+    if "no duplicate store" not in contract["state_ownership"]["context_role"]:
+        raise ContractError("MatchFrameContext must not become a second state store")
+
+    context = contract["match_frame_context"]
+    if "BigInt" not in context["canonical_time"]:
+        raise ContractError("MatchFrameContext canonical time must remain BigInt-safe")
+    if "latest real Pose sample at or before" not in context["pose_resolution"]:
+        raise ContractError(
+            "Pose frames must resolve independently under their source-rate contract"
+        )
+    if (
+        "1.5 nominal sample intervals" not in context["tracking_resolution"]
+        or "1.5 nominal sample intervals" not in context["pose_resolution"]
+    ):
+        raise ContractError("V3 source-frame age tolerance must remain explicit")
+    if "Never interpolate" not in context["pose_resolution"]:
+        raise ContractError("MatchFrameContext must not fabricate Pose samples")
+    selection = contract["interaction"]["selection_authority"]
+    if "Field-origin player picks commit the player and current canonical time" not in selection:
+        raise ContractError("Field-origin selection must preserve canonical time")
+    if "retain RES-109 section 12" not in selection:
+        raise ContractError("Pose-origin selection must preserve the RES-109 subject transition")
+    if "coordinates and proximity never establish identity" not in context["player_identity"]:
+        raise ContractError("player identity must come from a registered identity mapping")
+    if "structured" not in contract["pitch"]["geometry_source"]:
+        raise ContractError("Pitch3D dimensions must come from structured source metadata")
+    if "never infer" not in contract["pitch"]["missing_geometry"]:
+        raise ContractError("missing metric pitch geometry must fail closed")
+
+    presentation = contract["field_presentation"]
+    if (
+        "Tactical Map" not in presentation["default_mode"]
+        or "OrthographicCamera" not in presentation["default_mode"]
+    ):
+        raise ContractError("Tactical Map must be the fitted orthographic Field default")
+    if (
+        "Structure Lift" not in presentation["structure_lift"]
+        or "orthographic" not in presentation["structure_lift"]
+    ):
+        raise ContractError(
+            "Structure Lift must preserve metric pitch XY with orthographic projection"
+        )
+    if "optional" not in presentation["optional_exploration"].lower():
+        raise ContractError("Perspective exploration must remain optional")
+    if "render-layer-depths.ts" not in presentation["depth_offset_authority"]:
+        raise ContractError("Field presentation offsets must have one depth authority")
+    if "one restrained DirectionalLight" not in presentation["shadow_policy"]:
+        raise ContractError("analytical Field shadows must use one restrained light")
+    required_planar = {
+        "tracking positions",
+        "functional units and inter-line gaps",
+        "shape graph",
+        "local triangles",
+        "opposition relations",
+        "hull and Voronoi",
+        "event paths",
+    }
+    if set(presentation["planar_quantities"]) != required_planar:
+        raise ContractError("tracking and ordinary tactical geometry must remain planar")
+
+    layer_ids = [layer["id"] for layer in contract["layers"]]
+    expected_layers = {
+        "PitchLayer",
+        "TrackingLayer",
+        "TacticalLayer",
+        "PoseLayer",
+        "ContextLayer",
+    }
+    if len(layer_ids) != len(set(layer_ids)) or set(layer_ids) != expected_layers:
+        raise ContractError(f"V3 layers must be exactly {sorted(expected_layers)}")
+
+    alignment = {item["mode"]: item for item in contract["source_alignment"]}
+    expected_modes = {
+        "source_native",
+        "tracking_anchored_display",
+        "display_grounded_vertical",
+    }
+    if set(alignment) != expected_modes:
+        raise ContractError(f"V3 source alignment modes must be exactly {sorted(expected_modes)}")
+    if any(
+        alignment[mode]["scientific_input_eligible"] for mode in expected_modes - {"source_native"}
+    ):
+        raise ContractError("display-transformed coordinates must never be scientific inputs")
+
+    worker = contract["worker_data_plane"]
+    for required in ("Arrow JS", "Web Worker", "Comlink"):
+        if required not in worker["transport"]:
+            raise ContractError(f"worker data plane must use {required}")
+    if "object maps at animation-frame cadence" not in worker["rule"]:
+        raise ContractError("worker contract must prohibit frame-cadence row-object maps")
+    if "processors compute values" not in contract["scalar_fields"]["metric_authority"]:
+        raise ContractError("scalar-field shaders must not compute scientific values")
+    if "NOT PHYSICAL HEIGHT" not in contract["scalar_fields"]["elevation"]:
+        raise ContractError("analytical elevation must be labeled as non-physical")
+
+    step_ids = [step["id"] for step in contract["migration"]["steps"]]
+    if step_ids != list(range(1, 14)):
+        raise ContractError("V3 migration gates must be the ordered 1–13 execution contract")
+    stop_rule = contract["migration"]["stop_rule"]
+    if "RES-111" not in stop_rule or "RES-114" not in stop_rule:
+        raise ContractError("RES-111 and RES-114 must remain gated on RES-113 acceptance")
+    if set(contract["adr_ids"]) != {
+        "ADR-001-renderer-migration",
+        "ADR-002-shared-canvas-multiview",
+        "ADR-003-worker-data-plane",
+        "ADR-004-webgpu-benchmark-gate",
+    }:
+        raise ContractError("V3 must freeze renderer, multi-view, worker and WebGPU ADRs")
+
+
 def validate_files(root: Path) -> None:
-    schema_path = root / "architecture" / "system-v2.schema.json"
-    contract_path = root / "architecture" / "system-v2.json"
-    schema = _load(schema_path)
-    contract = _load(contract_path)
-    _validate(contract, schema, schema, "$")
-    _check_project_invariants(root, contract)
+    for version in ("v2", "v3"):
+        schema_path = root / "architecture" / f"system-{version}.schema.json"
+        contract_path = root / "architecture" / f"system-{version}.json"
+        schema = _load(schema_path)
+        contract = _load(contract_path)
+        _validate(contract, schema, schema, "$")
+        if version == "v2":
+            _check_project_invariants(root, contract)
+        else:
+            _check_matchlab_v3_invariants(contract)
 
 
 def main() -> None:
@@ -172,7 +296,8 @@ def main() -> None:
     args = parser.parse_args()
     validate_files(args.root.resolve())
     print(
-        f"architecture contract PASSED: {args.root.resolve() / 'architecture' / 'system-v2.json'}"
+        f"architecture contracts PASSED: V2 and MatchLab V3 in "
+        f"{args.root.resolve() / 'architecture'}"
     )
 
 

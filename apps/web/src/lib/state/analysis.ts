@@ -1,8 +1,9 @@
 ﻿/**
  * Transient analysis state spine.
  *
- * Zustand owns only small high-frequency client state: hover, live playback,
- * brush, focused panel, hovered entity/joint and renderer interaction flags.
+ * Zustand owns small high-frequency client state: live playback, hover, brush,
+ * team/tactical focus and renderer interaction flags. Player identity stays in
+ * the durable match context.
  * Server data never enters this store, and playback never mutates the URL:
  * `commitTime` is the single boundary that a route may serialize.
  */
@@ -18,6 +19,8 @@ export interface TimeRangeNs {
 
 export type PlaybackStatus = "idle" | "ready" | "buffering" | "ended";
 export type PlaybackDirection = -1 | 1;
+export type TacticalRelationMode = "off" | "stable-graph" | "selected-triangles" | "attacker-defender";
+export type ScalarFieldMode = "heatmap" | "contour" | "elevation";
 
 export interface AnalysisState {
   /** Live playback/scrub time; high-frequency and never URL-serialized directly. */
@@ -36,8 +39,12 @@ export interface AnalysisState {
   playbackStatus: PlaybackStatus;
   /** Nominal rate of the currently selected stream, for frame stepping. */
   nominalRateHz: number | null;
-  selectedEntityId: string | null;
   hoveredEntityId: string | null;
+  selectedTeamId: string | null;
+  selectedTacticalObjectId: string | null;
+  hoveredTacticalObjectId: string | null;
+  tacticalRelationMode: TacticalRelationMode;
+  scalarFieldMode: ScalarFieldMode;
   hoveredJoint: string | null;
   selectedJoint: string | null;
   focusedPanel: WorkbenchPanel;
@@ -59,8 +66,12 @@ export interface AnalysisState {
   setPlaybackDirectionAndPlay: (direction: PlaybackDirection) => void;
   setPlaybackStatus: (status: PlaybackStatus) => void;
   setNominalRate: (rateHz: number | null) => void;
-  selectEntity: (entityId: string | null) => void;
   hoverEntity: (entityId: string | null) => void;
+  selectTeam: (teamId: string | null) => void;
+  selectTacticalObject: (objectId: string | null) => void;
+  hoverTacticalObject: (objectId: string | null) => void;
+  setTacticalRelationMode: (mode: TacticalRelationMode) => void;
+  setScalarFieldMode: (mode: ScalarFieldMode) => void;
   hoverJoint: (jointId: string | null) => void;
   selectJoint: (jointId: string | null) => void;
   focusPanel: (panel: WorkbenchPanel) => void;
@@ -70,7 +81,6 @@ export interface AnalysisState {
   hydrate: (state: {
     committedTimeNs?: bigint | null;
     committedRangeNs?: TimeRangeNs | null;
-    selectedEntityId?: string | null;
     focusedPanel?: WorkbenchPanel;
   }) => void;
   resetTransient: () => void;
@@ -84,6 +94,11 @@ const TRANSIENT_DEFAULTS = {
   playbackStatus: "idle",
   nominalRateHz: null,
   hoveredEntityId: null,
+  selectedTeamId: null,
+  selectedTacticalObjectId: null,
+  hoveredTacticalObjectId: null,
+  tacticalRelationMode: "off",
+  scalarFieldMode: "heatmap",
   hoveredJoint: null,
   selectedJoint: null,
   interacting: false,
@@ -98,8 +113,12 @@ export const useAnalysisStore = create<AnalysisState>()((set) => ({
   playbackRate: 1,
   playbackDirection: 1,
   nominalRateHz: null,
-  selectedEntityId: null,
   hoveredEntityId: null,
+  selectedTeamId: null,
+  selectedTacticalObjectId: null,
+  hoveredTacticalObjectId: null,
+  tacticalRelationMode: "off",
+  scalarFieldMode: "heatmap",
   hoveredJoint: null,
   selectedJoint: null,
   focusedPanel: "overview",
@@ -117,8 +136,12 @@ export const useAnalysisStore = create<AnalysisState>()((set) => ({
   setPlaybackStatus: (playbackStatus) => set({ playbackStatus }),
   setNominalRate: (rateHz) =>
     set({ nominalRateHz: rateHz !== null && Number.isFinite(rateHz) && rateHz > 0 ? rateHz : null }),
-  selectEntity: (entityId) => set({ selectedEntityId: entityId }),
   hoverEntity: (entityId) => set({ hoveredEntityId: entityId }),
+  selectTeam: (selectedTeamId) => set({ selectedTeamId }),
+  selectTacticalObject: (selectedTacticalObjectId) => set({ selectedTacticalObjectId }),
+  hoverTacticalObject: (hoveredTacticalObjectId) => set({ hoveredTacticalObjectId }),
+  setTacticalRelationMode: (tacticalRelationMode) => set({ tacticalRelationMode }),
+  setScalarFieldMode: (scalarFieldMode) => set({ scalarFieldMode }),
   hoverJoint: (jointId) => set({ hoveredJoint: jointId }),
   selectJoint: (jointId) => set({ selectedJoint: jointId }),
   focusPanel: (panel) => set({ focusedPanel: panel }),
@@ -132,7 +155,6 @@ export const useAnalysisStore = create<AnalysisState>()((set) => ({
       brushRangeNs: null,
       playing: false,
       playbackStatus: "idle",
-      selectedEntityId: null,
       hoveredEntityId: null,
       hoveredJoint: null,
       selectedJoint: null,
@@ -147,8 +169,6 @@ export const useAnalysisStore = create<AnalysisState>()((set) => ({
         state.committedTimeNs !== undefined ? state.committedTimeNs : current.committedTimeNs,
       committedRangeNs:
         state.committedRangeNs !== undefined ? state.committedRangeNs : current.committedRangeNs,
-      selectedEntityId:
-        state.selectedEntityId !== undefined ? state.selectedEntityId : current.selectedEntityId,
       focusedPanel: state.focusedPanel ?? current.focusedPanel,
       playheadNs:
         state.committedTimeNs !== undefined ? state.committedTimeNs : current.playheadNs,

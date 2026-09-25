@@ -84,7 +84,7 @@ export function resolveLabDefaults(
   // The stream must match the surface being shown, so a laboratory tab never
   // opens against a stream of the wrong modality.
   const surfaceForView: LabSurface | null =
-    view === "signals" || view === "field" || view === "pose" ? view : null;
+    view === "split" ? "field" : view === "signals" || view === "field" || view === "pose" ? view : null;
 
   // Outside a renderer view, preselect the first openable surface's stream so
   // switching tabs is immediate rather than another empty state.

@@ -1,3 +1,7 @@
+import type { PoseWindowBuffers } from "@/components/matchlab/frame-buffers";
+
+export const EMPTY_JOINT_NAMES: readonly string[] = [];
+
 /**
  * Pose viewer model.
  *
@@ -16,7 +20,6 @@ export interface PoseLandmark {
   /** Provider p90 predicted error radius, in metres; null when unavailable. */
   readonly errorM: number | null;
 }
-
 export interface PoseFrame {
   readonly tRelNs: number;
   readonly subjectId: string | null;
@@ -42,6 +45,52 @@ export interface PoseRow {
   readonly y_m?: unknown;
   readonly z_m?: unknown;
   readonly error_m?: unknown;
+}
+
+/** Materialize view frames from worker-prepared columns, without regrouping Arrow rows on the UI thread. */
+export function poseFramesFromBuffers(
+  buffers: PoseWindowBuffers | undefined,
+  subjectId: string | null = null,
+): PoseFrame[] {
+  if (buffers === undefined) return [];
+  const frames: PoseFrame[] = [];
+  for (let subjectIndex = 0; subjectIndex < buffers.subjectIds.length; subjectIndex += 1) {
+    const currentSubjectId = buffers.subjectIds[subjectIndex]!;
+    if (subjectId !== null && currentSubjectId !== subjectId) continue;
+    for (let frameIndex = buffers.subjectFrameOffsets[subjectIndex]!;
+      frameIndex < buffers.subjectFrameOffsets[subjectIndex + 1]!;
+      frameIndex += 1) {
+      const landmarks: PoseLandmark[] = [];
+      const unavailableJoints: string[] = [];
+      const base = frameIndex * buffers.jointNames.length;
+      for (let jointIndex = 0; jointIndex < buffers.jointNames.length; jointIndex += 1) {
+        const name = buffers.jointNames[jointIndex]!;
+        const valueIndex = base + jointIndex;
+        if (buffers.availability[valueIndex] !== 1) {
+          if (buffers.present[valueIndex] === 1) unavailableJoints.push(name);
+          continue;
+        }
+        const xM = buffers.positionsXYZ[valueIndex * 3]!;
+        const yM = buffers.positionsXYZ[valueIndex * 3 + 1]!;
+        const zM = buffers.positionsXYZ[valueIndex * 3 + 2]!;
+        landmarks.push({
+          jointName: name,
+          xM,
+          yM,
+          zM,
+          errorM: Number.isFinite(buffers.errorM[valueIndex]!) ? buffers.errorM[valueIndex]! : null,
+        });
+      }
+      frames.push({
+        tRelNs: Number(buffers.frameTimesNs[frameIndex]!),
+        subjectId: currentSubjectId,
+        landmarks,
+        unavailableJoints,
+        observed: buffers.frameObserved[frameIndex] === 1,
+      });
+    }
+  }
+  return frames;
 }
 
 export interface DisplayConnectionDefinition {
@@ -198,13 +247,42 @@ export function frameIndexAt(frames: readonly PoseFrame[], tRelNs: bigint): numb
   return result;
 }
 
-/** Landmarks of the frame at or before the requested time (no interpolation). */
+/** Resolve a real frame at or before the time, within the source gap allowance. */
+export function poseFrameIndexAt(
+  frames: readonly PoseFrame[],
+  tRelNs: bigint | null,
+  maxGapNs: number,
+): number {
+  if (tRelNs === null) return nextFrameIndexAt(frames, 0n);
+  for (let index = frameIndexAt(frames, tRelNs); index >= 0; index -= 1) {
+    if (Number(tRelNs) - frames[index]!.tRelNs > maxGapNs) break;
+    if (frames[index]!.observed) return index;
+  }
+  return -1;
+}
+
+/** First real frame at or after the requested time, or -1 when none is loaded. */
+export function nextFrameIndexAt(frames: readonly PoseFrame[], tRelNs: bigint): number {
+  const target = Number(tRelNs);
+  let low = 0;
+  let high = frames.length;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (frames[middle]!.tRelNs < target) low = middle + 1;
+    else high = middle;
+  }
+  while (low < frames.length && !frames[low]!.observed) low += 1;
+  return low < frames.length ? low : -1;
+}
+
+/** Landmarks of a real frame at or before the requested time; no interpolation. */
 export function landmarksAt(
   frames: readonly PoseFrame[],
   tRelNs: bigint | null,
+  maxGapNs = Number.POSITIVE_INFINITY,
 ): readonly PoseLandmark[] {
   if (frames.length === 0) return [];
-  const index = tRelNs === null ? 0 : frameIndexAt(frames, tRelNs);
+  const index = poseFrameIndexAt(frames, tRelNs, maxGapNs);
   return index < 0 ? [] : (frames[index]?.landmarks ?? []);
 }
 

@@ -1,0 +1,58 @@
+{
+  "issue": "RES-113",
+  "rendererModes": {
+    "pixi": {
+      "renderer": "pixi",
+      "canonicalTimeNs": "300020000000",
+      "sourceFrameNs": "300020000000",
+      "hulls": 2,
+      "territoryCells": 22,
+      "influenceCells": 294,
+      "ballState": "22 players · 0 extrapolated",
+      "pitchDimensionsM": [
+        "105",
+        "68"
+      ],
+      "selection": "1. FC NürnbergDFL-OBJ-00008F\nx -33.79 m · y 1.21 m\ndetected position",
+      "trailsVisible": "true",
+      "buttonCount": 0,
+      "sourceEvents": "4 source events in window",
+      "forwardDeltaNs": "1416600000",
+      "reverseDeltaNs": "-1466500000"
+    },
+    "r3f": {
+      "renderer": "r3f",
+      "canonicalTimeNs": "300020000000",
+      "sourceFrameNs": "300020000000",
+      "hulls": 2,
+      "territoryCells": 22,
+      "influenceCells": 294,
+      "ballState": "22 players · 0 extrapolated",
+      "pitchDimensionsM": [
+        "105",
+        "68"
+      ],
+      "selection": "1. FC NürnbergDFL-OBJ-00008F\nx -33.79 m · y 1.21 m\ndetected position",
+      "trailsVisible": "true",
+      "buttonCount": 0,
+      "sourceEvents": "4 source events in window",
+      "forwardDeltaNs": "2116600000",
+      "reverseDeltaNs": "-2116600000"
+    }
+  },
+  "criteria": [
+    "source frame",
+    "fixed metric dimensions",
+    "hull/territory/influence counts",
+    "player pointer selection",
+    "ball/detection summary",
+    "trail layer",
+    "events in exact window",
+    "forward and reverse canonical time"
+  ],
+  "screenshots": {
+    "pixi": "parity-pixi.png",
+    "r3f": "parity-r3f.png"
+  },
+  "visualReviewNote": "Player coordinates and tactical outlines align. Pixi renders a banded surface texture while R3F uses a flat green pitch; review this non-measurement visual difference before retiring the Pixi oracle."
+}

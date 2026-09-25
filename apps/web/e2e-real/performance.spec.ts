@@ -95,7 +95,7 @@ test("Field (DFL): base replay, each overlay, combined overlays and chunk handof
   const results: Record<string, unknown> = {};
   const play = async (label: string, seconds: number) => {
     const before = (await playheadNs(page))!;
-    await page.getByRole("button", { name: "Play" }).click();
+    await page.getByRole("button", { name: "Play", exact: true }).click();
     const measured = await sample(page, seconds * 1000);
     await page.getByRole("button", { name: "Pause playback" }).click({ timeout: 3_000 }).catch(() => undefined);
     const after = (await playheadNs(page))!;
@@ -105,7 +105,7 @@ test("Field (DFL): base replay, each overlay, combined overlays and chunk handof
     expect(advancedS, label).toBeGreaterThan(seconds * 0.8);
     return measured;
   };
-  await play("base-replay-hull-default", 5);
+  await play("base-replay-planar-default", 5);
   for (const layer of ["Territory", "Influence"]) {
     await page.getByRole("button", { name: new RegExp(layer) }).click();
     await play(`with-${layer.toLowerCase()}`, 5);
@@ -153,7 +153,7 @@ test("Pose (SkillCorner): one subject, all layers, follow camera, all subjects, 
   const results: Record<string, unknown> = {};
   const play = async (label: string, seconds: number) => {
     const before = (await playheadNs(page))!;
-    await page.getByRole("button", { name: "Play" }).click();
+    await page.getByRole("button", { name: "Play", exact: true }).click();
     const measured = await sample(page, seconds * 1000);
     await page.getByRole("button", { name: "Pause playback" }).click({ timeout: 3_000 }).catch(() => undefined);
     const after = (await playheadNs(page))!;

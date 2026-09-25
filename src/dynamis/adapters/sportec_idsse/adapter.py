@@ -259,6 +259,10 @@ class IdsseMatchAdapter:
                         "source_file_key": self._positions_path.name,
                         "frame_major": True,
                         "multi_entity": True,
+                        "pitch_dimensions_m": {
+                            "length_m": metadata.pitch_x_m,
+                            "width_m": metadata.pitch_y_m,
+                        },
                     },
                 )
             )

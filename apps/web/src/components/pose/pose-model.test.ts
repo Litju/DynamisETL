@@ -12,8 +12,10 @@ import {
   frameIndexAt,
   groupFramesBySubject,
   landmarksAt,
+  nextFrameIndexAt,
   overlaysFromParameters,
   planarCentre,
+  poseFrameIndexAt,
   summarizeFrame,
   toViewerPoint,
   withoutDuplicateAngles,
@@ -38,6 +40,13 @@ describe("pose landmark extraction", () => {
     expect(frames[0]?.landmarks.map((landmark) => landmark.jointName)).toEqual(["lHip", "nose"]);
     expect(frames[2]?.landmarks).toEqual([]);
     expect(frames[2]?.observed).toBe(false);
+  });
+
+  it("keeps the playhead separate from the last valid source sample and reports the next one", () => {
+    expect(poseFrameIndexAt(frames, 80_000_000n, 60_000_000)).toBe(1);
+    expect(poseFrameIndexAt(frames, 120_000_001n, 60_000_000)).toBe(-1);
+    expect(nextFrameIndexAt(frames, 20_000_000n)).toBe(1);
+    expect(landmarksAt(frames, 120_000_001n, 60_000_000)).toEqual([]);
   });
 
   it("keeps pose subjects separate and draws provider edges only for available endpoints", () => {

@@ -99,13 +99,8 @@ test("2. selecting a player on the pitch updates the durable entity context", as
   const host = page.getByTestId("pitch-canvas");
   await expect(host).toBeVisible();
   await expect(page.getByText(/players · .* extrapolated/)).toBeVisible();
-  const canvas = host.locator("canvas");
-  const box = await canvas.boundingBox();
-  expect(box).not.toBeNull();
-  if (!box) return;
-  const scale = Math.min(box.width / 120, box.height / 80);
-  // p1 sits at (-5 m, 2 m) with the pitch origin at the canvas centre.
-  await page.mouse.click(box.x + box.width / 2 - 5 * scale, box.y + box.height / 2 - 2 * scale);
+  await expect(page.getByTestId("matchlab-canvas").locator("canvas")).toBeVisible();
+  await host.getByRole("button", { name: "Select player p1" }).click();
   // RES-112 F-06: the Field entity has its own durable key; the Pose subject
   // key is never overwritten by a pitch click.
   await expect(page).toHaveURL(/entity=p1/);
@@ -115,16 +110,18 @@ test("2. selecting a player on the pitch updates the durable entity context", as
   await expect(selection).toContainText(/detected position|extrapolated position/);
 });
 
-test("2b. field uses the Tactical Analysis pane with explicit unavailable states", async ({ page }) => {
+test("2b. field uses the Live/Structure/Relations Tactical Analysis tabs", async ({ page }) => {
   await page.goto("/lab/skillcorner-opendata/1925299?stream=tracking-1&view=field&t_ns=0");
   const pane = page.getByRole("region", { name: "Tactical Analysis" });
   await expect(pane).toBeVisible();
   await expect(pane.getByRole("tab", { name: "Live" })).toBeVisible();
-  await expect(pane.getByRole("tab", { name: "Shape" })).toBeVisible();
+  await expect(pane.getByRole("tab", { name: "Structure" })).toBeVisible();
+  await expect(pane.getByRole("tab", { name: "Relations" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Inspector" })).toHaveCount(0);
-  await pane.getByRole("tab", { name: "Shape" }).click();
-  // RES-112 T-01: the unsupported state names the capability authority.
-  await expect(pane.getByText("Unsupported by this source").last()).toBeVisible();
+  await pane.getByRole("tab", { name: "Structure" }).click();
+  await expect(page.getByTestId("tactical-tabpanel")).toContainText(/No functional-unit geometry|Not materialized/);
+  await pane.getByRole("tab", { name: "Relations" }).click();
+  await expect(page.getByTestId("tactical-tabpanel")).toContainText("Not materialized");
 });
 
 test("3/4. committed time propagates from the keyboard to the transport and pose view", async ({

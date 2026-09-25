@@ -8,7 +8,21 @@
 /// <reference lib="webworker" />
 import { expose, transfer } from "comlink";
 
+import type {
+  EventWindowBuffers,
+  PoseWindowBuffers,
+  TacticalGridWindowBuffers,
+  TacticalPolygonWindowBuffers,
+  TrackingWindowBuffers,
+} from "@/components/matchlab/frame-buffers";
 import { decodeWindow, pointsForColumn, type DecodedWindow } from "@/lib/arrow/decode";
+import {
+  prepareEventWindow,
+  preparePoseWindow,
+  prepareTacticalGridWindow,
+  prepareTacticalPolygonWindow,
+  prepareTrackingWindow,
+} from "@/lib/arrow/match-frame-preparation";
 
 export interface ArrowWorkerApi {
   decode(buffer: ArrayBuffer): DecodedWindow;
@@ -17,6 +31,77 @@ export interface ArrowWorkerApi {
     columnName: string,
     originNs: string,
   ): { xMs: Float64Array; values: Float64Array };
+  prepareTracking(buffer: ArrayBuffer | DecodedWindow): TrackingWindowBuffers;
+  preparePose(buffer: ArrayBuffer | DecodedWindow, jointNames: readonly string[]): PoseWindowBuffers;
+  prepareTacticalPolygons(
+    buffer: ArrayBuffer | DecodedWindow,
+    objectColumn: "group_id" | "entity_id",
+    polygonColumn: "hull_polygon_json" | "cell_polygon_json",
+  ): TacticalPolygonWindowBuffers;
+  prepareTacticalGrid(
+    buffer: ArrayBuffer | DecodedWindow,
+    valueColumn?: string,
+    groupColumn?: string | null,
+  ): TacticalGridWindowBuffers;
+  prepareEvents(buffer: ArrayBuffer | DecodedWindow): EventWindowBuffers;
+}
+
+function decodedInput(input: ArrayBuffer | DecodedWindow): DecodedWindow {
+  return input instanceof ArrayBuffer ? decodeWindow(input) : input;
+}
+
+function transferTracking(data: TrackingWindowBuffers): TrackingWindowBuffers {
+  return transfer(data, [
+    data.frameTimesNs.buffer as ArrayBuffer,
+    data.frameOffsets.buffer as ArrayBuffer,
+    data.entityIndexes.buffer as ArrayBuffer,
+    data.teamIndexes.buffer as ArrayBuffer,
+    data.positionsXY.buffer as ArrayBuffer,
+    data.objectKinds.buffer as ArrayBuffer,
+    data.detectionState.buffer as ArrayBuffer,
+  ]);
+}
+
+function transferPose(data: PoseWindowBuffers): PoseWindowBuffers {
+  return transfer(data, [
+    data.frameTimesNs.buffer as ArrayBuffer,
+    data.subjectFrameOffsets.buffer as ArrayBuffer,
+    data.positionsXYZ.buffer as ArrayBuffer,
+    data.errorM.buffer as ArrayBuffer,
+    data.present.buffer as ArrayBuffer,
+    data.availability.buffer as ArrayBuffer,
+    data.frameObserved.buffer as ArrayBuffer,
+  ]);
+}
+
+function transferPolygons(data: TacticalPolygonWindowBuffers): TacticalPolygonWindowBuffers {
+  return transfer(data, [
+    data.frameTimesNs.buffer as ArrayBuffer,
+    data.framePolygonOffsets.buffer as ArrayBuffer,
+    data.polygonPointOffsets.buffer as ArrayBuffer,
+    data.positionsXY.buffer as ArrayBuffer,
+    data.objectIndexes.buffer as ArrayBuffer,
+    data.groupIndexes.buffer as ArrayBuffer,
+  ]);
+}
+
+function transferGrid(data: TacticalGridWindowBuffers): TacticalGridWindowBuffers {
+  return transfer(data, [
+    data.gridTimesNs.buffer as ArrayBuffer,
+    data.gridOffsets.buffer as ArrayBuffer,
+    data.positionsXY.buffer as ArrayBuffer,
+    data.values.buffer as ArrayBuffer,
+    data.groupIndexes.buffer as ArrayBuffer,
+    data.cellWidthM.buffer as ArrayBuffer,
+    data.cellHeightM.buffer as ArrayBuffer,
+  ]);
+}
+
+function transferEvents(data: EventWindowBuffers): EventWindowBuffers {
+  return transfer(data, [
+    data.timeNs.buffer as ArrayBuffer,
+    data.positionsXY.buffer as ArrayBuffer,
+  ]);
 }
 
 const api: ArrowWorkerApi = {
@@ -42,6 +127,23 @@ const api: ArrowWorkerApi = {
       values[index] = interleaved[index * 2 + 1] ?? Number.NaN;
     }
     return transfer({ xMs, values }, [xMs.buffer, values.buffer]);
+  },
+  prepareTracking(buffer) {
+    return transferTracking(prepareTrackingWindow(decodedInput(buffer)));
+  },
+  preparePose(buffer, jointNames) {
+    return transferPose(preparePoseWindow(decodedInput(buffer), jointNames));
+  },
+  prepareTacticalPolygons(buffer, objectColumn, polygonColumn) {
+    return transferPolygons(
+      prepareTacticalPolygonWindow(decodedInput(buffer), objectColumn, polygonColumn),
+    );
+  },
+  prepareTacticalGrid(buffer, valueColumn = "arrival_time_s", groupColumn: string | null = "owner_group_id") {
+    return transferGrid(prepareTacticalGridWindow(decodedInput(buffer), valueColumn, groupColumn));
+  },
+  prepareEvents(buffer) {
+    return transferEvents(prepareEventWindow(decodedInput(buffer)));
   },
 };
 

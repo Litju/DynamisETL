@@ -205,6 +205,10 @@ class SkillCornerMatchAdapter:
                         "frame_entity_observations": True,
                         "multi_entity": True,
                         "provider_product": "broadcast tracking (computer-vision)",
+                        "pitch_dimensions_m": {
+                            "length_m": metadata.pitch_length_m,
+                            "width_m": metadata.pitch_width_m,
+                        },
                     },
                 )
             )

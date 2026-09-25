@@ -260,6 +260,20 @@ def test_idsse_match_metadata_and_periods(tmp_path: Path, dfl_files: dict[str, P
     assert events.deleted_events == 1
 
 
+def test_idsse_tracking_stream_registers_source_pitch_dimensions(
+    tmp_path: Path, dfl_files: dict[str, Path]
+) -> None:
+    adapter = _adapter(tmp_path, dfl_files)
+    tracking = next(
+        stream for stream in adapter.domain().streams if stream.modality.value == "tracking"
+    )
+    metadata = adapter.metadata
+    assert tracking.stream_metadata["pitch_dimensions_m"] == {
+        "length_m": metadata.pitch_x_m,
+        "width_m": metadata.pitch_y_m,
+    }
+
+
 def test_idsse_authorities_declare_the_origin_translation(
     tmp_path: Path, dfl_files: dict[str, Path]
 ) -> None:

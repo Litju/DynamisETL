@@ -47,6 +47,7 @@ from dynamis.serving.models import (
     MetricMethodology,
     MetricPage,
     MetricValue,
+    PitchDimensionsView,
     ProvenanceEdge,
     ProvenanceGraph,
     ProvenanceNode,
@@ -249,6 +250,7 @@ class FakeBackend:
                     synchronization_spec_id="skillcorner-source-provided-match-clock",
                     clock_id="skillcorner-match-clock",
                     skeleton_id=None,
+                    pitch_dimensions_m=PitchDimensionsView(length_m=105.0, width_m=68.0),
                     sample_artifact_ids=["sample-1"],
                     sample_row_count=100,
                 )
@@ -438,7 +440,18 @@ def test_catalog_routes_preserve_rights_and_measurement_context(client: TestClie
     stream = session.json()["streams"][0]
     assert stream["measurement_class"] == "MODEL_ESTIMATED"
     assert stream["sample_artifact_ids"] == ["sample-1"]
+    assert stream["pitch_dimensions_m"] == {"length_m": 105.0, "width_m": 68.0}
     assert session.json()["participants"][0]["group_label"] == "home"
+
+
+def test_pitch_dimensions_require_positive_finite_source_metres() -> None:
+    assert PitchDimensionsView(length_m=105.0, width_m=68.0).width_m == 68.0
+    with pytest.raises(ValueError):
+        PitchDimensionsView(length_m=0.0, width_m=68.0)
+    with pytest.raises(ValueError):
+        PitchDimensionsView(length_m=float("nan"), width_m=68.0)
+    with pytest.raises(ValueError):
+        PitchDimensionsView.model_validate({"length_m": "105.0", "width_m": 68.0})
 
 
 def test_metrics_route_passes_filters_and_exposes_provenance(client: TestClient) -> None:

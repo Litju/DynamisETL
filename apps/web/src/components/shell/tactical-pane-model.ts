@@ -14,7 +14,7 @@ import {
   type TacticalRow,
 } from "@/components/pitch/tactical-overlay";
 
-export type TacticalLevel = "A" | "B" | "C" | "D" | "E";
+export type TacticalLevel = "A" | "B" | "C" | "D" | "E" | "V3";
 
 export const LEVEL_NAMES: Record<TacticalLevel, string> = {
   A: "Level A · team geometry",
@@ -22,6 +22,7 @@ export const LEVEL_NAMES: Record<TacticalLevel, string> = {
   C: "Level C · arrival-time influence",
   D: "Level D · source-event snapshots",
   E: "Level E · shape / phase",
+  V3: "MatchLab V3 · functional structure",
 };
 
 const CAPABILITY_KEYS: Record<TacticalLevel, keyof TacticalCapabilityView["capabilities"]> = {
@@ -30,6 +31,7 @@ const CAPABILITY_KEYS: Record<TacticalLevel, keyof TacticalCapabilityView["capab
   C: "level_c_influence",
   D: "level_d_event_linked",
   E: "level_e_shape_phase",
+  V3: "matchlab_v3_functional_units",
 };
 
 export const ALGORITHMS: Record<TacticalLevel, string> = {
@@ -38,6 +40,7 @@ export const ALGORITHMS: Record<TacticalLevel, string> = {
   C: "tactical.arrival_time",
   D: "tactical.source_event_snapshot",
   E: "tactical.team_shape",
+  V3: "tactical.matchlab_shape",
 };
 
 export type LevelStatus =
@@ -52,6 +55,7 @@ const REASON_KEYWORDS: Record<TacticalLevel, RegExp> = {
   C: /influence|velocity|model/i,
   D: /event/i,
   E: /formation|phase|shape|temporal/i,
+  V3: /role|roster|shape|possession|direction/i,
 };
 
 export function levelStatus(

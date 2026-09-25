@@ -9,7 +9,8 @@ import { EChart } from "@/components/charts/EChart";
 import { MeasurementClassBadge } from "@/components/common/Badges";
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
 import { SectionTitle } from "@/components/common/Panel";
-import { sessionTeams } from "@/components/pitch/PitchReplay";
+import { ARRIVAL_TIME_ELEVATION_SPEC, describeElevationSpec } from "@/components/matchlab/elevation-specs";
+import { maximumFrameAgeNs, sessionTeams } from "@/components/pitch/pitch-model";
 import {
   ALGORITHMS,
   LEVEL_NAMES,
@@ -25,8 +26,11 @@ import {
   type TacticalLevel,
 } from "@/components/shell/tactical-pane-model";
 import type { TacticalRow } from "@/components/pitch/tactical-overlay";
+import { jsonIds } from "@/components/pitch/tactical-v3";
 import { useThrottledPlayhead } from "@/hooks/useThrottledPlayhead";
 import { useAnalysisContext } from "@/lib/analysis-context";
+import { useMatchFrameContext } from "@/lib/match-frame-context";
+import type { MatchFrameContextValue } from "@/lib/match-frame-context";
 import { ApiError } from "@/lib/api/client";
 import {
   sessionQuery,
@@ -37,14 +41,16 @@ import {
 import { cn } from "@/lib/cn";
 import type { TacticalView } from "@/lib/search";
 import { useAnalysisStore } from "@/lib/state/analysis";
+import type { ScalarFieldMode, TacticalRelationMode } from "@/lib/state/analysis";
 import { formatClockNs, formatDurationNs } from "@/lib/time";
 
 const TABS: ReadonlyArray<readonly [TacticalView, string]> = [
   ["live", "Live"],
+  ["structure", "Structure"],
+  ["relations", "Relations"],
   ["space", "Space"],
-  ["shape", "Shape"],
-  ["range", "Range"],
   ["events", "Events"],
+  ["range", "Range"],
   ["report", "Report"],
 ];
 
@@ -193,9 +199,13 @@ function ClassLine({ measurementClass, method }: { measurementClass: string; met
 
 export function TacticalAnalysisPane({ onCollapse }: { onCollapse?: () => void } = {}) {
   const context = useAnalysisContext();
+  const matchFrame = useMatchFrameContext();
   const timeNs = useThrottledPlayhead(200);
-  const selectedEntityId = useAnalysisStore((state) => state.selectedEntityId);
+  const selectedEntityId =
+    matchFrame?.selectedTrackingObjectId ?? context?.subjectId ?? context?.entityId ?? null;
   const datasetId = context?.datasetId ?? "";
+  const relationMode = useAnalysisStore((state) => state.tacticalRelationMode);
+  const scalarFieldMode = useAnalysisStore((state) => state.scalarFieldMode);
   const session = useQuery({
     ...sessionQuery(datasetId, context?.sessionId ?? ""),
     enabled: Boolean(context?.datasetId && context?.sessionId),
@@ -214,7 +224,7 @@ export function TacticalAnalysisPane({ onCollapse }: { onCollapse?: () => void }
   });
   const view: TacticalView = context?.tacticalView ?? "live";
   const stream = session.data?.streams.find((item) => item.stream_id === context?.streamId) ?? null;
-  const frameAgeNs = 1.5 * (1e9 / (stream?.nominal_sampling_rate_hz && stream.nominal_sampling_rate_hz > 0 ? stream.nominal_sampling_rate_hz : 25));
+  const frameAgeNs = maximumFrameAgeNs(stream?.nominal_sampling_rate_hz);
   const teams = useMemo(() => sessionTeams(session.data), [session.data]);
   const statuses = useMemo(() => {
     if (!capabilities.data) return null;
@@ -225,6 +235,7 @@ export function TacticalAnalysisPane({ onCollapse }: { onCollapse?: () => void }
       C: levelStatus("C", capabilities.data, list),
       D: levelStatus("D", capabilities.data, list),
       E: levelStatus("E", capabilities.data, list),
+      V3: levelStatus("V3", capabilities.data, list),
     } as const;
   }, [artifacts.data, capabilities.data]);
 
@@ -245,13 +256,29 @@ export function TacticalAnalysisPane({ onCollapse }: { onCollapse?: () => void }
   const teamGeometry = statuses ? levelArtifact(statuses.A, "team_geometry") : null;
   const teamTerritory = statuses ? levelArtifact(statuses.B, "team_territory") : null;
   const teamInfluence = statuses ? levelArtifact(statuses.C, "team_influence") : null;
+  const functionalUnits = statuses ? levelArtifact(statuses.V3, "functional_unit_geometry") : null;
+  const shapeEdges = statuses ? levelArtifact(statuses.V3, "shape_graph_edges") : null;
+  const triangles = statuses ? levelArtifact(statuses.V3, "tactical_triangles") : null;
+  const interactions = statuses ? levelArtifact(statuses.V3, "attacker_defender_interactions") : null;
+  const sourceContext = statuses ? levelArtifact(statuses.V3, "source_possession_context") : null;
+  const occupiedArea = statuses ? levelArtifact(statuses.A, "team_geometry") : null;
   const eventSnapshots = statuses ? levelArtifact(statuses.D, "source_event_snapshots") : null;
   const rangeTooLong = range !== null && range.toNs - range.fromNs > MAX_RANGE_NS;
-  const liveGeometry = useQuery(seriesQuery(teamGeometry, liveWindow, view === "live"));
+  const liveUnits = useQuery(seriesQuery(functionalUnits, liveWindow, view === "live" || view === "structure"));
+  const liveSourceContext = useQuery(seriesQuery(sourceContext, liveWindow, view === "live"));
+  const liveEdges = useQuery(seriesQuery(shapeEdges, liveWindow, view === "relations" && relationMode === "stable-graph" && (selectedEntityId !== null || Boolean(matchFrame?.selectedTeamId))));
+  const liveTriangles = useQuery(seriesQuery(triangles, liveWindow, view === "relations" && relationMode === "selected-triangles" && selectedEntityId !== null));
+  const liveInteractions = useQuery(seriesQuery(interactions, liveWindow, view === "relations" && relationMode === "attacker-defender" && selectedEntityId !== null));
+  const liveOccupiedArea = useQuery(seriesQuery(occupiedArea, liveWindow, view === "space"));
   const liveTerritory = useQuery(seriesQuery(teamTerritory, liveWindow, view === "space"));
   const liveInfluence = useQuery(seriesQuery(teamInfluence, liveWindow, view === "space"));
   const rangeGeometry = useQuery(seriesQuery(teamGeometry, range, (view === "range" || view === "report") && !rangeTooLong));
   const events = useQuery(seriesQuery(eventSnapshots, eventWindow, view === "events" || view === "report"));
+  const exactUnits = rowsAtFrame(liveUnits.data?.rows as TacticalRow[] | undefined, timeNs, frameAgeNs);
+  const exactSourceContext = rowsAtFrame(liveSourceContext.data?.rows as TacticalRow[] | undefined, timeNs, frameAgeNs);
+  const exactEdges = rowsAtFrame(liveEdges.data?.rows as TacticalRow[] | undefined, timeNs, frameAgeNs);
+  const exactTriangles = rowsAtFrame(liveTriangles.data?.rows as TacticalRow[] | undefined, timeNs, frameAgeNs);
+  const exactInteractions = rowsAtFrame(liveInteractions.data?.rows as TacticalRow[] | undefined, timeNs, frameAgeNs);
 
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const onTabKey = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
@@ -289,23 +316,68 @@ export function TacticalAnalysisPane({ onCollapse }: { onCollapse?: () => void }
   } else if (statuses && capabilities.data) {
     const capability = capabilities.data;
     if (view === "live") {
-      body = statuses.A.kind !== "available"
-        ? <LevelState level="A" status={statuses.A} />
-        : <LiveTab query={liveGeometry} rows={rowsAtFrame(liveGeometry.data?.rows as TacticalRow[] | undefined, timeNs, frameAgeNs)} teams={teams} />;
+      body = statuses.V3.kind !== "available"
+        ? <LevelState level="V3" status={statuses.V3} />
+        : (
+          <LiveTab
+            unitsQuery={liveUnits}
+            contextQuery={liveSourceContext}
+            unitRows={exactUnits}
+            contextRows={exactSourceContext}
+            teams={teams}
+            selectedEntityId={selectedEntityId}
+            matchFrame={matchFrame}
+          />
+        );
+    } else if (view === "structure") {
+      body = statuses.V3.kind !== "available"
+        ? <LevelState level="V3" status={statuses.V3} />
+        : (
+          <StructureTab
+            query={liveUnits}
+            rows={exactUnits}
+            teams={teams}
+            selectedEntityId={selectedEntityId}
+            matchFrame={matchFrame}
+            detail
+          />
+        );
+    } else if (view === "relations") {
+      body = statuses.V3.kind !== "available"
+        ? <LevelState level="V3" status={statuses.V3} />
+        : (
+          <RelationsTab
+            mode={relationMode}
+            setMode={(mode) => useAnalysisStore.getState().setTacticalRelationMode(mode)}
+            selectedEntityId={selectedEntityId}
+            teamId={matchFrame?.selectedTeamId ?? null}
+            teams={teams}
+            edgesQuery={liveEdges}
+            trianglesQuery={liveTriangles}
+            interactionsQuery={liveInteractions}
+            edges={exactEdges}
+            triangles={exactTriangles}
+            interactions={exactInteractions}
+            matchFrame={matchFrame}
+          />
+        );
     } else if (view === "space") {
       body = (
         <SpaceTab
+          statusA={statuses.A}
           statusB={statuses.B}
           statusC={statuses.C}
+          occupiedArea={liveOccupiedArea}
+          occupiedRows={rowsAtFrame(liveOccupiedArea.data?.rows as TacticalRow[] | undefined, timeNs, frameAgeNs)}
           territory={liveTerritory}
           influence={liveInfluence}
           territoryRows={rowsAtFrame(liveTerritory.data?.rows as TacticalRow[] | undefined, timeNs, frameAgeNs)}
           influenceRows={rowsAtFrame(liveInfluence.data?.rows as TacticalRow[] | undefined, timeNs, frameAgeNs)}
           teams={teams}
+          scalarMode={scalarFieldMode}
+          setScalarMode={(mode) => useAnalysisStore.getState().setScalarFieldMode(mode)}
         />
       );
-    } else if (view === "shape") {
-      body = <LevelState level="E" status={statuses.E.kind === "available" ? { kind: "unsupported", capability: statuses.E.capability, reasons: capability.unavailable_reasons } : statuses.E} />;
     } else if (view === "range") {
       body = statuses.A.kind !== "available"
         ? <LevelState level="A" status={statuses.A} />
@@ -422,60 +494,288 @@ function queryState(query: SeriesQuery): ReactNode | null {
   return null;
 }
 
-function LiveTab({ query, rows, teams }: { query: SeriesQuery; rows: readonly TacticalRow[]; teams: TeamContext }) {
+function SourceContext({ rows, teams }: { rows: readonly TacticalRow[]; teams: TeamContext }) {
+  const row = rows[0];
+  if (!row) {
+    return <p className="mt-2 text-[11px] text-text-muted">No source possession context is recorded at this exact frame.</p>;
+  }
+  const teamId = row["source_possession_team_id"];
+  const ballStatus = row["source_ball_status"];
+  const ballX = numberOf(row, "ball_x_m");
+  const ballY = numberOf(row, "ball_y_m");
+  return (
+    <div className="mt-2 grid grid-cols-2 gap-2 rounded-control border border-border-subtle bg-surface-2/60 p-2 text-[11px]">
+      <div>
+        <div className="text-text-muted">Source possession</div>
+        <div className="mt-0.5 text-text-primary">
+          {typeof teamId === "string" ? <TeamName groupId={teamId} teams={teams} /> : "unknown"}
+          {typeof ballStatus === "string" ? <span className="ml-1.5 text-text-muted">· {ballStatus} ball</span> : null}
+        </div>
+      </div>
+      <div>
+        <div className="text-text-muted">Ball · {typeof row["ball_zone_frame"] === "string" ? String(row["ball_zone_frame"]).replaceAll("_", " ") : "frame axis"}</div>
+        <div className="mono mt-0.5 tabular text-text-primary">
+          {ballX === null || ballY === null ? "no finite point" : `${ballX.toFixed(1)}, ${ballY.toFixed(1)} m`}
+          {typeof row["ball_zone"] === "string" ? ` · ${row["ball_zone"]}` : ""}
+        </div>
+      </div>
+      <div className="col-span-2"><ClassLine measurementClass="SOURCE_DERIVED" method="Provider context and the ball point from this frame; no possession-by-proximity inference." /></div>
+    </div>
+  );
+}
+
+function StructureTab({
+  query,
+  rows,
+  teams,
+  selectedEntityId,
+  matchFrame,
+  detail = false,
+}: {
+  query: SeriesQuery;
+  rows: readonly TacticalRow[];
+  teams: TeamContext;
+  selectedEntityId: string | null;
+  matchFrame: MatchFrameContextValue | null;
+  detail?: boolean;
+}) {
   const state = queryState(query);
   if (state) return state;
   const teamRows = byTeam(rows, teams.order);
-  if (teamRows.length === 0) {
-    return <StatePanel state="no_frame" title="No team geometry row at this frame." detail="The tracking frame at the playhead has no Level A output (for example a frame without both teams)." />;
-  }
+  const groupIds = [...new Set(teamRows.map((item) => item.groupId))];
+  if (teamRows.length === 0) return <StatePanel state="no_frame" title="No functional-unit geometry at this exact frame." detail="V3 uses source roster roles; missing players and roles remain missing or unknown." />;
   return (
-    <div className="p-3">
-      <SectionTitle>Current frame · team geometry</SectionTitle>
-      <TeamTable
-        teams={teams}
-        rows={teamRows}
-        caption="Level A team geometry at the current frame"
-        metrics={[
-          { key: "player_count", label: "Players", unit: "", digits: 0 },
-          { key: "centroid_x_m", label: "Centroid x", unit: "m" },
-          { key: "centroid_y_m", label: "Centroid y", unit: "m" },
-          { key: "length_m", label: "Length", unit: "m" },
-          { key: "width_m", label: "Width", unit: "m" },
-          { key: "hull_area_m2", label: "Hull area", unit: "m²", digits: 0 },
-          { key: "stretch_index", label: "Stretch index", unit: "ratio", digits: 3 },
-        ]}
-      />
-      <ClassLine
-        measurementClass={query.data?.meta.measurement_class ?? "PIPELINE_DERIVED"}
-        method={<>Deterministic geometry of <span className="mono">{ALGORITHMS.A}</span> on the pitch frame axes.</>}
-      />
-      <p className="mt-2 text-[11px] leading-relaxed text-text-muted">
-        Length and width are along the pitch x/y axes; attacking direction, possession and pressure are not inferred.
-      </p>
+    <div className="space-y-3 p-3">
+      <SectionTitle>DEF / MID / ATT · current frame</SectionTitle>
+      {groupIds.map((groupId) => {
+        const units = teamRows.filter((item) => item.groupId === groupId).map((item) => item.row);
+        const ordered = ["GK", "DEF", "MID", "ATT", "unknown"].flatMap((role) => units.filter((row) => row["functional_unit"] === role));
+        const first = ordered[0];
+        return (
+          <section key={groupId} className="rounded-control border border-border-subtle bg-surface-1 p-2.5">
+            <div className="mb-2 flex items-center justify-between gap-2 text-[11px]">
+              <TeamName groupId={groupId} teams={teams} />
+              <span className="text-text-muted">{first?.["coordinate_normalization"] === "team_attack_positive_x" ? "attack-axis coordinates" : "source-frame coordinates"}</span>
+            </div>
+            <div className="space-y-1.5">
+              {ordered.map((row) => {
+                const role = String(row["functional_unit"] ?? "unknown");
+                const memberIds = jsonIds(row["role_ids_json"]);
+                const isSelected = selectedEntityId !== null && memberIds.includes(selectedEntityId);
+                return (
+                  <div key={`${groupId}:${role}`} className={cn("rounded border px-2 py-1.5", isSelected ? "border-accent/70 bg-accent/5" : "border-border-subtle/70")}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-semibold tracking-wide text-text-primary">{role}</span>
+                      <span className="mono text-[10px] tabular text-text-muted">n={numberOf(row, "player_count") ?? 0}</span>
+                    </div>
+                    <div className="mt-0.5 grid grid-cols-3 gap-1 text-[10px] text-text-muted">
+                      <span>line {formatValue(numberOf(row, "line_height_x_m"), "m")}</span>
+                      <span>depth {formatValue(numberOf(row, "depth_x_m"), "m")}</span>
+                      <span>width {formatValue(numberOf(row, "width_y_m"), "m")}</span>
+                    </div>
+                    {detail ? (
+                      <div className="mt-0.5 grid grid-cols-2 gap-1 text-[10px] text-text-muted">
+                        <span>centroid {formatValue(numberOf(row, "centroid_x_m"), "m")}, {formatValue(numberOf(row, "centroid_y_m"), "m")}</span>
+                        <span>dispersion {formatValue(numberOf(row, "dispersion_rms_m"), "m")}</span>
+                        <span>principal axis {formatValue(numberOf(row, "orientation_deg"), "°")}</span>
+                        <span>major/minor 1σ {formatValue(numberOf(row, "major_axis_sd_m"), "m")} / {formatValue(numberOf(row, "minor_axis_sd_m"), "m")}</span>
+                      </div>
+                    ) : null}
+                    {memberIds.length > 0 ? (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {memberIds.map((id) => (
+                          <button key={id} type="button" data-player-id={id} aria-pressed={id === selectedEntityId} onClick={() => matchFrame?.selectTrackingObject(id, "player")} className={cn("mono rounded px-1 py-0.5 text-[9px]", id === selectedEntityId ? "bg-accent text-surface-0" : "bg-surface-3 text-text-secondary hover:text-text-primary")} title="Select this source-tracked player in Field and Pose">
+                            {id.length > 13 ? id.slice(-8) : id}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-text-muted">
+              <span>DEF↔MID gap {formatValue(numberOf(first, "def_mid_gap_m"), "m")}</span>
+              <span>MID↔ATT gap {formatValue(numberOf(first, "mid_att_gap_m"), "m")}</span>
+              <span>outfield block depth {formatValue(numberOf(first, "outfield_block_depth_m"), "m")}</span>
+            </div>
+          </section>
+        );
+      })}
+      <ClassLine measurementClass={query.data?.meta.measurement_class ?? "PIPELINE_DERIVED"} method={<>Source-roster roles · <span className="mono">{ALGORITHMS.V3}</span> v2 · exact-frame geometry.</>} />
+      <p className="text-[10px] leading-relaxed text-text-muted">Inter-line gaps are absolute coordinate separations; they do not label formation, pressing, or phase.</p>
+    </div>
+  );
+}
+
+function LiveTab({
+  unitsQuery,
+  contextQuery,
+  unitRows,
+  contextRows,
+  teams,
+  selectedEntityId,
+  matchFrame,
+}: {
+  unitsQuery: SeriesQuery;
+  contextQuery: SeriesQuery;
+  unitRows: readonly TacticalRow[];
+  contextRows: readonly TacticalRow[];
+  teams: TeamContext;
+  selectedEntityId: string | null;
+  matchFrame: MatchFrameContextValue | null;
+}) {
+  const state = queryState(unitsQuery) ?? queryState(contextQuery);
+  if (state) return state;
+  return (
+    <div className="space-y-3 p-3">
+      <section>
+        <SectionTitle>Possession and ball context</SectionTitle>
+        <SourceContext rows={contextRows} teams={teams} />
+      </section>
+      <StructureTab query={unitsQuery} rows={unitRows} teams={teams} selectedEntityId={selectedEntityId} matchFrame={matchFrame} />
+    </div>
+  );
+}
+
+function RelationsTab({
+  mode,
+  setMode,
+  selectedEntityId,
+  teamId,
+  teams,
+  edgesQuery,
+  trianglesQuery,
+  interactionsQuery,
+  edges,
+  triangles,
+  interactions,
+  matchFrame,
+}: {
+  mode: TacticalRelationMode;
+  setMode: (mode: TacticalRelationMode) => void;
+  selectedEntityId: string | null;
+  teamId: string | null;
+  teams: TeamContext;
+  edgesQuery: SeriesQuery;
+  trianglesQuery: SeriesQuery;
+  interactionsQuery: SeriesQuery;
+  edges: readonly TacticalRow[];
+  triangles: readonly TacticalRow[];
+  interactions: readonly TacticalRow[];
+  matchFrame: MatchFrameContextValue | null;
+}) {
+  const selectedTeam = teamId ?? teams.order[0] ?? null;
+  const buttons: readonly [TacticalRelationMode, string][] = [
+    ["off", "Off"],
+    ["stable-graph", "Stable graph"],
+    ["selected-triangles", "Local triangles"],
+    ["attacker-defender", "ATT ↔ DEF"],
+  ];
+  const selectedEdges = edges.filter((row) => row["stable_edge"] === true && (
+    selectedEntityId !== null
+      ? row["player_a_id"] === selectedEntityId || row["player_b_id"] === selectedEntityId
+      : row["group_id"] === selectedTeam
+  ));
+  const localTriangles = triangles.filter((row) => row["stable_triangle"] === true && jsonIds(row["triangle_player_ids_json"]).includes(selectedEntityId ?? ""));
+  const selectedRelations = interactions.filter((row) => row["attacker_id"] === selectedEntityId);
+  const query = mode === "stable-graph" ? edgesQuery : mode === "selected-triangles" ? trianglesQuery : mode === "attacker-defender" ? interactionsQuery : null;
+  const state = query ? queryState(query) : null;
+  return (
+    <div className="space-y-3 p-3">
+      <section>
+        <SectionTitle>Local relations · exact current frame</SectionTitle>
+        <div className="mt-2 flex flex-wrap gap-1">
+          {buttons.map(([value, label]) => (
+            <button key={value} type="button" aria-pressed={mode === value} onClick={() => setMode(value)} className={cn("t-control-compact rounded-control border px-2 text-[10px]", mode === value ? "border-accent bg-accent/10 text-text-primary" : "border-border-subtle text-text-muted hover:text-text-secondary")}>{label}</button>
+          ))}
+        </div>
+      </section>
+      {state}
+      {mode === "off" ? <p className="text-[11px] text-text-muted">Choose a relation to request it and show it on the Field.</p> : null}
+      {mode !== "off" && selectedEntityId === null && teamId === null ? <StatePanel state="empty" title="Select a player or team first." detail="Relations are local to the selected object; all-team triangle displays are disabled." /> : null}
+      {mode === "stable-graph" && !state ? (
+        <section className="space-y-1.5" aria-label="Selected player's stable shape graph">
+          {selectedEdges.length === 0 ? <StatePanel state="no_frame" title="No stable local edge at this frame." className="min-h-16 p-2" /> : selectedEdges.map((row) => {
+            const a = String(row["player_a_id"] ?? "");
+            const b = String(row["player_b_id"] ?? "");
+            const id = `shape-edge:${row["group_id"]}:${a}:${b}`;
+            return <button key={id} type="button" onClick={() => matchFrame?.selectTacticalObject(id)} className="flex w-full items-center justify-between rounded border border-border-subtle px-2 py-1.5 text-left hover:border-accent"><span className="mono text-[10px] text-text-primary">{a} ↔ {b}</span><span className="mono text-[10px] text-text-muted">{(numberOf(row, "edge_persistence_fraction") ?? 0).toFixed(2)} persistence</span></button>;
+          })}
+          <p className="text-[10px] text-text-muted">Stable incident Delaunay edges only; persistence is not tactical intent.</p>
+        </section>
+      ) : null}
+      {mode === "selected-triangles" && !state ? (
+        <section className="space-y-1.5" aria-label="Selected player's local triangles">
+          {selectedEntityId === null ? <StatePanel state="empty" title="Select a player to see local triangles." /> : localTriangles.length === 0 ? <StatePanel state="no_frame" title="No stable triangle containing the selected player at this frame." className="min-h-16 p-2" /> : localTriangles.map((row) => {
+            const ids = jsonIds(row["triangle_player_ids_json"]);
+            const id = `tactical-triangle:${row["group_id"]}:${ids.join(":")}`;
+            return <button key={id} type="button" onClick={() => matchFrame?.selectTacticalObject(id)} className="flex w-full items-center justify-between rounded border border-border-subtle px-2 py-1.5 text-left hover:border-accent"><span className="mono text-[10px] text-text-primary">{ids.join(" · ")}</span><span className="mono text-[10px] text-text-muted">{formatValue(numberOf(row, "area_m2"), "m²")} · {String(row["zone"] ?? "zone unavailable")}</span></button>;
+          })}
+          <p className="text-[10px] text-text-muted">Only stable triangles incident to the selected player are exposed.</p>
+        </section>
+      ) : null}
+      {mode === "attacker-defender" && !state ? (
+        <section className="space-y-1.5" aria-label="Selected attacker's nearest defenders">
+          {selectedEntityId === null ? <StatePanel state="empty" title="Select an ATT player to see nearest defenders." /> : selectedRelations.length === 0 ? <StatePanel state="no_frame" title="No ATT ↔ DEF relation for this selected player at this frame." className="min-h-16 p-2" /> : selectedRelations.map((row) => {
+            const attacker = String(row["attacker_id"] ?? "");
+            const defender = String(row["nearest_defender_id"] ?? "");
+            const id = `attacker-defender:${attacker}:${defender}`;
+            return <button key={id} type="button" onClick={() => { matchFrame?.selectTacticalObject(id); matchFrame?.selectTrackingObject(defender, "player"); }} className="flex w-full items-center justify-between rounded border border-border-subtle px-2 py-1.5 text-left hover:border-accent"><span className="mono text-[10px] text-text-primary">{attacker} → {defender}</span><span className="mono text-[10px] text-text-muted">{formatValue(numberOf(row, "nearest_defender_distance_m"), "m")} · {row["geometric_tie_up"] === true ? "mutual nearest" : "not mutual nearest"}</span></button>;
+          })}
+          <p className="text-[10px] text-text-muted">Nearest geometry only; no marking, pressure, or assignment claim.</p>
+        </section>
+      ) : null}
     </div>
   );
 }
 
 function SpaceTab({
+  statusA,
   statusB,
   statusC,
+  occupiedArea,
+  occupiedRows,
   territory,
   influence,
   territoryRows,
   influenceRows,
   teams,
+  scalarMode,
+  setScalarMode,
 }: {
+  statusA: LevelStatus;
   statusB: LevelStatus;
   statusC: LevelStatus;
+  occupiedArea: SeriesQuery;
+  occupiedRows: readonly TacticalRow[];
   territory: SeriesQuery;
   influence: SeriesQuery;
   territoryRows: readonly TacticalRow[];
   influenceRows: readonly TacticalRow[];
   teams: TeamContext;
+  scalarMode: ScalarFieldMode;
+  setScalarMode: (mode: ScalarFieldMode) => void;
 }) {
   return (
     <div className="space-y-4 p-3">
+      <section aria-label="Occupied area">
+        <SectionTitle>Occupied area · optional convex hull</SectionTitle>
+        {statusA.kind !== "available" ? (
+          <LevelState level="A" status={statusA} />
+        ) : (
+          queryState(occupiedArea) ?? (
+            byTeam(occupiedRows, teams.order).length === 0 ? (
+              <StatePanel state="no_frame" title="No occupied-area hull at this frame." className="min-h-16 p-2" />
+            ) : (
+              <>
+                <TeamTable teams={teams} rows={byTeam(occupiedRows, teams.order)} caption="Optional convex-hull area at the current frame" metrics={[{ key: "hull_area_m2", label: "Hull area", unit: "m²" }]} />
+                <ClassLine measurementClass={occupiedArea.data?.meta.measurement_class ?? "PIPELINE_DERIVED"} method="Deterministic convex-hull area; an optional occupied-area summary, not the default team shape." />
+              </>
+            )
+          )
+        )}
+      </section>
       <section aria-label="Territory">
         <SectionTitle>Territory · clipped Voronoi (Level B)</SectionTitle>
         {statusB.kind !== "available" ? (
@@ -494,7 +794,16 @@ function SpaceTab({
         )}
       </section>
       <section aria-label="Influence">
-        <SectionTitle>Influence · arrival-time model (Level C)</SectionTitle>
+        <div className="flex items-center justify-between gap-2">
+          <SectionTitle>Influence · arrival-time model (Level C)</SectionTitle>
+          <label className="flex items-center gap-1 text-[10px] text-text-muted">Field
+            <select aria-label="Scalar field mode" value={scalarMode} onChange={(event) => setScalarMode(event.target.value as ScalarFieldMode)} className="rounded border border-border-subtle bg-surface-2 px-1 py-0.5 text-[10px] text-text-primary">
+              <option value="heatmap">Heatmap</option>
+              <option value="contour">Contour</option>
+              <option value="elevation">Analytical elevation</option>
+            </select>
+          </label>
+        </div>
         {statusC.kind !== "available" ? (
           <LevelState level="C" status={statusC} />
         ) : (
@@ -504,7 +813,7 @@ function SpaceTab({
             ) : (
               <>
                 <TeamTable teams={teams} rows={byTeam(influenceRows, teams.order)} caption="Level C influence share at the current frame" metrics={[{ key: "influence_percentage", label: "Grid share", unit: "%" }]} />
-                <ClassLine measurementClass={influence.data?.meta.measurement_class ?? "MODEL_ESTIMATED"} method="Versioned kinematic arrival-time assumptions; not measured territory." />
+                <ClassLine measurementClass={influence.data?.meta.measurement_class ?? "MODEL_ESTIMATED"} method={scalarMode === "elevation" ? `ANALYTICAL ELEVATION · NOT PHYSICAL HEIGHT · ${describeElevationSpec(ARRIVAL_TIME_ELEVATION_SPEC)}` : "Versioned kinematic arrival-time assumptions; not measured territory."} />
               </>
             )
           )

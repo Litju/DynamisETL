@@ -16,7 +16,7 @@ from scipy.spatial import Delaunay, QhullError
 from dynamis.processors.spec import ProcessorResult, ProcessorSpec, SeriesOutput
 
 ALGORITHM_ID = "tactical.matchlab_shape"
-ALGORITHM_VERSION = "1"
+ALGORITHM_VERSION = "2"
 ROLE_DOMAINS = ("GK", "DEF", "MID", "ATT", "unknown")
 PLAYER_TYPES = frozenset({"player", "goalkeeper"})
 REQUIRED_COLUMNS = frozenset(
@@ -98,6 +98,41 @@ def _orientation(points: tuple[tuple[float, float], ...]) -> tuple[float | None,
         return None, math.sqrt(major), math.sqrt(minor)
     angle = math.degrees(0.5 * math.atan2(2 * xy, xx - yy)) % 180.0
     return angle, math.sqrt(major), math.sqrt(minor)
+
+
+def _ball_zone(
+    ball: tuple[float, float] | None,
+    *,
+    direction: str | None,
+    pitch_length_m: float,
+    pitch_width_m: float,
+) -> str | None:
+    """Classify a real ball point in the declared frame, without inferring play state."""
+    if ball is None:
+        return None
+    flip = -1.0 if direction == "right_to_left" else 1.0
+    # Team attack normalization reverses the pitch-length axis only; the
+    # source lateral axis is preserved.
+    x_m, y_m = ball[0] * flip, ball[1]
+    if not (-pitch_length_m / 2 <= x_m <= pitch_length_m / 2) or not (
+        -pitch_width_m / 2 <= y_m <= pitch_width_m / 2
+    ):
+        return "out_of_bounds"
+    if direction is None:
+        return (
+            "left_third"
+            if x_m < -pitch_length_m / 6
+            else "right_third"
+            if x_m >= pitch_length_m / 6
+            else "center_third"
+        )
+    return (
+        "own_third"
+        if x_m < -pitch_length_m / 6
+        else "opponent_third"
+        if x_m >= pitch_length_m / 6
+        else "middle_third"
+    )
 
 
 def _delaunay(
@@ -300,6 +335,8 @@ def _frame_row(
     role_authority: str,
     direction_authority: str,
     possession_context: Mapping[str, Any] | None,
+    pitch_length_m: float,
+    pitch_width_m: float,
 ) -> dict[str, Any]:
     transform = "team_attack_positive_x" if direction else "source_frame"
     players = frame.groups.get(group_id, ())
@@ -319,6 +356,7 @@ def _frame_row(
         "source_possession_known": (
             possession_context is not None and possession_context["team_id"] is not None
         ),
+        "source_ball_present": frame.ball is not None,
     }
     return {
         **context,
@@ -346,6 +384,15 @@ def _frame_row(
         "source_ball_status": (
             None if possession_context is None else possession_context["ball_status"]
         ),
+        "ball_x_m": None if frame.ball is None else frame.ball[0],
+        "ball_y_m": None if frame.ball is None else frame.ball[1],
+        "ball_zone": _ball_zone(
+            frame.ball,
+            direction=direction,
+            pitch_length_m=pitch_length_m,
+            pitch_width_m=pitch_width_m,
+        ),
+        "ball_zone_frame": "team_attack_normalized" if direction else "source_frame",
         "source_possession_measurement_class": (
             "SOURCE_DERIVED" if possession_context is not None else None
         ),
@@ -453,6 +500,20 @@ def process_tactical_shape(
                     "source_possession_player_id": source_possession["player_id"],
                     "source_ball_status": source_possession["ball_status"],
                     "source_possession_known": source_possession["team_id"] is not None,
+                    "source_ball_present": frame.ball is not None,
+                    "ball_x_m": None if frame.ball is None else frame.ball[0],
+                    "ball_y_m": None if frame.ball is None else frame.ball[1],
+                    "ball_zone": _ball_zone(
+                        frame.ball,
+                        direction=directions.get(source_possession["team_id"]),
+                        pitch_length_m=pitch_length,
+                        pitch_width_m=pitch_width,
+                    ),
+                    "ball_zone_frame": (
+                        "team_attack_normalized"
+                        if directions.get(source_possession["team_id"])
+                        else "source_frame"
+                    ),
                     "quality_json": json.dumps(
                         {
                             "source_measurement_class": "SOURCE_DERIVED",
@@ -495,6 +556,8 @@ def process_tactical_shape(
                     role_authority=role_authority,
                     direction_authority=direction_authority,
                     possession_context=source_possession,
+                    pitch_length_m=pitch_length,
+                    pitch_width_m=pitch_width,
                 )
                 row.update(
                     {
@@ -597,6 +660,8 @@ def process_tactical_shape(
                         role_authority=role_authority,
                         direction_authority=direction_authority,
                         possession_context=source_possession,
+                        pitch_length_m=pitch_length,
+                        pitch_width_m=pitch_width,
                     )
                     row.update(
                         {
@@ -725,6 +790,8 @@ def process_tactical_shape(
                     role_authority=role_authority,
                     direction_authority=direction_authority,
                     possession_context=source_possession,
+                    pitch_length_m=pitch_length,
+                    pitch_width_m=pitch_width,
                 )
                 row.update(
                     {
@@ -784,6 +851,8 @@ def process_tactical_shape(
                     role_authority=role_authority,
                     direction_authority=direction_authority,
                     possession_context=source_possession,
+                    pitch_length_m=pitch_length,
+                    pitch_width_m=pitch_width,
                 )
                 row.update(
                     {
@@ -862,12 +931,19 @@ def process_tactical_shape(
         ),
         ("source_possession_context", possession_rows, {}, "SOURCE_DERIVED"),
     ):
+        context_null_types = {
+            "ball_x_m": pa.float64(),
+            "ball_y_m": pa.float64(),
+            "ball_zone": pa.string(),
+            "source_ball_status": pa.string(),
+        }
+        context_null_types.update(null_types)
         table = _series_table(
             rows,
             series_name=name,
             parameters=resolved,
             measurement_class=measurement_class,
-            null_types=null_types,
+            null_types=context_null_types,
         )
         if table is not None:
             outputs.append(SeriesOutput(name=name, table=table))

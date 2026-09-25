@@ -131,7 +131,7 @@ test("RES-109 §12 switches between real local Pose subjects from a >10 s playhe
   const rangeFromNs = 17_417_738_000;
   const rangeToNs = 60_000_000_000;
   await page.goto(`/lab/skillcorner-opendata/1925299?stream=pose-1&subject=${firstSubject}&trial=period_1&view=pose&from_ns=${rangeFromNs}&to_ns=${rangeToNs}&t_ns=${rangeFromNs}`);
-  await expect(page.getByTestId("pose-canvas").locator("canvas")).toBeVisible();
+  await expect(page.getByTestId("matchlab-canvas").locator("canvas")).toBeVisible();
   await expect(page.getByTestId("pose-telemetry").getByText(firstSubject, { exact: true })).toBeVisible();
   await page.locator("#pose-subject").selectOption(targetSubject);
   await expect(page).toHaveURL(new RegExp(`subject=${targetSubject}`));

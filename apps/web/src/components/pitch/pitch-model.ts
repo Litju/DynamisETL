@@ -7,6 +7,8 @@
  * (detected ≠ extrapolated) instead of being smoothed or hidden.
  */
 
+import type { SessionDetail } from "@/api/types";
+
 export interface PitchGeometry {
   readonly lengthM: number;
   readonly widthM: number;
@@ -14,6 +16,35 @@ export interface PitchGeometry {
 
 /** SkillCorner pitch is 105 × 68 m with the origin at the centre. */
 export const DEFAULT_PITCH: PitchGeometry = { lengthM: 105, widthM: 68 };
+export const DEFAULT_NOMINAL_RATE_HZ = 25;
+
+export function maximumFrameAgeNs(nominalRateHz: number | null | undefined): number {
+  const rateHz = nominalRateHz !== null && nominalRateHz !== undefined &&
+    Number.isFinite(nominalRateHz) && nominalRateHz > 0
+    ? nominalRateHz
+    : DEFAULT_NOMINAL_RATE_HZ;
+  return 1.5 * (1e9 / rateHz);
+}
+
+/**
+ * Session-stable team order and labels from served participants. Kept in this
+ * pure model so shell panels do not eagerly load the Field renderer.
+ */
+export function sessionTeams(session: SessionDetail | undefined): {
+  readonly order: readonly string[];
+  readonly labels: ReadonlyMap<string, string>;
+} {
+  const labels = new Map<string, string>();
+  for (const participant of session?.participants ?? []) {
+    const groupId = participant.group_label;
+    if (!groupId) continue;
+    const name = participant.cohort;
+    if (!labels.has(groupId) || (name && labels.get(groupId) === groupId)) {
+      labels.set(groupId, name && name.length > 0 ? name : groupId);
+    }
+  }
+  return { order: [...labels.keys()].sort(), labels };
+}
 
 export interface Viewport {
   /** World container offset in pixels. */

@@ -1523,6 +1523,26 @@
         "title": "MetricValue",
         "type": "object"
       },
+      "PitchDimensionsView": {
+        "properties": {
+          "length_m": {
+            "exclusiveMinimum": 0.0,
+            "title": "Length M",
+            "type": "number"
+          },
+          "width_m": {
+            "exclusiveMinimum": 0.0,
+            "title": "Width M",
+            "type": "number"
+          }
+        },
+        "required": [
+          "length_m",
+          "width_m"
+        ],
+        "title": "PitchDimensionsView",
+        "type": "object"
+      },
       "ProvenanceEdge": {
         "properties": {
           "id": {
@@ -2318,6 +2338,16 @@
               }
             ],
             "title": "Nominal Sampling Rate Hz"
+          },
+          "pitch_dimensions_m": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PitchDimensionsView"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "sample_artifact_ids": {
             "items": {

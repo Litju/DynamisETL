@@ -4,7 +4,7 @@ import math
 import pyarrow as pa
 import pytest
 
-from dynamis.processors.tactical_shape import _delaunay, _Player, process_tactical_shape
+from dynamis.processors.tactical_shape import _ball_zone, _delaunay, _Player, process_tactical_shape
 
 
 def _rows(timestamps: list[int]) -> pa.Table:
@@ -181,7 +181,7 @@ def test_functional_unit_geometry_and_attack_normalization() -> None:
     series = next(item for item in result.series if item.name == "functional_unit_geometry")
     metadata = series.table.schema.metadata or {}
     assert metadata[b"dynamis.algorithm_id"] == b"tactical.matchlab_shape"
-    assert metadata[b"dynamis.algorithm_version"] == b"1"
+    assert metadata[b"dynamis.algorithm_version"] == b"2"
     assert b"stable_window_ns" in metadata[b"dynamis.parameters"]
 
 
@@ -224,6 +224,9 @@ def test_stable_graph_triangles_interactions_and_source_context() -> None:
     assert len(possession) == len(timestamps)
     assert all(row["measurement_class"] == "SOURCE_DERIVED" for row in possession)
     assert all(row["source_possession_team_id"] == "home" for row in possession)
+    assert all(row["ball_x_m"] == 0.0 and row["ball_y_m"] == 0.0 for row in possession)
+    assert all(row["ball_zone"] == "middle_third" for row in possession)
+    assert all(row["ball_zone_frame"] == "team_attack_normalized" for row in possession)
     possession_series = next(
         item for item in result.series if item.name == "source_possession_context"
     )
@@ -243,6 +246,27 @@ def test_direction_missing_fails_closed_to_frame_axis() -> None:
     assert home_gk["coordinate_normalization"] == "source_frame"
     assert home_gk["attacking_direction"] is None
     assert "source_possession_context" not in {item.name for item in result.series}
+
+
+def test_source_ball_zone_requires_finite_point_and_never_infers_direction() -> None:
+    assert (
+        _ball_zone(
+            (-40.0, 0.0), direction="right_to_left", pitch_length_m=100.0, pitch_width_m=60.0
+        )
+        == "opponent_third"
+    )
+    assert (
+        _ball_zone((-40.0, 0.0), direction=None, pitch_length_m=100.0, pitch_width_m=60.0)
+        == "left_third"
+    )
+    assert (
+        _ball_zone((51.0, 0.0), direction="left_to_right", pitch_length_m=100.0, pitch_width_m=60.0)
+        == "out_of_bounds"
+    )
+    assert (
+        _ball_zone(None, direction="left_to_right", pitch_length_m=100.0, pitch_width_m=60.0)
+        is None
+    )
 
 
 def test_source_role_absence_stays_unknown() -> None:

@@ -24,7 +24,7 @@ async function observations(page: Page): Promise<Observation[]> {
 }
 
 async function waitForPose(page: Page) {
-  await expect(page.getByTestId("pose-canvas").locator("canvas")).toBeVisible();
+  await expect(page.getByTestId("matchlab-canvas").locator("canvas")).toBeVisible();
   await expect(page.getByTestId("pose-canvas")).toHaveAttribute("data-renderer-ready", "true");
 }
 
@@ -90,13 +90,13 @@ test("switching while playing stops playback explicitly (RES-109 §12)", async (
   const subjects = observed.filter((item) => item.observation_count > 500).map((item) => item.entity_id);
   await page.goto(`${POSE}&subject=${subjects[0]}`);
   await waitForPose(page);
-  await page.getByRole("button", { name: "Play" }).click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
   await page.waitForTimeout(1_500);
   await page.locator("#pose-subject").selectOption(subjects[1]!);
-  await expect(page.getByRole("button", { name: "Play" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Play", exact: true })).toBeVisible();
   await expect(page.getByText("Playback paused for the subject switch — press Play to continue.")).toBeVisible();
   await expect(page.getByTestId("pose-telemetry")).toContainText(subjects[1]!);
-  await page.getByRole("button", { name: "Play" }).click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
   await expect(page.getByText("Playback paused for the subject switch — press Play to continue.")).toHaveCount(0);
   await page.getByRole("button", { name: "Pause playback" }).click();
   await expectCleanConsole(console);
@@ -108,7 +108,7 @@ test("long playback crosses chunks with one renderer and no console errors", asy
   await waitForPose(page);
   const before = (await playheadNs(page))!;
   await page.getByLabel("Playback rate").selectOption("4");
-  await page.getByRole("button", { name: "Play" }).click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
   const playback = await measurePlayback(page, 9_000);
   await page.getByRole("button", { name: "Pause playback" }).click({ timeout: 3_000 }).catch(() => undefined);
   const after = (await playheadNs(page))!;
@@ -130,8 +130,8 @@ test("frames, scope, camera ownership and layers stay consistent", async ({ page
   await expect(world).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "follow-subject" })).toHaveAttribute("aria-pressed", "true");
   // Manual ownership: dragging the canvas hands the camera to the reader.
-  const canvas = page.getByTestId("pose-canvas").locator("canvas");
-  const box = (await canvas.boundingBox())!;
+  const poseView = page.getByTestId("pose-canvas");
+  const box = (await poseView.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
   await page.mouse.move(box.x + box.width / 2 + 80, box.y + box.height / 2 + 20, { steps: 6 });

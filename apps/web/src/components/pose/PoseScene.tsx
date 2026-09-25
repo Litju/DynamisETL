@@ -1,11 +1,12 @@
-import { CameraControls, Grid } from "@react-three/drei";
-import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
+import { CameraControls, PerspectiveCamera, View } from "@react-three/drei";
+import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   BufferAttribute,
   BufferGeometry,
   Color,
   DynamicDrawUsage,
+  GridHelper,
   InstancedMesh,
   LineBasicMaterial,
   LineSegments,
@@ -25,6 +26,7 @@ import {
   boundsOf,
   cameraFor,
   landmarksAt,
+  poseFrameIndexAt,
   toViewerPoint,
   type AngleDefinition,
   type CameraMode,
@@ -38,6 +40,7 @@ import {
   type ViewerPoint,
   withoutDuplicateAngles,
 } from "@/components/pose/pose-model";
+import type { MatchFrameSourceKind, ResolvedMatchFrame } from "@/lib/match-frame-context";
 import { useAnalysisStore } from "@/lib/state/analysis";
 
 export const JOINT_COLOR = "#9fe3f2";
@@ -114,6 +117,10 @@ export interface PoseSceneProps {
   readonly selectedSubjectId?: string | null;
   /** Clicking a subject in the all-subject world selects it as the subject. */
   readonly onSelectSubject?: (subjectId: string) => void;
+  readonly maxFrameGapNs?: number;
+  readonly sourceStreamId?: string | undefined;
+  readonly sourceArtifactId?: string | null | undefined;
+  readonly reportResolvedFrame?: ((kind: MatchFrameSourceKind, frame: ResolvedMatchFrame) => void) | undefined;
 }
 
 interface LandmarkDescriptor {
@@ -195,7 +202,7 @@ function PoseStage({ subjects, bounds, ...props }: PoseSceneProps & {
     const subject = subjects[0];
     if (!subject) return;
     const time = useAnalysisStore.getState().playheadNs ?? useAnalysisStore.getState().committedTimeNs;
-    const landmarks = landmarksAt(subject.frames, time);
+    const landmarks = landmarksAt(subject.frames, time, props.maxFrameGapNs);
     let desired: readonly [number, number, number] | null = null;
     const centre = props.coordinateMode === "body_local" ? bodyLocalCentre(landmarks) : WORLD_ORIGIN;
     if (cameraMode === "follow_subject") {
@@ -224,6 +231,18 @@ function PoseStage({ subjects, bounds, ...props }: PoseSceneProps & {
   const handleControlStart = useCallback(() => {
     if (cameraMode !== "manual") onManualCamera?.();
   }, [cameraMode, onManualCamera]);
+  const grid = useMemo(() => {
+    const size = bounds.radius * 2.6;
+    const divisions = Math.max(2, Math.round(size / (bounds.radius / 8)));
+    const value = new GridHelper(size, divisions, "#33404f", "#242c37");
+    value.position.set(bounds.center[0], bounds.min[1], bounds.center[2]);
+    return value;
+  }, [bounds.center, bounds.min, bounds.radius]);
+  useEffect(() => () => {
+    grid.geometry.dispose();
+    if (Array.isArray(grid.material)) grid.material.forEach((material) => material.dispose());
+    else grid.material.dispose();
+  }, [grid]);
   return (
     <>
       <color attach="background" args={["#12161c"]} />
@@ -232,17 +251,20 @@ function PoseStage({ subjects, bounds, ...props }: PoseSceneProps & {
       <fog attach="fog" args={["#12161c", bounds.radius * 6, bounds.radius * 18]} />
       <ambientLight intensity={0.9} />
       <directionalLight position={[2, 4, 3]} intensity={1.1} />
-      <Grid args={[bounds.radius * 2.6, bounds.radius * 2.6]} position={[bounds.center[0], bounds.min[1], bounds.center[2]]} cellSize={bounds.radius / 8} cellColor="#242c37" sectionSize={bounds.radius / 2} sectionColor="#33404f" fadeDistance={bounds.radius * 14} fadeStrength={1.5} />
+      <primitive object={grid} />
       <CameraControls ref={controlsRef} makeDefault onStart={handleControlStart} />
-      <PoseHotPath subjects={subjects} sceneRadius={bounds.radius} {...props} />
+      <PoseLayer subjects={subjects} sceneRadius={bounds.radius} {...props} />
     </>
   );
 }
 
-function PoseHotPath({ subjects, overlays, providerConnections, showProviderSkeleton, showTorsoCue, showFootContact, showHandContact, showHeadNeck, showArticulationAngles, showSegments, showAngles, showErrorRadii, coordinateMode, selectedSubjectId = null, onSelectSubject, sceneRadius }: PoseSceneProps & {
+export interface PoseLayerProps extends PoseSceneProps {
   readonly subjects: readonly PoseSubjectFrames[];
   readonly sceneRadius: number;
-}) {
+}
+
+/** Reusable Pose geometry layer; camera and Canvas ownership stay with the viewport. */
+export function PoseLayer({ subjects, overlays, providerConnections, showProviderSkeleton, showTorsoCue, showFootContact, showHandContact, showHeadNeck, showArticulationAngles, showSegments, showAngles, showErrorRadii, coordinateMode, selectedSubjectId = null, onSelectSubject, maxFrameGapNs, sourceStreamId, sourceArtifactId, reportResolvedFrame, sceneRadius }: PoseLayerProps) {
   // In the all-subject world the camera frames the whole group, so a 3 cm
   // glyph is sub-pixel; joints scale with the scene so every figure stays
   // readable. A single subject keeps its true glyph size.
@@ -256,6 +278,10 @@ function PoseHotPath({ subjects, overlays, providerConnections, showProviderSkel
   const errorMesh = useInstancedGlyph(descriptors.length, true);
   const currentRef = useRef<CurrentLandmarks>([]);
   const centresRef = useRef<Array<{ readonly xM: number; readonly yM: number }>>([]);
+  const lastResolvedFrameKey = useRef("unknown");
+  useEffect(() => {
+    lastResolvedFrameKey.current = "unknown";
+  }, [sourceArtifactId, sourceStreamId]);
   const identity = useMemo(() => new Quaternion(), []);
   const matrix = useMemo(() => new Matrix4(), []);
   const position = useMemo(() => new Vector3(), []);
@@ -293,15 +319,36 @@ function PoseHotPath({ subjects, overlays, providerConnections, showProviderSkel
   const articulationAngles = useMemo(() => withoutDuplicateAngles(ARTICULATION_ANGLE_CUES, overlays.angles), [overlays.angles]);
   useFrame(() => {
     const time = useAnalysisStore.getState().playheadNs ?? useAnalysisStore.getState().committedTimeNs;
+    const focusSubject = focusIndex >= 0 ? subjects[focusIndex] : undefined;
+    const focusFrameIndex = focusSubject
+      ? poseFrameIndexAt(focusSubject.frames, time, maxFrameGapNs ?? Number.POSITIVE_INFINITY)
+      : -1;
+    const focusFrame = focusFrameIndex >= 0 ? focusSubject?.frames[focusFrameIndex] ?? null : null;
     const current = subjects.map((subject, subjectIndex) => {
       const byName = new Map<string, PoseLandmark>();
-      for (const landmark of landmarksAt(subject.frames, time)) byName.set(landmark.jointName, landmark);
+      const frameIndex = poseFrameIndexAt(subject.frames, time, maxFrameGapNs ?? Number.POSITIVE_INFINITY);
+      const frame = frameIndex >= 0 ? (subject.frames[frameIndex] ?? null) : null;
+      for (const landmark of frame?.landmarks ?? []) byName.set(landmark.jointName, landmark);
       const centre = coordinateMode === "body_local"
         ? bodyLocalCentre([...byName.values()], centresRef.current[subjectIndex] ?? null)
         : WORLD_ORIGIN;
       centresRef.current[subjectIndex] = centre;
       return { landmarks: byName, centre };
     });
+    if (reportResolvedFrame) {
+      const identity = focusFrame === null
+        ? null
+        : (sourceArtifactId ?? sourceStreamId ?? "pose") + ":" + focusFrame.subjectId + ":" + focusFrame.tRelNs;
+      const key = (sourceArtifactId ?? sourceStreamId ?? "pose") + ":" + (identity ?? "absent");
+      if (key !== lastResolvedFrameKey.current) {
+        lastResolvedFrameKey.current = key;
+        reportResolvedFrame("pose", {
+          identity,
+          canonicalTimeNs: focusFrame === null ? null : BigInt(Math.trunc(focusFrame.tRelNs)),
+          availability: focusFrame === null ? "absent" : "available",
+        });
+      }
+    }
     currentRef.current = current;
     for (let index = 0; index < descriptors.length; index += 1) {
       const descriptor = descriptors[index]!;
@@ -540,13 +587,34 @@ export function arcPoints(vertex: PoseLandmark, first: PoseLandmark, second: Pos
   return points;
 }
 
-export function PoseCanvas({ playing, onReady, ...scene }: PoseSceneProps & {
-  readonly playing: boolean;
+export function PoseCanvas({ onReady, evidenceHostRef, ...scene }: PoseSceneProps & {
   readonly onReady?: () => void;
+  readonly evidenceHostRef?: React.RefObject<HTMLDivElement | null>;
 }) {
-  return <Canvas frameloop={playing ? "always" : "demand"} camera={{ fov: 40, near: 0.01, far: 100 }} dpr={[1, 2]} gl={{ antialias: true }} onCreated={() => onReady?.()}>
-    <PoseScene {...scene} />
-  </Canvas>;
+  return (
+    <View className="absolute inset-0" style={{ width: "100%", height: "100%" }} index={1}>
+      <PerspectiveCamera makeDefault position={[0, 0, 5]} />
+      <PoseReady onReady={onReady} evidenceHostRef={evidenceHostRef} />
+      <PoseScene {...scene} />
+    </View>
+  );
+}
+
+function PoseReady({
+  onReady,
+  evidenceHostRef,
+}: {
+  readonly onReady?: (() => void) | undefined;
+  readonly evidenceHostRef?: React.RefObject<HTMLDivElement | null> | undefined;
+}) {
+  useEffect(() => onReady?.(), [onReady]);
+  useFrame(({ camera }) => {
+    if (evidenceHostRef?.current) {
+      evidenceHostRef.current.dataset.viewCameraId = camera.uuid;
+      evidenceHostRef.current.dataset.cameraProjection = "isPerspectiveCamera" in camera && camera.isPerspectiveCamera ? "perspective" : "orthographic";
+    }
+  });
+  return null;
 }
 
 export default PoseCanvas;

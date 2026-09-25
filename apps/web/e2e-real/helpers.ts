@@ -73,11 +73,13 @@ export async function evidence(page: Page, name: string) {
 export async function measurePlayback(page: Page, milliseconds: number) {
   await page.evaluate(() => {
     const host = document.querySelector("[data-testid='pitch-canvas'], [data-testid='pose-canvas']");
-    const seen = new Set<Element | null>([host?.querySelector("canvas") ?? null]);
+    const sharedCanvas = document.querySelector("[data-testid='matchlab-canvas'] canvas");
+    const getCanvas = () => sharedCanvas ?? host?.querySelector("canvas") ?? null;
+    const seen = new Set<Element | null>([getCanvas()]);
     const state = { seen, stop: false, frames: 0 };
     const tick = () => {
       state.frames += 1;
-      seen.add(host?.querySelector("canvas") ?? null);
+      seen.add(getCanvas());
       if (!state.stop) requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);

@@ -20,6 +20,7 @@ def test_tactical_authority_files_are_consistent() -> None:
         "V3",
     }
     assert metrics["matchlab_tactical_v3"]["algorithm_id"] == "tactical.matchlab_shape"
+    assert metrics["matchlab_tactical_v3"]["algorithm_version"] == "2"
     assert metrics["matchlab_tactical_v3"]["role_domains"] == ["GK", "DEF", "MID", "ATT", "unknown"]
     assert all(item["id"].startswith("tactical.") for item in metrics["metrics"])
     assert all(len(item["id"]) > 9 and item["unit"] for item in metrics["metrics"])

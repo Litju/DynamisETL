@@ -59,7 +59,8 @@ run already has the same algorithm, parameters hash and input checksums:
    `entity_object_types = ["player"]`);
 2. Pose translation-invariant kinematics per SkillCorner pose period;
 3. tactical Level A geometry, Level B clipped territory, Level C arrival-time influence
-   (MODEL_ESTIMATED) per tracking period, and Level D source-event snapshots per DFL period;
+   (MODEL_ESTIMATED), Level D source-event snapshots where supported, and source-authorized
+   MatchLab V3 per tracking period;
 4. Gold export → dbt build → publish when served metrics disagree with the control plane;
 5. the same verification as `--check`, then the flagship URLs.
 
@@ -89,8 +90,8 @@ pnpm --filter @dynamis/web run dev   # workbench on :5173 (proxies /api to :8000
 | --- | --- |
 | `/catalog` | five datasets with laboratory chips and rights |
 | `/lab/dfl-sportec-idsse/DFL-MAT-J03WPY?view=overview` | athlete locomotor headline (no ball), charts, derived metrics |
-| `/lab/dfl-sportec-idsse/DFL-MAT-J03WPY?view=field&stream=tracking-period-1&tactical=live` | pitch at 00:00:01.020, team hulls on the drawn frame, Live per-team geometry; Space territory + MODEL_ESTIMATED influence; Events source-event snapshots with seek |
-| `/lab/skillcorner-opendata/1925299?view=field&stream=tracking-period-1&tactical=live` | pitch at 00:00:00.000, A/B/C tactical tabs; Events and Shape explicitly unsupported with the capability reason |
+| `/lab/dfl-sportec-idsse/DFL-MAT-J03WPY?view=field&stream=tracking-period-1&tactical=live` | Tactical Map default with a fitted orthographic pitch at 00:00:01.020, source possession/ball context and GK/DEF/MID/ATT inter-line structure; optional Occupied area; Space territory + MODEL_ESTIMATED influence; DFL source-event snapshots with seek. Structure Lift is optional and exposes declared scalar elevation with a restrained pitch shadow. |
+| `/lab/skillcorner-opendata/1925299?view=field&stream=tracking-period-1&tactical=live` | Tactical Map default with a fitted orthographic pitch at 00:00:00.000, source-declared possession/direction and GK/DEF/MID/ATT structure; local relations on demand; no provider event/phase labels. Structure Lift is an optional orthographic view. |
 | `/lab/skillcorner-opendata/1925299?view=pose&stream=pose-period-1` | body-local skeleton of the first subject at its first observation; subject selector with shirt/name; all-subject world with focus ring |
 | `/compare`, `/methods`, `/quality`, `/runs` | method, provenance, quality/rights and run evidence |
 

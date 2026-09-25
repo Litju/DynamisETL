@@ -9,7 +9,8 @@ capability matrix, never from what happens to be on disk.
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+import math
+from collections.abc import Callable, Mapping
 from functools import lru_cache
 from typing import Any
 
@@ -24,6 +25,8 @@ from dynamis.processors.spec import ProcessorResult
 from dynamis.processors.tactical_events import process_tactical_event_snapshots
 from dynamis.processors.tactical_geometry import process_tactical_geometry
 from dynamis.processors.tactical_influence import process_tactical_influence
+from dynamis.processors.tactical_shape import process_tactical_shape
+from dynamis.processors.tactical_sources import load_tactical_source_authority
 from dynamis.processors.tactical_territory import process_tactical_territory
 
 #: Tracking-only tactical processors by capability level.
@@ -39,13 +42,48 @@ LEVEL_SERIES: dict[str, tuple[str, ...]] = {
     "B": ("player_territory", "team_territory"),
     "C": ("team_influence", "player_influence", "influence_grid"),
     "D": ("source_event_snapshots",),
+    "V3": (
+        "functional_unit_geometry",
+        "shape_graph_edges",
+        "tactical_triangles",
+        "attacker_defender_interactions",
+        "source_possession_context",
+    ),
 }
+
+
+def matchlab_v3_parameters(ref: SilverStreamRef) -> dict[str, float]:
+    """Use registered pitch metres for MatchLab V3; never assume a default pitch."""
+    dimensions = ref.stream_metadata.get("pitch_dimensions_m")
+    if not isinstance(dimensions, dict):
+        raise ValueError(
+            f"{ref.dataset_id}/{ref.stream_id}: MatchLab V3 requires registered pitch_dimensions_m"
+        )
+    length_m = dimensions.get("length_m")
+    width_m = dimensions.get("width_m")
+    if (
+        isinstance(length_m, bool)
+        or not isinstance(length_m, (int, float))
+        or not math.isfinite(float(length_m))
+        or length_m <= 0
+        or isinstance(width_m, bool)
+        or not isinstance(width_m, (int, float))
+        or not math.isfinite(float(width_m))
+        or width_m <= 0
+    ):
+        raise ValueError(
+            f"{ref.dataset_id}/{ref.stream_id}: registered pitch dimensions must be finite "
+            "positive metres"
+        )
+    return {"pitch_length_m": float(length_m), "pitch_width_m": float(width_m)}
+
 
 LEVEL_ALGORITHMS: dict[str, str] = {
     "A": "tactical.team_geometry",
     "B": "tactical.spatial_territory",
     "C": "tactical.arrival_time",
     "D": "tactical.source_event_snapshot",
+    "V3": "tactical.matchlab_shape",
 }
 
 _CAPABILITY_KEYS = {
@@ -53,6 +91,7 @@ _CAPABILITY_KEYS = {
     "B": "level_b_territory",
     "C": "level_c_influence",
     "D": "level_d_event_linked",
+    "V3": "matchlab_v3_functional_units",
 }
 
 
@@ -63,7 +102,7 @@ def _capability_matrix() -> dict[str, Any]:
 
 
 def supported_levels(dataset_id: str) -> tuple[str, ...]:
-    """Levels A-D the capability authority declares supported for a dataset."""
+    """Tactical levels declared supported by the capability authority."""
     payload = _capability_matrix()["datasets"].get(dataset_id)
     if payload is None:
         return ()
@@ -143,6 +182,55 @@ def materialize_event_level(
     )
 
 
+def materialize_matchlab_v3(
+    settings: Settings,
+    engine: Engine,
+    *,
+    dataset_id: str,
+    ref: SilverStreamRef,
+    table: pa.Table,
+    tracking_input: Any,
+    parameters: Mapping[str, float] | None = None,
+    code_sha: str | None = None,
+) -> ProcessorRunResult:
+    """Run source-authorized MatchLab V3 geometry for one canonical stream."""
+    if ref.trial_id is None:
+        raise ValueError(
+            f"{dataset_id}/{ref.stream_id}: MatchLab V3 requires a declared trial "
+            "to load source-authorized tactical context"
+        )
+    registered_parameters = matchlab_v3_parameters(ref)
+    if parameters is not None and dict(parameters) != registered_parameters:
+        raise ValueError(
+            f"{dataset_id}/{ref.stream_id}: MatchLab V3 parameters must use registered pitch metres"
+        )
+    resolved_parameters = registered_parameters
+    source = load_tactical_source_authority(
+        settings,
+        dataset_id=dataset_id,
+        trial_id=ref.trial_id,
+        tracking=table,
+    )
+    result = process_tactical_shape(
+        table,
+        role_by_player=source.role_by_player,
+        attacking_direction_by_team=source.attacking_direction_by_team,
+        possession=source.possession,
+        role_authority=source.role_authority,
+        direction_authority=source.direction_authority,
+        parameters=resolved_parameters,
+    )
+    return execute_processor(
+        settings,
+        result=result,
+        dataset_id=dataset_id,
+        inputs=(*source.inputs, tracking_input),
+        series_key=ref.stream_id,
+        engine=engine,
+        code_sha=code_sha,
+    )
+
+
 def dataset_event_runs(settings: Settings, engine: Engine, *, dataset_id: str) -> dict[str, Any]:
     """Level D over every tracking period of a dataset with one event stream."""
     with engine.connect() as connection:
@@ -184,7 +272,9 @@ __all__ = [
     "TRACKING_LEVELS",
     "dataset_event_runs",
     "event_snapshot_result",
+    "matchlab_v3_parameters",
     "materialize_event_level",
+    "materialize_matchlab_v3",
     "materialize_tracking_level",
     "supported_levels",
 ]

@@ -6,13 +6,14 @@ import {
   useParams,
   useSearch,
 } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
-import { LabOverview } from "@/components/lab/LabOverview";
-import { SignalLaboratory } from "@/components/lab/SignalLaboratory";
-import { PitchReplay } from "@/components/pitch/PitchReplay";
 import { lazy, Suspense } from "react";
 
+const LabOverview = lazy(() => import("@/components/lab/LabOverview").then((module) => ({ default: module.LabOverview })));
+const MatchLabCanvasRoot = lazy(() => import("@/components/matchlab/MatchLabCanvasRoot").then((module) => ({ default: module.MatchLabCanvasRoot })));
+const SignalLaboratory = lazy(() => import("@/components/lab/SignalLaboratory").then((module) => ({ default: module.SignalLaboratory })));
+const PitchReplay = lazy(() => import("@/components/pitch/PitchReplay").then((module) => ({ default: module.PitchReplay })));
 const PoseViewer = lazy(() => import("@/components/pose/PoseViewer"));
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
 import { artifactQuery, sessionQuery } from "@/lib/api/queries";
@@ -44,15 +45,25 @@ export function LabPage() {
 
   const durableTimeNs = tryParseNs(search.t_ns);
   const durableSubject = search.subject ?? null;
-  const durableEntity = search.entity ?? null;
   const durableView = search.view ?? "overview";
+  const previousRendererContext = useRef({
+    datasetId,
+    sessionId,
+    view: durableView,
+    trialId: search.trial ?? null,
+    streamId: search.stream ?? null,
+    modality: null as string | null,
+    synchronizationSpecId: null as string | null,
+    subjectId: search.subject ?? null,
+    timeText: search.t_ns ?? null,
+  });
+  const preserveCanonicalTime = useRef(false);
   useEffect(() => {
     hydrate({
       committedTimeNs: durableTimeNs,
-      selectedEntityId: durableEntity,
       focusedPanel: durableView,
     });
-  }, [hydrate, durableEntity, durableTimeNs, durableView]);
+  }, [hydrate, durableTimeNs, durableView]);
   useEffect(() => () => {
     useAnalysisStore.getState().resetTransient();
   }, [datasetId, sessionId]);
@@ -92,7 +103,7 @@ export function LabPage() {
   // Canonical time authority: a renderer view always has a committed frame that
   // lies inside the selected stream's canonical span (RES-112 F-01/F-08/P-01).
   const rendererView =
-    durableView === "signals" || durableView === "field" || durableView === "pose";
+    durableView === "signals" || durableView === "field" || durableView === "pose" || durableView === "split";
   const timeArtifactId = rendererView ? (selectedStream?.sample_artifact_ids[0] ?? null) : null;
   const timeArtifact = useQuery({
     ...artifactQuery(timeArtifactId ?? ""),
@@ -100,6 +111,61 @@ export function LabPage() {
   });
   const awaitingPoseSubject = durableView === "pose" && search.subject === undefined;
   useEffect(() => {
+    const previous = previousRendererContext.current;
+    const trialId = search.trial ?? selectedStream?.trial_id ?? null;
+    const streamId = search.stream ?? null;
+    const subjectId = search.subject ?? null;
+    const periodChanged = previous.datasetId !== datasetId ||
+      previous.sessionId !== sessionId ||
+      previous.trialId !== trialId;
+    // A linked Field/Pose view change shares canonical time even when the Pose
+    // artifact has no exact sample at that instant.
+    const explicitPoseTime =
+      durableView === "pose" &&
+      search.t_ns !== undefined &&
+      durableTimeNs !== null &&
+      !periodChanged;
+    const streamChanged = previous.streamId !== streamId;
+    const subjectChanged = previous.subjectId !== subjectId;
+    const pairedFieldPoseSwitch =
+      previous.view !== durableView &&
+      previous.timeText === (search.t_ns ?? null) &&
+      search.t_ns !== undefined &&
+      previous.trialId !== null &&
+      previous.trialId === trialId &&
+      previous.subjectId === subjectId &&
+      previous.synchronizationSpecId !== null &&
+      previous.synchronizationSpecId === selectedStream?.synchronization_spec_id &&
+      ((previous.modality === "tracking" && selectedStream?.modality === "pose") ||
+        (previous.modality === "pose" && selectedStream?.modality === "tracking"));
+    if (periodChanged) preserveCanonicalTime.current = false;
+    else if (pairedFieldPoseSwitch) preserveCanonicalTime.current = true;
+    else if (streamChanged || subjectChanged) preserveCanonicalTime.current = false;
+    else if (previous.view !== durableView && previous.timeText === (search.t_ns ?? null) && search.t_ns !== undefined) {
+      preserveCanonicalTime.current = true;
+    }
+    previousRendererContext.current = {
+      datasetId,
+      sessionId,
+      view: durableView,
+      trialId,
+      streamId,
+      modality: selectedStream?.modality ?? null,
+      synchronizationSpecId: selectedStream?.synchronization_spec_id ?? null,
+      subjectId,
+      timeText: search.t_ns ?? null,
+    };
+    // An explicit Pose time is query state. Preserve gaps so Pose can report
+    // observation bounds instead of moving the global playhead.
+    if (explicitPoseTime) {
+      preserveCanonicalTime.current = false;
+      return;
+    }
+    if (preserveCanonicalTime.current) {
+      if (!timeArtifact.data || awaitingPoseSubject) return;
+      preserveCanonicalTime.current = false;
+      return;
+    }
     if (!timeArtifact.data || awaitingPoseSubject) return;
     const target = canonicalTimeDefault(timeArtifact.data, {
       currentNs: durableTimeNs,
@@ -108,7 +174,7 @@ export function LabPage() {
     });
     if (target === null) return;
     updateSearch({ t_ns: formatNsDecimal(target) });
-  }, [awaitingPoseSubject, durableSubject, durableTimeNs, durableView, timeArtifact.data, updateSearch]);
+  }, [awaitingPoseSubject, datasetId, durableSubject, durableTimeNs, durableView, search.stream, search.subject, search.t_ns, search.trial, selectedStream, sessionId, timeArtifact.data, updateSearch]);
 
   if (session.isPending) return <LoadingPanel label="Loading laboratory session" />;
   if (session.isError) {
@@ -127,11 +193,21 @@ export function LabPage() {
     ...WORKBENCH_VIEWS.filter(
       (candidate): candidate is WorkbenchView =>
         candidate !== "overview" &&
-        (candidate === "provenance" || candidate === view || surfaces.includes(candidate as never)),
+        (candidate === "provenance" || candidate === view ||
+          (candidate === "split"
+            ? surfaces.includes("field") && surfaces.includes("pose")
+            : surfaces.includes(candidate as never))),
     ),
   ];
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <Suspense fallback={<LoadingPanel label="Opening laboratory" />}>
+      <MatchLabCanvasRoot
+        enabled={
+          (view === "field" || view === "pose" || view === "split") &&
+          Boolean(selectedStream?.sample_artifact_ids[0])
+        }
+      >
+        <div className="relative z-10 flex h-full min-h-0 flex-col">
         <div
           role="tablist"
           aria-label="Laboratory views"
@@ -194,6 +270,17 @@ export function LabPage() {
             <Suspense fallback={<LoadingPanel label="Loading 3D laboratory" />}>
               <PoseViewer />
             </Suspense>
+          ) : view === "split" ? (
+            <div className="grid h-full min-h-0 grid-cols-2 gap-2">
+              <section className="min-h-0 min-w-0 overflow-hidden rounded-panel border border-border-subtle">
+                <PitchReplay />
+              </section>
+              <section className="min-h-0 min-w-0 overflow-hidden rounded-panel border border-border-subtle">
+                <Suspense fallback={<LoadingPanel label="Loading Pose view" />}>
+                  <PoseViewer />
+                </Suspense>
+              </section>
+            </div>
           ) : (
             <StatePanel
               state="empty"
@@ -206,6 +293,8 @@ export function LabPage() {
             />
           )}
         </div>
-      </div>
+        </div>
+      </MatchLabCanvasRoot>
+    </Suspense>
   );
 }

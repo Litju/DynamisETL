@@ -119,6 +119,11 @@ function installFetch(options: { reduced?: boolean; withOverlays?: boolean } = {
       const url = new URL(raw, "http://localhost");
       if (url.pathname === "/api/catalog/datasets/demo/sessions/s1") return json(SESSION);
       if (url.pathname === "/api/artifacts/pose-sample") return json(ARTIFACT);
+      if (url.pathname === "/api/artifacts/pose-sample/observations") {
+        return json([
+          { entity_id: "s2", first_observed_ns: 80_000_000, last_observed_ns: 100_000_000, observation_count: 1 },
+        ]);
+      }
       if (url.pathname === "/api/artifacts/pose-sample/window") {
         return json(
           windowBody(
@@ -234,6 +239,7 @@ function renderViewer(overrides: Partial<AnalysisContextValue> = {}) {
     commitTime: vi.fn(),
     commitRange: vi.fn(),
     selectSubject: vi.fn(),
+    selectFieldEntity: vi.fn(),
     selectStream: vi.fn(),
     selectResult: vi.fn(),
     ...overrides,
@@ -299,14 +305,16 @@ it("requires a pose stream and never renders another modality", async () => {
 
 it("distinguishes a subject with observations from an empty current window", async () => {
   installFetch();
-  renderViewer({ subjectId: "s2" });
+  useAnalysisStore.setState({ playheadNs: 50_000_000n, committedTimeNs: 50_000_000n });
+  renderViewer({ subjectId: "s2", timeNs: 50_000_000n });
   expect(
-    await screen.findByText("Subject s2 is not observed at the current time."),
+    await screen.findByText(/Subject s2 is not observed at/),
   ).toBeInTheDocument();
+  expect(await screen.findByText(/Next observation/)).toBeInTheDocument();
   expect(screen.queryByTestId("pose-scene-stub")).not.toBeInTheDocument();
 });
 
-it("switches the subject with one exact target-time navigation transaction", async () => {
+it("switches the subject to its first valid in-range observation", async () => {
   installFetch();
   const selectSubject = vi.fn();
   renderViewer({ subjectId: "s1", selectSubject });

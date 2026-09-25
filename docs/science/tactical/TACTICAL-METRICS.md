@@ -54,7 +54,7 @@ to claim formation, phase, pressing, or transition labels. Source positions
 classify players; source direction is required for attack-normalized coordinates;
 source possession is contextual and is never reconstructed from distance.
 
-The V3 processor is `tactical.matchlab_shape` v1. Its detailed output fields and
+The V3 processor is `tactical.matchlab_shape` v2. Its detailed output fields and
 fixed renderer domains live in `architecture/tactical-metrics.json`. V3 geometry
 is `PIPELINE_DERIVED`; provider possession, role, direction, event, and phase
 fields remain `SOURCE_DERIVED`. SkillCorner tracking remains `MODEL_ESTIMATED`
@@ -69,6 +69,6 @@ The implementation identities are reserved and versioned as follows:
 - `tactical.spatial_territory` v1
 - `tactical.arrival_time` v1
 - `tactical.source_event_snapshot` v1
-- `tactical.matchlab_shape` v1
+- `tactical.matchlab_shape` v2
 
 They all consume canonical Arrow tables and publish dense tactical series as external Parquet. They do not read raw provider payloads or recompute in React.
