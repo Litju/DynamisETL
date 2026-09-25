@@ -141,6 +141,7 @@ test("RES-113 §21–22 real DFL and SkillCorner hybrid Field evidence", async (
   await fieldPlayers.nth(nextFieldPlayer!.index).click();
   await expect(splitPitch).toHaveAttribute("data-selected-player-id", fieldSubject);
   await expect(pose).toHaveAttribute("data-selected-player-id", fieldSubject);
+  await page.getByRole("button", { name: "Controls", exact: true }).click();
   const subjectSelect = page.getByLabel("Pose subject");
   const firstPoseSubject = (await subjectSelect.locator("option").evaluateAll((options) => options.map((option) => (option as HTMLOptionElement).value)))
     .find((subjectId) => subjectId !== fieldSubject);
@@ -148,6 +149,7 @@ test("RES-113 §21–22 real DFL and SkillCorner hybrid Field evidence", async (
   await subjectSelect.selectOption(firstPoseSubject!);
   await expect(pose).toHaveAttribute("data-selected-player-id", firstPoseSubject!);
   await expect(splitPitch).toHaveAttribute("data-selected-player-id", firstPoseSubject!);
+  await page.getByRole("button", { name: "Close controls", exact: true }).click();
   await capture(page, "10-skillcorner-field-orthographic-pose-3d-synchronized.png");
 
   await expectCleanConsole(console);

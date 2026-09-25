@@ -99,18 +99,22 @@ async function captureRenderer(page: Page, mode: "pixi" | "r3f", player: { reado
   await page.getByRole("button", { name: "Play", exact: true }).click();
   await expect(page.getByRole("button", { name: "Pause playback", exact: true })).toBeVisible();
   const beforeForward = await playheadNs(page);
-  await expect.poll(async () => (await playheadNs(page))!, { timeout: 5_000 })
-    .toBeGreaterThan(beforeForward + 500_000_000n);
+  // Measure both renderers over the same elapsed time instead of using the
+  // polling backoff as the playback window; the clock itself is shared.
+  const forwardStartedAt = await page.evaluate(() => performance.now());
+  await page.waitForTimeout(1_500);
   await page.getByRole("button", { name: "Pause playback" }).click();
+  const forwardElapsedMs = await page.evaluate((start) => performance.now() - start, forwardStartedAt);
   const afterForward = (await playheadNs(page))!;
   await expect(host).toHaveAttribute("data-drawn-frame-ns", (await host.getAttribute("data-drawn-frame-ns"))!);
 
   await page.getByRole("button", { name: "Reverse", exact: true }).click();
   await expect(page.getByRole("button", { name: "Pause playback", exact: true })).toBeVisible();
   const beforeReverse = await playheadNs(page);
-  await expect.poll(async () => (await playheadNs(page))!, { timeout: 5_000 })
-    .toBeLessThan(beforeReverse - 500_000_000n);
+  const reverseStartedAt = await page.evaluate(() => performance.now());
+  await page.waitForTimeout(1_500);
   await page.getByRole("button", { name: "Pause playback" }).click();
+  const reverseElapsedMs = await page.evaluate((start) => performance.now() - start, reverseStartedAt);
   const afterReverse = (await playheadNs(page))!;
   await expectCleanConsole(errors);
 
@@ -119,6 +123,8 @@ async function captureRenderer(page: Page, mode: "pixi" | "r3f", player: { reado
     sourceEvents,
     forwardDeltaNs: (afterForward! - beforeForward!).toString(),
     reverseDeltaNs: (afterReverse - beforeReverse!).toString(),
+    forwardRate: Number(afterForward! - beforeForward!) / (forwardElapsedMs * 1e6),
+    reverseRate: Number(beforeReverse - afterReverse) / (reverseElapsedMs * 1e6),
   };
 }
 
@@ -134,15 +140,17 @@ test("real DFL Pixi oracle and R3F renderer agree on Field data, layers, selecti
   expect(BigInt(r3f.forwardDeltaNs)).toBeGreaterThan(0n);
   expect(BigInt(pixi.reverseDeltaNs)).toBeLessThan(0n);
   expect(BigInt(r3f.reverseDeltaNs)).toBeLessThan(0n);
-  expect(BigInt(r3f.forwardDeltaNs) - BigInt(pixi.forwardDeltaNs)).toBeLessThan(750_000_000n);
-  expect(BigInt(pixi.forwardDeltaNs) - BigInt(r3f.forwardDeltaNs)).toBeLessThan(750_000_000n);
-  expect(BigInt(r3f.reverseDeltaNs) - BigInt(pixi.reverseDeltaNs)).toBeLessThan(750_000_000n);
-  expect(BigInt(pixi.reverseDeltaNs) - BigInt(r3f.reverseDeltaNs)).toBeLessThan(750_000_000n);
+  // Compare rates over the same 1.5 s reference interval. Absolute deltas from
+  // separate browser navigations include page-load/polling latency and falsely
+  // turn that scheduling variance into renderer playback drift.
+  const referenceWindowNs = 1_500_000_000;
+  expect(Math.abs(r3f.forwardRate - pixi.forwardRate) * referenceWindowNs).toBeLessThan(750_000_000);
+  expect(Math.abs(r3f.reverseRate - pixi.reverseRate) * referenceWindowNs).toBeLessThan(750_000_000);
 
   const receipt = {
     issue: "RES-113",
     rendererModes: { pixi, r3f },
-    criteria: ["source frame", "fixed metric dimensions", "hull/territory/influence counts", "player pointer selection", "ball/detection summary", "trail layer", "events in exact window", "forward and reverse canonical time"],
+    criteria: ["source frame", "fixed metric dimensions", "hull/territory/influence counts", "player pointer selection", "ball/detection summary", "trail layer", "events in exact window", "forward and reverse canonical-time rates"],
     screenshots: { pixi: "parity-pixi.png", r3f: "parity-r3f.png" },
     visualReviewNote: "Player coordinates and tactical outlines align. Pixi renders a banded surface texture while R3F uses a flat green pitch; review this non-measurement visual difference before retiring the Pixi oracle.",
   };
