@@ -29,6 +29,7 @@ from dynamis.storage.paths import receipt_path, relative_posix
 
 _TABLES = build_metadata().tables
 DERIVED_METRIC_TABLE = _TABLES["derived_metric"]
+SKELETON_JOINT_TABLE = _TABLES["skeleton_joint"]
 
 WHITE_DATASET_ID = "white-cmj-acc-grf"
 REFERENCE_JUMP_HEIGHT = "source_jump_height"
@@ -424,6 +425,29 @@ SKILLCORNER_POSE_PARAMETERS: dict[str, Any] = {
     "error_policy": "worst_case_additive_radius",
 }
 
+SKILLCORNER_POSE_QUALITY_PARAMETERS: dict[str, Any] = {
+    "expected_joint_names": [],
+    "metric_requirements": {
+        **{
+            f"segment_{segment['name']}": [
+                segment["start_landmark"],
+                segment["end_landmark"],
+            ]
+            for segment in SKILLCORNER_POSE_PARAMETERS["segments"]
+        },
+        **{
+            f"included_angle_{angle['name']}": [
+                angle["vertex_landmark"],
+                angle["first_landmark"],
+                angle["second_landmark"],
+            ]
+            for angle in SKILLCORNER_POSE_PARAMETERS["angles"]
+        },
+    },
+    "minimum_derivative_segment_frames": 3,
+    "derivative": SKILLCORNER_POSE_PARAMETERS["derivative"],
+}
+
 POSE_REQUIRED_COLUMNS = [
     "session_id",
     "trial_id",
@@ -438,7 +462,35 @@ POSE_REQUIRED_COLUMNS = [
     "y_m",
     "z_m",
     "error_m",
+    "nominal_sampling_rate_hz",
 ]
+
+
+def _pose_quality_parameters(
+    pose_parameters: dict[str, Any],
+    expected_joint_names: tuple[str, ...],
+) -> dict[str, Any]:
+    """Bind quality coverage to the registered skeleton and configured metrics."""
+    requirements: dict[str, list[str]] = {}
+    for segment in pose_parameters.get("segments", []):
+        name = str(segment["name"])
+        requirements[f"segment_{name}"] = [
+            str(segment["start_landmark"]),
+            str(segment["end_landmark"]),
+        ]
+    for angle in pose_parameters.get("angles", []):
+        name = str(angle["name"])
+        requirements[f"included_angle_{name}"] = [
+            str(angle["vertex_landmark"]),
+            str(angle["first_landmark"]),
+            str(angle["second_landmark"]),
+        ]
+    return {
+        "expected_joint_names": list(expected_joint_names),
+        "metric_requirements": requirements,
+        "minimum_derivative_segment_frames": 3,
+        "derivative": dict(pose_parameters.get("derivative", {})),
+    }
 
 
 def skillcorner_pose_acceptance(
@@ -448,8 +500,9 @@ def skillcorner_pose_acceptance(
     parameters: dict[str, Any] | None = None,
     progress: Callable[[int, int], None] | None = None,
 ) -> dict[str, Any]:
-    """Process the SkillCorner pose streams with translation-invariant geometry."""
+    """Accept SkillCorner geometry and cadence-grid Pose quality deterministically."""
     from dynamis.processors.pose import process_pose
+    from dynamis.processors.pose_quality import process_pose_quality
 
     resolved = dict(parameters or SKILLCORNER_POSE_PARAMETERS)
     with engine.connect() as connection:
@@ -457,7 +510,29 @@ def skillcorner_pose_acceptance(
     if not refs:
         raise ValueError(f"{SKILLCORNER_DATASET_ID}: no registered pose streams")
 
-    def execute(ref: SilverStreamRef) -> tuple[ProcessorRunResult, Any, Any]:
+    skeleton_ids = sorted({ref.skeleton_id for ref in refs if ref.skeleton_id is not None})
+    if len(skeleton_ids) != 1 or len(skeleton_ids) != len({ref.skeleton_id for ref in refs}):
+        raise ValueError("SkillCorner Pose streams must declare one registered skeleton authority")
+    with engine.connect() as connection:
+        skeleton_rows = connection.execute(
+            sa.select(
+                SKELETON_JOINT_TABLE.c.skeleton_id,
+                SKELETON_JOINT_TABLE.c.joint_id,
+                SKELETON_JOINT_TABLE.c.joint_name,
+            )
+            .where(SKELETON_JOINT_TABLE.c.skeleton_id.in_(skeleton_ids))
+            .order_by(SKELETON_JOINT_TABLE.c.skeleton_id, SKELETON_JOINT_TABLE.c.joint_id)
+        ).fetchall()
+    skeleton_names: dict[str, list[str]] = {skeleton_id: [] for skeleton_id in skeleton_ids}
+    for row in skeleton_rows:
+        skeleton_names[row.skeleton_id].append(row.joint_name)
+    for ref in refs:
+        if ref.skeleton_id is None or not skeleton_names.get(ref.skeleton_id):
+            raise ValueError(f"{ref.stream_id}: registered Pose skeleton has no joint definitions")
+
+    def execute(
+        ref: SilverStreamRef,
+    ) -> tuple[ProcessorRunResult, Any, ProcessorRunResult, Any, Any]:
         table, processor_input = load_silver(settings, ref, columns=POSE_REQUIRED_COLUMNS)
         result = process_pose(table, parameters=resolved)
         run = execute_processor(
@@ -468,26 +543,58 @@ def skillcorner_pose_acceptance(
             series_key=ref.stream_id,
             engine=engine,
         )
-        return run, result, table
+        quality_result = process_pose_quality(
+            table,
+            parameters=_pose_quality_parameters(
+                resolved,
+                tuple(skeleton_names[ref.skeleton_id or ""]),
+            ),
+        )
+        quality_run = execute_processor(
+            settings,
+            result=quality_result,
+            dataset_id=SKILLCORNER_DATASET_ID,
+            inputs=(processor_input,),
+            series_key=ref.stream_id,
+            engine=engine,
+        )
+        return run, result, quality_run, quality_result, table
 
     first_checksums: dict[str, str] = {}
     run_ids: set[str] = set()
     per_stream: list[dict[str, Any]] = []
     metric_values: dict[str, list[float]] = {}
     for index, ref in enumerate(refs):
-        run, result, table = execute(ref)
-        first_checksums[ref.stream_id] = run.series[0].artifact.checksum_sha256
-        run_ids.add(run.run_id)
+        run, result, quality_run, quality_result, table = execute(ref)
+        for processor_name, processor_run in (
+            ("kinematics", run),
+            ("quality", quality_run),
+        ):
+            run_ids.add(processor_run.run_id)
+            for series in processor_run.series:
+                first_checksums[f"{ref.stream_id}:{processor_name}:{series.name}"] = (
+                    series.artifact.checksum_sha256
+                )
         per_stream.append(
             {
                 "stream_id": ref.stream_id,
                 "rows": int(table.num_rows),
                 "frames": result.diagnostics["frames"],
                 "entities": result.diagnostics["entities"],
-                "metrics": len(result.metrics),
+                "metrics": len(result.metrics) + len(quality_result.metrics),
+                "quality_expected_frames": quality_result.diagnostics["expected_frames"],
+                "skeleton_id": ref.skeleton_id,
+                "series_checksums": {
+                    f"kinematics:{series.name}": series.artifact.checksum_sha256
+                    for series in run.series
+                }
+                | {
+                    f"quality:{series.name}": series.artifact.checksum_sha256
+                    for series in quality_run.series
+                },
             }
         )
-        for metric in result.metrics:
+        for metric in (*result.metrics, *quality_result.metrics):
             metric_values.setdefault(metric.declaration.metric_id, []).append(metric.value)
         del table
         if progress is not None:
@@ -496,15 +603,26 @@ def skillcorner_pose_acceptance(
     rerun_matches = 0
     rerun_run_ids: set[str] = set()
     for ref in refs:
-        run, _, table = execute(ref)
-        rerun_run_ids.add(run.run_id)
-        if run.series[0].artifact.checksum_sha256 == first_checksums[ref.stream_id]:
-            rerun_matches += 1
+        run, _, quality_run, _, table = execute(ref)
+        for processor_name, processor_run in (
+            ("kinematics", run),
+            ("quality", quality_run),
+        ):
+            rerun_run_ids.add(processor_run.run_id)
+            for series in processor_run.series:
+                if (
+                    series.artifact.checksum_sha256
+                    == first_checksums[f"{ref.stream_id}:{processor_name}:{series.name}"]
+                ):
+                    rerun_matches += 1
         del table
     receipt = {
         "dataset_id": SKILLCORNER_DATASET_ID,
-        "algorithm_id": "pose.translation_invariant_kinematics",
-        "configuration": resolved,
+        "algorithms": ["pose.translation_invariant_kinematics", "pose.analysis_quality"],
+        "configurations": {
+            "pose.translation_invariant_kinematics": resolved,
+            "pose.analysis_quality": "registered skeleton names and geometry requirements",
+        },
         "streams": len(refs),
         "runs": len(run_ids),
         "rerun_series_matches": rerun_matches,
@@ -534,7 +652,10 @@ def skillcorner_pose_acceptance(
         },
     }
     target = receipt_path(
-        settings, dataset_id=SKILLCORNER_DATASET_ID, kind="acceptance", name="res100-pose"
+        settings,
+        dataset_id=SKILLCORNER_DATASET_ID,
+        kind="acceptance",
+        name="res111-pose-analysis-quality",
     )
     atomic_write_text(target, json.dumps(receipt, indent=2, sort_keys=True) + "\n")
     receipt["receipt_path"] = relative_posix(settings.dataset_root, target)

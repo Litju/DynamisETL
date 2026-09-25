@@ -50,15 +50,28 @@
     },
     {
       "algorithm_id": "pose.analysis_quality",
-      "version": "planned",
-      "status": "not_implemented",
+      "version": "1.0.0",
+      "status": "implemented",
       "measurement_class": "PIPELINE_DERIVED",
       "metrics": [
-        {"id_pattern": "pose.quality.coverage.{metric}", "layer": "D", "unit": "1", "status": "planned", "definition": "Usable exact-observation fraction for a named metric and selected range."},
-        {"id_pattern": "pose.quality.dropout_count.{landmark}", "layer": "D", "unit": "1", "status": "planned", "definition": "Count of unavailable temporal intervals under explicit cadence/gap policy."},
-        {"id_pattern": "pose.quality.longest_dropout.{landmark}", "layer": "D", "unit": "s", "status": "planned", "definition": "Longest unavailable interval under explicit cadence/gap policy."},
-        {"id_pattern": "pose.quality.provider_error_radius_p95.{landmark}", "layer": "0", "unit": "m", "status": "planned", "definition": "95th percentile of provider p90 error-radius samples; retain provider p90-radius label."}
-      ]
+        {"id_pattern": "pose.quality.coverage.any_pose_present", "layer": "D", "unit": "1", "status": "implemented", "definition": "Fraction of cadence-expected frames with any source Pose row within the subject's first-to-last observed span."},
+        {"id_pattern": "pose.quality.coverage.any_usable_pose", "layer": "D", "unit": "1", "status": "implemented", "definition": "Fraction of cadence-expected frames with at least one available finite landmark."},
+        {"id_pattern": "pose.quality.availability.{landmark}", "layer": "D", "unit": "1", "status": "implemented", "definition": "Fraction of cadence-expected frames with the named landmark available and finite."},
+        {"id_pattern": "pose.quality.coverage.metric.{metric}", "layer": "D", "unit": "1", "status": "implemented_when_configured", "definition": "Fraction of cadence-expected frames with every configured metric landmark available and finite."},
+        {"id_pattern": "pose.quality.dropout_count.{landmark}", "layer": "D", "unit": "1", "status": "implemented", "definition": "Count of contiguous missing/unavailable intervals on the explicit cadence grid."},
+        {"id_pattern": "pose.quality.longest_dropout.{landmark}", "layer": "D", "unit": "s", "status": "implemented", "definition": "Longest missing/unavailable interval on the explicit cadence grid."},
+        {"id_pattern": "pose.quality.provider_error_radius_mean.{landmark}", "layer": "0", "unit": "m", "status": "implemented_when_available", "definition": "Mean over provider p90 predicted error-radius samples; provider p90-radius semantics are preserved."},
+        {"id_pattern": "pose.quality.provider_error_radius_median.{landmark}", "layer": "0", "unit": "m", "status": "implemented_when_available", "definition": "Median over provider p90 predicted error-radius samples; provider p90-radius semantics are preserved."},
+        {"id_pattern": "pose.quality.provider_error_radius_p95.{landmark}", "layer": "0", "unit": "m", "status": "implemented_when_available", "definition": "95th percentile over provider p90 predicted error-radius samples; provider p90-radius semantics are preserved."},
+        {"id_pattern": "pose.quality.derivative_eligible_fraction.{metric}", "layer": "D", "unit": "1", "status": "implemented_when_configured", "definition": "Fraction of expected frames in a contiguous complete-metric run meeting the configured minimum frame count; records derivative settings and is not itself a derivative."}
+      ],
+      "frame_grid": "nominal_sampling_rate_hz_or_median_observed_step",
+      "availability_rule": "is_available_and_finite_xyz",
+      "minimum_derivative_segment_frames": 3,
+      "error_radius_quantile_method": "linear",
+      "series_columns": ["entity_id", "t_rel_ns", "any_pose_present", "any_pose_available", "available_landmark_count", "expected_landmark_count"],
+      "dropout_interval_series": "pose_quality_dropout_intervals",
+      "dropout_interval_series_columns": ["entity_id", "joint_name", "start_ns", "end_ns_exclusive", "missing_frames", "duration_s"]
     },
     {
       "algorithm_id": "pose.bilateral_geometry",

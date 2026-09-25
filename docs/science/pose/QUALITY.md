@@ -14,6 +14,16 @@ The provider error radius must not be reused as a pipeline confidence score.
 Missing or unavailable observations remain explicit gaps and do not become
 zero-valued samples.
 
+The implemented `pose.analysis_quality` v1 processor evaluates each subject's
+first-to-last observed span on a cadence-derived grid, using the registered
+skeleton order and configured metric landmark requirements. Its dense Parquet
+series records subject-level row presence and finite-availability counts per
+expected frame, plus a separate per-landmark dropout-interval series. Provider
+error-radius distributions are scalar summaries; the exact per-frame provider
+radii remain available in the source Pose series. It reports stream-span summaries;
+selected-range summaries must be requested for the exact canonical range and
+must not be reconstructed from chart display samples.
+
 For a selected range, quality summaries report the exact subject, stream,
 canonical from/to times, expected cadence, observed/usable-frame fraction,
 landmark-specific availability, dropout count and intervals, longest dropout,
@@ -22,6 +32,11 @@ summary with the provider's p90-radius semantics. A selected derivative also
 reports its sampling rate, temporal segmentation threshold, filter and
 parameters, differentiation scheme, edge policy, minimum usable segment
 length, and whether the current sample is eligible.
+
+The v1 derivative-eligible fraction is a mask over cadence-grid runs with all
+configured metric landmarks available and a configured minimum number of
+contiguous frames. It is a quality-gate summary, not a derivative value or a
+claim that a biomechanical derivative passed independent validation.
 
 Never aggregate these distinct measurements into an undocumented scalar
 quality score. A missing model, source dropout, insufficient landmarks, invalid
