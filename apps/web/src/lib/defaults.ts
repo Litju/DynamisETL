@@ -44,6 +44,24 @@ export function defaultStreamFor(
   return candidates[0] ?? null;
 }
 
+/** First observed, registered player: prefer Pose, then tracking as the fail-safe. */
+export function defaultMatchPlayerId(
+  session: SessionDetail | undefined,
+  poseArtifact: Pick<ArtifactDetail, "entity_observations"> | undefined,
+  trackingArtifact: Pick<ArtifactDetail, "entity_observations"> | undefined,
+): string | null {
+  if (session === undefined) return null;
+  const fromArtifact = (artifact: Pick<ArtifactDetail, "entity_observations"> | undefined) => {
+    const observed = new Set(
+      (artifact?.entity_observations ?? [])
+        .filter((observation) => observation.observation_count > 0)
+        .map((observation) => observation.entity_id),
+    );
+    return session.participants.find((participant) => observed.has(participant.subject_id))?.subject_id ?? null;
+  };
+  return fromArtifact(poseArtifact) ?? fromArtifact(trackingArtifact);
+}
+
 /**
  * The view a session opens on. Registered tracking opens in the integrated
  * MatchLab workstation, including field-only sources whose Pose pane will state

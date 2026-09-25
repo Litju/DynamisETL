@@ -21,7 +21,7 @@ const MatchLabDashboard = lazy(() => import("@/components/matchlab/MatchLabWorks
 const MatchLabPoseViewport = lazy(() => import("@/components/matchlab/MatchLabWorkspace").then((module) => ({ default: module.MatchLabPoseViewport })));
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
 import { artifactQuery, sessionQuery } from "@/lib/api/queries";
-import { canonicalTimeDefault, patchChangesSearch, resolveLabDefaults } from "@/lib/defaults";
+import { canonicalTimeDefault, defaultMatchPlayerId, patchChangesSearch, resolveLabDefaults } from "@/lib/defaults";
 import { sessionSurfaces } from "@/lib/capabilities";
 import { cn } from "@/lib/cn";
 import { labSearchSchema, parseSearch, WORKBENCH_VIEWS } from "@/lib/search";
@@ -125,24 +125,33 @@ export function LabPage() {
   const poseStreamForMatch = detail?.streams.find(
     (stream) => stream.modality === "pose" && stream.trial_id === (selectedStream?.trial_id ?? search.trial),
   );
-  const defaultSubjectArtifactId = durableView === "matchlab" && search.subject === undefined && selectedStream?.modality === "tracking"
-    ? poseStreamForMatch?.sample_artifact_ids[0] ?? selectedStream.sample_artifact_ids[0] ?? null
+  const poseSubjectArtifactId = durableView === "matchlab" && search.subject === undefined && selectedStream?.modality === "tracking"
+    ? poseStreamForMatch?.sample_artifact_ids[0] ?? null
     : null;
-  const defaultSubjectArtifact = useQuery({
-    ...artifactQuery(defaultSubjectArtifactId ?? ""),
-    enabled: Boolean(defaultSubjectArtifactId),
+  const poseSubjectArtifact = useQuery({
+    ...artifactQuery(poseSubjectArtifactId ?? ""),
+    enabled: Boolean(poseSubjectArtifactId),
   });
   const awaitingPoseSubject = durableView === "pose" && search.subject === undefined;
   useEffect(() => {
-    if (durableView !== "matchlab" || search.subject !== undefined || !detail || !defaultSubjectArtifact.data) return;
-    const observedSubjects = new Set(
-      (defaultSubjectArtifact.data.entity_observations ?? [])
-        .filter((observation) => observation.observation_count > 0)
-        .map((observation) => observation.entity_id),
-    );
-    const firstObservedParticipant = detail.participants.find((participant) => observedSubjects.has(participant.subject_id));
-    if (firstObservedParticipant) updateSearch({ subject: firstObservedParticipant.subject_id });
-  }, [defaultSubjectArtifact.data, detail, durableView, search.subject, updateSearch]);
+    if (
+      durableView !== "matchlab" ||
+      search.subject !== undefined ||
+      !detail ||
+      (poseSubjectArtifactId !== null && poseSubjectArtifact.isPending)
+    ) return;
+    const selectedSubject = defaultMatchPlayerId(detail, poseSubjectArtifact.data, timeArtifact.data);
+    if (selectedSubject !== null) updateSearch({ subject: selectedSubject });
+  }, [
+    detail,
+    durableView,
+    poseSubjectArtifact.data,
+    poseSubjectArtifact.isPending,
+    poseSubjectArtifactId,
+    search.subject,
+    timeArtifact.data,
+    updateSearch,
+  ]);
   useEffect(() => {
     const previous = previousRendererContext.current;
     const trialId = search.trial ?? selectedStream?.trial_id ?? null;
