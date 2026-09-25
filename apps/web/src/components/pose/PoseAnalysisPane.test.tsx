@@ -162,6 +162,33 @@ function installFetch(): void {
           provenance_fields: ["subject_id", "t_rel_ns"],
         });
       }
+      if (url.pathname === "/api/pose/range-report") {
+        return json({
+          algorithm_id: "pose.range_summary",
+          algorithm_version: "1.0.0",
+          parameters_hash: "e".repeat(64),
+          code_git_sha: "f".repeat(40),
+          dataset_id: "skillcorner-opendata",
+          session_id: "match-1",
+          trial_id: "period-1",
+          stream_id: "pose-period-1",
+          subject_id: "player-1",
+          from_ns: Number(url.searchParams.get("from_ns")),
+          to_ns: Number(url.searchParams.get("to_ns")),
+          input_artifact_checksums: { pose_source: "a".repeat(64) },
+          metrics: [
+            {
+              metric_id: "pose.range.landmark.speed_mean.lKnee",
+              metric_name: "Mean body-anchor-relative speed in selected range for lKnee",
+              si_unit: "m/s",
+              value_num: 1.1,
+              description: "Exact range summary.",
+              provenance: { from_ns: 0, to_ns: 80_000_000 },
+            },
+          ],
+          display_note: "Exact processor samples.",
+        });
+      }
       if (url.pathname === "/api/artifacts/landmark-series/window") {
         return json({
           meta: {
@@ -232,12 +259,12 @@ const context: AnalysisContextValue = {
   selectResult: vi.fn(),
 };
 
-function renderPane() {
+function renderPane(contextValue: AnalysisContextValue = context) {
   installFetch();
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <AnalysisContext.Provider value={context}>
+      <AnalysisContext.Provider value={contextValue}>
         <PoseAnalysisPane />
       </AnalysisContext.Provider>
     </QueryClientProvider>,
@@ -280,4 +307,15 @@ it("renders the processor waveform from the bounded typed-series window", async 
 
   expect(await screen.findByRole("figure", { name: /lKnee Body-relative speed waveform/ })).toBeTruthy();
   await waitFor(() => expect(screen.getByText(/Exact precomputed processor series · 3 points/)).toBeTruthy());
+});
+
+it("requests an exact range report from server-side processor series", async () => {
+  renderPane({ ...context, fromNs: 0n, toNs: 80_000_000n });
+  fireEvent.click(await screen.findByRole("tab", { name: "Selected joint" }));
+  fireEvent.change(screen.getByRole("combobox", { name: "Select Pose landmark" }), { target: { value: "lKnee" } });
+  fireEvent.click(screen.getByRole("tab", { name: "Range" }));
+
+  expect(await screen.findByText(/pose\.range_summary v1\.0\.0 · subject player-1 · exact processor inputs/)).toBeTruthy();
+  expect(screen.getByText("Mean body-anchor-relative speed in selected range for lKnee")).toBeTruthy();
+  expect(screen.getByText(/code SHA/)).toBeTruthy();
 });

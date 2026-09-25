@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
-import type { MetricValue } from "@/api/types";
+import type { MetricValue, PoseRangeReportView } from "@/api/types";
 import { EMPTY_JOINT_NAMES } from "@/components/pose/pose-model";
 import { PoseTelemetry } from "@/components/pose/PoseTelemetry";
 import { useAnalysisContext } from "@/lib/analysis-context";
@@ -11,6 +11,7 @@ import {
   metricsQuery,
   methodologyQuery,
   processingArtifactsQuery,
+  poseRangeReportQuery,
   sessionQuery,
 } from "@/lib/api/queries";
 import { decodeWindowOffThread } from "@/lib/arrow/client";
@@ -68,6 +69,24 @@ function MetricRows({ rows, empty }: { readonly rows: readonly MetricValue[]; re
           </div>
           <dd className="mono self-center text-right text-[11px] tabular text-text-primary">
             {metricValue(row)}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function RangeMetricRows({ report }: { readonly report: PoseRangeReportView }) {
+  return (
+    <dl className="divide-y divide-border-subtle">
+      {report.metrics.map((metric) => (
+        <div key={metric.metric_id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 px-3 py-2">
+          <div className="min-w-0">
+            <dt className="truncate text-[11px] text-text-secondary">{metric.metric_name}</dt>
+            <dd className="mono truncate text-[9px] text-text-muted">{metric.metric_id}</dd>
+          </div>
+          <dd className="mono self-center text-right text-[11px] tabular text-text-primary">
+            {formatMetricValue(metric.value_num, metric.si_unit).text}
           </dd>
         </div>
       ))}
@@ -260,7 +279,18 @@ export function PoseAnalysisPane() {
         ? `right_${selectedJoint.slice(1, 2).toLowerCase()}${selectedJoint.slice(2)}`
         : "";
     return metricRows.filter(
-      (row) => row.metric_id.endsWith(`.${selectedToken}`) || (angleToken !== "" && row.metric_id.endsWith(`.${angleToken}`)),
+      (row) => {
+        const selectedLandmarkMetric =
+          row.metric_id.startsWith("pose.landmark.displacement_from_range_start.") ||
+          row.metric_id.startsWith("pose.landmark.path_length.") ||
+          row.metric_id.startsWith("pose.landmark.speed_mean.") ||
+          row.metric_id.startsWith("pose.landmark.speed_peak.");
+        const selectedGeometricAngle = row.metric_id.startsWith("pose.angular_rom.");
+        return (
+          (selectedLandmarkMetric && row.metric_id.endsWith(`.${selectedToken}`)) ||
+          (selectedGeometricAngle && angleToken !== "" && row.metric_id.endsWith(`.${angleToken}`))
+        );
+      },
     );
   }, [metricRows, selectedJoint, selectedToken]);
   const kinematicsRows = useMemo(
@@ -279,6 +309,23 @@ export function PoseAnalysisPane() {
   const methodology = useQuery({
     ...methodologyQuery(methodologyMetricId),
     enabled: Boolean(methodologyMetricId),
+  });
+  const rangeReportEnabled = Boolean(
+    context?.datasetId && context.sessionId && stream?.stream_id && subjectId &&
+    selectedJoint && PRECOMPUTED_LANDMARKS.has(selectedJoint) && explicitRange,
+  );
+  const rangeReport = useQuery({
+    ...poseRangeReportQuery({
+      datasetId: context?.datasetId ?? "",
+      sessionId: context?.sessionId ?? "",
+      streamId: stream?.stream_id ?? "",
+      subjectId: subjectId ?? "",
+      fromNs: Number(explicitRange?.fromNs ?? 0n),
+      toNs: Number(explicitRange?.toNs ?? 0n),
+      landmarkName: selectedJoint ?? "lKnee",
+    }),
+    enabled: rangeReportEnabled,
+    staleTime: 30_000,
   });
   const decodedWaveform = waveform.data?.prepared;
   const waveformPath = waveformColumn === null ? null : waveformPathFor(decodedWaveform, waveformColumn);
@@ -409,10 +456,28 @@ export function PoseAnalysisPane() {
             ) : (
               <p className="mt-2 text-[10px] text-text-muted">No committed range. Use the shared timeline to brush and commit an exact range.</p>
             )}
-            <p className="mt-3 text-[10px] text-text-muted">
-              The waveform above reads the precomputed exact-time series for the selected window. Scalar values below are the processor’s registered stream-span summaries.
-            </p>
-            <MetricRows rows={kinematicsRows} empty="No accepted geometric or derivative summaries are available." />
+            {explicitRange === null ? null : selectedJoint === null || !PRECOMPUTED_LANDMARKS.has(selectedJoint) ? (
+              <p className="mt-3 text-[10px] text-text-muted">Select one of the processed lower-limb landmarks to build its exact-range report.</p>
+            ) : rangeReport.isPending ? (
+              <p className="mt-3 text-[10px] text-text-muted">Computing a bounded report from exact processor series…</p>
+            ) : rangeReport.isError ? (
+              <p className="mt-3 text-[10px] text-quality-warning">Range report unavailable; the exact window may exceed the serving limit or a required processor series is missing.</p>
+            ) : rangeReport.data ? (
+              <section aria-label="Exact Pose range report" className="mt-3">
+                <div className="border-y border-border-subtle px-3 py-2 text-[9px] text-text-muted">
+                  {rangeReport.data.algorithm_id} v{rangeReport.data.algorithm_version} · subject {rangeReport.data.subject_id} · exact processor inputs
+                </div>
+                <RangeMetricRows report={rangeReport.data} />
+                <details className="mx-3 my-2">
+                  <summary className="cursor-pointer text-[10px] text-text-muted">Method and input checksums</summary>
+                  <p className="mono mt-1 break-all text-[9px] text-text-muted">code SHA {rangeReport.data.code_git_sha ?? "unavailable"}</p>
+                  {Object.entries(rangeReport.data.input_artifact_checksums).map(([name, checksum]) => (
+                    <p key={name} className="mono mt-1 break-all text-[9px] text-text-muted">{name} · {checksum}</p>
+                  ))}
+                  <p className="mt-1 text-[9px] text-text-muted">{rangeReport.data.display_note}</p>
+                </details>
+              </section>
+            ) : null}
           </div>
         ) : null}
         {section === "Symmetry" ? (
