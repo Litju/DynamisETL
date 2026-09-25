@@ -1,6 +1,6 @@
 # MatchLab V3 architecture
 
-Status: frozen for the MatchLab rendering boundary. Contract: architecture/system-v3.json.
+Status: frozen for the MatchLab rendering boundary. Current contract: architecture/system-v3.json, version 3.1.0 (RES-113 §§21–22 hybrid Field amendment).
 
 ## Scope
 
@@ -21,6 +21,13 @@ The context is an API over the existing state owners. It is not another store. P
 - Three.js, React Three Fiber and Drei; one Canvas and one WebGL renderer.
 - WebGL2 is the initial production backend. WebGPU is considered only after the final representative scene is complete and measured.
 - The registered source match dimensions determine the procedural pitch. Missing geometry is an explicit unavailable state.
+- Field defaults to Tactical Map with a fitted OrthographicCamera and stable margins around the registered source pitch. Structure Lift uses an oblique orthographic camera; optional Perspective Explore is not the tactical default. Reset returns the selected preset to deterministic framing, and camera movement never alters source coordinates.
+- The procedural pitch is source-sized and includes a visible turf edge and three-dimensional goal frames/nets. Tracking uses grounded planar point markers; source identity is carried by labels and selection state, not glyph height.
+- Default tactical structure comes from V3 source-roster GK/DEF/MID/ATT functional-unit rows, with centroids and inter-line gaps. Level A convex hull is optional occupied-area context. Stable graph edges, selected-player triangles and selected ATT-to-nearest-DEF relations are requested and drawn only in their Relations mode.
+- Tracking positions, functional-unit structure, inter-line gaps, graph edges, local triangles, opposition relations, hull/Voronoi geometry, contours and events preserve their scientific pitch-plane XY. Presentation-only layer offsets live in `render-layer-depths.ts` and remain visually subtle.
+- `ScalarFieldLayer` is the only analytical 2.5D surface. A metric-specific `ElevationSpec` declares its scientific domain, units, display transform, height limit, pitch-plane baseline and fixed color domain. Heights update the mesh from worker-prepared typed buffers; no scientific metric is recalculated in React or a shader. Its label is `ANALYTICAL ELEVATION · NOT PHYSICAL HEIGHT`.
+- Tactical Map disables shadows. Structure Lift enables exactly one restrained DirectionalLight shadow map; the pitch receives the analytical surface's shadow and planar tactical layers do not cast meaningful shadows. Split mode keeps Field orthographic and Pose genuinely 3D.
+- Tactical views are ordered Live / Structure / Relations / Space / Events / Range / Report. Selecting a player or relation resolves through MatchFrameContext and stays synchronized between Field and Pose.
 - Tracking/Pose frames resolve independently against one signed BigInt canonical time. A source frame is the latest real sample at or before the playhead within the declared source-rate tolerance; its own timestamp stays visible. Source frame indexes are never equated and missing samples are never interpolated.
 - Scientific values, identity and provenance stay in their existing artifacts and processors.
 - Pixi is only a temporary parity oracle during migration. It is not a second production Field path.

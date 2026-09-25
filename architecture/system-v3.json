@@ -1,7 +1,7 @@
 {
   "$schema": "./system-v3.schema.json",
   "contract_id": "dynamisdata-matchlab-rendering",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "status": "frozen",
   "scope": "MatchLab Field, Pose, shared context, renderer and frame-preparation boundary only. System V2 remains authoritative outside this boundary.",
   "authorities": {
@@ -42,6 +42,14 @@
     "coordinate_frame": "Tracking X/Y retain the registered pitch-centred source frame. Pitch3D markings use the same metric dimensions and do not transform observations.",
     "markings": "Generate standardized IFAB markings procedurally and goals from field dimensions; optional context decoration cannot affect analytical clarity."
   },
+  "field_presentation": {
+    "default_mode": "Tactical Map uses a registered-pitch-fitted OrthographicCamera with stable margins and deterministic reset framing.",
+    "structure_lift": "Structure Lift uses an oblique orthographic camera over the same scientific pitch-plane XY geometry.",
+    "optional_exploration": "Perspective/Orbit is an optional exploration mode and never the tactical default.",
+    "planar_quantities": ["tracking positions", "functional units and inter-line gaps", "shape graph", "local triangles", "opposition relations", "hull and Voronoi", "event paths"],
+    "depth_offset_authority": "All presentation-only Field offsets are centralized in apps/web/src/components/matchlab/render-layer-depths.ts and never become scientific Z.",
+    "shadow_policy": "Tactical Map has shadows disabled. Structure Lift enables one restrained DirectionalLight shadow map; the pitch receives the analytical ScalarFieldLayer shadow and planar tactical layers do not cast meaningful shadows. Split mode keeps Field orthographic and Pose 3D."
+  },
   "layers": [
     { "id": "PitchLayer", "responsibility": "Registered metric pitch and goals.", "independently_toggleable": true },
     { "id": "TrackingLayer", "responsibility": "Tracked entities, ball, provider state, trails and player picking.", "independently_toggleable": true },
@@ -66,7 +74,7 @@
     "gpu_representation": ["typed buffer or DataTexture", "flat heatmap", "contour", "optional analytical elevation"],
     "color_domain": "Fixed and declared for the selected metric; never autoscaled frame by frame.",
     "metric_authority": "Scientific processors compute values; shaders only map supplied values to a declared visual encoding.",
-    "elevation": "Always label analytical elevation as NOT PHYSICAL PITCH HEIGHT; never imply it is a measured surface."
+    "elevation": "A metric-specific ElevationSpec declares scientific domain, units, elevation transform, display-height limit, pitch-plane baseline and color domain. Update mesh vertex heights from worker-prepared typed buffers without recomputing science in React or shaders. Always label ANALYTICAL ELEVATION · NOT PHYSICAL HEIGHT."
   },
   "interaction": {
     "selection_authority": "One MatchFrameContext selection action. Field-origin player picks commit the player and current canonical time without moving it when Pose is absent; the Pose view reports absence and the next sample. Pose-origin player switches retain RES-109 section 12 by resolving the first valid observation in the active range. Both commit player and target time together through the durable router context.",
@@ -91,16 +99,17 @@
       { "id": 9, "gate": "Implement the generic fixed-domain scalar-field renderer." },
       { "id": 10, "gate": "Prove real SkillCorner Field/Pose cross-selection and synchronized playback." },
       { "id": 11, "gate": "Benchmark WebGL2 and WebGPU only on the final representative MatchLab scene." },
-      { "id": 12, "gate": "Remove the production Pixi Field path only after complete parity and real-data acceptance." }
+      { "id": 12, "gate": "Remove the production Pixi Field path only after complete parity and real-data acceptance." },
+      { "id": 13, "gate": "Apply the RES-113 §§21–22 hybrid Field amendment and capture real DFL/SkillCorner Tactical Map, Structure Lift, scalar elevation/shadow, tactical structure and split Field/Pose evidence." }
     ],
     "stop_rule": "Do not start RES-111 or RES-114 until RES-113 is reviewed and accepted."
   },
   "acceptance": {
     "contract": "V3 schema and architecture validator pass; RES-109/110 contracts remain intact.",
     "fixture": "Field, Pose, layers, picking, exact time, worker buffers and split views pass deterministic fixture checks.",
-    "real_skillcorner": "Real tracking/Pose player identity is selected in either direction and continuous forward/reverse playback remains synchronized by canonical time with explicit source gaps.",
+    "real_skillcorner": "Real DFL and SkillCorner browser evidence captures hybrid Field modes and accepted tactical structure; SkillCorner tracking/Pose identity is selected in either direction and playback stays synchronized by canonical time with explicit source gaps.",
     "parity": "Player, ball, event, selection, trail, tactical overlay, coordinate and forward/reverse playback parity against the Pixi oracle is recorded before Pixi production retirement.",
-    "benchmark": "Field-only, Pose-only and split scenes are measured at 1600x1000 and 1440x900; WebGPU decision records compatibility, frame timing, draw calls, memory and selection latency.",
+    "benchmark": "Field-only, Pose-only and split scenes are measured at 1600x1000 and 1440x900; Tactical Map and Structure Lift are measured separately, with paired Structure Lift shadow overhead and scalar update cost. WebGPU decision records compatibility, frame timing, draw calls, memory and selection latency.",
     "user_review": "The owner reviews and explicitly accepts the unified renderer; implementation completion alone does not accept RES-113."
   },
   "adr_ids": ["ADR-001-renderer-migration", "ADR-002-shared-canvas-multiview", "ADR-003-worker-data-plane", "ADR-004-webgpu-benchmark-gate"]

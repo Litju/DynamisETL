@@ -34,6 +34,14 @@ No transform is applied when direction is absent; such results are explicitly
 frame-axis results. Normalized third/zone labels are unavailable without source
 direction.
 
+Source-possession context also carries raw ball X/Y from the same exact
+tracking frame and classifies a pitch third only when a finite source ball
+point is present. With declared attacking direction, the zone is `own_third`,
+`middle_third`, or `opponent_third` in that team's normalized frame; without
+direction it is `left_third`, `center_third`, or `right_third` in the source
+frame. Out-of-pitch points are `out_of_bounds`; missing points remain null.
+This does not infer possession, active play, or an event phase.
+
 ## Functional units
 
 Source roster roles are fixed for a player identity during the accepted match;
@@ -51,6 +59,17 @@ They describe frame-axis separation and do not assert line order. Outfield block
 depth is the X range across source-labelled DEF/MID/ATT players; goalkeeper and
 unknown-role rows are excluded. Each result reports role counts, direction
 availability, and source-frame versus team-normalized coordinates.
+
+### Field presentation
+
+Live and Structure lead with the source possession/ball context and the
+GK/DEF/MID/ATT functional units, their current centroids and inter-line gaps.
+The Level A convex hull is optional Space / Occupied Area context and is off by
+default. Stable graph edges require an explicit Relations selection. Triangle
+display is limited to stable triangles incident to the selected player;
+attacker-defender display is limited to the selected ATT player and its nearest
+DEF. These displays expose geometric descriptors only and do not name a
+formation, pressing action, marker, or phase.
 
 ## Delaunay graph and triangles
 

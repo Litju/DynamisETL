@@ -26,5 +26,7 @@ X/Y observations retain the source coordinate frame. Camera movement, pitch geom
 
 ## Tactical scalar fields
 
-Processors provide the bounded grid, metric identity, method/model, units, measurement class, frame and fixed semantic color domain. The renderer only encodes those supplied values as a heatmap, contour or optional analytical elevation. Elevation is always labeled NOT PHYSICAL PITCH HEIGHT. Exact-frame tactical geometry remains exact; a sampled influence grid may show its canonical grid time and declared maximum age.
+Processors provide the bounded grid, metric identity, method/model, units, measurement class, frame and fixed semantic color domain. The existing Arrow/Comlink worker transfers the grid as typed buffers; the renderer updates flat, contour and elevated mesh buffers from those exact rows. A metric-specific `ElevationSpec` declares scientific domain, units, deterministic elevation transform, display-height limit, pitch-plane baseline, color domain and legend copy. The display transform does not recompute or change a scientific metric. Elevation is always labeled NOT PHYSICAL PITCH HEIGHT. Exact-frame tactical geometry remains exact; a sampled influence grid may show its canonical grid time and declared maximum age.
+
+Tactical Map and Structure Lift are orthographic camera presets over the same metric pitch. Tracking, functional units, gaps, shape graphs, triangles, opposition relations, hull/Voronoi and events remain planar. Only declared scalar elevation varies vertically. Presentation-only layer offsets are centralized in `render-layer-depths.ts`; one restrained DirectionalLight shadow map is enabled only in Structure Lift.
 

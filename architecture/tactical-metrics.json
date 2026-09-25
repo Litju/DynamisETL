@@ -411,9 +411,14 @@
   ],
   "matchlab_tactical_v3": {
     "algorithm_id": "tactical.matchlab_shape",
-    "algorithm_version": "1",
+    "algorithm_version": "2",
     "measurement_class": "PIPELINE_DERIVED",
     "source_context_class": "SOURCE_DERIVED",
+    "source_context_outputs": {
+      "ball_position": "Raw source-frame ball X/Y when present; null otherwise.",
+      "ball_zone": "Third classification from the finite source ball point; team-attack-normalized only when direction is declared, otherwise source-frame thirds.",
+      "ball_zone_frame": "team_attack_normalized or source_frame; never inferred from possession."
+    },
     "role_domains": [
       "GK",
       "DEF",

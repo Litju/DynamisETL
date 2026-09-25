@@ -191,6 +191,21 @@ def _check_matchlab_v3_invariants(contract: dict[str, Any]) -> None:
     if "never infer" not in contract["pitch"]["missing_geometry"]:
         raise ContractError("missing metric pitch geometry must fail closed")
 
+    presentation = contract["field_presentation"]
+    if "Tactical Map" not in presentation["default_mode"] or "OrthographicCamera" not in presentation["default_mode"]:
+        raise ContractError("Tactical Map must be the fitted orthographic Field default")
+    if "Structure Lift" not in presentation["structure_lift"] or "orthographic" not in presentation["structure_lift"]:
+        raise ContractError("Structure Lift must preserve metric pitch XY with orthographic projection")
+    if "optional" not in presentation["optional_exploration"].lower():
+        raise ContractError("Perspective exploration must remain optional")
+    if "render-layer-depths.ts" not in presentation["depth_offset_authority"]:
+        raise ContractError("Field presentation offsets must have one depth authority")
+    if "one restrained DirectionalLight" not in presentation["shadow_policy"]:
+        raise ContractError("analytical Field shadows must use one restrained light")
+    required_planar = {"tracking positions", "functional units and inter-line gaps", "shape graph", "local triangles", "opposition relations", "hull and Voronoi", "event paths"}
+    if set(presentation["planar_quantities"]) != required_planar:
+        raise ContractError("tracking and ordinary tactical geometry must remain planar")
+
     layer_ids = [layer["id"] for layer in contract["layers"]]
     expected_layers = {
         "PitchLayer",
@@ -224,12 +239,12 @@ def _check_matchlab_v3_invariants(contract: dict[str, Any]) -> None:
         raise ContractError("worker contract must prohibit frame-cadence row-object maps")
     if "processors compute values" not in contract["scalar_fields"]["metric_authority"]:
         raise ContractError("scalar-field shaders must not compute scientific values")
-    if "NOT PHYSICAL PITCH HEIGHT" not in contract["scalar_fields"]["elevation"]:
+    if "NOT PHYSICAL HEIGHT" not in contract["scalar_fields"]["elevation"]:
         raise ContractError("analytical elevation must be labeled as non-physical")
 
     step_ids = [step["id"] for step in contract["migration"]["steps"]]
-    if step_ids != list(range(1, 13)):
-        raise ContractError("V3 migration gates must be the ordered 1–12 execution contract")
+    if step_ids != list(range(1, 14)):
+        raise ContractError("V3 migration gates must be the ordered 1–13 execution contract")
     stop_rule = contract["migration"]["stop_rule"]
     if "RES-111" not in stop_rule or "RES-114" not in stop_rule:
         raise ContractError("RES-111 and RES-114 must remain gated on RES-113 acceptance")

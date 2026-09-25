@@ -6,14 +6,14 @@
   "additionalProperties": false,
   "required": [
     "$schema", "contract_id", "version", "status", "scope", "authorities",
-    "technology", "state_ownership", "match_frame_context", "pitch", "layers",
+    "technology", "state_ownership", "match_frame_context", "pitch", "field_presentation", "layers",
     "source_alignment", "worker_data_plane", "scalar_fields", "interaction",
     "migration", "acceptance", "adr_ids"
   ],
   "properties": {
     "$schema": { "type": "string", "minLength": 1 },
     "contract_id": { "type": "string", "enum": ["dynamisdata-matchlab-rendering"] },
-    "version": { "type": "string", "enum": ["3.0.0"] },
+    "version": { "type": "string", "enum": ["3.1.0"] },
     "status": { "type": "string", "enum": ["frozen"] },
     "scope": { "type": "string", "minLength": 1 },
     "authorities": {
@@ -72,6 +72,18 @@
         "missing_geometry": { "type": "string", "minLength": 1 },
         "coordinate_frame": { "type": "string", "minLength": 1 },
         "markings": { "type": "string", "minLength": 1 }
+      }
+    },
+    "field_presentation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["default_mode", "structure_lift", "optional_exploration", "planar_quantities", "depth_offset_authority", "shadow_policy"],
+      "properties": {
+        "default_mode": { "type": "string", "minLength": 1 },
+        "structure_lift": { "type": "string", "minLength": 1 },
+        "optional_exploration": { "type": "string", "minLength": 1 },
+        "planar_quantities": { "$ref": "#/$defs/stringArray" },
+        "depth_offset_authority": { "type": "string", "minLength": 1 },
+        "shadow_policy": { "type": "string", "minLength": 1 }
       }
     },
     "layers": {
@@ -139,7 +151,7 @@
         "single_worktree": { "type": "boolean", "enum": [true] },
         "atomic_commits": { "type": "boolean", "enum": [true] },
         "steps": {
-          "type": "array", "minItems": 12,
+          "type": "array", "minItems": 13,
           "items": {
             "type": "object", "additionalProperties": false,
             "required": ["id", "gate"],
