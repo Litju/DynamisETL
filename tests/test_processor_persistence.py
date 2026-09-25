@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import text
+from sqlalchemy.dialects import postgresql
 
 from dynamis.config import (
     ENV_DB_SCHEMA,
@@ -26,7 +27,55 @@ from dynamis.processors import (
     ScalarMetric,
     SeriesOutput,
 )
-from dynamis.processors.persistence import persist_processing_result
+from dynamis.processors.persistence import (
+    MAX_UPSERT_BIND_PARAMETERS,
+    METRIC_DEFINITION_TABLE,
+    _upsert,
+    persist_processing_result,
+)
+
+
+def test_large_metric_upsert_is_batched_below_driver_parameter_limit() -> None:
+    class Result:
+        def __init__(self, row_count: int) -> None:
+            self.row_count = row_count
+
+        def fetchall(self) -> list[tuple[int]]:
+            return [(index,) for index in range(self.row_count)]
+
+    class Connection:
+        def __init__(self) -> None:
+            self.parameter_counts: list[int] = []
+            self.row_counts: list[int] = []
+
+        def execute(self, statement):
+            compiled = statement.compile(dialect=postgresql.dialect())
+            count = len(compiled.params)
+            self.parameter_counts.append(count)
+            rows = count // len(METRIC_DEFINITION_TABLE.columns)
+            self.row_counts.append(rows)
+            return Result(rows)
+
+    rows = [
+        {
+            "metric_id": f"test.pose.quality.{index}",
+            "name": f"Test Pose quality metric {index}",
+            "si_unit": "m",
+            "measurement_class": "PIPELINE_DERIVED",
+            "value_kind": "scalar",
+            "description": "Batch persistence known answer.",
+            "algorithm_id": "test.persistence",
+        }
+        for index in range(6_000)
+    ]
+    connection = Connection()
+
+    written = _upsert(connection, METRIC_DEFINITION_TABLE, rows)
+
+    assert written == len(rows)
+    assert len(connection.parameter_counts) == 2
+    assert max(connection.parameter_counts) <= MAX_UPSERT_BIND_PARAMETERS
+    assert sum(connection.row_counts) == len(rows)
 
 
 def _spec() -> ProcessorSpec:
