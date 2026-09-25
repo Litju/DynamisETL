@@ -1524,6 +1524,7 @@
         "type": "object"
       },
       "PitchDimensionsView": {
+        "additionalProperties": false,
         "properties": {
           "length_m": {
             "exclusiveMinimum": 0.0,
@@ -1541,6 +1542,136 @@
           "width_m"
         ],
         "title": "PitchDimensionsView",
+        "type": "object"
+      },
+      "PoseRangeMetricView": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "metric_id": {
+            "title": "Metric Id",
+            "type": "string"
+          },
+          "metric_name": {
+            "title": "Metric Name",
+            "type": "string"
+          },
+          "provenance": {
+            "additionalProperties": true,
+            "title": "Provenance",
+            "type": "object"
+          },
+          "si_unit": {
+            "title": "Si Unit",
+            "type": "string"
+          },
+          "value_num": {
+            "title": "Value Num",
+            "type": "number"
+          }
+        },
+        "required": [
+          "metric_id",
+          "metric_name",
+          "si_unit",
+          "value_num",
+          "description",
+          "provenance"
+        ],
+        "title": "PoseRangeMetricView",
+        "type": "object"
+      },
+      "PoseRangeReportView": {
+        "properties": {
+          "algorithm_id": {
+            "title": "Algorithm Id",
+            "type": "string"
+          },
+          "algorithm_version": {
+            "title": "Algorithm Version",
+            "type": "string"
+          },
+          "code_git_sha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code Git Sha"
+          },
+          "dataset_id": {
+            "title": "Dataset Id",
+            "type": "string"
+          },
+          "display_note": {
+            "title": "Display Note",
+            "type": "string"
+          },
+          "from_ns": {
+            "title": "From Ns",
+            "type": "integer"
+          },
+          "input_artifact_checksums": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Input Artifact Checksums",
+            "type": "object"
+          },
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/PoseRangeMetricView"
+            },
+            "title": "Metrics",
+            "type": "array"
+          },
+          "parameters_hash": {
+            "title": "Parameters Hash",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "stream_id": {
+            "title": "Stream Id",
+            "type": "string"
+          },
+          "subject_id": {
+            "title": "Subject Id",
+            "type": "string"
+          },
+          "to_ns": {
+            "title": "To Ns",
+            "type": "integer"
+          },
+          "trial_id": {
+            "title": "Trial Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "algorithm_id",
+          "algorithm_version",
+          "parameters_hash",
+          "code_git_sha",
+          "dataset_id",
+          "session_id",
+          "trial_id",
+          "stream_id",
+          "subject_id",
+          "from_ns",
+          "to_ns",
+          "input_artifact_checksums",
+          "metrics",
+          "display_note"
+        ],
+        "title": "PoseRangeReportView",
         "type": "object"
       },
       "ProvenanceEdge": {
@@ -3869,6 +4000,214 @@
         "summary": "Methodology",
         "tags": [
           "metrics"
+        ]
+      }
+    },
+    "/api/pose/range-report": {
+      "get": {
+        "operationId": "pose_range_report_api_pose_range_report_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "dataset_id",
+            "required": true,
+            "schema": {
+              "title": "Dataset Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "stream_id",
+            "required": true,
+            "schema": {
+              "title": "Stream Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "subject_id",
+            "required": true,
+            "schema": {
+              "title": "Subject Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from_ns",
+            "required": true,
+            "schema": {
+              "title": "From Ns",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to_ns",
+            "required": true,
+            "schema": {
+              "title": "To Ns",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "landmark_name",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Landmark Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoseRangeReportView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pose Range Report",
+        "tags": [
+          "pose"
+        ]
+      }
+    },
+    "/api/processing/artifacts": {
+      "get": {
+        "operationId": "processing_artifacts_api_processing_artifacts_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "dataset_id",
+            "required": true,
+            "schema": {
+              "title": "Dataset Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "session_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "stream_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Stream Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "algorithm_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Algorithm Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "series_name",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Series Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ArtifactRefView"
+                  },
+                  "title": "Response Processing Artifacts Api Processing Artifacts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Processing Artifacts",
+        "tags": [
+          "processing"
         ]
       }
     },

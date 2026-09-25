@@ -47,7 +47,7 @@ TIME_COLUMNS = frozenset({TIME_COLUMN, "timestamp_utc_ns"})
 #: Candidate entity columns, most specific first. A spatial artifact identifies
 #: a tracked object by ``object_id``; a per-subject artifact (pose, IMU, force)
 #: identifies it by ``subject_id``.
-ENTITY_COLUMNS: tuple[str, ...] = ("object_id", "subject_id")
+ENTITY_COLUMNS: tuple[str, ...] = ("object_id", "subject_id", "entity_id")
 REDUCTION_METHOD = "min_max_envelope_per_time_bucket"
 REDUCTION_NOTE = (
     "Display-only extrema-preserving reduction. Scientific metric values and processor "

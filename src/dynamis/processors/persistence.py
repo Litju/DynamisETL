@@ -40,6 +40,7 @@ _TRUTHY = frozenset({"1", "true", "yes", "on"})
 _FULL_GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 
 _TABLES = build_metadata().tables
+MAX_UPSERT_BIND_PARAMETERS = 30_000
 ALGORITHM_SPEC_TABLE = _TABLES["algorithm_spec"]
 DERIVED_METRIC_TABLE = _TABLES["derived_metric"]
 METRIC_DEFINITION_TABLE = _TABLES["metric_definition"]
@@ -92,20 +93,25 @@ def _upsert(
     if not rows:
         return 0
     primary_keys = [column.name for column in table.primary_key.columns]
-    statement = pg_insert(table).values(rows)
-    if update:
-        statement = statement.on_conflict_do_update(
-            index_elements=primary_keys,
-            set_={
-                column.name: statement.excluded[column.name]
-                for column in table.columns
-                if column.name not in primary_keys
-            },
-        )
-    else:
-        statement = statement.on_conflict_do_nothing(index_elements=primary_keys)
-    statement = statement.returning(*table.primary_key.columns)
-    return len(connection.execute(statement).fetchall())
+    values_per_row = max(1, len(rows[0]))
+    batch_size = max(1, MAX_UPSERT_BIND_PARAMETERS // values_per_row)
+    written = 0
+    for start in range(0, len(rows), batch_size):
+        statement = pg_insert(table).values(rows[start : start + batch_size])
+        if update:
+            statement = statement.on_conflict_do_update(
+                index_elements=primary_keys,
+                set_={
+                    column.name: statement.excluded[column.name]
+                    for column in table.columns
+                    if column.name not in primary_keys
+                },
+            )
+        else:
+            statement = statement.on_conflict_do_nothing(index_elements=primary_keys)
+        statement = statement.returning(*table.primary_key.columns)
+        written += len(connection.execute(statement).fetchall())
+    return written
 
 
 def _upsert_algorithm(connection, result: ProcessorResult, *, code_sha: str | None) -> int:

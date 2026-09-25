@@ -1,7 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
-import { EMPTY_JOINT_NAMES, nextFrameIndexAt, poseFrameIndexAt, poseFramesFromBuffers, summarizeFrame } from "@/components/pose/pose-model";
+import {
+  EMPTY_JOINT_NAMES,
+  nextFrameIndexAt,
+  poseFrameFromBuffersAt,
+  poseFrameIndexAt,
+  poseFramesFromBuffers,
+  summarizeFrame,
+} from "@/components/pose/pose-model";
 import { maximumFrameAgeNs } from "@/components/pitch/pitch-model";
 import { poseSubjectObservations, stablePoseSubjects } from "@/components/pose/use-pose-subjects";
 import { useAnalysisContext } from "@/lib/analysis-context";
@@ -15,7 +22,7 @@ import { useAnalysisStore } from "@/lib/state/analysis";
 import { formatClockNs } from "@/lib/time";
 
 /** Full live landmark telemetry for the Pose route's right-hand evidence pane. */
-export function PoseTelemetry() {
+export function PoseTelemetry({ summaryOnly = false }: { readonly summaryOnly?: boolean } = {}) {
   const context = useAnalysisContext();
   const matchFrame = useMatchFrameContext();
   // 29 rows of text: refreshed at most five times per second during playback.
@@ -79,19 +86,22 @@ export function PoseTelemetry() {
   });
   const { window } = playback;
   const frames = useMemo(
-    () =>
-      poseFramesFromBuffers(window.data?.prepared, subjectId),
-    [subjectId, window.data],
+    () => summaryOnly ? [] : poseFramesFromBuffers(window.data?.prepared, subjectId),
+    [subjectId, summaryOnly, window.data],
   );
   const frameIndex = poseFrameIndexAt(frames, effective, maxGapNs);
-  const currentFrame = frameIndex >= 0 ? frames[frameIndex] ?? null : null;
+  const currentFrame = summaryOnly
+    ? poseFrameFromBuffersAt(window.data?.prepared, subjectId, effective, maxGapNs)
+    : frameIndex >= 0
+      ? frames[frameIndex] ?? null
+      : null;
   const landmarks = currentFrame?.landmarks ?? [];
   const byName = new Map(landmarks.map((landmark) => [landmark.jointName, landmark]));
   const jointNames = stream?.skeleton_joint_names ?? window.data?.prepared.jointNames ?? landmarks.map((landmark) => landmark.jointName);
-  const previousFrameIndex = effective === null
+  const previousFrameIndex = summaryOnly || effective === null
     ? -1
     : poseFrameIndexAt(frames, effective, Number.POSITIVE_INFINITY);
-  const nextIndex = effective === null ? -1 : nextFrameIndexAt(frames, effective);
+  const nextIndex = summaryOnly || effective === null ? -1 : nextFrameIndexAt(frames, effective);
   const previousFrame = previousFrameIndex >= 0 ? frames[previousFrameIndex] ?? null : null;
   const nextFrame = nextIndex >= 0 ? frames[nextIndex] ?? null : null;
   const summary = summarizeFrame(currentFrame);
@@ -114,9 +124,9 @@ export function PoseTelemetry() {
   }
 
   return (
-    <aside aria-label="Live pose telemetry" data-testid="pose-telemetry" className="flex h-full min-h-0 flex-col bg-surface-1">
+    <aside aria-label={summaryOnly ? "Current Pose sample" : "Live pose telemetry"} data-testid="pose-telemetry" className="flex h-full min-h-0 flex-col bg-surface-1">
       <header className="shrink-0 border-b border-border-subtle px-3 py-2">
-        <h2 className="t-section text-text-muted">Live pose telemetry</h2>
+        <h2 className="t-section text-text-muted">{summaryOnly ? "Current sample" : "Live pose telemetry"}</h2>
         <p className="mt-1 text-[12px] text-text-primary">
           {participant?.notes ?? subjectId ?? "not scoped"}
           {participant?.notes ? <span className="mono ml-1.5 text-[10px] text-text-muted">{subjectId}</span> : null}
@@ -133,7 +143,7 @@ export function PoseTelemetry() {
           </p>
         )}
       </header>
-      <div
+      {summaryOnly ? null : <div
         aria-label="Pose landmark telemetry table"
         className="min-h-0 flex-1 overflow-y-auto p-2"
         tabIndex={0}
@@ -182,7 +192,7 @@ export function PoseTelemetry() {
             })}
           </>
         )}
-      </div>
+      </div>}
     </aside>
   );
 }

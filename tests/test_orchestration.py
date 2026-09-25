@@ -40,6 +40,9 @@ EXPECTED_ASSETS = {
     "dfl_tracking_processing",
     "skillcorner_tracking_processing",
     "skillcorner_pose_processing",
+    "skillcorner_pose_quality_processing",
+    "skillcorner_pose_bilateral_processing",
+    "skillcorner_pose_landmark_processing",
     "dfl_tactical_geometry_processing",
     "dfl_tactical_territory_processing",
     "dfl_tactical_influence_processing",
@@ -221,6 +224,9 @@ def test_dagster_definitions_expose_lineage_edges() -> None:
         "dfl_tracking_processing",
         "skillcorner_tracking_processing",
         "skillcorner_pose_processing",
+        "skillcorner_pose_quality_processing",
+        "skillcorner_pose_bilateral_processing",
+        "skillcorner_pose_landmark_processing",
     }
     marts = graph.get(AssetKey("gold_marts"))
     assert {key.path[-1] for key in marts.parent_keys} == {"gold_serving_export"}

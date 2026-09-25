@@ -14,6 +14,7 @@ import os
 import time
 from typing import Annotated, Any, Literal, Protocol, cast
 
+import pyarrow as pa
 import pyarrow.parquet as pq
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse
@@ -53,6 +54,8 @@ from dynamis.serving.models import (
     MetricCatalogEntry,
     MetricMethodology,
     MetricPage,
+    PoseRangeMetricView,
+    PoseRangeReportView,
     ProvenanceGraph,
     QualityIssuePage,
     RightsPage,
@@ -142,6 +145,26 @@ class ServingBackend(Protocol):
         stream_id: str | None = None,
         series_name: str | None = None,
     ) -> list[ArtifactRefView]: ...
+
+    def processing_artifacts(
+        self,
+        dataset_id: str,
+        session_id: str | None = None,
+        stream_id: str | None = None,
+        algorithm_id: str | None = None,
+        series_name: str | None = None,
+    ) -> list[ArtifactRefView]: ...
+
+    def pose_range_report(
+        self,
+        dataset_id: str,
+        session_id: str,
+        stream_id: str,
+        subject_id: str,
+        from_ns: int,
+        to_ns: int,
+        landmark_name: str,
+    ) -> PoseRangeReportView | None: ...
 
     def tactical_capability(self, dataset_id: str) -> TacticalCapabilityView | None: ...
 
@@ -306,6 +329,219 @@ class PostgresServingBackend:
                 stream_id=stream_id,
                 series_name=series_name,
             )
+
+    def processing_artifacts(
+        self,
+        dataset_id: str,
+        session_id: str | None = None,
+        stream_id: str | None = None,
+        algorithm_id: str | None = None,
+        series_name: str | None = None,
+    ) -> list[ArtifactRefView]:
+        with self._connect() as connection:
+            return repository.list_processing_artifacts(
+                connection,
+                dataset_id=dataset_id,
+                session_id=session_id,
+                stream_id=stream_id,
+                algorithm_id=algorithm_id,
+                series_name=series_name,
+            )
+
+    def pose_range_report(
+        self,
+        dataset_id: str,
+        session_id: str,
+        stream_id: str,
+        subject_id: str,
+        from_ns: int,
+        to_ns: int,
+        landmark_name: str,
+    ) -> PoseRangeReportView | None:
+        from dynamis.processors.pose_range import process_pose_range
+
+        session = self.session(dataset_id, session_id)
+        if session is None:
+            return None
+        stream = next(
+            (
+                candidate
+                for candidate in session.streams
+                if candidate.stream_id == stream_id and candidate.modality == "pose"
+            ),
+            None,
+        )
+        if stream is None or not stream.sample_artifact_ids:
+            return None
+        artifacts = self.processing_artifacts(
+            dataset_id,
+            session_id=session_id,
+            stream_id=stream_id,
+        )
+        by_series = {
+            (artifact.algorithm_id, artifact.artifact_metadata.get("series_name")): artifact
+            for artifact in artifacts
+        }
+        geometry_ref = by_series.get(
+            ("pose.translation_invariant_kinematics", "pose_translation_invariant_kinematics")
+        )
+        landmark_ref = by_series.get(("pose.landmark_kinematics", "pose_landmark_kinematics"))
+        quality_ref = by_series.get(("pose.analysis_quality", "pose_analysis_quality"))
+        bilateral_ref = by_series.get(("pose.bilateral_geometry", "pose_bilateral_geometry"))
+        if geometry_ref is None or landmark_ref is None or quality_ref is None:
+            return None
+        source_ref = self.artifact(stream.sample_artifact_ids[0])
+        source_detail = self.artifact_detail(stream.sample_artifact_ids[0])
+        if source_ref is None or source_detail is None:
+            return None
+
+        token = landmark_name
+        angle_name = {
+            "lKnee": "left_knee",
+            "rKnee": "right_knee",
+            "lHip": "left_hip",
+            "rHip": "right_hip",
+        }.get(landmark_name)
+        geometry_columns = ["t_rel_ns"]
+        if angle_name is not None:
+            geometry_columns.extend(
+                [f"angle_{angle_name}_rad", f"angular_velocity_{angle_name}_rad_s"]
+            )
+        landmark_columns = [
+            "entity_id",
+            "t_rel_ns",
+            "temporal_segment_index",
+            f"available_{token}",
+            f"relative_position_x_{token}_m",
+            f"relative_position_y_{token}_m",
+            f"relative_position_z_{token}_m",
+            f"body_relative_speed_{token}_m_s",
+        ]
+        quality_columns = [
+            "t_rel_ns",
+            "any_pose_present",
+            "any_pose_available",
+            "available_landmark_count",
+            "expected_landmark_count",
+        ]
+        source_columns = [
+            "t_rel_ns",
+            "joint_name",
+            "is_available",
+            "error_m",
+            "x_m",
+            "y_m",
+            "z_m",
+            "nominal_sampling_rate_hz",
+        ]
+
+        def exact_window(
+            artifact: ArtifactRefView,
+            columns: list[str],
+            *,
+            lower: int | None = from_ns,
+            upper: int | None = to_ns,
+        ) -> pa.Table:
+            result = self.window(
+                artifact.artifact_id,
+                from_ns=lower,
+                to_ns=upper,
+                columns=tuple(columns),
+                max_points=None,
+                entity_id=subject_id,
+            )
+            if result.meta.reduction is not None:
+                raise ValueError("selected range report requires exact processor samples")
+            return result.table
+
+        source_table = exact_window(source_ref, source_columns)
+        geometry_table = exact_window(geometry_ref, geometry_columns)
+        landmark_table = exact_window(landmark_ref, landmark_columns)
+        quality_table = exact_window(quality_ref, quality_columns)
+        source_checksums = {
+            "source_pose": source_ref.checksum_sha256,
+            "pose_geometry": geometry_ref.checksum_sha256,
+            "pose_landmarks": landmark_ref.checksum_sha256,
+            "pose_quality": quality_ref.checksum_sha256,
+        }
+        bilateral_pair = (
+            "knee_included_angle"
+            if landmark_name in {"lKnee", "rKnee"}
+            else "hip_included_angle"
+            if landmark_name in {"lHip", "rHip"}
+            else None
+        )
+        bilateral_table = None
+        if bilateral_ref is not None and bilateral_pair is not None:
+            bilateral_table = exact_window(
+                bilateral_ref,
+                [
+                    "t_rel_ns",
+                    f"left_{bilateral_pair}_rad",
+                    f"right_{bilateral_pair}_rad",
+                    f"right_minus_left_{bilateral_pair}_rad",
+                    f"common_available_{bilateral_pair}",
+                ],
+            )
+            source_checksums["pose_bilateral"] = bilateral_ref.checksum_sha256
+        result = process_pose_range(
+            dataset_id=dataset_id,
+            session_id=session_id,
+            trial_id=stream.trial_id or "",
+            stream_id=stream_id,
+            subject_id=subject_id,
+            from_ns=from_ns,
+            to_ns=to_ns,
+            landmark_name=landmark_name,
+            sampling_rate_hz=stream.nominal_sampling_rate_hz or 0.0,
+            grid_origin_ns=source_detail.canonical_time_min_ns or 0,
+            geometry=geometry_table,
+            landmark_series=landmark_table,
+            quality_frames=quality_table,
+            bilateral_series=bilateral_table,
+            source_pose=source_table,
+            source_checksums=source_checksums,
+            input_series_versions={
+                "pose.geometry": geometry_ref.algorithm_version or "unknown",
+                "pose.landmark": landmark_ref.algorithm_version or "unknown",
+                "pose.quality": quality_ref.algorithm_version or "unknown",
+                **(
+                    {"pose.bilateral": bilateral_ref.algorithm_version or "unknown"}
+                    if bilateral_ref is not None
+                    else {}
+                ),
+            },
+        )
+        return PoseRangeReportView(
+            algorithm_id=result.spec.algorithm_id,
+            algorithm_version=result.spec.version,
+            parameters_hash=result.spec.parameters_hash,
+            code_git_sha=result.diagnostics.get("code_git_sha"),
+            dataset_id=dataset_id,
+            session_id=session_id,
+            trial_id=stream.trial_id or "",
+            stream_id=stream_id,
+            subject_id=subject_id,
+            from_ns=from_ns,
+            to_ns=to_ns,
+            input_artifact_checksums=source_checksums,
+            metrics=[
+                PoseRangeMetricView(
+                    metric_id=metric.declaration.metric_id,
+                    metric_name=metric.declaration.name,
+                    si_unit=metric.declaration.si_unit,
+                    value_num=metric.value,
+                    description=metric.declaration.description,
+                    provenance=dict(metric.provenance),
+                )
+                for metric in result.metrics
+            ],
+            display_note=(
+                "Range summaries aggregate exact versioned processor samples. Provider p90 "
+                "error-radius evidence remains source evidence; no display-reduced samples "
+                "or normative labels are used."
+            ),
+        )
 
     def tactical_capability(self, dataset_id: str) -> TacticalCapabilityView | None:
         return tactical_authority.tactical_capability(dataset_id)
@@ -622,6 +858,63 @@ def create_app(
         series_name: str | None = None,
     ) -> list[ArtifactRefView]:
         return service.tactical_artifacts(dataset_id, session_id, stream_id, series_name)
+
+    @app.get(
+        "/api/processing/artifacts",
+        response_model=list[ArtifactRefView],
+        tags=["processing"],
+    )
+    def processing_artifacts(
+        dataset_id: str,
+        service: BackendDependency,
+        session_id: str | None = None,
+        stream_id: str | None = None,
+        algorithm_id: str | None = None,
+        series_name: str | None = None,
+    ) -> list[ArtifactRefView]:
+        return service.processing_artifacts(
+            dataset_id,
+            session_id,
+            stream_id,
+            algorithm_id,
+            series_name,
+        )
+
+    @app.get(
+        "/api/pose/range-report",
+        response_model=PoseRangeReportView,
+        tags=["pose"],
+    )
+    def pose_range_report(
+        dataset_id: str,
+        session_id: str,
+        stream_id: str,
+        subject_id: str,
+        from_ns: int,
+        to_ns: int,
+        service: BackendDependency,
+        landmark_name: str = Query(min_length=1, max_length=128),
+    ) -> PoseRangeReportView:
+        try:
+            report = service.pose_range_report(
+                dataset_id,
+                session_id,
+                stream_id,
+                subject_id,
+                from_ns,
+                to_ns,
+                landmark_name,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if report is None:
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    "Pose range report requires current processor series for the selected stream"
+                ),
+            )
+        return report
 
     def _tactical_series(
         artifact_id: str,

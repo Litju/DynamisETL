@@ -15,6 +15,7 @@ export type StreamView = components["schemas"]["StreamView"];
 export type MetricValue = components["schemas"]["MetricValue"];
 export type MetricPage = components["schemas"]["MetricPage"];
 export type MetricMethodology = components["schemas"]["MetricMethodology"];
+export type PoseRangeReportView = components["schemas"]["PoseRangeReportView"];
 export type ProvenanceGraph = components["schemas"]["ProvenanceGraph"];
 export type QualityIssuePage = components["schemas"]["QualityIssuePage"];
 export type QualityIssueView = components["schemas"]["QualityIssueView"];

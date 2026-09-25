@@ -48,6 +48,8 @@ from dynamis.serving.models import (
     MetricPage,
     MetricValue,
     PitchDimensionsView,
+    PoseRangeMetricView,
+    PoseRangeReportView,
     ProvenanceEdge,
     ProvenanceGraph,
     ProvenanceNode,
@@ -140,6 +142,23 @@ ARTIFACT = ArtifactRefView(
     synchronization_spec_id="skillcorner-source-provided-match-clock",
 )
 
+PROCESSING_ARTIFACT = ArtifactRefView(
+    **{
+        **ARTIFACT.model_dump(),
+        "artifact_id": "pose-landmark-series",
+        "layer": "gold",
+        "relative_path": "gold/pose-landmark-series.parquet",
+        "artifact_kind": "processing",
+        "modality": None,
+        "measurement_class": "PIPELINE_DERIVED",
+        "algorithm_id": "pose.landmark_kinematics",
+        "algorithm_version": "1.0.0",
+        "parameters_hash": "c" * 64,
+        "run_id": "run-pose-landmarks",
+        "artifact_metadata": {"series_name": "pose_landmark_kinematics"},
+    }
+)
+
 
 def _window_result() -> Any:
     table = pa.table(
@@ -175,6 +194,8 @@ class FakeBackend:
         self.window_error: Exception | None = None
         self.last_filters: MetricFilters | None = None
         self.last_window_kwargs: dict[str, Any] = {}
+        self.last_processing_filters: dict[str, str | None] | None = None
+        self.last_pose_range_request: tuple[Any, ...] | None = None
 
     def status(self) -> ServingStatus:
         return ServingStatus(
@@ -260,6 +281,68 @@ class FakeBackend:
     def metrics(self, filters: MetricFilters, limit: int, offset: int) -> MetricPage:
         self.last_filters = filters
         return MetricPage(source="gold", total=1, limit=limit, offset=offset, rows=[METRIC])
+
+    def processing_artifacts(
+        self,
+        dataset_id: str,
+        session_id: str | None = None,
+        stream_id: str | None = None,
+        algorithm_id: str | None = None,
+        series_name: str | None = None,
+    ) -> list[ArtifactRefView]:
+        self.last_processing_filters = {
+            "dataset_id": dataset_id,
+            "session_id": session_id,
+            "stream_id": stream_id,
+            "algorithm_id": algorithm_id,
+            "series_name": series_name,
+        }
+        return [PROCESSING_ARTIFACT]
+
+    def pose_range_report(
+        self,
+        dataset_id: str,
+        session_id: str,
+        stream_id: str,
+        subject_id: str,
+        from_ns: int,
+        to_ns: int,
+        landmark_name: str,
+    ) -> PoseRangeReportView:
+        self.last_pose_range_request = (
+            dataset_id,
+            session_id,
+            stream_id,
+            subject_id,
+            from_ns,
+            to_ns,
+            landmark_name,
+        )
+        return PoseRangeReportView(
+            algorithm_id="pose.range_summary",
+            algorithm_version="1.1.0",
+            parameters_hash="e" * 64,
+            code_git_sha="f" * 40,
+            dataset_id=dataset_id,
+            session_id=session_id,
+            trial_id="period-1",
+            stream_id=stream_id,
+            subject_id=subject_id,
+            from_ns=from_ns,
+            to_ns=to_ns,
+            input_artifact_checksums={"pose_source": "a" * 64},
+            metrics=[
+                PoseRangeMetricView(
+                    metric_id="pose.range.landmark.speed_mean.lKnee",
+                    metric_name="Mean knee speed",
+                    si_unit="m/s",
+                    value_num=1.0,
+                    description="A precomputed series summary.",
+                    provenance={"scope": "exact-range"},
+                )
+            ],
+            display_note="Exact precomputed processor inputs.",
+        )
 
     def metric_definitions(self) -> list[MetricCatalogEntry]:
         return []
@@ -564,11 +647,68 @@ def test_openapi_document_covers_the_locked_surface() -> None:
         "/api/quality",
         "/api/runs",
         "/api/rights",
+        "/api/processing/artifacts",
+        "/api/pose/range-report",
         "/api/artifacts/{artifact_id}",
         "/api/artifacts/{artifact_id}/observations",
         "/api/artifacts/{artifact_id}/window",
     ):
         assert path in paths, path
+
+
+def test_processing_artifacts_route_filters_scientific_series(client: TestClient) -> None:
+    response = client.get(
+        "/api/processing/artifacts",
+        params={
+            "dataset_id": "skillcorner-opendata",
+            "session_id": "1925299",
+            "stream_id": "pose-period-1",
+            "algorithm_id": "pose.landmark_kinematics",
+            "series_name": "pose_landmark_kinematics",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()[0]["artifact_kind"] == "processing"
+    assert response.json()[0]["algorithm_id"] == "pose.landmark_kinematics"
+    backend = client.app.state.fake_backend  # type: ignore[attr-defined]
+    assert backend.last_processing_filters == {
+        "dataset_id": "skillcorner-opendata",
+        "session_id": "1925299",
+        "stream_id": "pose-period-1",
+        "algorithm_id": "pose.landmark_kinematics",
+        "series_name": "pose_landmark_kinematics",
+    }
+
+
+def test_pose_range_report_route_preserves_subject_and_exact_bounds(client: TestClient) -> None:
+    response = client.get(
+        "/api/pose/range-report",
+        params={
+            "dataset_id": "skillcorner-opendata",
+            "session_id": "1925299",
+            "stream_id": "pose-period-1",
+            "subject_id": "SC-P1",
+            "from_ns": 40_000_000,
+            "to_ns": 200_000_000,
+            "landmark_name": "lKnee",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["algorithm_id"] == "pose.range_summary"
+    assert response.json()["from_ns"] == 40_000_000
+    assert response.json()["to_ns"] == 200_000_000
+    backend = client.app.state.fake_backend  # type: ignore[attr-defined]
+    assert backend.last_pose_range_request == (
+        "skillcorner-opendata",
+        "1925299",
+        "pose-period-1",
+        "SC-P1",
+        40_000_000,
+        200_000_000,
+        "lKnee",
+    )
 
 
 def _dense_artifact_ref(settings: Settings, table: pa.Table) -> ArtifactRefView:
@@ -660,6 +800,24 @@ def test_dense_window_scopes_to_one_entity(tmp_settings: Settings) -> None:
     assert entity_cardinality(tmp_settings, ref) == 3
     assert entity_ids(tmp_settings, ref) == ["p1", "p2", "p3"]
     assert entity_column(pq.read_schema(resolve_artifact_path(tmp_settings, ref))) == "object_id"
+
+
+def test_processed_series_scopes_windows_by_entity_id(tmp_settings: Settings) -> None:
+    table = pa.table(
+        {
+            "entity_id": pa.array(["s1", "s2", "s1"], type=pa.string()),
+            "t_rel_ns": pa.array([0, 0, 40_000_000], type=pa.int64()),
+            "body_relative_speed_lKnee_m_s": pa.array([1.0, 9.0, 1.5], type=pa.float64()),
+        }
+    )
+    ref = _dense_artifact_ref(tmp_settings, table).model_copy(
+        update={"artifact_kind": "processing"}
+    )
+
+    scoped = load_artifact_window(tmp_settings, ref, entity_id="s1")
+
+    assert entity_column(pq.read_schema(resolve_artifact_path(tmp_settings, ref))) == "entity_id"
+    assert scoped.table.column("body_relative_speed_lKnee_m_s").to_pylist() == [1.0, 1.5]
 
 
 def test_pose_entity_observation_authority_excludes_unavailable_rows(

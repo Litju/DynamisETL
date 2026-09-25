@@ -1,0 +1,139 @@
+{
+  "schema_version": "1.0.0",
+  "source": {
+    "dataset": "SkillCorner Open Data Body Pose",
+    "skeleton_id": "skillcorner-bodypose-29-landmarks",
+    "landmark_count": 29,
+    "sampling_rate_hz": 25,
+    "measurement_class": "MODEL_ESTIMATED",
+    "coordinate_frame": "skillcorner-pose-hybrid-m",
+    "coordinate_semantics": {
+      "x_y": "pitch-global metres; generated separately from tracking and may be slightly misaligned",
+      "z": "player-centroid-relative; not registered pitch height",
+      "error_radius": "provider p90_mae_cm converted to metres; predicted error radius, not probability or confidence"
+    },
+    "landmarks": [
+      "nose", "neck", "lEye", "rEye", "lEar", "rEar", "lShoulder", "rShoulder",
+      "lElbow", "rElbow", "lWrist", "rWrist", "lThumb", "rThumb", "lPinky",
+      "rPinky", "midHip", "lHip", "rHip", "lKnee", "rKnee", "lAnkle", "rAnkle",
+      "lHeel", "rHeel", "lBigToe", "rBigToe", "lSmallToe", "rSmallToe"
+    ]
+  },
+  "status_vocabulary": {
+    "available": "The source landmarks can define this quantity geometrically when all named observations are present; this is not an anatomical claim.",
+    "conditional": "A geometric quantity is possible only for an explicitly declared landmark configuration and eligible samples.",
+    "unsupported": "Current source/model evidence does not identify this quantity defensibly."
+  },
+  "regions": {
+    "head_neck": {
+      "landmarks": ["nose", "neck", "lEye", "rEye", "lEar", "rEar"],
+      "raw_landmarks": "available",
+      "geometric_included_angle": "conditional",
+      "segment_orientation_descriptor": "conditional",
+      "speed": "conditional",
+      "acceleration": "conditional",
+      "anatomical_flexion_extension": "unsupported",
+      "anatomical_abduction_adduction": "unsupported",
+      "anatomical_internal_external_rotation": "unsupported",
+      "model_fitting": "unsupported",
+      "limitations": ["No cervical segment coordinate system or anatomical calibration landmarks.", "Do not interpret Z as global height."]
+    },
+    "shoulder": {
+      "landmarks": ["neck", "lShoulder", "rShoulder", "lElbow", "rElbow"],
+      "raw_landmarks": "available",
+      "geometric_included_angle": "conditional",
+      "segment_orientation_descriptor": "conditional",
+      "speed": "conditional",
+      "acceleration": "conditional",
+      "anatomical_flexion_extension": "unsupported",
+      "anatomical_abduction_adduction": "unsupported",
+      "anatomical_internal_external_rotation": "unsupported",
+      "model_fitting": "unsupported",
+      "limitations": ["Scapular and humeral anatomical frames are not identified by the landmark set.", "No subject-specific calibration."]
+    },
+    "elbow": {
+      "landmarks": ["lShoulder", "rShoulder", "lElbow", "rElbow", "lWrist", "rWrist"],
+      "raw_landmarks": "available",
+      "geometric_included_angle": "conditional",
+      "segment_orientation_descriptor": "conditional",
+      "speed": "conditional",
+      "acceleration": "conditional",
+      "anatomical_flexion_extension": "unsupported",
+      "anatomical_abduction_adduction": "unsupported",
+      "anatomical_internal_external_rotation": "unsupported",
+      "model_fitting": "unsupported",
+      "limitations": ["A three-point elbow angle is geometric, not a standardized elbow coordinate system.", "No medial/lateral epicondyle landmarks."]
+    },
+    "wrist_hand": {
+      "landmarks": ["lWrist", "rWrist", "lThumb", "rThumb", "lPinky", "rPinky"],
+      "raw_landmarks": "available",
+      "geometric_included_angle": "conditional",
+      "segment_orientation_descriptor": "conditional",
+      "speed": "conditional",
+      "acceleration": "conditional",
+      "anatomical_flexion_extension": "unsupported",
+      "anatomical_abduction_adduction": "unsupported",
+      "anatomical_internal_external_rotation": "unsupported",
+      "model_fitting": "unsupported",
+      "limitations": ["Sparse hand landmarks do not identify carpal/bone frames or wrist JCS.", "Provider error radius varies by landmark."]
+    },
+    "trunk": {
+      "landmarks": ["neck", "lShoulder", "rShoulder", "midHip", "lHip", "rHip"],
+      "raw_landmarks": "available",
+      "geometric_included_angle": "conditional",
+      "segment_orientation_descriptor": "conditional",
+      "speed": "conditional",
+      "acceleration": "conditional",
+      "anatomical_flexion_extension": "unsupported",
+      "anatomical_abduction_adduction": "unsupported",
+      "anatomical_internal_external_rotation": "unsupported",
+      "model_fitting": "unsupported",
+      "limitations": ["No vertebral/bony segment landmarks or trunk local coordinate system.", "midHip is a provider landmark, not a whole-body center of mass."]
+    },
+    "hip": {
+      "landmarks": ["midHip", "lHip", "rHip", "lKnee", "rKnee"],
+      "raw_landmarks": "available",
+      "geometric_included_angle": "conditional",
+      "segment_orientation_descriptor": "conditional",
+      "speed": "conditional",
+      "acceleration": "conditional",
+      "anatomical_flexion_extension": "unsupported",
+      "anatomical_abduction_adduction": "unsupported",
+      "anatomical_internal_external_rotation": "unsupported",
+      "model_fitting": "unsupported",
+      "limitations": ["No pelvis/femur anatomical axes or subject-specific calibration.", "Hip point geometry does not uniquely determine a hip JCS."]
+    },
+    "knee": {
+      "landmarks": ["lHip", "rHip", "lKnee", "rKnee", "lAnkle", "rAnkle"],
+      "raw_landmarks": "available",
+      "geometric_included_angle": "conditional",
+      "segment_orientation_descriptor": "conditional",
+      "speed": "conditional",
+      "acceleration": "conditional",
+      "anatomical_flexion_extension": "unsupported",
+      "anatomical_abduction_adduction": "unsupported",
+      "anatomical_internal_external_rotation": "unsupported",
+      "model_fitting": "unsupported",
+      "limitations": ["hip-knee-ankle included angle is not anatomical knee flexion.", "No femoral/tibial anatomical axes, epicondyles, or subject calibration."]
+    },
+    "ankle_foot": {
+      "landmarks": ["lAnkle", "rAnkle", "lHeel", "rHeel", "lBigToe", "rBigToe", "lSmallToe", "rSmallToe"],
+      "raw_landmarks": "available",
+      "geometric_included_angle": "conditional",
+      "segment_orientation_descriptor": "conditional",
+      "speed": "conditional",
+      "acceleration": "conditional",
+      "anatomical_flexion_extension": "unsupported",
+      "anatomical_abduction_adduction": "unsupported",
+      "anatomical_internal_external_rotation": "unsupported",
+      "model_fitting": "unsupported",
+      "limitations": ["Sparse foot landmarks do not identify multi-segment foot or ankle axes.", "No malleolar/bony landmarks or neutral-position calibration."]
+    }
+  },
+  "layer_c_decision": {
+    "status": "unavailable",
+    "reason": "The provider landmark set and hybrid frame do not identify the required articulating-segment coordinate systems and model calibration; no validated mapping, residual, or supported-DOF evidence exists in this repository.",
+    "permitted_output": "Layer A geometric quantities and quality-eligible Layer B derivatives only.",
+    "reopen_requirements": ["declared biomechanical model", "landmark-to-model mapping", "scaling and frame mapping", "objective and constraints", "fit residual and per-joint supported DOFs", "independent V&V against reference data"]
+  }
+}

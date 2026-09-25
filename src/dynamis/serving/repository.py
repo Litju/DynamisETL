@@ -1085,7 +1085,11 @@ def _artifact_by_checksum(connection: Connection, checksum: str) -> ArtifactRefV
             sa.text(
                 """SELECT p.artifact_id, p.dataset_id, p.layer, p.relative_path,
                 p.checksum_sha256, p.row_count, p.byte_size, p.artifact_type,
-                p.artifact_metadata, p.artifact_metadata->>'stream_id' AS stream_id,
+                p.artifact_metadata,
+                COALESCE(
+                    p.artifact_metadata->>'stream_id',
+                    p.artifact_metadata->>'series_key'
+                ) AS stream_id,
                 p.artifact_metadata->>'measurement_class' AS measurement_class,
                 p.artifact_metadata->>'coordinate_frame_id' AS coordinate_frame_id,
                 p.artifact_metadata->>'input_measurement_class' AS input_measurement_class,
@@ -1164,7 +1168,11 @@ def _artifact_by_id(connection: Connection, artifact_id: str) -> ArtifactRefView
             sa.text(
                 """SELECT p.artifact_id, p.dataset_id, p.layer, p.relative_path,
                 p.checksum_sha256, p.row_count, p.byte_size, p.artifact_type,
-                p.artifact_metadata, p.artifact_metadata->>'stream_id' AS stream_id,
+                p.artifact_metadata,
+                COALESCE(
+                    p.artifact_metadata->>'stream_id',
+                    p.artifact_metadata->>'series_key'
+                ) AS stream_id,
                 p.artifact_metadata->>'measurement_class' AS measurement_class,
                 p.artifact_metadata->>'coordinate_frame_id' AS coordinate_frame_id,
                 p.artifact_metadata->>'input_measurement_class' AS input_measurement_class,
@@ -1235,6 +1243,76 @@ def list_tactical_artifacts(
         SELECT * FROM candidates
         WHERE run_id = current_run_id
         ORDER BY artifact_metadata->>'series_name', artifact_id
+    """
+    rows = connection.execute(sa.text(query), parameters).mappings().all()
+    return [_artifact_view(row, kind="processing") for row in rows]
+
+
+def list_processing_artifacts(
+    connection: Connection,
+    *,
+    dataset_id: str,
+    session_id: str | None = None,
+    stream_id: str | None = None,
+    algorithm_id: str | None = None,
+    series_name: str | None = None,
+) -> list[ArtifactRefView]:
+    """List current processor series for one dataset/session/stream context."""
+    clauses = ["p.dataset_id = :dataset_id"]
+    parameters: dict[str, Any] = {"dataset_id": dataset_id}
+    if session_id is not None:
+        clauses.append("COALESCE(p.artifact_metadata->>'session_id', s.session_id) = :session_id")
+        parameters["session_id"] = session_id
+    if stream_id is not None:
+        clauses.append(
+            "COALESCE(p.artifact_metadata->>'stream_id', p.artifact_metadata->>'series_key') "
+            "= :stream_id"
+        )
+        parameters["stream_id"] = stream_id
+    if algorithm_id is not None:
+        clauses.append("r.algorithm_id = :algorithm_id")
+        parameters["algorithm_id"] = algorithm_id
+    series_filter = ""
+    if series_name is not None:
+        series_filter = "AND artifact_metadata->>'series_name' = :series_name"
+        parameters["series_name"] = series_name
+    query = f"""
+        WITH candidates AS (
+            SELECT p.artifact_id, p.dataset_id, p.layer, p.relative_path,
+                p.checksum_sha256, p.row_count, p.byte_size, p.artifact_type,
+                p.artifact_metadata,
+                COALESCE(
+                    p.artifact_metadata->>'stream_id',
+                    p.artifact_metadata->>'series_key'
+                ) AS stream_id,
+                p.artifact_metadata->>'measurement_class' AS measurement_class,
+                p.artifact_metadata->>'coordinate_frame_id' AS coordinate_frame_id,
+                p.artifact_metadata->>'algorithm_version' AS algorithm_version,
+                p.artifact_metadata->>'parameters_hash' AS parameters_hash,
+                r.algorithm_id, r.run_id,
+                first_value(r.run_id) OVER (
+                    PARTITION BY r.algorithm_id,
+                        COALESCE(p.artifact_metadata->>'session_id', s.session_id, ''),
+                        COALESCE(
+                            p.artifact_metadata->>'stream_id',
+                            p.artifact_metadata->>'series_key',
+                            ''
+                        )
+                    ORDER BY r.completed_at DESC NULLS LAST, r.run_id DESC
+                ) AS current_run_id
+            FROM processing_artifact p
+            JOIN processing_run r ON r.run_id = p.run_id
+            LEFT JOIN sensor_stream s ON s.dataset_id = p.dataset_id
+                AND s.stream_id = COALESCE(
+                    p.artifact_metadata->>'stream_id',
+                    p.artifact_metadata->>'series_key'
+                )
+            WHERE r.status = 'completed' AND {" AND ".join(clauses)}
+        )
+        SELECT * FROM candidates
+        WHERE run_id = current_run_id
+            {series_filter}
+        ORDER BY algorithm_id, artifact_metadata->>'series_name', artifact_id
     """
     rows = connection.execute(sa.text(query), parameters).mappings().all()
     return [_artifact_view(row, kind="processing") for row in rows]

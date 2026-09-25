@@ -203,6 +203,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/pose/range-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Pose Range Report */
+        get: operations["pose_range_report_api_pose_range_report_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/processing/artifacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Processing Artifacts */
+        get: operations["processing_artifacts_api_processing_artifacts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/quality": {
         parameters: {
             query?: never;
@@ -859,6 +893,56 @@ export interface components {
             length_m: number;
             /** Width M */
             width_m: number;
+        };
+        /** PoseRangeMetricView */
+        PoseRangeMetricView: {
+            /** Description */
+            description: string;
+            /** Metric Id */
+            metric_id: string;
+            /** Metric Name */
+            metric_name: string;
+            /** Provenance */
+            provenance: {
+                [key: string]: unknown;
+            };
+            /** Si Unit */
+            si_unit: string;
+            /** Value Num */
+            value_num: number;
+        };
+        /** PoseRangeReportView */
+        PoseRangeReportView: {
+            /** Algorithm Id */
+            algorithm_id: string;
+            /** Algorithm Version */
+            algorithm_version: string;
+            /** Code Git Sha */
+            code_git_sha: string | null;
+            /** Dataset Id */
+            dataset_id: string;
+            /** Display Note */
+            display_note: string;
+            /** From Ns */
+            from_ns: number;
+            /** Input Artifact Checksums */
+            input_artifact_checksums: {
+                [key: string]: string;
+            };
+            /** Metrics */
+            metrics: components["schemas"]["PoseRangeMetricView"][];
+            /** Parameters Hash */
+            parameters_hash: string;
+            /** Session Id */
+            session_id: string;
+            /** Stream Id */
+            stream_id: string;
+            /** Subject Id */
+            subject_id: string;
+            /** To Ns */
+            to_ns: number;
+            /** Trial Id */
+            trial_id: string;
         };
         /** ProvenanceEdge */
         ProvenanceEdge: {
@@ -1698,6 +1782,78 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MetricMethodology"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pose_range_report_api_pose_range_report_get: {
+        parameters: {
+            query: {
+                dataset_id: string;
+                session_id: string;
+                stream_id: string;
+                subject_id: string;
+                from_ns: number;
+                to_ns: number;
+                landmark_name: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PoseRangeReportView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    processing_artifacts_api_processing_artifacts_get: {
+        parameters: {
+            query: {
+                dataset_id: string;
+                session_id?: string | null;
+                stream_id?: string | null;
+                algorithm_id?: string | null;
+                series_name?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactRefView"][];
                 };
             };
             /** @description Validation Error */

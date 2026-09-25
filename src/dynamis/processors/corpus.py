@@ -81,6 +81,7 @@ class SilverStreamRef:
     nominal_sampling_rate_hz: float | None
     coordinate_frame_id: str | None
     stream_metadata: dict[str, Any]
+    skeleton_id: str | None = None
 
 
 def list_silver_streams(
@@ -104,6 +105,7 @@ def list_silver_streams(
             SENSOR_STREAM_TABLE.c.subject_id,
             SENSOR_STREAM_TABLE.c.nominal_sampling_rate_hz,
             SENSOR_STREAM_TABLE.c.coordinate_frame_id,
+            SENSOR_STREAM_TABLE.c.skeleton_id,
             SENSOR_STREAM_TABLE.c.stream_metadata,
         )
         .select_from(
@@ -136,6 +138,7 @@ def list_silver_streams(
             row_count=int(row.row_count),
             nominal_sampling_rate_hz=row.nominal_sampling_rate_hz,
             coordinate_frame_id=row.coordinate_frame_id,
+            skeleton_id=row.skeleton_id,
             stream_metadata=dict(row.stream_metadata or {}),
         )
         for row in rows
