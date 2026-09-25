@@ -448,6 +448,19 @@ SKILLCORNER_POSE_QUALITY_PARAMETERS: dict[str, Any] = {
     "derivative": SKILLCORNER_POSE_PARAMETERS["derivative"],
 }
 
+SKILLCORNER_POSE_BILATERAL_PARAMETERS: dict[str, Any] = {
+    "angles": [
+        dict(angle)
+        for angle in SKILLCORNER_POSE_PARAMETERS["angles"]
+        if angle["name"] in {"left_knee", "right_knee", "left_hip", "right_hip"}
+    ],
+    "angle_pairs": [
+        {"name": "knee_included_angle", "left_angle": "left_knee", "right_angle": "right_knee"},
+        {"name": "hip_included_angle", "left_angle": "left_hip", "right_angle": "right_hip"},
+    ],
+    "derivative": SKILLCORNER_POSE_PARAMETERS["derivative"],
+}
+
 POSE_REQUIRED_COLUMNS = [
     "session_id",
     "trial_id",
@@ -502,6 +515,7 @@ def skillcorner_pose_acceptance(
 ) -> dict[str, Any]:
     """Accept SkillCorner geometry and cadence-grid Pose quality deterministically."""
     from dynamis.processors.pose import process_pose
+    from dynamis.processors.pose_bilateral import process_pose_bilateral
     from dynamis.processors.pose_quality import process_pose_quality
 
     resolved = dict(parameters or SKILLCORNER_POSE_PARAMETERS)
@@ -530,9 +544,7 @@ def skillcorner_pose_acceptance(
         if ref.skeleton_id is None or not skeleton_names.get(ref.skeleton_id):
             raise ValueError(f"{ref.stream_id}: registered Pose skeleton has no joint definitions")
 
-    def execute(
-        ref: SilverStreamRef,
-    ) -> tuple[ProcessorRunResult, Any, ProcessorRunResult, Any, Any]:
+    def execute(ref: SilverStreamRef) -> tuple[Any, ...]:
         table, processor_input = load_silver(settings, ref, columns=POSE_REQUIRED_COLUMNS)
         result = process_pose(table, parameters=resolved)
         run = execute_processor(
@@ -558,17 +570,32 @@ def skillcorner_pose_acceptance(
             series_key=ref.stream_id,
             engine=engine,
         )
-        return run, result, quality_run, quality_result, table
+        bilateral_result = process_pose_bilateral(
+            table,
+            parameters=SKILLCORNER_POSE_BILATERAL_PARAMETERS,
+        )
+        bilateral_run = execute_processor(
+            settings,
+            result=bilateral_result,
+            dataset_id=SKILLCORNER_DATASET_ID,
+            inputs=(processor_input,),
+            series_key=ref.stream_id,
+            engine=engine,
+        )
+        return run, result, quality_run, quality_result, bilateral_run, bilateral_result, table
 
     first_checksums: dict[str, str] = {}
     run_ids: set[str] = set()
     per_stream: list[dict[str, Any]] = []
     metric_values: dict[str, list[float]] = {}
     for index, ref in enumerate(refs):
-        run, result, quality_run, quality_result, table = execute(ref)
+        run, result, quality_run, quality_result, bilateral_run, bilateral_result, table = execute(
+            ref
+        )
         for processor_name, processor_run in (
             ("kinematics", run),
             ("quality", quality_run),
+            ("bilateral", bilateral_run),
         ):
             run_ids.add(processor_run.run_id)
             for series in processor_run.series:
@@ -581,7 +608,9 @@ def skillcorner_pose_acceptance(
                 "rows": int(table.num_rows),
                 "frames": result.diagnostics["frames"],
                 "entities": result.diagnostics["entities"],
-                "metrics": len(result.metrics) + len(quality_result.metrics),
+                "metrics": len(result.metrics)
+                + len(quality_result.metrics)
+                + len(bilateral_result.metrics),
                 "quality_expected_frames": quality_result.diagnostics["expected_frames"],
                 "skeleton_id": ref.skeleton_id,
                 "series_checksums": {
@@ -591,10 +620,14 @@ def skillcorner_pose_acceptance(
                 | {
                     f"quality:{series.name}": series.artifact.checksum_sha256
                     for series in quality_run.series
+                }
+                | {
+                    f"bilateral:{series.name}": series.artifact.checksum_sha256
+                    for series in bilateral_run.series
                 },
             }
         )
-        for metric in (*result.metrics, *quality_result.metrics):
+        for metric in (*result.metrics, *quality_result.metrics, *bilateral_result.metrics):
             metric_values.setdefault(metric.declaration.metric_id, []).append(metric.value)
         del table
         if progress is not None:
@@ -603,10 +636,11 @@ def skillcorner_pose_acceptance(
     rerun_matches = 0
     rerun_run_ids: set[str] = set()
     for ref in refs:
-        run, _, quality_run, _, table = execute(ref)
+        run, _, quality_run, _, bilateral_run, _, table = execute(ref)
         for processor_name, processor_run in (
             ("kinematics", run),
             ("quality", quality_run),
+            ("bilateral", bilateral_run),
         ):
             rerun_run_ids.add(processor_run.run_id)
             for series in processor_run.series:
@@ -618,10 +652,15 @@ def skillcorner_pose_acceptance(
         del table
     receipt = {
         "dataset_id": SKILLCORNER_DATASET_ID,
-        "algorithms": ["pose.translation_invariant_kinematics", "pose.analysis_quality"],
+        "algorithms": [
+            "pose.translation_invariant_kinematics",
+            "pose.analysis_quality",
+            "pose.bilateral_geometry",
+        ],
         "configurations": {
             "pose.translation_invariant_kinematics": resolved,
             "pose.analysis_quality": "registered skeleton names and geometry requirements",
+            "pose.bilateral_geometry": SKILLCORNER_POSE_BILATERAL_PARAMETERS,
         },
         "streams": len(refs),
         "runs": len(run_ids),

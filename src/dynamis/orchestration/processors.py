@@ -33,6 +33,7 @@ from dynamis.gold.export import export_serving
 from dynamis.gold.publish import publish_gold
 from dynamis.processors.acceptance import (
     SKILLCORNER_ACCEPTANCE_PARAMETERS,
+    SKILLCORNER_POSE_BILATERAL_PARAMETERS,
     SKILLCORNER_POSE_PARAMETERS,
     SKILLCORNER_POSE_QUALITY_PARAMETERS,
     TRACKING_ACCEPTANCE_PARAMETERS,
@@ -112,6 +113,12 @@ def _pose_quality_processor(table):
     return process_pose_quality(table, parameters=SKILLCORNER_POSE_QUALITY_PARAMETERS)
 
 
+def _pose_bilateral_processor(table):
+    from dynamis.processors.pose_bilateral import process_pose_bilateral
+
+    return process_pose_bilateral(table, parameters=SKILLCORNER_POSE_BILATERAL_PARAMETERS)
+
+
 def _womens_processor(table):
     from dynamis.processors.acceptance import WOMENS_GEODETIC_PARAMETERS
     from dynamis.processors.locomotor import process_locomotor
@@ -181,6 +188,12 @@ def skillcorner_pose_processing() -> dict:
 def skillcorner_pose_quality_processing() -> dict:
     """Cadence-grid Pose availability, dropout and provider-radius quality summaries."""
     return _process(SKILLCORNER_DATASET_ID, "pose", _pose_quality_processor)
+
+
+@asset(group_name="processors", compute_kind="python")
+def skillcorner_pose_bilateral_processing() -> dict:
+    """Same-subject, exact-time left/right geometric Pose comparison."""
+    return _process(SKILLCORNER_DATASET_ID, "pose", _pose_bilateral_processor)
 
 
 @asset(group_name="tactical_processors", compute_kind="python")
@@ -310,6 +323,7 @@ def gold_serving_export(
     skillcorner_tracking_processing: dict,
     skillcorner_pose_processing: dict,
     skillcorner_pose_quality_processing: dict,
+    skillcorner_pose_bilateral_processing: dict,
 ) -> dict:
     """Deterministic Parquet export of the control plane for dbt-duckdb."""
     del (
@@ -321,6 +335,7 @@ def gold_serving_export(
         skillcorner_tracking_processing,
         skillcorner_pose_processing,
         skillcorner_pose_quality_processing,
+        skillcorner_pose_bilateral_processing,
     )
     resolved, engine = _engine()
     try:
@@ -416,6 +431,7 @@ __all__ = [
     "gold_serving_export",
     "skillcorner_pose_processing",
     "skillcorner_pose_quality_processing",
+    "skillcorner_pose_bilateral_processing",
     "skillcorner_tactical_geometry_processing",
     "skillcorner_tactical_influence_processing",
     "skillcorner_tactical_territory_processing",

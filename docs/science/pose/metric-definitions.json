@@ -75,13 +75,23 @@
     },
     {
       "algorithm_id": "pose.bilateral_geometry",
-      "version": "planned",
-      "status": "not_implemented",
+      "version": "1.0.0",
+      "status": "implemented",
       "measurement_class": "PIPELINE_DERIVED",
       "metrics": [
-        {"id_pattern": "pose.bilateral.angle_difference.{homologous_angle}", "layer": "D", "unit": "rad", "status": "planned", "definition": "Right-minus-left geometric included-angle difference at matched exact subject/time observations."},
-        {"id_pattern": "pose.bilateral.waveform_similarity.{homologous_metric}", "layer": "D", "unit": "1", "status": "planned_quality_gated", "definition": "Explicitly named similarity statistic on legitimately aligned common valid samples; reports both-side quality separately."}
-      ]
+        {"id_pattern": "pose.bilateral.coverage.{pair}", "layer": "D", "unit": "1", "status": "implemented", "definition": "Common available exact-time frame fraction for the named pair within one subject."},
+        {"id_pattern": "pose.bilateral.angle_difference_mean.{pair}", "layer": "D", "unit": "rad", "status": "implemented", "definition": "Mean right-minus-left geometric included-angle difference at matched subject/timestamp rows."},
+        {"id_pattern": "pose.bilateral.angle_difference_mean_absolute.{pair}", "layer": "D", "unit": "rad", "status": "implemented", "definition": "Mean absolute right-minus-left geometric included-angle difference on common samples."},
+        {"id_pattern": "pose.bilateral.angle_difference_rms.{pair}", "layer": "D", "unit": "rad", "status": "implemented", "definition": "Root-mean-square right-minus-left geometric included-angle difference on common samples."},
+        {"id_pattern": "pose.bilateral.angle_difference_range.{pair}", "layer": "D", "unit": "rad", "status": "implemented_when_two_samples", "definition": "Range of the right-minus-left geometric included-angle difference."},
+        {"id_pattern": "pose.bilateral.waveform_correlation.{pair}", "layer": "D", "unit": "1", "status": "implemented_when_nonconstant", "definition": "Descriptive Pearson correlation on common exact-time samples; no normative threshold."},
+        {"id_pattern": "pose.bilateral.maximum_angle_time_offset.{pair}", "layer": "D", "unit": "s", "status": "implemented_when_unique_maxima", "definition": "Right maximum-angle timestamp minus left maximum-angle timestamp, emitted only when both maxima are unique."}
+      ],
+      "alignment": "same_subject_exact_canonical_timestamp",
+      "difference_convention": "right_minus_left",
+      "normative_assessment": false,
+      "series_name": "pose_bilateral_geometry",
+      "series_columns": ["entity_id", "t_rel_ns", "left_{pair}_angle_rad", "right_{pair}_angle_rad", "right_minus_left_{pair}_rad", "common_available_{pair}"]
     },
     {
       "algorithm_id": "pose.biomechanical_ik",
