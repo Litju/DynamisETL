@@ -443,6 +443,26 @@ export function PoseAnalysisPane() {
                   </figcaption>
                 </figure>
               )}
+              {landmarkSpan && selectedJoint && PRECOMPUTED_LANDMARKS.has(selectedJoint) ? (
+                <div className="mt-2 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    className="rounded-sm border border-border-subtle px-2 py-1 text-[9px] text-text-secondary hover:bg-surface-2"
+                    onClick={() => context.commitRange({ fromNs: landmarkSpan.fromNs, toNs: landmarkSpan.toNs })}
+                  >
+                    Commit plotted range
+                  </button>
+                  {explicitRange ? (
+                    <button
+                      type="button"
+                      className="rounded-sm px-2 py-1 text-[9px] text-text-muted hover:bg-surface-2"
+                      onClick={() => context.commitRange(null)}
+                    >
+                      Clear range
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </div>
         ) : null}

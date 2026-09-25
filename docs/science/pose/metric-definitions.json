@@ -381,11 +381,18 @@
                     "definition": "Sum of consecutive exact body-anchor-relative displacement magnitudes in the selected range; gaps are not bridged.",
                 },
                 {
-                    "id_pattern": "pose.range.landmark.speed_{mean|peak}.{landmark}",
+                    "id_pattern": "pose.range.landmark.speed_mean.{landmark}",
                     "layer": "B",
                     "unit": "m/s",
                     "status": "implemented_when_observed",
-                    "definition": "Summary of the versioned body-anchor-relative hybrid-axis speed series in the exact range.",
+                    "definition": "Mean of the versioned body-anchor-relative hybrid-axis speed series in the exact range.",
+                },
+                {
+                    "id_pattern": "pose.range.landmark.speed_peak.{landmark}",
+                    "layer": "B",
+                    "unit": "m/s",
+                    "status": "implemented_when_observed",
+                    "definition": "Peak of the versioned body-anchor-relative hybrid-axis speed series in the exact range.",
                 },
                 {
                     "id_pattern": "pose.range.angle_rom.{angle}",
@@ -430,11 +437,25 @@
                     "definition": "Descriptive Pearson correlation over exact common bilateral samples; no normative threshold.",
                 },
                 {
-                    "id_pattern": "pose.range.provider_error_radius_{mean|median|p95}.{landmark}",
+                    "id_pattern": "pose.range.provider_error_radius_mean.{landmark}",
                     "layer": "0",
                     "unit": "m",
                     "status": "implemented_when_available",
-                    "definition": "Statistic over provider p90 predicted error-radius samples within the exact range; not confidence or probability.",
+                    "definition": "Mean of provider p90 predicted error-radius samples within the exact range; not confidence or probability.",
+                },
+                {
+                    "id_pattern": "pose.range.provider_error_radius_median.{landmark}",
+                    "layer": "0",
+                    "unit": "m",
+                    "status": "implemented_when_available",
+                    "definition": "Median of provider p90 predicted error-radius samples within the exact range; not confidence or probability.",
+                },
+                {
+                    "id_pattern": "pose.range.provider_error_radius_p95.{landmark}",
+                    "layer": "0",
+                    "unit": "m",
+                    "status": "implemented_when_available",
+                    "definition": "95th percentile of provider p90 predicted error-radius samples within the exact range; not confidence or probability.",
                 },
             ],
             "report_provenance": [

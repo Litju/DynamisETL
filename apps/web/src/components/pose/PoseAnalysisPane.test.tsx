@@ -273,6 +273,7 @@ function renderPane(contextValue: AnalysisContextValue = context) {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.clearAllMocks();
   useAnalysisStore.getState().resetTransient();
 });
 
@@ -287,6 +288,9 @@ it("provides keyboard-addressable analysis sections and shared selected-joint co
   const selector = screen.getByRole("combobox", { name: "Select Pose landmark" });
   fireEvent.change(selector, { target: { value: "lKnee" } });
   expect(useAnalysisStore.getState().selectedJoint).toBe("lKnee");
+  await screen.findByRole("figure", { name: /lKnee Body-relative speed waveform/ });
+  fireEvent.click(screen.getByRole("button", { name: "Commit plotted range" }));
+  expect(context.commitRange).toHaveBeenCalledWith({ fromNs: 0n, toNs: 80_000_000n });
   fireEvent.click(screen.getByRole("tab", { name: "Quality" }));
   expect(await screen.findByText(/00:00:00.040–00:00:00.080 · 1 frames/)).toBeTruthy();
   fireEvent.click(screen.getByRole("tab", { name: "Selected joint" }));
