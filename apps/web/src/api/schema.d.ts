@@ -203,6 +203,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/processing/artifacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Processing Artifacts */
+        get: operations["processing_artifacts_api_processing_artifacts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/quality": {
         parameters: {
             query?: never;
@@ -1698,6 +1715,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MetricMethodology"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    processing_artifacts_api_processing_artifacts_get: {
+        parameters: {
+            query: {
+                dataset_id: string;
+                session_id?: string | null;
+                stream_id?: string | null;
+                algorithm_id?: string | null;
+                series_name?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactRefView"][];
                 };
             };
             /** @description Validation Error */

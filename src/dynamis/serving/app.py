@@ -143,6 +143,15 @@ class ServingBackend(Protocol):
         series_name: str | None = None,
     ) -> list[ArtifactRefView]: ...
 
+    def processing_artifacts(
+        self,
+        dataset_id: str,
+        session_id: str | None = None,
+        stream_id: str | None = None,
+        algorithm_id: str | None = None,
+        series_name: str | None = None,
+    ) -> list[ArtifactRefView]: ...
+
     def tactical_capability(self, dataset_id: str) -> TacticalCapabilityView | None: ...
 
     def tactical_methodology(self) -> TacticalMethodologyPage: ...
@@ -304,6 +313,24 @@ class PostgresServingBackend:
                 dataset_id=dataset_id,
                 session_id=session_id,
                 stream_id=stream_id,
+                series_name=series_name,
+            )
+
+    def processing_artifacts(
+        self,
+        dataset_id: str,
+        session_id: str | None = None,
+        stream_id: str | None = None,
+        algorithm_id: str | None = None,
+        series_name: str | None = None,
+    ) -> list[ArtifactRefView]:
+        with self._connect() as connection:
+            return repository.list_processing_artifacts(
+                connection,
+                dataset_id=dataset_id,
+                session_id=session_id,
+                stream_id=stream_id,
+                algorithm_id=algorithm_id,
                 series_name=series_name,
             )
 
@@ -622,6 +649,27 @@ def create_app(
         series_name: str | None = None,
     ) -> list[ArtifactRefView]:
         return service.tactical_artifacts(dataset_id, session_id, stream_id, series_name)
+
+    @app.get(
+        "/api/processing/artifacts",
+        response_model=list[ArtifactRefView],
+        tags=["processing"],
+    )
+    def processing_artifacts(
+        dataset_id: str,
+        service: BackendDependency,
+        session_id: str | None = None,
+        stream_id: str | None = None,
+        algorithm_id: str | None = None,
+        series_name: str | None = None,
+    ) -> list[ArtifactRefView]:
+        return service.processing_artifacts(
+            dataset_id,
+            session_id,
+            stream_id,
+            algorithm_id,
+            series_name,
+        )
 
     def _tactical_series(
         artifact_id: str,

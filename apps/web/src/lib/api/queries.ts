@@ -45,6 +45,14 @@ export interface TacticalArtifactQuery {
   readonly seriesName?: string | undefined;
 }
 
+export interface ProcessingArtifactQuery {
+  readonly datasetId: string;
+  readonly sessionId?: string | undefined;
+  readonly streamId?: string | undefined;
+  readonly algorithmId?: string | undefined;
+  readonly seriesName?: string | undefined;
+}
+
 export interface TacticalSeriesQuery {
   readonly artifactId: string;
   readonly fromNs?: number | undefined;
@@ -95,6 +103,7 @@ export const queryKeys = {
   tacticalQuality: (datasetId: string) => ["tactical", "quality", datasetId] as const,
   tacticalMethodology: ["tactical", "methodology"] as const,
   tacticalArtifacts: (query: TacticalArtifactQuery) => ["tactical", "artifacts", query] as const,
+  processingArtifacts: (query: ProcessingArtifactQuery) => ["processing", "artifacts", query] as const,
   tacticalSeries: (query: TacticalSeriesQuery) => ["tactical", "series", query] as const,
 };
 
@@ -342,6 +351,28 @@ export const tacticalArtifactsQuery = (query: TacticalArtifactQuery) =>
                 session_id: query.sessionId,
                 stream_id: query.streamId,
                 series_name: query.seriesName,
+              }),
+            },
+          },
+        }),
+      ),
+    staleTime: 30_000,
+  });
+
+export const processingArtifactsQuery = (query: ProcessingArtifactQuery) =>
+  queryOptions({
+    queryKey: queryKeys.processingArtifacts(query),
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/api/processing/artifacts", {
+          params: {
+            query: {
+              dataset_id: query.datasetId,
+              ...compact({
+              session_id: query.sessionId,
+              stream_id: query.streamId,
+              algorithm_id: query.algorithmId,
+              series_name: query.seriesName,
               }),
             },
           },

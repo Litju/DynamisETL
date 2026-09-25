@@ -1524,6 +1524,7 @@
         "type": "object"
       },
       "PitchDimensionsView": {
+        "additionalProperties": false,
         "properties": {
           "length_m": {
             "exclusiveMinimum": 0.0,
@@ -3869,6 +3870,116 @@
         "summary": "Methodology",
         "tags": [
           "metrics"
+        ]
+      }
+    },
+    "/api/processing/artifacts": {
+      "get": {
+        "operationId": "processing_artifacts_api_processing_artifacts_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "dataset_id",
+            "required": true,
+            "schema": {
+              "title": "Dataset Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "session_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "stream_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Stream Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "algorithm_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Algorithm Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "series_name",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Series Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ArtifactRefView"
+                  },
+                  "title": "Response Processing Artifacts Api Processing Artifacts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Processing Artifacts",
+        "tags": [
+          "processing"
         ]
       }
     },
