@@ -267,7 +267,7 @@ const report = {
     run.status === "ok" && run.measurement?.isWebGPURenderer === true,
   ) ? "passed all real Field/Pose scenes without renderer or console errors" : "failed one or more real scenes",
   recommendedBackend: "WebGL2",
-  decision: "WebGPU rendered all tested scenes without errors but showed no benefit. Standalone Field was within 1 FPS and Pose was 1–3 FPS slower; the split scene was 8–9 FPS on WebGPU versus 43–46 FPS on WebGL2, with p95 frame intervals of 200–217 ms versus 50 ms. Keep WebGL2 as the production backend.",
+  decision: "WebGPU rendered all tested scenes without renderer or console errors, but did not provide a performance benefit in this captured sample. WebGL2 was faster in Field, Pose and split mode, with the largest gap in split mode; compare each run's FPS, frame intervals and resource figures. Keep WebGL2 as the production backend.",
   runs,
 };
 await mkdir(path.dirname(output), { recursive: true });
