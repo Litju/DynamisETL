@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { DecodedWindow } from "@/lib/arrow/decode";
-import { poseFramesFromBuffers } from "@/components/pose/pose-model";
+import {
+  poseFrameFromBuffersAt,
+  poseFramesFromBuffers,
+} from "@/components/pose/pose-model";
 import {
   prepareEventWindow,
   preparePoseWindow,
@@ -85,6 +88,14 @@ describe("Arrow MatchFrame preparation", () => {
       landmarks: [{ jointName: "lHip", xM: 1, yM: 2, zM: 3 }],
     });
     expect(poseFramesFromBuffers(result, "s2")[0]?.unavailableJoints).toEqual([]);
+    expect(poseFrameFromBuffersAt(result, "s1", 0n, 0)).toMatchObject({
+      subjectId: "s1",
+      tRelNs: 0,
+      unavailableJoints: ["nose"],
+      landmarks: [{ jointName: "lHip", xM: 1, yM: 2, zM: 3 }],
+    });
+    expect(poseFrameFromBuffersAt(result, "s1", 40n, 0)).toBeNull();
+    expect(poseFrameFromBuffersAt(result, "s2", 40n, 0)?.observed).toBe(true);
   });
 
   it("parses exact tactical polygons into frame and point offsets", () => {

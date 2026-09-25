@@ -7,7 +7,6 @@ import { CommandPalette } from "@/components/command/CommandPalette";
 import { ContextBar } from "@/components/shell/ContextBar";
 import { Explorer } from "@/components/shell/Explorer";
 import { Inspector } from "@/components/shell/Inspector";
-import { PoseTelemetry } from "@/components/pose/PoseTelemetry";
 import { NavRail } from "@/components/shell/NavRail";
 import { Transport } from "@/components/shell/Transport";
 import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
@@ -16,6 +15,7 @@ import { useAnalysisStore } from "@/lib/state/analysis";
 import { inspectorVisible, useUiStore } from "@/lib/state/ui";
 
 const TacticalAnalysisPane = lazy(() => import("@/components/shell/TacticalAnalysisPane").then((module) => ({ default: module.TacticalAnalysisPane })));
+const PoseAnalysisPane = lazy(() => import("@/components/pose/PoseAnalysisPane").then((module) => ({ default: module.PoseAnalysisPane })));
 
 export interface ShellLayout {
   /** The session explorer only exists inside an open laboratory session. */
@@ -109,7 +109,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                 className="min-w-0"
               >
                 {showPoseTelemetry ? (
-                  <PoseTelemetry />
+                  <Suspense fallback={<div className="p-3 text-[11px] text-text-muted">Loading Pose analysis pane…</div>}>
+                    <PoseAnalysisPane />
+                  </Suspense>
                 ) : showTacticalAnalysis ? (
                   <Suspense fallback={null}>
                     <TacticalAnalysisPane onCollapse={() => setInspectorOpen(false)} />

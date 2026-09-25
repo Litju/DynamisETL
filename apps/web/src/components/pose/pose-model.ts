@@ -93,6 +93,75 @@ export function poseFramesFromBuffers(
   return frames;
 }
 
+/** Read one exact source frame from worker buffers without materializing the window. */
+export function poseFrameFromBuffersAt(
+  buffers: PoseWindowBuffers | undefined,
+  subjectId: string | null,
+  tRelNs: bigint | null,
+  maxGapNs: number,
+): PoseFrame | null {
+  if (buffers === undefined || subjectId === null) return null;
+  const subjectIndex = buffers.subjectIds.indexOf(subjectId);
+  if (subjectIndex < 0) return null;
+  const start = buffers.subjectFrameOffsets[subjectIndex] ?? 0;
+  const stop = buffers.subjectFrameOffsets[subjectIndex + 1] ?? start;
+  if (start >= stop) return null;
+
+  let candidate = -1;
+  if (tRelNs === null) {
+    for (let index = start; index < stop; index += 1) {
+      if (buffers.frameObserved[index] === 1) {
+        candidate = index;
+        break;
+      }
+    }
+  } else {
+    let low = start;
+    let high = stop;
+    while (low < high) {
+      const middle = Math.floor((low + high) / 2);
+      if ((buffers.frameTimesNs[middle] ?? 0n) <= tRelNs) low = middle + 1;
+      else high = middle;
+    }
+    for (let index = low - 1; index >= start; index -= 1) {
+      const frameTime = buffers.frameTimesNs[index] ?? 0n;
+      if (Number(tRelNs - frameTime) > maxGapNs) break;
+      if (buffers.frameObserved[index] === 1) {
+        candidate = index;
+        break;
+      }
+    }
+  }
+  if (candidate < 0) return null;
+
+  const landmarks: PoseLandmark[] = [];
+  const unavailableJoints: string[] = [];
+  const base = candidate * buffers.jointNames.length;
+  for (let jointIndex = 0; jointIndex < buffers.jointNames.length; jointIndex += 1) {
+    const name = buffers.jointNames[jointIndex]!;
+    const valueIndex = base + jointIndex;
+    if (buffers.availability[valueIndex] !== 1) {
+      if (buffers.present[valueIndex] === 1) unavailableJoints.push(name);
+      continue;
+    }
+    const positionIndex = valueIndex * 3;
+    landmarks.push({
+      jointName: name,
+      xM: buffers.positionsXYZ[positionIndex]!,
+      yM: buffers.positionsXYZ[positionIndex + 1]!,
+      zM: buffers.positionsXYZ[positionIndex + 2]!,
+      errorM: Number.isFinite(buffers.errorM[valueIndex]!) ? buffers.errorM[valueIndex]! : null,
+    });
+  }
+  return {
+    tRelNs: Number(buffers.frameTimesNs[candidate] ?? 0n),
+    subjectId,
+    landmarks,
+    unavailableJoints,
+    observed: buffers.frameObserved[candidate] === 1,
+  };
+}
+
 export interface DisplayConnectionDefinition {
   readonly startLandmark: string;
   readonly endLandmark: string;
