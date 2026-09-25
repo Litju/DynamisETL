@@ -107,6 +107,21 @@ describe("deterministic laboratory defaults", () => {
     });
   });
 
+  it("opens tracking sessions in MatchLab, including a field-only DFL source", () => {
+    const detail = session([
+      stream({ stream_id: "track-period-1", modality: "tracking", trial_id: "period-1" }),
+      stream({ stream_id: "pose-period-1", modality: "pose", trial_id: "period-1" }),
+    ], ["period-1"]);
+    expect(resolveLabDefaults(detail, {}).patch).toMatchObject({
+      view: "matchlab",
+      stream: "track-period-1",
+      trial: "period-1",
+    });
+
+    const dfl = session([stream({ stream_id: "dfl-track", modality: "tracking", trial_id: "period-1" })], ["period-1"]);
+    expect(resolveLabDefaults(dfl, {}).patch.view).toBe("matchlab");
+  });
+
   it("never invents a subject the data does not name", () => {
     const detail = session([stream({ stream_id: "pose-1", modality: "pose" })], ["p1"]);
     const { patch } = resolveLabDefaults(detail, { view: "pose" });

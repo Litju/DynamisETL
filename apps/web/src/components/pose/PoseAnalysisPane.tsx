@@ -94,10 +94,17 @@ function RangeMetricRows({ report }: { readonly report: PoseRangeReportView }) {
   );
 }
 
-export function PoseAnalysisPane() {
+export function PoseAnalysisPane({
+  embedded = false,
+  sectionOverride,
+}: {
+  readonly embedded?: boolean;
+  readonly sectionOverride?: Section;
+} = {}) {
   const context = useAnalysisContext();
   const matchFrame = useMatchFrameContext();
-  const [section, setSection] = useState<Section>("Live");
+  const storedSection = useAnalysisStore((state) => state.poseAnalysisSection);
+  const section = sectionOverride ?? storedSection;
   const [waveMetric, setWaveMetric] = useState<WaveMetric>("body_relative_speed");
   const throttledTimeNs = useThrottledPlayhead(200);
   const selectedJoint = useAnalysisStore((state) => state.selectedJoint);
@@ -348,8 +355,8 @@ export function PoseAnalysisPane() {
   }
 
   return (
-    <aside aria-label="Pose analysis pane" data-testid="pose-analysis-pane" className="flex h-full min-h-0 flex-col bg-surface-1">
-      <header className="shrink-0 border-b border-border-subtle px-3 py-2">
+    <aside aria-label="Pose analysis pane" data-testid="pose-analysis-pane" className={embedded && sectionOverride ? "min-h-0 bg-surface-1" : "flex h-full min-h-0 flex-col bg-surface-1"}>
+      {!embedded ? <header className="shrink-0 border-b border-border-subtle px-3 py-2">
         <h2 className="t-section text-text-muted">Pose analysis</h2>
         <p className="mt-1 truncate text-[12px] text-text-primary">
           {participant?.notes ?? subjectId ?? "No subject selected"}
@@ -365,8 +372,8 @@ export function PoseAnalysisPane() {
           {jointNames.length > 0 ? ` · ${jointNames.length} registered landmarks` : ""}
           </p>
         ) : null}
-      </header>
-      <div role="tablist" aria-label="Pose analysis sections" className="flex shrink-0 flex-wrap gap-1 border-b border-border-subtle px-2 py-1.5">
+      </header> : null}
+      {sectionOverride === undefined ? <div role="tablist" aria-label="Pose analysis sections" className="flex shrink-0 flex-wrap gap-1 border-b border-border-subtle px-2 py-1.5">
         {SECTIONS.map((item) => (
           <button
             key={item}
@@ -375,7 +382,7 @@ export function PoseAnalysisPane() {
             role="tab"
             aria-selected={section === item}
             aria-controls={panelId}
-            onClick={() => setSection(item)}
+            onClick={() => useAnalysisStore.getState().setPoseAnalysisSection(item)}
             className={section === item
               ? "shrink-0 rounded-sm border border-border-subtle bg-surface-3 px-2 py-1 text-[10px] text-text-primary"
               : "shrink-0 rounded-sm px-2 py-1 text-[10px] text-text-muted hover:bg-surface-2 hover:text-text-secondary"}
@@ -383,8 +390,12 @@ export function PoseAnalysisPane() {
             {item}
           </button>
         ))}
-      </div>
-      <div id={panelId} role="tabpanel" aria-labelledby={tabId(section)} className="min-h-0 flex-1 overflow-y-auto">
+      </div> : null}
+      <div
+        id={panelId}
+        className={embedded && sectionOverride ? "" : "min-h-0 flex-1 overflow-y-auto"}
+        {...(sectionOverride === undefined ? { role: "tabpanel", "aria-labelledby": tabId(section) } : {})}
+      >
         {section === "Live" ? (
           <div className="flex h-full min-h-0 flex-col">
             <PoseTelemetry summaryOnly />

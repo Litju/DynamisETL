@@ -7,6 +7,7 @@ import {
   useSearch,
 } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef } from "react";
+import { Group, Panel, Separator } from "react-resizable-panels";
 
 import { lazy, Suspense } from "react";
 
@@ -15,6 +16,9 @@ const MatchLabCanvasRoot = lazy(() => import("@/components/matchlab/MatchLabCanv
 const SignalLaboratory = lazy(() => import("@/components/lab/SignalLaboratory").then((module) => ({ default: module.SignalLaboratory })));
 const PitchReplay = lazy(() => import("@/components/pitch/PitchReplay").then((module) => ({ default: module.PitchReplay })));
 const PoseViewer = lazy(() => import("@/components/pose/PoseViewer"));
+const MatchLabContextSpine = lazy(() => import("@/components/matchlab/MatchLabWorkspace").then((module) => ({ default: module.MatchLabContextSpine })));
+const MatchLabDashboard = lazy(() => import("@/components/matchlab/MatchLabWorkspace").then((module) => ({ default: module.MatchLabDashboard })));
+const MatchLabPoseViewport = lazy(() => import("@/components/matchlab/MatchLabWorkspace").then((module) => ({ default: module.MatchLabPoseViewport })));
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
 import { artifactQuery, sessionQuery } from "@/lib/api/queries";
 import { canonicalTimeDefault, patchChangesSearch, resolveLabDefaults } from "@/lib/defaults";
@@ -46,6 +50,7 @@ export function LabPage() {
   const durableTimeNs = tryParseNs(search.t_ns);
   const durableSubject = search.subject ?? null;
   const durableView = search.view ?? "overview";
+  const previousLabView = useRef(durableView);
   const previousRendererContext = useRef({
     datasetId,
     sessionId,
@@ -64,6 +69,14 @@ export function LabPage() {
       focusedPanel: durableView,
     });
   }, [hydrate, durableTimeNs, durableView]);
+  useEffect(() => {
+    const previous = previousLabView.current;
+    previousLabView.current = durableView;
+    if (durableView !== "matchlab" || previous === "matchlab") return;
+    useAnalysisStore.getState().setFieldCameraMode("tactical-map");
+    useAnalysisStore.getState().setDashboardDomain("tactical");
+    useAnalysisStore.getState().setPoseAnalysisSection("Live");
+  }, [durableView]);
   useEffect(() => () => {
     useAnalysisStore.getState().resetTransient();
   }, [datasetId, sessionId]);
@@ -103,13 +116,33 @@ export function LabPage() {
   // Canonical time authority: a renderer view always has a committed frame that
   // lies inside the selected stream's canonical span (RES-112 F-01/F-08/P-01).
   const rendererView =
-    durableView === "signals" || durableView === "field" || durableView === "pose" || durableView === "split";
+    durableView === "signals" || durableView === "field" || durableView === "pose" || durableView === "matchlab";
   const timeArtifactId = rendererView ? (selectedStream?.sample_artifact_ids[0] ?? null) : null;
   const timeArtifact = useQuery({
     ...artifactQuery(timeArtifactId ?? ""),
     enabled: Boolean(timeArtifactId),
   });
+  const poseStreamForMatch = detail?.streams.find(
+    (stream) => stream.modality === "pose" && stream.trial_id === (selectedStream?.trial_id ?? search.trial),
+  );
+  const defaultSubjectArtifactId = durableView === "matchlab" && search.subject === undefined && selectedStream?.modality === "tracking"
+    ? poseStreamForMatch?.sample_artifact_ids[0] ?? selectedStream.sample_artifact_ids[0] ?? null
+    : null;
+  const defaultSubjectArtifact = useQuery({
+    ...artifactQuery(defaultSubjectArtifactId ?? ""),
+    enabled: Boolean(defaultSubjectArtifactId),
+  });
   const awaitingPoseSubject = durableView === "pose" && search.subject === undefined;
+  useEffect(() => {
+    if (durableView !== "matchlab" || search.subject !== undefined || !detail || !defaultSubjectArtifact.data) return;
+    const observedSubjects = new Set(
+      (defaultSubjectArtifact.data.entity_observations ?? [])
+        .filter((observation) => observation.observation_count > 0)
+        .map((observation) => observation.entity_id),
+    );
+    const firstObservedParticipant = detail.participants.find((participant) => observedSubjects.has(participant.subject_id));
+    if (firstObservedParticipant) updateSearch({ subject: firstObservedParticipant.subject_id });
+  }, [defaultSubjectArtifact.data, detail, durableView, search.subject, updateSearch]);
   useEffect(() => {
     const previous = previousRendererContext.current;
     const trialId = search.trial ?? selectedStream?.trial_id ?? null;
@@ -194,16 +227,24 @@ export function LabPage() {
       (candidate): candidate is WorkbenchView =>
         candidate !== "overview" &&
         (candidate === "provenance" || candidate === view ||
-          (candidate === "split"
-            ? surfaces.includes("field") && surfaces.includes("pose")
+          (candidate === "matchlab"
+            ? surfaces.includes("field")
             : surfaces.includes(candidate as never))),
     ),
   ];
+  const viewLabels: Record<WorkbenchView, string> = {
+    overview: "Overview",
+    signals: "Signals",
+    field: "Field",
+    pose: "Pose",
+    matchlab: "MatchLab",
+    provenance: "Provenance",
+  };
   return (
     <Suspense fallback={<LoadingPanel label="Opening laboratory" />}>
       <MatchLabCanvasRoot
         enabled={
-          (view === "field" || view === "pose" || view === "split") &&
+          (view === "field" || view === "pose" || view === "matchlab") &&
           Boolean(selectedStream?.sample_artifact_ids[0])
         }
       >
@@ -221,13 +262,13 @@ export function LabPage() {
               aria-selected={view === candidate}
               onClick={() => updateSearch({ view: candidate })}
               className={cn(
-                "t-context relative rounded-control px-2.5 py-1 capitalize transition-colors duration-quick",
+                "t-context relative rounded-control px-2.5 py-1 transition-colors duration-quick",
                 view === candidate
                   ? "bg-surface-3 font-medium text-text-primary"
                   : "text-text-muted hover:bg-surface-2 hover:text-text-secondary",
               )}
             >
-              {candidate}
+              {viewLabels[candidate]}
               {view === candidate ? (
                 <span
                   aria-hidden="true"
@@ -249,6 +290,11 @@ export function LabPage() {
             ) : null}
           </span>
         </div>
+        {view === "matchlab" ? (
+          <Suspense fallback={<div className="h-10 shrink-0 border-b border-border-subtle bg-surface-1" />}>
+            <MatchLabContextSpine session={session.data} />
+          </Suspense>
+        ) : null}
         <div className="min-h-0 flex-1">
           {view === "overview" ? (
             <LabOverview
@@ -270,17 +316,32 @@ export function LabPage() {
             <Suspense fallback={<LoadingPanel label="Loading 3D laboratory" />}>
               <PoseViewer />
             </Suspense>
-          ) : view === "split" ? (
-            <div className="grid h-full min-h-0 grid-cols-2 gap-2">
-              <section className="min-h-0 min-w-0 overflow-hidden rounded-panel border border-border-subtle">
-                <PitchReplay />
-              </section>
-              <section className="min-h-0 min-w-0 overflow-hidden rounded-panel border border-border-subtle">
-                <Suspense fallback={<LoadingPanel label="Loading Pose view" />}>
-                  <PoseViewer />
-                </Suspense>
-              </section>
-            </div>
+          ) : view === "matchlab" ? (
+            <Group
+              orientation="horizontal"
+              id="matchlab-composition"
+              data-testid="matchlab-composition"
+              className="flex h-full min-h-0"
+              resizeTargetMinimumSize={{ coarse: 28, fine: 6 }}
+            >
+              <Panel id="matchlab-field" defaultSize="48%" minSize="38%" className="min-w-0 overflow-hidden bg-transparent">
+                <section aria-label="Field Tactical Map" data-testid="matchlab-field-panel" className="h-full min-h-0 overflow-hidden bg-transparent">
+                  {selectedStream?.modality === "tracking" ? (
+                    <PitchReplay />
+                  ) : (
+                    <StatePanel state="unsupported" title="Tactical tracking unavailable for this period" detail="MatchLab requires a registered tracking artifact for the left Tactical Map. No tactical positions are inferred from Pose." />
+                  )}
+                </section>
+              </Panel>
+              <Separator aria-label="Resize Field and Pose panels" className="w-px shrink-0 bg-border-subtle transition-colors data-[separator]:hover:bg-accent" />
+              <Panel id="matchlab-pose" defaultSize="30%" minSize="24%" className="min-w-0 overflow-hidden bg-transparent">
+                <MatchLabPoseViewport />
+              </Panel>
+              <Separator aria-label="Resize Pose and Analysis panels" className="w-px shrink-0 bg-border-subtle transition-colors data-[separator]:hover:bg-accent" />
+              <Panel id="matchlab-analysis" defaultSize="22%" minSize="18%" className="min-w-0 overflow-hidden bg-surface-1">
+                <MatchLabDashboard session={session.data} />
+              </Panel>
+            </Group>
           ) : (
             <StatePanel
               state="empty"

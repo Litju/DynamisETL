@@ -1,7 +1,7 @@
 import { useRouterState } from "@tanstack/react-router";
-import { PanelRight } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, PanelRight } from "lucide-react";
 import { Group, Panel, Separator } from "react-resizable-panels";
-import { lazy, Suspense, type ReactNode } from "react";
+import { lazy, Suspense, useState, type ReactNode } from "react";
 
 import { CommandPalette } from "@/components/command/CommandPalette";
 import { ContextBar } from "@/components/shell/ContextBar";
@@ -13,6 +13,7 @@ import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
 import { usePlaybackClock } from "@/hooks/usePlaybackClock";
 import { useAnalysisStore } from "@/lib/state/analysis";
 import { inspectorVisible, useUiStore } from "@/lib/state/ui";
+import { normalizeLabSearch } from "@/lib/search";
 
 const TacticalAnalysisPane = lazy(() => import("@/components/shell/TacticalAnalysisPane").then((module) => ({ default: module.TacticalAnalysisPane })));
 const PoseAnalysisPane = lazy(() => import("@/components/pose/PoseAnalysisPane").then((module) => ({ default: module.PoseAnalysisPane })));
@@ -61,20 +62,23 @@ export function AppShell({ children }: { children: ReactNode }) {
   const nominalRateHz = useAnalysisStore((state) => state.nominalRateHz);
 
   const layout = shellLayoutFor(pathname);
-  const showExplorer = !focusMode && layout.explorer;
-  const routeView = new URLSearchParams(location.searchStr ?? "").get("view");
+  const routeSearch = normalizeLabSearch(location.search);
+  const routeView = routeSearch.view;
+  const matchLabRoute = routeView === "matchlab";
+  const showExplorer = !focusMode && layout.explorer && !matchLabRoute;
   const poseRoute = routeView === "pose";
   const showPoseTelemetry = !focusMode && layout.inspector && poseRoute;
   const tacticalRoute = !focusMode && layout.inspector && routeView === "field";
   const showTacticalAnalysis = tacticalRoute && inspectorVisible(inspectorOverride, layout.inspector);
   const showInspector =
-    showPoseTelemetry || showTacticalAnalysis || (!focusMode && inspectorVisible(inspectorOverride, layout.inspector));
+    !matchLabRoute && (showPoseTelemetry || showTacticalAnalysis || (!focusMode && inspectorVisible(inspectorOverride, layout.inspector)));
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-surface-0 text-text-primary">
       <ContextBar />
       <div className="flex min-h-0 flex-1">
         {!focusMode ? <NavRail /> : null}
+        {matchLabRoute && !focusMode ? <MatchLabExplorerRail /> : null}
         <Group
           orientation="horizontal"
           id="dynamis-workbench"
@@ -123,12 +127,38 @@ export function AppShell({ children }: { children: ReactNode }) {
             </>
           ) : null}
         </Group>
-        {!focusMode && !showInspector ? (
+        {!focusMode && !matchLabRoute && !showInspector ? (
         <InspectorRail tactical={tacticalRoute} onExpand={() => setInspectorOpen(true)} />
         ) : null}
       </div>
       {layout.transport ? <Transport nominalRateHz={nominalRateHz} /> : null}
       <CommandPalette />
+    </div>
+  );
+}
+
+/** Narrow, on-demand source/context rail for the flagship MatchLab route. */
+function MatchLabExplorerRail() {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="relative z-30 h-full w-8 shrink-0 border-r border-border-subtle bg-surface-0">
+      <button
+        type="button"
+        onClick={() => setExpanded((open) => !open)}
+        aria-label={expanded ? "Close MatchLab explorer" : "Open MatchLab explorer"}
+        aria-expanded={expanded}
+        className="flex h-8 w-8 items-center justify-center border-b border-border-subtle text-text-muted hover:bg-surface-2 hover:text-text-secondary"
+      >
+        {expanded ? <PanelLeftClose size={14} aria-hidden="true" /> : <PanelLeftOpen size={14} aria-hidden="true" />}
+      </button>
+      <span aria-hidden="true" className="t-section mt-3 block select-none text-center text-[9px] text-text-muted" style={{ writingMode: "vertical-rl" }}>
+        Explorer
+      </span>
+      {expanded ? (
+        <aside className="absolute inset-y-0 left-full z-30 w-64 border-r border-border-subtle bg-surface-1 shadow-panel">
+          <Explorer onCollapse={() => setExpanded(false)} />
+        </aside>
+      ) : null}
     </div>
   );
 }

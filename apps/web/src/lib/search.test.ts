@@ -29,6 +29,11 @@ describe("durable search parameter validation", () => {
     expect(parsed.view).toBe("pose");
   });
 
+  it("promotes legacy split links to the MatchLab workstation", () => {
+    expect(parseSearch(labSearchSchema, { view: "split" }).view).toBe("matchlab");
+    expect(parseSearch(compareSearchSchema, { view: "split" }).view).toBe("matchlab");
+  });
+
   it("normalizes the router's numeric coercion back to decimal text", () => {
     // The router query decoder turns numeric-looking values into numbers before
     // validation; canonical time and subject identity must stay exact text.

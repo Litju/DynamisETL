@@ -1,7 +1,7 @@
-# DynamisData demo runbook — Field and Pose flagship routes
+# DynamisData demo runbook — MatchLab flagship workstation
 
 This runbook takes a machine with the accepted local corpus to a workbench whose flagship
-Field and Pose routes are fully populated, and fails loudly when it cannot. Nothing here
+MatchLab route integrates Field, selected-player Pose and the Analysis Dashboard, and fails loudly when it cannot. Nothing here
 downloads data: every step reads the configured local roots and the PostgreSQL control
 plane. Acquisition and ingest are separate, rights-gated steps (see `README.md`,
 `DATA_SOURCES.md`).
@@ -88,6 +88,8 @@ pnpm --filter @dynamis/web run dev   # workbench on :5173 (proxies /api to :8000
 
 | route | what must be visible |
 | --- | --- |
+| `/lab/skillcorner-opendata/1925299?view=matchlab&stream=tracking-period-1&subject=11897&t_ns=120000000000` | Tactical Map left, genuine selected-player Pose 3D centre, persistent Analysis Dashboard right; one canonical player/time context, one shared transport, and explicit source/method/measurement-class provenance. The route stays at 48/30/22 at 1600×1000 and 1440×900, and keeps all three panels visible at 1366×768. |
+| `/lab/dfl-sportec-idsse/DFL-MAT-J03WPY?view=matchlab&stream=tracking-period-1&t_ns=300020000000` | Real DFL Tactical Map and tactical Analysis Dashboard, with an explicit Pose-unavailable state because this period has no registered Pose source. |
 | `/catalog` | five datasets with laboratory chips and rights |
 | `/lab/dfl-sportec-idsse/DFL-MAT-J03WPY?view=overview` | athlete locomotor headline (no ball), charts, derived metrics |
 | `/lab/dfl-sportec-idsse/DFL-MAT-J03WPY?view=field&stream=tracking-period-1&tactical=live` | Tactical Map default with a fitted orthographic pitch at 00:00:01.020, source possession/ball context and GK/DEF/MID/ATT inter-line structure; optional Occupied area; Space territory + MODEL_ESTIMATED influence; DFL source-event snapshots with seek. Structure Lift is optional and exposes declared scalar elevation with a restrained pitch shadow. |
