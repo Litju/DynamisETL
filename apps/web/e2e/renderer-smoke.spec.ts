@@ -51,6 +51,13 @@ for (const candidate of CASES) {
       consoleMessages.push(entry);
       consoleErrors.push(entry);
     });
+    page.on("response", (response) => {
+      if (response.status() >= 400) {
+        const entry = `http ${response.status()}: ${response.url()}`;
+        consoleMessages.push(entry);
+        consoleErrors.push(entry);
+      }
+    });
 
     await page.goto(candidate.route);
     const host = page.getByTestId(candidate.host);

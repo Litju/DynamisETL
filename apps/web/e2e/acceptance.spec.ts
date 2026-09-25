@@ -79,10 +79,13 @@ test("1c. Pose playback advances both the playhead and rendered scene", async ({
   expect(after.equals(before)).toBe(false);
 });
 
-test("1d. Pose telemetry lists every provider landmark in the inspector", async ({ page }) => {
+test("1d. Raw Pose landmarks remain available inside the analysis pane", async ({ page }) => {
   await page.goto(
     "/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P1&view=pose&t_ns=0",
   );
+  const rawLandmarksTab = page.getByRole("tab", { name: "Raw landmarks", exact: true });
+  await expect(rawLandmarksTab).toBeVisible();
+  await rawLandmarksTab.click();
   const telemetry = page.getByTestId("pose-telemetry");
   await expect(telemetry).toBeVisible();
   await expect(page.locator("#inspector").getByTestId("pose-telemetry")).toBeVisible();
