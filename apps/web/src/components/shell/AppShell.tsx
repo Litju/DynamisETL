@@ -1,13 +1,12 @@
 import { useRouterState } from "@tanstack/react-router";
 import { PanelRight } from "lucide-react";
 import { Group, Panel, Separator } from "react-resizable-panels";
-import type { ReactNode } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 
 import { CommandPalette } from "@/components/command/CommandPalette";
 import { ContextBar } from "@/components/shell/ContextBar";
 import { Explorer } from "@/components/shell/Explorer";
 import { Inspector } from "@/components/shell/Inspector";
-import { TacticalAnalysisPane } from "@/components/shell/TacticalAnalysisPane";
 import { PoseTelemetry } from "@/components/pose/PoseTelemetry";
 import { NavRail } from "@/components/shell/NavRail";
 import { Transport } from "@/components/shell/Transport";
@@ -15,6 +14,8 @@ import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
 import { usePlaybackClock } from "@/hooks/usePlaybackClock";
 import { useAnalysisStore } from "@/lib/state/analysis";
 import { inspectorVisible, useUiStore } from "@/lib/state/ui";
+
+const TacticalAnalysisPane = lazy(() => import("@/components/shell/TacticalAnalysisPane").then((module) => ({ default: module.TacticalAnalysisPane })));
 
 export interface ShellLayout {
   /** The session explorer only exists inside an open laboratory session. */
@@ -110,7 +111,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                 {showPoseTelemetry ? (
                   <PoseTelemetry />
                 ) : showTacticalAnalysis ? (
-                  <TacticalAnalysisPane onCollapse={() => setInspectorOpen(false)} />
+                  <Suspense fallback={null}>
+                    <TacticalAnalysisPane onCollapse={() => setInspectorOpen(false)} />
+                  </Suspense>
                 ) : (
                   <Inspector onCollapse={() => setInspectorOpen(false)} />
                 )}

@@ -10,7 +10,7 @@ import { MeasurementClassBadge } from "@/components/common/Badges";
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
 import { SectionTitle } from "@/components/common/Panel";
 import { ARRIVAL_TIME_ELEVATION_SPEC, describeElevationSpec } from "@/components/matchlab/elevation-specs";
-import { sessionTeams } from "@/components/pitch/PitchReplay";
+import { sessionTeams } from "@/components/pitch/pitch-model";
 import {
   ALGORITHMS,
   LEVEL_NAMES,

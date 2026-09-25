@@ -2,6 +2,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { chromium } from "@playwright/test";
 
+/* global window, document, requestAnimationFrame */
+
 const baseUrl = process.env.DYNAMIS_REAL_BASE_URL ?? "http://127.0.0.1:5173";
 const output = path.resolve(process.cwd(), "../../output/playwright/res-113/hybrid-field-benchmark.json");
 const evidenceDirectory = path.resolve(process.cwd(), "../../output/playwright/res-113/final");

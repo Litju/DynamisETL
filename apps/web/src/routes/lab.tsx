@@ -8,12 +8,12 @@ import {
 } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
-import { LabOverview } from "@/components/lab/LabOverview";
-import { MatchLabCanvasRoot } from "@/components/matchlab/MatchLabCanvasRoot";
-import { SignalLaboratory } from "@/components/lab/SignalLaboratory";
-import { PitchReplay } from "@/components/pitch/PitchReplay";
 import { lazy, Suspense } from "react";
 
+const LabOverview = lazy(() => import("@/components/lab/LabOverview").then((module) => ({ default: module.LabOverview })));
+const MatchLabCanvasRoot = lazy(() => import("@/components/matchlab/MatchLabCanvasRoot").then((module) => ({ default: module.MatchLabCanvasRoot })));
+const SignalLaboratory = lazy(() => import("@/components/lab/SignalLaboratory").then((module) => ({ default: module.SignalLaboratory })));
+const PitchReplay = lazy(() => import("@/components/pitch/PitchReplay").then((module) => ({ default: module.PitchReplay })));
 const PoseViewer = lazy(() => import("@/components/pose/PoseViewer"));
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
 import { artifactQuery, sessionQuery } from "@/lib/api/queries";
@@ -157,13 +157,14 @@ export function LabPage() {
     ),
   ];
   return (
-    <MatchLabCanvasRoot
-      enabled={
-        (view === "field" || view === "pose" || view === "split") &&
-        Boolean(selectedStream?.sample_artifact_ids[0])
-      }
-    >
-      <div className="relative z-10 flex h-full min-h-0 flex-col">
+    <Suspense fallback={<LoadingPanel label="Opening laboratory" />}>
+      <MatchLabCanvasRoot
+        enabled={
+          (view === "field" || view === "pose" || view === "split") &&
+          Boolean(selectedStream?.sample_artifact_ids[0])
+        }
+      >
+        <div className="relative z-10 flex h-full min-h-0 flex-col">
         <div
           role="tablist"
           aria-label="Laboratory views"
@@ -249,7 +250,8 @@ export function LabPage() {
             />
           )}
         </div>
-      </div>
-    </MatchLabCanvasRoot>
+        </div>
+      </MatchLabCanvasRoot>
+    </Suspense>
   );
 }

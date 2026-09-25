@@ -1,7 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { DFL, SC, expectCleanConsole, probe, waitForPitch } from "./helpers";
 
@@ -12,16 +12,12 @@ async function capture(page: Page, name: string) {
   await page.screenshot({ path: path.join(OUT, name), fullPage: false });
 }
 
-async function cameraTuple(pitch: ReturnType<typeof pageLocator>) {
+async function cameraTuple(pitch: Locator) {
   return {
     x: await pitch.getAttribute("data-camera-x"),
     y: await pitch.getAttribute("data-camera-height"),
     z: await pitch.getAttribute("data-camera-z"),
   };
-}
-
-function pageLocator(page: Page) {
-  return page.getByTestId("pitch-canvas");
 }
 
 test("RES-113 §21–22 real DFL and SkillCorner hybrid Field evidence", async ({ page }) => {

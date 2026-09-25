@@ -5,6 +5,7 @@ import { MeasurementClassBadge, ModalityBadge } from "@/components/common/Badges
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
 import {
   isTrackingStream,
+  sessionTeams,
   teamRole,
 } from "@/components/pitch/pitch-model";
 import {
@@ -65,6 +66,8 @@ import {
 import { effectiveTimeNs, useAnalysisStore } from "@/lib/state/analysis";
 import { useUiStore } from "@/lib/state/ui";
 import { formatClockNs, formatDurationNs } from "@/lib/time";
+
+export { sessionTeams };
 
 const MAX_REPLAY_POINTS = 20_000;
 const MAX_EVENT_POINTS = 2_000;
@@ -155,11 +158,6 @@ export function pitchEventsFromBuffers(buffers: EventWindowBuffers | undefined):
 }
 
 /**
- * Session-stable team order and labels from the served participants: the two
- * provider team ids in sorted order (the same rule the markers always used),
- * labelled with the registered team name when the API serves one.
- */
-/**
  * On-pitch labels: the registered shirt number when the provider registered
  * one (`shirt 16 (…)` → `16`), otherwise the renderer's short id.
  */
@@ -170,22 +168,6 @@ export function shirtLabels(session: SessionDetail | undefined): ReadonlyMap<str
     if (match) labels.set(participant.subject_id, match[1]!);
   }
   return labels;
-}
-
-export function sessionTeams(session: SessionDetail | undefined): {
-  readonly order: readonly string[];
-  readonly labels: ReadonlyMap<string, string>;
-} {
-  const labels = new Map<string, string>();
-  for (const participant of session?.participants ?? []) {
-    const groupId = participant.group_label;
-    if (!groupId) continue;
-    const name = participant.cohort;
-    if (!labels.has(groupId) || (name && labels.get(groupId) === groupId)) {
-      labels.set(groupId, name && name.length > 0 ? name : groupId);
-    }
-  }
-  return { order: [...labels.keys()].sort(), labels };
 }
 
 /**

@@ -58,7 +58,7 @@ function TacticalPolygon({
       const vertices = points.map(([xM, yM]) => [xM, FIELD_RENDER_DEPTH_M.shapeOutline, -yM] as const);
       return points.length > 2 ? [...vertices, vertices[0]!] : vertices;
     },
-    [depthM, points],
+    [points],
   );
   useEffect(() => () => geometry.dispose(), [geometry]);
   const colorValue = selected ? matchFrame.selectedTacticalObjectId === objectId ? "#ffffff" : color : color;
