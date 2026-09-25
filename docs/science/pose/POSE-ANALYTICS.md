@@ -53,6 +53,11 @@ The machine-readable definitions are in
 [`metric-definitions.json`](metric-definitions.json); the source/model gate is
 in [`skillcorner-capability-matrix.json`](skillcorner-capability-matrix.json).
 
+An exact selected-range report is computed by `pose.range_summary` v1.0.0 from
+the bounded canonical source window and current, versioned processor series.
+The report carries exact subject/time bounds and input artifact checksums. It
+does not read display-reduced chart samples.
+
 ## Required provenance
 
 Every analytical sample or summary preserves subject, session, period/trial,

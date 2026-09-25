@@ -53,6 +53,16 @@ export interface ProcessingArtifactQuery {
   readonly seriesName?: string | undefined;
 }
 
+export interface PoseRangeReportQuery {
+  readonly datasetId: string;
+  readonly sessionId: string;
+  readonly streamId: string;
+  readonly subjectId: string;
+  readonly fromNs: number;
+  readonly toNs: number;
+  readonly landmarkName: string;
+}
+
 export interface TacticalSeriesQuery {
   readonly artifactId: string;
   readonly fromNs?: number | undefined;
@@ -104,6 +114,7 @@ export const queryKeys = {
   tacticalMethodology: ["tactical", "methodology"] as const,
   tacticalArtifacts: (query: TacticalArtifactQuery) => ["tactical", "artifacts", query] as const,
   processingArtifacts: (query: ProcessingArtifactQuery) => ["processing", "artifacts", query] as const,
+  poseRangeReport: (query: PoseRangeReportQuery) => ["pose", "range-report", query] as const,
   tacticalSeries: (query: TacticalSeriesQuery) => ["tactical", "series", query] as const,
 };
 
@@ -374,6 +385,28 @@ export const processingArtifactsQuery = (query: ProcessingArtifactQuery) =>
               algorithm_id: query.algorithmId,
               series_name: query.seriesName,
               }),
+            },
+          },
+        }),
+      ),
+    staleTime: 30_000,
+  });
+
+export const poseRangeReportQuery = (query: PoseRangeReportQuery) =>
+  queryOptions({
+    queryKey: queryKeys.poseRangeReport(query),
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/api/pose/range-report", {
+          params: {
+            query: {
+              dataset_id: query.datasetId,
+              session_id: query.sessionId,
+              stream_id: query.streamId,
+              subject_id: query.subjectId,
+              from_ns: query.fromNs,
+              to_ns: query.toNs,
+              landmark_name: query.landmarkName,
             },
           },
         }),

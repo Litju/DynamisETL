@@ -180,6 +180,32 @@ class MetricPage(BaseModel):
     rows: list[MetricValue]
 
 
+class PoseRangeMetricView(BaseModel):
+    metric_id: str
+    metric_name: str
+    si_unit: str
+    value_num: float
+    description: str
+    provenance: dict[str, Any]
+
+
+class PoseRangeReportView(BaseModel):
+    algorithm_id: str
+    algorithm_version: str
+    parameters_hash: str
+    code_git_sha: str | None
+    dataset_id: str
+    session_id: str
+    trial_id: str
+    stream_id: str
+    subject_id: str
+    from_ns: int
+    to_ns: int
+    input_artifact_checksums: dict[str, str]
+    metrics: list[PoseRangeMetricView]
+    display_note: str
+
+
 class MetricDefinitionView(BaseModel):
     metric_id: str
     name: str
