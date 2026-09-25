@@ -265,9 +265,7 @@ def test_idsse_tracking_stream_registers_source_pitch_dimensions(
 ) -> None:
     adapter = _adapter(tmp_path, dfl_files)
     tracking = next(
-        stream
-        for stream in adapter.domain().streams
-        if stream.modality.value == "tracking"
+        stream for stream in adapter.domain().streams if stream.modality.value == "tracking"
     )
     metadata = adapter.metadata
     assert tracking.stream_metadata["pitch_dimensions_m"] == {

@@ -249,18 +249,24 @@ def test_direction_missing_fails_closed_to_frame_axis() -> None:
 
 
 def test_source_ball_zone_requires_finite_point_and_never_infers_direction() -> None:
-    assert _ball_zone(
-        (-40.0, 0.0), direction="right_to_left", pitch_length_m=100.0, pitch_width_m=60.0
-    ) == "opponent_third"
-    assert _ball_zone(
-        (-40.0, 0.0), direction=None, pitch_length_m=100.0, pitch_width_m=60.0
-    ) == "left_third"
-    assert _ball_zone(
-        (51.0, 0.0), direction="left_to_right", pitch_length_m=100.0, pitch_width_m=60.0
-    ) == "out_of_bounds"
-    assert _ball_zone(
-        None, direction="left_to_right", pitch_length_m=100.0, pitch_width_m=60.0
-    ) is None
+    assert (
+        _ball_zone(
+            (-40.0, 0.0), direction="right_to_left", pitch_length_m=100.0, pitch_width_m=60.0
+        )
+        == "opponent_third"
+    )
+    assert (
+        _ball_zone((-40.0, 0.0), direction=None, pitch_length_m=100.0, pitch_width_m=60.0)
+        == "left_third"
+    )
+    assert (
+        _ball_zone((51.0, 0.0), direction="left_to_right", pitch_length_m=100.0, pitch_width_m=60.0)
+        == "out_of_bounds"
+    )
+    assert (
+        _ball_zone(None, direction="left_to_right", pitch_length_m=100.0, pitch_width_m=60.0)
+        is None
+    )
 
 
 def test_source_role_absence_stays_unknown() -> None:

@@ -174,8 +174,13 @@ def _check_matchlab_v3_invariants(contract: dict[str, Any]) -> None:
     if "BigInt" not in context["canonical_time"]:
         raise ContractError("MatchFrameContext canonical time must remain BigInt-safe")
     if "latest real Pose sample at or before" not in context["pose_resolution"]:
-        raise ContractError("Pose frames must resolve independently under their source-rate contract")
-    if "1.5 nominal sample intervals" not in context["tracking_resolution"] or "1.5 nominal sample intervals" not in context["pose_resolution"]:
+        raise ContractError(
+            "Pose frames must resolve independently under their source-rate contract"
+        )
+    if (
+        "1.5 nominal sample intervals" not in context["tracking_resolution"]
+        or "1.5 nominal sample intervals" not in context["pose_resolution"]
+    ):
         raise ContractError("V3 source-frame age tolerance must remain explicit")
     if "Never interpolate" not in context["pose_resolution"]:
         raise ContractError("MatchFrameContext must not fabricate Pose samples")
@@ -192,17 +197,33 @@ def _check_matchlab_v3_invariants(contract: dict[str, Any]) -> None:
         raise ContractError("missing metric pitch geometry must fail closed")
 
     presentation = contract["field_presentation"]
-    if "Tactical Map" not in presentation["default_mode"] or "OrthographicCamera" not in presentation["default_mode"]:
+    if (
+        "Tactical Map" not in presentation["default_mode"]
+        or "OrthographicCamera" not in presentation["default_mode"]
+    ):
         raise ContractError("Tactical Map must be the fitted orthographic Field default")
-    if "Structure Lift" not in presentation["structure_lift"] or "orthographic" not in presentation["structure_lift"]:
-        raise ContractError("Structure Lift must preserve metric pitch XY with orthographic projection")
+    if (
+        "Structure Lift" not in presentation["structure_lift"]
+        or "orthographic" not in presentation["structure_lift"]
+    ):
+        raise ContractError(
+            "Structure Lift must preserve metric pitch XY with orthographic projection"
+        )
     if "optional" not in presentation["optional_exploration"].lower():
         raise ContractError("Perspective exploration must remain optional")
     if "render-layer-depths.ts" not in presentation["depth_offset_authority"]:
         raise ContractError("Field presentation offsets must have one depth authority")
     if "one restrained DirectionalLight" not in presentation["shadow_policy"]:
         raise ContractError("analytical Field shadows must use one restrained light")
-    required_planar = {"tracking positions", "functional units and inter-line gaps", "shape graph", "local triangles", "opposition relations", "hull and Voronoi", "event paths"}
+    required_planar = {
+        "tracking positions",
+        "functional units and inter-line gaps",
+        "shape graph",
+        "local triangles",
+        "opposition relations",
+        "hull and Voronoi",
+        "event paths",
+    }
     if set(presentation["planar_quantities"]) != required_planar:
         raise ContractError("tracking and ordinary tactical geometry must remain planar")
 
@@ -226,8 +247,7 @@ def _check_matchlab_v3_invariants(contract: dict[str, Any]) -> None:
     if set(alignment) != expected_modes:
         raise ContractError(f"V3 source alignment modes must be exactly {sorted(expected_modes)}")
     if any(
-        alignment[mode]["scientific_input_eligible"]
-        for mode in expected_modes - {"source_native"}
+        alignment[mode]["scientific_input_eligible"] for mode in expected_modes - {"source_native"}
     ):
         raise ContractError("display-transformed coordinates must never be scientific inputs")
 

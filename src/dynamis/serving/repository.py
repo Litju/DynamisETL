@@ -538,9 +538,7 @@ def session_detail(
                     if row["skeleton_id"] is not None
                     else []
                 ),
-                pitch_dimensions_m=(
-                    row.get("stream_metadata") or {}
-                ).get("pitch_dimensions_m"),
+                pitch_dimensions_m=(row.get("stream_metadata") or {}).get("pitch_dimensions_m"),
                 sample_artifact_ids=[str(item) for item in _list(row["artifact_ids"])],
                 sample_row_count=int(row["sample_row_count"]),
             )

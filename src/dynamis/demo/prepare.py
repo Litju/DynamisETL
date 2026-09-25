@@ -387,8 +387,7 @@ def _tactical_steps(
                 )
                 parameters_hash = probe_result.spec.parameters_hash
                 checksums = tuple(
-                    [item.checksum_sha256 for item in probe_source.inputs]
-                    + [ref.checksum_sha256]
+                    [item.checksum_sha256 for item in probe_source.inputs] + [ref.checksum_sha256]
                 )
 
                 def run_v3(
