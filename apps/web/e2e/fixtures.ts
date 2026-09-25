@@ -477,6 +477,7 @@ const TACTICAL_CAPABILITY = {
     level_c_influence: "supported_partial_with_model_input_quality",
     level_d_event_linked: "unavailable",
     level_e_shape_phase: "unavailable",
+    matchlab_v3_functional_units: "supported_from_declared_roles",
   },
   quality_evidence: { tracking_rate_hz: 10, local_event_files: false, local_phase_files: false },
   unavailable_reasons: ["no accepted local event or phase artifact"],

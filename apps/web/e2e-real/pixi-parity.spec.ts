@@ -43,7 +43,7 @@ async function captureRenderer(page: Page, mode: "pixi" | "r3f", player: { reado
   await page.goto(`${DFL}?view=field&stream=tracking-period-1&t_ns=300020000000&from_ns=285000000000&to_ns=315000000000`);
   const host = await waitForPitch(page);
   await expect(host).toHaveAttribute("data-renderer", mode);
-  for (const layer of ["Trails", "Labels", "Hull", "Territory", "Influence"]) {
+  for (const layer of ["Trails", "Labels", "Occupied area", "Territory", "Influence"]) {
     const button = page.getByRole("button", { name: new RegExp(layer) }).first();
     if (await button.getAttribute("aria-pressed") !== "true") await button.click();
   }

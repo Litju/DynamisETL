@@ -115,16 +115,18 @@ test("2. selecting a player on the pitch updates the durable entity context", as
   await expect(selection).toContainText(/detected position|extrapolated position/);
 });
 
-test("2b. field uses the Tactical Analysis pane with explicit unavailable states", async ({ page }) => {
+test("2b. field uses the Live/Structure/Relations Tactical Analysis tabs", async ({ page }) => {
   await page.goto("/lab/skillcorner-opendata/1925299?stream=tracking-1&view=field&t_ns=0");
   const pane = page.getByRole("region", { name: "Tactical Analysis" });
   await expect(pane).toBeVisible();
   await expect(pane.getByRole("tab", { name: "Live" })).toBeVisible();
-  await expect(pane.getByRole("tab", { name: "Shape" })).toBeVisible();
+  await expect(pane.getByRole("tab", { name: "Structure" })).toBeVisible();
+  await expect(pane.getByRole("tab", { name: "Relations" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Inspector" })).toHaveCount(0);
-  await pane.getByRole("tab", { name: "Shape" }).click();
-  // RES-112 T-01: the unsupported state names the capability authority.
-  await expect(pane.getByText("Unsupported by this source").last()).toBeVisible();
+  await pane.getByRole("tab", { name: "Structure" }).click();
+  await expect(page.getByTestId("tactical-tabpanel")).toContainText(/No functional-unit geometry|Not materialized/);
+  await pane.getByRole("tab", { name: "Relations" }).click();
+  await expect(page.getByTestId("tactical-tabpanel")).toContainText("Not materialized");
 });
 
 test("3/4. committed time propagates from the keyboard to the transport and pose view", async ({

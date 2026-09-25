@@ -1,0 +1,606 @@
+{
+  "issue": "RES-113",
+  "capturedAt": "2026-09-25T07:00:01.468Z",
+  "baseUrl": "http://127.0.0.1:5173",
+  "backend": "WebGL2 production renderer",
+  "browser": "Playwright Chromium with hardware WebGL enabled",
+  "deviceScaleFactor": 1,
+  "sampleDurationMs": 5000,
+  "warmupDurationMs": 2000,
+  "method": {
+    "data": "Real local DFL/Sportec tracking and RES-110 tactical processor artifacts through the running API; no mocks.",
+    "scenarios": "Tactical Map with planar territory and heatmap; Structure Lift with the same planar overlays and metric ElevationSpec; paired Structure Lift runs disable/enable its sole directional shadow map; SkillCorner split with orthographic Field and true-3D Pose.",
+    "shadowOverhead": "Structure Lift camera and scalar surface remain identical; only the dev-only shadow benchmark switch changes.",
+    "scalarSurfaceUpdate": "Records main-thread duration for each typed-buffer grid-to-mesh update, including height/color writes, topology indices and normals.",
+    "frames": "Two seconds of playback warm-up, then five seconds measured per scenario; frame interval percentiles, Three render-pass draw calls, selection latency and actual shadow-map pass duration are recorded.",
+    "resolution": "Measured separately at 1600x1000 and 1440x900 CSS pixels."
+  },
+  "shadowOverhead": [
+    {
+      "viewport": {
+        "width": 1600,
+        "height": 1000
+      },
+      "shadowOffFps": 55,
+      "shadowOnFps": 54,
+      "fpsDelta": -1,
+      "shadowOffFrameP95Ms": 33.29999999999927,
+      "shadowOnFrameP95Ms": 33.29999999999927,
+      "shadowOffDrawCallsP50": 24,
+      "shadowOnDrawCallsP50": 24,
+      "shadowPasses": 6,
+      "shadowPassDurationP50Ms": 0.10000000055879354,
+      "shadowPassDurationP95Ms": 0.20000000018626451
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "shadowOffFps": 54,
+      "shadowOnFps": 54,
+      "fpsDelta": 0,
+      "shadowOffFrameP95Ms": 16.80000000000109,
+      "shadowOnFrameP95Ms": 33.30000000000018,
+      "shadowOffDrawCallsP50": 24,
+      "shadowOnDrawCallsP50": 24,
+      "shadowPasses": 7,
+      "shadowPassDurationP50Ms": 0.09999999962747097,
+      "shadowPassDurationP95Ms": 0.39999999944120646
+    }
+  ],
+  "runs": [
+    {
+      "viewport": {
+        "width": 1600,
+        "height": 1000
+      },
+      "scenario": "tactical_map",
+      "errors": [],
+      "status": "ok",
+      "selectionLatency": {
+        "samplesMs": [
+          80.7,
+          62.8,
+          58,
+          33.4,
+          28.9,
+          29.4,
+          29.2,
+          29.8
+        ],
+        "p50Ms": 29.8,
+        "p95Ms": 80.7
+      },
+      "measurement": {
+        "elapsedMs": 5022,
+        "fps": 55,
+        "frameIntervalMs": {
+          "p50": 16.699999999999818,
+          "p95": 33.29999999999927,
+          "p99": 33.400000000000546,
+          "worst": 150.10000000000036
+        },
+        "renderPasses": 554,
+        "drawCallsPerRenderPass": {
+          "p50": 24,
+          "p95": 103,
+          "mean": 56.71841155234657
+        },
+        "trianglesPerRenderPassP50": 2546,
+        "shadowPass": {
+          "samples": 0,
+          "durationMs": {
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        "scalarSurfaceUpdate": {
+          "samples": 0,
+          "validSamples": 0,
+          "cellsPerUpdate": null,
+          "durationMs": {
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        "jsHeapBytes": 140840649,
+        "fieldCameraMode": "tactical-map",
+        "shadowEnabled": false,
+        "scalarCellCount": 294,
+        "scalarSurfaceReady": false,
+        "scalarSurfaceVertices": 0,
+        "renderer": {
+          "isWebGLRenderer": true,
+          "isWebGPURenderer": false
+        }
+      },
+      "sourceFrameIdentity": "tracking-period-1-a1150b16850c:307100000000"
+    },
+    {
+      "viewport": {
+        "width": 1600,
+        "height": 1000
+      },
+      "scenario": "structure_lift_shadow_off",
+      "errors": [],
+      "status": "ok",
+      "selectionLatency": {
+        "samplesMs": [
+          73.2,
+          60.1,
+          31.1,
+          42.2,
+          44,
+          61,
+          62.2,
+          57.4
+        ],
+        "p50Ms": 57.4,
+        "p95Ms": 73.2
+      },
+      "measurement": {
+        "elapsedMs": 5029,
+        "fps": 55,
+        "frameIntervalMs": {
+          "p50": 16.699999999999818,
+          "p95": 33.29999999999927,
+          "p99": 33.400000000001455,
+          "worst": 100
+        },
+        "renderPasses": 558,
+        "drawCallsPerRenderPass": {
+          "p50": 24,
+          "p95": 103,
+          "mean": 56.763440860215056
+        },
+        "trianglesPerRenderPassP50": 2410,
+        "shadowPass": {
+          "samples": 0,
+          "durationMs": {
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        "scalarSurfaceUpdate": {
+          "samples": 5,
+          "validSamples": 5,
+          "cellsPerUpdate": 294,
+          "durationMs": {
+            "p50": 0.6000000005587935,
+            "p95": 0.8000000007450581,
+            "max": 0.8000000007450581
+          }
+        },
+        "jsHeapBytes": 193236761,
+        "fieldCameraMode": "structure-lift",
+        "shadowEnabled": false,
+        "scalarCellCount": 294,
+        "scalarSurfaceReady": true,
+        "scalarSurfaceVertices": 294,
+        "renderer": {
+          "isWebGLRenderer": true,
+          "isWebGPURenderer": false
+        }
+      },
+      "sourceFrameIdentity": "tracking-period-1-a1150b16850c:307180000000"
+    },
+    {
+      "viewport": {
+        "width": 1600,
+        "height": 1000
+      },
+      "scenario": "structure_lift_shadow_on",
+      "errors": [],
+      "status": "ok",
+      "selectionLatency": {
+        "samplesMs": [
+          105.9,
+          61.1,
+          46.5,
+          38.7,
+          39.3,
+          35.4,
+          35.8,
+          35
+        ],
+        "p50Ms": 38.7,
+        "p95Ms": 105.9
+      },
+      "measurement": {
+        "elapsedMs": 5019,
+        "fps": 54,
+        "frameIntervalMs": {
+          "p50": 16.699999999999818,
+          "p95": 33.29999999999927,
+          "p99": 50,
+          "worst": 150
+        },
+        "renderPasses": 546,
+        "drawCallsPerRenderPass": {
+          "p50": 24,
+          "p95": 103,
+          "mean": 57.095238095238095
+        },
+        "trianglesPerRenderPassP50": 2410,
+        "shadowPass": {
+          "samples": 6,
+          "durationMs": {
+            "p50": 0.10000000055879354,
+            "p95": 0.20000000018626451,
+            "max": 0.20000000018626451
+          }
+        },
+        "scalarSurfaceUpdate": {
+          "samples": 5,
+          "validSamples": 5,
+          "cellsPerUpdate": 294,
+          "durationMs": {
+            "p50": 0.900000000372529,
+            "p95": 1.300000000745058,
+            "max": 1.300000000745058
+          }
+        },
+        "jsHeapBytes": 197468296,
+        "fieldCameraMode": "structure-lift",
+        "shadowEnabled": true,
+        "scalarCellCount": 294,
+        "scalarSurfaceReady": true,
+        "scalarSurfaceVertices": 294,
+        "renderer": {
+          "isWebGLRenderer": true,
+          "isWebGPURenderer": false
+        }
+      },
+      "sourceFrameIdentity": "tracking-period-1-a1150b16850c:307100000000"
+    },
+    {
+      "viewport": {
+        "width": 1600,
+        "height": 1000
+      },
+      "scenario": "split_field_orthographic_pose_3d",
+      "errors": [],
+      "status": "ok",
+      "selectionLatency": {
+        "samplesMs": [
+          25.3,
+          139.4,
+          110,
+          134.7,
+          73.1,
+          83,
+          68,
+          104.3
+        ],
+        "p50Ms": 83,
+        "p95Ms": 139.4
+      },
+      "measurement": {
+        "elapsedMs": 5022,
+        "fps": 55,
+        "frameIntervalMs": {
+          "p50": 16.699999999999818,
+          "p95": 33.30000000000018,
+          "p99": 50,
+          "worst": 50
+        },
+        "renderPasses": 828,
+        "drawCallsPerRenderPass": {
+          "p50": 16,
+          "p95": 104,
+          "mean": 43.97826086956522
+        },
+        "trianglesPerRenderPassP50": 2858,
+        "shadowPass": {
+          "samples": 0,
+          "durationMs": {
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        "scalarSurfaceUpdate": {
+          "samples": 0,
+          "validSamples": 0,
+          "cellsPerUpdate": null,
+          "durationMs": {
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        "jsHeapBytes": 153643009,
+        "fieldCameraMode": "tactical-map",
+        "shadowEnabled": false,
+        "scalarCellCount": 294,
+        "scalarSurfaceReady": false,
+        "scalarSurfaceVertices": 0,
+        "renderer": {
+          "isWebGLRenderer": true,
+          "isWebGPURenderer": false
+        }
+      },
+      "sourceFrameIdentity": "tracking-period-1-457d138baddf:126800000000"
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scenario": "tactical_map",
+      "errors": [],
+      "status": "ok",
+      "selectionLatency": {
+        "samplesMs": [
+          83.1,
+          62.2,
+          58.4,
+          46.9,
+          28.6,
+          30.2,
+          26.2,
+          28.8
+        ],
+        "p50Ms": 30.2,
+        "p95Ms": 83.1
+      },
+      "measurement": {
+        "elapsedMs": 5025,
+        "fps": 56,
+        "frameIntervalMs": {
+          "p50": 16.699999999999818,
+          "p95": 16.800000000000182,
+          "p99": 33.399999999999636,
+          "worst": 133.39999999999964
+        },
+        "renderPasses": 568,
+        "drawCallsPerRenderPass": {
+          "p50": 24,
+          "p95": 103,
+          "mean": 56.889084507042256
+        },
+        "trianglesPerRenderPassP50": 2546,
+        "shadowPass": {
+          "samples": 0,
+          "durationMs": {
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        "scalarSurfaceUpdate": {
+          "samples": 0,
+          "validSamples": 0,
+          "cellsPerUpdate": null,
+          "durationMs": {
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        "jsHeapBytes": 197680518,
+        "fieldCameraMode": "tactical-map",
+        "shadowEnabled": false,
+        "scalarCellCount": 294,
+        "scalarSurfaceReady": false,
+        "scalarSurfaceVertices": 0,
+        "renderer": {
+          "isWebGLRenderer": true,
+          "isWebGPURenderer": false
+        }
+      },
+      "sourceFrameIdentity": "tracking-period-1-a1150b16850c:307100000000"
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scenario": "structure_lift_shadow_off",
+      "errors": [],
+      "status": "ok",
+      "selectionLatency": {
+        "samplesMs": [
+          97.3,
+          79.7,
+          70.2,
+          64.7,
+          64.2,
+          42.1,
+          28.2,
+          29.6
+        ],
+        "p50Ms": 64.2,
+        "p95Ms": 97.3
+      },
+      "measurement": {
+        "elapsedMs": 5032,
+        "fps": 54,
+        "frameIntervalMs": {
+          "p50": 16.699999999999818,
+          "p95": 16.80000000000109,
+          "p99": 66.60000000000036,
+          "worst": 149.89999999999964
+        },
+        "renderPasses": 546,
+        "drawCallsPerRenderPass": {
+          "p50": 24,
+          "p95": 103,
+          "mean": 57.443223443223445
+        },
+        "trianglesPerRenderPassP50": 2410,
+        "shadowPass": {
+          "samples": 0,
+          "durationMs": {
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        "scalarSurfaceUpdate": {
+          "samples": 5,
+          "validSamples": 5,
+          "cellsPerUpdate": 294,
+          "durationMs": {
+            "p50": 0.6999999992549419,
+            "p95": 0.900000000372529,
+            "max": 0.900000000372529
+          }
+        },
+        "jsHeapBytes": 205239224,
+        "fieldCameraMode": "structure-lift",
+        "shadowEnabled": false,
+        "scalarCellCount": 294,
+        "scalarSurfaceReady": true,
+        "scalarSurfaceVertices": 294,
+        "renderer": {
+          "isWebGLRenderer": true,
+          "isWebGPURenderer": false
+        }
+      },
+      "sourceFrameIdentity": "tracking-period-1-a1150b16850c:307140000000"
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scenario": "structure_lift_shadow_on",
+      "errors": [],
+      "status": "ok",
+      "selectionLatency": {
+        "samplesMs": [
+          85.8,
+          56.9,
+          72.4,
+          68.2,
+          65.9,
+          55,
+          34.9,
+          34.9
+        ],
+        "p50Ms": 56.9,
+        "p95Ms": 85.8
+      },
+      "measurement": {
+        "elapsedMs": 5052,
+        "fps": 54,
+        "frameIntervalMs": {
+          "p50": 16.699999999999818,
+          "p95": 33.30000000000018,
+          "p99": 50,
+          "worst": 100
+        },
+        "renderPasses": 544,
+        "drawCallsPerRenderPass": {
+          "p50": 24,
+          "p95": 103,
+          "mean": 57.15257352941177
+        },
+        "trianglesPerRenderPassP50": 2410,
+        "shadowPass": {
+          "samples": 7,
+          "durationMs": {
+            "p50": 0.09999999962747097,
+            "p95": 0.39999999944120646,
+            "max": 0.39999999944120646
+          }
+        },
+        "scalarSurfaceUpdate": {
+          "samples": 6,
+          "validSamples": 6,
+          "cellsPerUpdate": 294,
+          "durationMs": {
+            "p50": 0.6999999992549419,
+            "p95": 1.099999999627471,
+            "max": 1.099999999627471
+          }
+        },
+        "jsHeapBytes": 206342298,
+        "fieldCameraMode": "structure-lift",
+        "shadowEnabled": true,
+        "scalarCellCount": 294,
+        "scalarSurfaceReady": true,
+        "scalarSurfaceVertices": 294,
+        "renderer": {
+          "isWebGLRenderer": true,
+          "isWebGPURenderer": false
+        }
+      },
+      "sourceFrameIdentity": "tracking-period-1-a1150b16850c:307180000000"
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scenario": "split_field_orthographic_pose_3d",
+      "errors": [],
+      "status": "ok",
+      "selectionLatency": {
+        "samplesMs": [
+          31.4,
+          138.9,
+          100,
+          91.4,
+          51.1,
+          74.9,
+          83.5,
+          100.2
+        ],
+        "p50Ms": 83.5,
+        "p95Ms": 138.9
+      },
+      "measurement": {
+        "elapsedMs": 5046,
+        "fps": 55,
+        "frameIntervalMs": {
+          "p50": 16.699999999999818,
+          "p95": 33.30000000000018,
+          "p99": 33.399999999999636,
+          "worst": 33.400000000001455
+        },
+        "renderPasses": 840,
+        "drawCallsPerRenderPass": {
+          "p50": 16,
+          "p95": 104,
+          "mean": 44.10952380952381
+        },
+        "trianglesPerRenderPassP50": 2858,
+        "shadowPass": {
+          "samples": 0,
+          "durationMs": {
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        "scalarSurfaceUpdate": {
+          "samples": 0,
+          "validSamples": 0,
+          "cellsPerUpdate": null,
+          "durationMs": {
+            "p50": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        "jsHeapBytes": 177317817,
+        "fieldCameraMode": "tactical-map",
+        "shadowEnabled": false,
+        "scalarCellCount": 294,
+        "scalarSurfaceReady": false,
+        "scalarSurfaceVertices": 0,
+        "renderer": {
+          "isWebGLRenderer": true,
+          "isWebGPURenderer": false
+        }
+      },
+      "sourceFrameIdentity": "tracking-period-1-457d138baddf:126800000000"
+    }
+  ]
+}

@@ -112,7 +112,7 @@ test("DFL field and tactical pane", async ({ page }) => {
     pane: await text(page, "[aria-label='Tactical analysis views'] >> xpath=ancestor::section[1]"),
     layers: await text(page, "[aria-label='Scene layers']"),
   });
-  for (const tab of ["Space", "Shape", "Range", "Events", "Report"]) {
+  for (const tab of ["Structure", "Relations", "Space", "Range", "Events", "Report"]) {
     const control = page.getByRole("tab", { name: tab, exact: true });
     if (await control.count()) {
       await control.click();
@@ -141,7 +141,7 @@ test("SkillCorner field, overlays and playback", async ({ page }) => {
     layers: await text(page, "[aria-label='Scene layers']"),
     pane: await text(page, "[aria-label='Tactical analysis views'] >> xpath=ancestor::section[1]"),
   });
-  for (const layer of ["Hull", "Territory", "Influence"]) {
+  for (const layer of ["Occupied area", "Territory", "Influence"]) {
     const name = layer === "Influence" ? /Influence.*model/i : layer;
     const toggle = page.getByRole("button", { name });
     await expect(toggle).toBeVisible();
@@ -179,7 +179,7 @@ test("SkillCorner field, overlays and playback", async ({ page }) => {
     during,
     apiRequestsDuringPlay: probe.api.length - before,
   });
-  for (const tab of ["Space", "Shape", "Range", "Events", "Report"]) {
+  for (const tab of ["Structure", "Relations", "Space", "Range", "Events", "Report"]) {
     await page.getByRole("tab", { name: tab, exact: true }).click();
     await settle(page, 1_500);
     await shot(page, `08-field-sc-${tab.toLowerCase()}`, probe, {

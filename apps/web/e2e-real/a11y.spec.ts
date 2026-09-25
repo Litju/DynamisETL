@@ -60,9 +60,10 @@ async function expectTacticalTabReady(page: Page, tab: string) {
   await expect(panel.getByText("Loading tactical capability")).toHaveCount(0);
   await expect(panel.getByText("Loading tactical series")).toHaveCount(0);
   const readyText: Record<string, RegExp> = {
-    Live: /Current frame · team geometry|No team geometry row at this frame/,
-    Space: /Territory · clipped Voronoi/,
-    Shape: /is not supported for this source/,
+    Live: /POSSESSION AND BALL CONTEXT|No source possession context/,
+    Structure: /DEF \/ MID \/ ATT|No functional-unit geometry/,
+    Relations: /Choose a relation|Local relations/,
+    Space: /Occupied area|Territory · clipped Voronoi/,
     Range: /No range is committed/,
     Events: /source events/i,
     Report: /Deterministic report/,
@@ -82,7 +83,7 @@ test("axe (real data): every DFL tactical tab", async ({ page }) => {
   await page.goto(`${DFL}?view=field&stream=tracking-period-1&t_ns=300020000000`);
   await expect(page.getByTestId("pitch-canvas")).toHaveAttribute("data-renderer-ready", "true");
   const pane = page.getByRole("region", { name: "Tactical Analysis" });
-  for (const tab of ["Live", "Space", "Shape", "Range", "Events", "Report"]) {
+  for (const tab of ["Live", "Structure", "Relations", "Space", "Range", "Events", "Report"]) {
     await pane.getByRole("tab", { name: tab, exact: true }).click();
     await expectTacticalTabReady(page, tab);
     await expectNoSeriousViolations(page, `DFL field · ${tab}`);
@@ -122,10 +123,11 @@ test("keyboard: tactical tabs, layer toggles and timeline are reachable with vis
   expect(outline).not.toBe("none");
   await page.keyboard.press("End");
   await expect(page.getByRole("tab", { name: "Report", exact: true })).toBeFocused();
-  const hull = page.getByRole("button", { name: /Hull/ });
-  await hull.focus();
+  const occupiedArea = page.getByRole("button", { name: /Occupied area/ });
+  const before = await occupiedArea.getAttribute("aria-pressed");
+  await occupiedArea.focus();
   await page.keyboard.press("Enter");
-  await expect(hull).toHaveAttribute("aria-pressed", "false");
+  await expect(occupiedArea).toHaveAttribute("aria-pressed", before === "true" ? "false" : "true");
   const timeline = page.getByTestId("transport-timeline");
   await timeline.focus();
   await page.keyboard.press("ArrowRight");
