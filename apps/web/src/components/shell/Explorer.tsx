@@ -1,6 +1,6 @@
 ﻿import { useQuery } from "@tanstack/react-query";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, PanelLeftClose } from "lucide-react";
 import { useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import { StatePanel } from "@/components/common/StatePanel";
@@ -13,7 +13,7 @@ import { cn } from "@/lib/cn";
  * Session explorer: dataset → session → trial/stream navigation. It reads the
  * server state through Query and selection is durable URL context.
  */
-export function Explorer() {
+export function Explorer({ onCollapse }: { readonly onCollapse?: () => void } = {}) {
   const location = useRouterState({ select: (state) => state.location });
   const parts = location.pathname.split("/").filter(Boolean);
   const datasetId = parts[0] === "lab" ? (parts[1] ?? null) : null;
@@ -33,10 +33,15 @@ export function Explorer() {
   }
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex h-8 shrink-0 items-center border-b border-border-subtle px-3">
+      <header className="flex h-8 shrink-0 items-center justify-between border-b border-border-subtle px-3">
         <h2 className="t-section">
           Session explorer
         </h2>
+        {onCollapse ? (
+          <button type="button" aria-label="Close MatchLab explorer" onClick={onCollapse} className="flex size-6 items-center justify-center rounded-control text-text-muted hover:bg-surface-2 hover:text-text-secondary">
+            <PanelLeftClose size={13} aria-hidden="true" />
+          </button>
+        ) : null}
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <ExplorerForSession

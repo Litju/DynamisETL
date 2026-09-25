@@ -11,10 +11,19 @@ import { z } from "zod";
 /** Canonical time is signed; see `lib/time.ts` for why. */
 export const DECIMAL_NS = /^-?\d+$/;
 
-export const WORKBENCH_VIEWS = ["overview", "signals", "field", "pose", "split", "provenance"] as const;
+export const WORKBENCH_VIEWS = ["overview", "signals", "field", "pose", "matchlab", "provenance"] as const;
 export type WorkbenchView = (typeof WORKBENCH_VIEWS)[number];
 export const TACTICAL_VIEWS = ["live", "structure", "relations", "space", "events", "range", "report"] as const;
 export type TacticalView = (typeof TACTICAL_VIEWS)[number];
+
+const workbenchViewSchema = z.preprocess(
+  (value) => value === "split" ? "matchlab" : value,
+  z.enum(WORKBENCH_VIEWS).catch("overview").default("overview"),
+);
+const compareViewSchema = z.preprocess(
+  (value) => value === "split" ? "matchlab" : value,
+  z.enum(WORKBENCH_VIEWS).catch("signals").default("signals"),
+);
 
 export const MODALITIES = [
   "gnss",
@@ -58,7 +67,7 @@ export const labSearchSchema = z.object({
   from_ns: nsText,
   to_ns: nsText,
   range_ns: nsText,
-  view: z.enum(WORKBENCH_VIEWS).catch("overview").default("overview"),
+  view: workbenchViewSchema,
   tactical: z.enum(TACTICAL_VIEWS).optional().catch(undefined),
   compare: optionalText,
 });
@@ -76,7 +85,7 @@ export const compareSearchSchema = z.object({
   a: optionalText,
   b: optionalText,
   metric: optionalText,
-  view: z.enum(WORKBENCH_VIEWS).catch("signals").default("signals"),
+  view: compareViewSchema,
 });
 export type CompareSearch = z.infer<typeof compareSearchSchema>;
 

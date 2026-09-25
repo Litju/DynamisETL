@@ -33,7 +33,7 @@ import {
   type PitchEvent,
   type PitchLayers,
 } from "@/components/matchlab/render-types";
-import { FieldSceneView, type FieldCameraMode, type FieldSceneViewHandle } from "@/components/pitch/FieldSceneView";
+import { FieldSceneView, type FieldSceneViewHandle } from "@/components/pitch/FieldSceneView";
 import { eventStreams } from "@/lib/capabilities";
 import type { ArtifactRef, SessionDetail, StreamView, TacticalSeriesView } from "@/api/types";
 import { useAnalysisContext } from "@/lib/analysis-context";
@@ -582,7 +582,8 @@ function PitchView({
   const scalarFieldMode = useAnalysisStore((state) => state.scalarFieldMode);
   const [rendererReady, setRendererReady] = useState(false);
   const [layers, setLayers] = useState<PitchLayers>(DEFAULT_PITCH_LAYERS);
-  const [cameraMode, setCameraMode] = useState<FieldCameraMode>("tactical-map");
+  const cameraMode = useAnalysisStore((state) => state.fieldCameraMode);
+  const setCameraMode = useAnalysisStore((state) => state.setFieldCameraMode);
   const [influenceGridTimeNs, setInfluenceGridTimeNs] = useState<bigint | null>(null);
   const handleInfluenceGridTime = useCallback((timeNs: bigint | null) => {
     setInfluenceGridTimeNs((current) => current === timeNs ? current : timeNs);

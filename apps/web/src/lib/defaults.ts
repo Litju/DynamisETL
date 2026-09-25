@@ -44,16 +44,31 @@ export function defaultStreamFor(
   return candidates[0] ?? null;
 }
 
+/** First observed, registered player: prefer Pose, then tracking as the fail-safe. */
+export function defaultMatchPlayerId(
+  session: SessionDetail | undefined,
+  poseArtifact: Pick<ArtifactDetail, "entity_observations"> | undefined,
+  trackingArtifact: Pick<ArtifactDetail, "entity_observations"> | undefined,
+): string | null {
+  if (session === undefined) return null;
+  const fromArtifact = (artifact: Pick<ArtifactDetail, "entity_observations"> | undefined) => {
+    const observed = new Set(
+      (artifact?.entity_observations ?? [])
+        .filter((observation) => observation.observation_count > 0)
+        .map((observation) => observation.entity_id),
+    );
+    return session.participants.find((participant) => observed.has(participant.subject_id))?.subject_id ?? null;
+  };
+  return fromArtifact(poseArtifact) ?? fromArtifact(trackingArtifact);
+}
+
 /**
- * The view a session opens on.
- *
- * Overview always wins when it can carry a real analytical summary, because it
- * is the orientation surface. A session with no renderable stream still opens
- * on overview: its metadata and derived metrics are the analysis it has.
+ * The view a session opens on. Registered tracking opens in the integrated
+ * MatchLab workstation, including field-only sources whose Pose pane will state
+ * unavailability. Sessions without tracking retain overview as their entry.
  */
 export function defaultViewFor(session: SessionDetail): WorkbenchView {
-  void session;
-  return "overview";
+  return sessionSurfaces(session.streams).includes("field") ? "matchlab" : "overview";
 }
 
 export interface ResolvedDefaults {
@@ -84,7 +99,7 @@ export function resolveLabDefaults(
   // The stream must match the surface being shown, so a laboratory tab never
   // opens against a stream of the wrong modality.
   const surfaceForView: LabSurface | null =
-    view === "split" ? "field" : view === "signals" || view === "field" || view === "pose" ? view : null;
+    view === "matchlab" ? "field" : view === "signals" || view === "field" || view === "pose" ? view : null;
 
   // Outside a renderer view, preselect the first openable surface's stream so
   // switching tabs is immediate rather than another empty state.

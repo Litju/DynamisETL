@@ -10,7 +10,7 @@
 
 import { create } from "zustand";
 
-export type WorkbenchPanel = "overview" | "signals" | "field" | "pose" | "provenance";
+export type WorkbenchPanel = "overview" | "signals" | "field" | "pose" | "matchlab" | "provenance";
 
 export interface TimeRangeNs {
   readonly fromNs: bigint;
@@ -21,6 +21,16 @@ export type PlaybackStatus = "idle" | "ready" | "buffering" | "ended";
 export type PlaybackDirection = -1 | 1;
 export type TacticalRelationMode = "off" | "stable-graph" | "selected-triangles" | "attacker-defender";
 export type ScalarFieldMode = "heatmap" | "contour" | "elevation";
+export type DashboardDomain = "tactical" | "biomechanics" | "report";
+export type PoseAnalysisSection =
+  | "Live"
+  | "Selected joint"
+  | "Range"
+  | "Symmetry"
+  | "Kinematics"
+  | "Quality"
+  | "Method / Provenance"
+  | "Raw landmarks";
 
 export interface AnalysisState {
   /** Live playback/scrub time; high-frequency and never URL-serialized directly. */
@@ -45,6 +55,10 @@ export interface AnalysisState {
   hoveredTacticalObjectId: string | null;
   tacticalRelationMode: TacticalRelationMode;
   scalarFieldMode: ScalarFieldMode;
+  fieldCameraMode: "tactical-map" | "structure-lift" | "perspective";
+  dashboardDomain: DashboardDomain;
+  poseAnalysisSection: PoseAnalysisSection;
+  poseDisplayMode: "match-context" | "body-local";
   hoveredJoint: string | null;
   selectedJoint: string | null;
   focusedPanel: WorkbenchPanel;
@@ -72,6 +86,10 @@ export interface AnalysisState {
   hoverTacticalObject: (objectId: string | null) => void;
   setTacticalRelationMode: (mode: TacticalRelationMode) => void;
   setScalarFieldMode: (mode: ScalarFieldMode) => void;
+  setFieldCameraMode: (mode: "tactical-map" | "structure-lift" | "perspective") => void;
+  setDashboardDomain: (domain: DashboardDomain) => void;
+  setPoseAnalysisSection: (section: PoseAnalysisSection) => void;
+  setPoseDisplayMode: (mode: "match-context" | "body-local") => void;
   hoverJoint: (jointId: string | null) => void;
   selectJoint: (jointId: string | null) => void;
   focusPanel: (panel: WorkbenchPanel) => void;
@@ -99,6 +117,10 @@ const TRANSIENT_DEFAULTS = {
   hoveredTacticalObjectId: null,
   tacticalRelationMode: "off",
   scalarFieldMode: "heatmap",
+  fieldCameraMode: "tactical-map",
+  dashboardDomain: "tactical",
+  poseAnalysisSection: "Live",
+  poseDisplayMode: "match-context",
   hoveredJoint: null,
   selectedJoint: null,
   interacting: false,
@@ -119,6 +141,10 @@ export const useAnalysisStore = create<AnalysisState>()((set) => ({
   hoveredTacticalObjectId: null,
   tacticalRelationMode: "off",
   scalarFieldMode: "heatmap",
+  fieldCameraMode: "tactical-map",
+  dashboardDomain: "tactical",
+  poseAnalysisSection: "Live",
+  poseDisplayMode: "match-context",
   hoveredJoint: null,
   selectedJoint: null,
   focusedPanel: "overview",
@@ -142,8 +168,17 @@ export const useAnalysisStore = create<AnalysisState>()((set) => ({
   hoverTacticalObject: (hoveredTacticalObjectId) => set({ hoveredTacticalObjectId }),
   setTacticalRelationMode: (tacticalRelationMode) => set({ tacticalRelationMode }),
   setScalarFieldMode: (scalarFieldMode) => set({ scalarFieldMode }),
+  setFieldCameraMode: (fieldCameraMode) => set({ fieldCameraMode }),
+  setDashboardDomain: (dashboardDomain) => set({ dashboardDomain }),
+  setPoseAnalysisSection: (poseAnalysisSection) => set({ poseAnalysisSection }),
+  setPoseDisplayMode: (poseDisplayMode) => set({ poseDisplayMode }),
   hoverJoint: (jointId) => set({ hoveredJoint: jointId }),
-  selectJoint: (jointId) => set({ selectedJoint: jointId }),
+  selectJoint: (jointId) => set((state) => ({
+    selectedJoint: jointId,
+    ...(jointId !== null && state.focusedPanel === "matchlab"
+      ? { dashboardDomain: "biomechanics", poseAnalysisSection: "Selected joint" }
+      : {}),
+  })),
   focusPanel: (panel) => set({ focusedPanel: panel }),
   setInteracting: (interacting) => set({ interacting }),
   beginSubjectSwitch: (sourceSubjectId, targetTimeNs) =>
@@ -158,6 +193,7 @@ export const useAnalysisStore = create<AnalysisState>()((set) => ({
       hoveredEntityId: null,
       hoveredJoint: null,
       selectedJoint: null,
+      poseAnalysisSection: "Live",
       subjectSwitching: true,
       switchingFromSubjectId: sourceSubjectId,
     }),

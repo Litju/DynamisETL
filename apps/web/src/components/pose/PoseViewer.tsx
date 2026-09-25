@@ -50,7 +50,7 @@ const MAX_POSE_POINTS = 20_000;
  * are rendered only when the versioned processor parameters declare them, and
  * the frame label always states that Z is player-centroid-relative.
  */
-export function PoseViewer() {
+export function PoseViewer({ compactControls = false }: { readonly compactControls?: boolean } = {}) {
   const context = useAnalysisContext();
   const matchFrame = useMatchFrameContext();
   const queryClient = useQueryClient();
@@ -67,6 +67,7 @@ export function PoseViewer() {
   const selectedJoint = useAnalysisStore((state) => state.selectedJoint);
   const hoveredJoint = useAnalysisStore((state) => state.hoveredJoint);
   const [rendererReady, setRendererReady] = useState(false);
+  const [controlsOpen, setControlsOpen] = useState(false);
   const rendererHostRef = useRef<HTMLDivElement | null>(null);
   const [view, dispatchView] = useReducer(poseViewReducer, INITIAL_POSE_VIEW);
   const allSubjects = view.scope === "all";
@@ -80,6 +81,9 @@ export function PoseViewer() {
     if (state.playing && !previous.playing) setPausedBySwitch(false);
   }), []);
   useEffect(() => () => subjectSwitchAbort.current?.abort(), []);
+  useEffect(() => {
+    useAnalysisStore.getState().setPoseDisplayMode(coordinateMode === "body_local" ? "body-local" : "match-context");
+  }, [coordinateMode]);
   const session = useQuery({
     ...sessionQuery(datasetId ?? "", sessionId ?? ""),
     enabled: Boolean(datasetId && sessionId),
@@ -317,7 +321,7 @@ export function PoseViewer() {
       selectedSubject === null &&
       subjectId !== null &&
       context?.entityId == null &&
-      context?.view !== "split"
+      context?.view !== "matchlab"
     ) {
       if (matchFrame) {
         matchFrame.selectPlayer(subjectId, { replace: true, origin: "pose" });
@@ -541,32 +545,64 @@ export function PoseViewer() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex min-h-9 shrink-0 flex-wrap items-center gap-3 border-b border-border-subtle bg-surface-1 px-3 py-1 text-[11px] text-text-muted">
+      <header className={compactControls
+        ? "flex min-h-8 shrink-0 flex-wrap items-center gap-1.5 border-b border-border-subtle bg-surface-1 px-2 py-1 text-[10px] text-text-muted"
+        : "flex min-h-9 shrink-0 flex-wrap items-center gap-3 border-b border-border-subtle bg-surface-1 px-3 py-1 text-[11px] text-text-muted"}>
+        {compactControls ? <span className="t-section text-text-secondary">Pose 3D</span> : null}
         <ModalityBadge modality={stream.modality} />
-        <span className="mono">{stream.stream_id}</span>
+        {!compactControls ? <span className="mono">{stream.stream_id}</span> : null}
         <MeasurementClassBadge measurementClass={stream.measurement_class} compact />
-        <span className="mono">skeleton {stream.skeleton_id ?? "unregistered"}</span>
-        {allSubjects ? (
+        {!compactControls ? <span className="mono">skeleton {stream.skeleton_id ?? "unregistered"}</span> : null}
+        {compactControls ? (
+          <span className="ml-auto flex items-center gap-1">
+            <SegmentButton
+              pressed={coordinateMode === "match_world"}
+              testId="pose-match-context-shortcut"
+              onClick={() => dispatchView({ type: "frame", frame: "match_world" })}
+            >
+              Match context
+            </SegmentButton>
+            <SegmentButton
+              pressed={coordinateMode === "body_local"}
+              testId="pose-body-local-shortcut"
+              onClick={() => dispatchView({ type: "frame", frame: "body_local" })}
+            >
+              Body-local
+            </SegmentButton>
+            <button
+              type="button"
+              aria-expanded={controlsOpen}
+              aria-controls="pose-view-controls"
+              onClick={() => setControlsOpen((open) => !open)}
+              className="t-control-compact rounded-control border border-border-subtle px-1.5 text-text-secondary hover:border-border-strong"
+            >
+              {controlsOpen ? "Close controls" : "Controls"}
+            </button>
+          </span>
+        ) : null}
+        {!compactControls && allSubjects ? (
           <span>all subjects · fixed camera ({subjectFrames.length})</span>
-        ) : (
+        ) : !compactControls ? (
           <span>
             individual <span className="mono text-text-secondary">{subjectId ?? "not scoped"}</span>
           </span>
-        )}
-        <span className="text-quality-warning">
+        ) : null}
+        {!compactControls ? <span className="text-quality-warning">
           {coordinateMode === "body_local"
             ? "local analytical frame · Z is player-centroid-relative, not absolute height · body-root recentered for display"
             : "match/world frame · source XY placement preserved; Z remains provider-relative, not ground height"}
-        </span>
-        {pausedBySwitch && !playing ? (
+        </span> : null}
+        {!compactControls && pausedBySwitch && !playing ? (
           <span role="status" className="text-text-secondary">
             Playback paused for the subject switch — press Play to continue.
           </span>
         ) : null}
-        {playbackStatus === "buffering" && playing ? (
+        {!compactControls && playbackStatus === "buffering" && playing ? (
           <span data-testid="playback-buffering" className="text-quality-warning">BUFFERING · waiting for exact next chunk</span>
         ) : null}
-        {hasCurrentFrame ? (
+        {compactControls ? (
+          <span className="tabular">{hasCurrentFrame ? `${summary.observedLandmarks}/29 landmarks` : "Pose observation unavailable"}</span>
+        ) : hasCurrentFrame ? (
           <span className="tabular">
             {summary.observedLandmarks} observed · {summary.unavailableLandmarks} unavailable
           </span>
@@ -575,12 +611,12 @@ export function PoseViewer() {
             Subject {subjectId ?? "not scoped"} not observed at the current frame
           </span>
         )}
-        {hasCurrentFrame && currentFrame && currentTime !== null && BigInt(currentFrame.tRelNs) !== currentTime ? (
+        {!compactControls && hasCurrentFrame && currentFrame && currentTime !== null && BigInt(currentFrame.tRelNs) !== currentTime ? (
           <span className="tabular">
             Pose source frame @ {formatClockNs(BigInt(currentFrame.tRelNs))} · canonical playhead {formatClockNs(currentTime)}
           </span>
         ) : null}
-        {hasCurrentFrame && summary.meanErrorM !== null ? (
+        {!compactControls && hasCurrentFrame && summary.meanErrorM !== null ? (
           <span className="tabular">
             mean provider p90 predicted error radius{" "}
             {formatMetricValue(summary.meanErrorM, "m").text}
@@ -612,7 +648,7 @@ export function PoseViewer() {
           ) : null}
         </div>
       ) : null}
-      <div className="flex min-h-0 flex-1">
+      <div className={compactControls ? "relative flex min-h-0 flex-1" : "flex min-h-0 flex-1"}>
         <div
           ref={rendererHostRef}
           className="relative min-h-0 flex-1"
@@ -661,7 +697,12 @@ export function PoseViewer() {
             />
           </Suspense>
         </div>
-        <aside className="w-60 shrink-0 overflow-y-auto border-l border-border-subtle bg-surface-1 p-2 text-[11px]">
+        <aside
+          id={compactControls ? "pose-view-controls" : undefined}
+          className={compactControls
+            ? `absolute inset-y-0 right-0 z-20 w-56 overflow-y-auto border-l border-border-subtle bg-surface-1 p-2 text-[11px] shadow-panel ${controlsOpen ? "block" : "hidden"}`
+            : "w-60 shrink-0 overflow-y-auto border-l border-border-subtle bg-surface-1 p-2 text-[11px]"}
+        >
           {observed.subjects.length > 0 ? (
             <ControlSection title="Subject">
               <select

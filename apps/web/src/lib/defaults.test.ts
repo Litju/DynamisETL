@@ -5,6 +5,7 @@ import { datasetSurfaces, sessionSurfaces } from "@/lib/capabilities";
 import { affordableSpanNs, windowAround } from "@/lib/dense-window";
 import {
   canonicalTimeDefault,
+  defaultMatchPlayerId,
   defaultStreamFor,
   patchChangesSearch,
   resolveLabDefaults,
@@ -105,6 +106,43 @@ describe("deterministic laboratory defaults", () => {
       trial: "t0",
       subject: "s0",
     });
+  });
+
+  it("opens tracking sessions in MatchLab, including a field-only DFL source", () => {
+    const detail = session([
+      stream({ stream_id: "track-period-1", modality: "tracking", trial_id: "period-1" }),
+      stream({ stream_id: "pose-period-1", modality: "pose", trial_id: "period-1" }),
+    ], ["period-1"]);
+    expect(resolveLabDefaults(detail, {}).patch).toMatchObject({
+      view: "matchlab",
+      stream: "track-period-1",
+      trial: "period-1",
+    });
+
+    const dfl = session([stream({ stream_id: "dfl-track", modality: "tracking", trial_id: "period-1" })], ["period-1"]);
+    expect(resolveLabDefaults(dfl, {}).patch.view).toBe("matchlab");
+  });
+
+  it("prefers observed Pose subjects and falls back to tracking only when needed", () => {
+    const detail = {
+      ...session([]),
+      participants: [
+        { subject_id: "pose-player", role: "player", group_label: "away", notes: null, cohort: null },
+        { subject_id: "tracking-player", role: "player", group_label: "home", notes: null, cohort: null },
+      ],
+    } as SessionDetail;
+    const artifact = (entityIds: string[]) => ({
+      entity_observations: entityIds.map((entity_id) => ({
+        entity_id,
+        first_observed_ns: 0,
+        last_observed_ns: 1,
+        observation_count: 1,
+      })),
+    });
+
+    expect(defaultMatchPlayerId(detail, artifact(["pose-player"]), artifact(["tracking-player"]))).toBe("pose-player");
+    expect(defaultMatchPlayerId(detail, artifact(["unregistered-id"]), artifact(["tracking-player"]))).toBe("tracking-player");
+    expect(defaultMatchPlayerId(detail, undefined, artifact(["unregistered-id"]))).toBeNull();
   });
 
   it("never invents a subject the data does not name", () => {

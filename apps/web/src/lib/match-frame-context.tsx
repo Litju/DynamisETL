@@ -53,7 +53,7 @@ export interface MatchFrameContextValue {
   readonly seekCanonicalTime: (timeNs: bigint) => void;
   readonly selectPlayer: (
     playerId: string | null,
-    options?: SubjectSelectionOptions & { origin?: "field" | "pose" },
+    options?: SubjectSelectionOptions & { origin?: "field" | "pose" | "dashboard" },
   ) => void;
   readonly selectTrackingObject: (objectId: string | null, objectType?: string | null) => void;
   readonly hoverTrackingObject: (objectId: string | null) => void;
@@ -188,6 +188,9 @@ export function MatchFrameContextProvider({
   const selectPlayer = useCallback<MatchFrameContextValue["selectPlayer"]>(
     (playerId, options) => {
       if (durable === null) return;
+      if (options?.origin === "pose" && durable.view === "matchlab") {
+        useAnalysisStore.getState().setDashboardDomain("biomechanics");
+      }
       if (playerId === null) {
         sourceFramesRef.current.pose = EMPTY_FRAME;
         durable.selectFieldEntity(null);
@@ -235,8 +238,14 @@ export function MatchFrameContextProvider({
     [],
   );
   const selectTacticalObject = useCallback(
-    (objectId: string | null) => useAnalysisStore.getState().selectTacticalObject(objectId),
-    [],
+    (objectId: string | null) => {
+      if (objectId !== null && durable?.view === "matchlab") {
+        useAnalysisStore.getState().setDashboardDomain("tactical");
+      }
+      if (objectId !== null) durable?.selectTacticalView?.("relations");
+      useAnalysisStore.getState().selectTacticalObject(objectId);
+    },
+    [durable],
   );
   const hoverTacticalObject = useCallback(
     (objectId: string | null) => useAnalysisStore.getState().hoverTacticalObject(objectId),

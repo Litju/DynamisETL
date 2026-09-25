@@ -81,7 +81,8 @@ test("real SkillCorner Field selection preserves time into Pose and both views p
   // selection keeps time zero and reports Pose absent rather than jumping.
   await expect(poseView).toHaveAttribute("data-pose-availability", "absent");
   expect(await playheadNs(page)).toBe(0n);
-  await expect(page.getByTestId("pose-telemetry")).toContainText("First observation");
+  await expect(page.getByTestId("pose-telemetry-status")).toContainText("not observed at 00:00:00.000");
+  await expect(page.getByTestId("pose-frame-availability")).toContainText("Next source sample 00:00:00.440");
 
   await page.getByRole("button", { name: "Play", exact: true }).click();
   const playback = await measurePlayback(page, 1_500);

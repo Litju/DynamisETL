@@ -197,7 +197,15 @@ function ClassLine({ measurementClass, method }: { measurementClass: string; met
   );
 }
 
-export function TacticalAnalysisPane({ onCollapse }: { onCollapse?: () => void } = {}) {
+export function TacticalAnalysisPane({
+  onCollapse,
+  embedded = false,
+  reportOnly = false,
+}: {
+  readonly onCollapse?: () => void;
+  readonly embedded?: boolean;
+  readonly reportOnly?: boolean;
+} = {}) {
   const context = useAnalysisContext();
   const matchFrame = useMatchFrameContext();
   const timeNs = useThrottledPlayhead(200);
@@ -406,6 +414,7 @@ export function TacticalAnalysisPane({ onCollapse }: { onCollapse?: () => void }
           })}
           datasetId={context.datasetId}
           sessionId={context.sessionId}
+          compact={reportOnly}
         />
       );
     }
@@ -413,9 +422,14 @@ export function TacticalAnalysisPane({ onCollapse }: { onCollapse?: () => void }
     body = <LoadingPanel label="Loading tactical capability" />;
   }
 
+  if (reportOnly) {
+    return <div data-testid="tactical-report-section">{body}</div>;
+  }
+
   return (
-    <section aria-label="Tactical Analysis" className="flex h-full min-h-0 flex-col border-l border-border-subtle bg-surface-1">
+    <section aria-label="Tactical Analysis" className={`flex h-full min-h-0 flex-col bg-surface-1 ${embedded ? "" : "border-l border-border-subtle"}`}>
       <header className="shrink-0 border-b border-border-subtle">
+        {!embedded ? <>
         <div className="flex h-8 items-center justify-between gap-2 px-3">
           <h2 className="t-section truncate text-text-muted">Tactical Analysis</h2>
           {onCollapse ? (
@@ -438,6 +452,7 @@ export function TacticalAnalysisPane({ onCollapse }: { onCollapse?: () => void }
           <dt className="text-text-muted">Selected</dt>
           <dd className="truncate text-text-secondary">{selectedLabel ?? "none (click a player or the ball)"}</dd>
         </dl>
+        </> : null}
         <div role="tablist" aria-label="Tactical analysis views" className="flex h-8 items-end gap-0.5 overflow-x-auto px-2">
           {TABS.map(([value, label], index) => (
             <button
@@ -474,11 +489,11 @@ export function TacticalAnalysisPane({ onCollapse }: { onCollapse?: () => void }
       >
         {body}
       </div>
-      <nav aria-label="Tactical evidence" className="flex shrink-0 flex-wrap gap-3 border-t border-border-subtle bg-surface-1 px-3 py-2 text-[11px]">
+      {!embedded ? <nav aria-label="Tactical evidence" className="flex shrink-0 flex-wrap gap-3 border-t border-border-subtle bg-surface-1 px-3 py-2 text-[11px]">
         <Link to="/methods" className="text-accent hover:underline">Method authority</Link>
         <Link to="/runs" search={{ dataset: context.datasetId }} className="text-accent hover:underline">Runs / provenance</Link>
         <Link to="/quality" search={{ dataset: context.datasetId }} className="text-accent hover:underline">Quality / rights</Link>
-      </nav>
+      </nav> : null}
     </section>
   );
 }
@@ -1004,7 +1019,7 @@ function EventsTab({
   );
 }
 
-function ReportTab({ payload, datasetId, sessionId }: { payload: Record<string, unknown>; datasetId: string; sessionId: string }) {
+function ReportTab({ payload, datasetId, sessionId, compact = false }: { payload: Record<string, unknown>; datasetId: string; sessionId: string; compact?: boolean }) {
   const text = useMemo(() => JSON.stringify(payload, null, 2), [payload]);
   const download = () => {
     const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
@@ -1023,7 +1038,7 @@ function ReportTab({ payload, datasetId, sessionId }: { payload: Record<string, 
       <button type="button" onClick={download} className="t-control mt-3 rounded-control border border-border-strong px-2 text-[11px] text-text-secondary hover:bg-surface-3">
         Download JSON report
       </button>
-      <pre data-testid="tactical-report" tabIndex={0} aria-label="Tactical report JSON" className="mono mt-3 max-h-[28rem] overflow-auto rounded-control border border-border-subtle bg-surface-0 p-2 text-[10px] text-text-muted">{text}</pre>
+      <pre data-testid="tactical-report" tabIndex={0} aria-label="Tactical report JSON" className={`mono mt-3 ${compact ? "max-h-40" : "max-h-[28rem]"} overflow-auto rounded-control border border-border-subtle bg-surface-0 p-2 text-[10px] text-text-muted`}>{text}</pre>
     </div>
   );
 }

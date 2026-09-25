@@ -18,7 +18,12 @@ function reset() {
     hoveredTacticalObjectId: null,
     tacticalRelationMode: "off",
     scalarFieldMode: "heatmap",
+    fieldCameraMode: "tactical-map",
+    dashboardDomain: "tactical",
+    poseAnalysisSection: "Live",
+    poseDisplayMode: "match-context",
     hoveredJoint: null,
+    selectedJoint: null,
     focusedPanel: "overview",
     interacting: false,
     subjectSwitching: false,
@@ -61,6 +66,19 @@ describe("transient analysis state spine", () => {
     expect(useAnalysisStore.getState().nominalRateHz).toBe(25);
     store.setPlaybackDirection(-1);
     expect(useAnalysisStore.getState().playbackDirection).toBe(-1);
+  });
+
+  it("opens integrated Pose analysis only when MatchLab owns the dashboard", () => {
+    const store = useAnalysisStore.getState();
+    store.hydrate({ focusedPanel: "pose" });
+    store.selectJoint("lKnee");
+    expect(useAnalysisStore.getState().dashboardDomain).toBe("tactical");
+    expect(useAnalysisStore.getState().poseAnalysisSection).toBe("Live");
+
+    store.hydrate({ focusedPanel: "matchlab" });
+    store.selectJoint("lKnee");
+    expect(useAnalysisStore.getState().dashboardDomain).toBe("biomechanics");
+    expect(useAnalysisStore.getState().poseAnalysisSection).toBe("Selected joint");
   });
 
   it("hydrates durable context from a deep link and resets transients", () => {
