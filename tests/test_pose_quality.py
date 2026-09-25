@@ -71,6 +71,7 @@ def test_quality_uses_explicit_cadence_grid_and_preserves_dropout_gaps() -> None
     result = process_pose_quality(_quality_table(), parameters=_parameters())
     metric_names = [metric.declaration.name for metric in result.metrics]
     assert len(metric_names) == len(set(metric_names))
+    assert result.spec.version == "1.1.0"
 
     assert _value(result, "pose.quality.coverage.any_pose_present") == pytest.approx(6 / 7)
     assert _value(result, "pose.quality.coverage.any_usable_pose") == pytest.approx(6 / 7)
@@ -102,6 +103,7 @@ def test_quality_uses_explicit_cadence_grid_and_preserves_dropout_gaps() -> None
         type=pa.bool_(),
     )
     b_dropout = dropouts.filter(b_mask)
+    assert b_dropout.column("t_rel_ns").to_pylist() == [80_000_000]
     assert b_dropout.column("start_ns").to_pylist() == [80_000_000]
     assert b_dropout.column("end_ns_exclusive").to_pylist() == [160_000_000]
     assert b_dropout.column("missing_frames").to_pylist() == [2]

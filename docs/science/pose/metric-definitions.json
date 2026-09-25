@@ -57,7 +57,7 @@
     },
     {
       "algorithm_id": "pose.analysis_quality",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "status": "implemented",
       "measurement_class": "PIPELINE_DERIVED",
       "metrics": [
@@ -78,7 +78,7 @@
       "error_radius_quantile_method": "linear",
       "series_columns": ["entity_id", "t_rel_ns", "any_pose_present", "any_pose_available", "available_landmark_count", "expected_landmark_count"],
       "dropout_interval_series": "pose_quality_dropout_intervals",
-      "dropout_interval_series_columns": ["entity_id", "joint_name", "start_ns", "end_ns_exclusive", "missing_frames", "duration_s"]
+      "dropout_interval_series_columns": ["entity_id", "joint_name", "t_rel_ns", "start_ns", "end_ns_exclusive", "missing_frames", "duration_s"]
     },
     {
       "algorithm_id": "pose.bilateral_geometry",

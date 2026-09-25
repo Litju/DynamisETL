@@ -25,7 +25,7 @@ from dynamis.processors.spec import (
 )
 
 ALGORITHM_ID = "pose.analysis_quality"
-ALGORITHM_VERSION = "1.0.0"
+ALGORITHM_VERSION = "1.1.0"
 DEFAULT_MINIMUM_DERIVATIVE_SEGMENT_FRAMES = 3
 SERIES_NAME = "pose_analysis_quality"
 _TOKEN = re.compile(r"[^A-Za-z0-9]+")
@@ -239,6 +239,7 @@ def process_pose_quality(
     series_parts: list[pa.Table] = []
     dropout_entity_ids: list[str] = []
     dropout_joint_names: list[str] = []
+    dropout_times_ns: list[int] = []
     dropout_start_ns: list[int] = []
     dropout_end_ns: list[int] = []
     dropout_missing_frames: list[int] = []
@@ -404,6 +405,7 @@ def process_pose_quality(
             for start, stop in missing_runs:
                 dropout_entity_ids.append(subject)
                 dropout_joint_names.append(name)
+                dropout_times_ns.append(int(frame_times[start]))
                 dropout_start_ns.append(int(frame_times[start]))
                 dropout_end_ns.append(int(frame_times[stop - 1]) + step_ns)
                 dropout_missing_frames.append(stop - start)
@@ -519,6 +521,7 @@ def process_pose_quality(
         {
             "entity_id": pa.array(dropout_entity_ids, type=pa.string()),
             "joint_name": pa.array(dropout_joint_names, type=pa.string()),
+            "t_rel_ns": pa.array(dropout_times_ns, type=pa.int64()),
             "start_ns": pa.array(dropout_start_ns, type=pa.int64()),
             "end_ns_exclusive": pa.array(dropout_end_ns, type=pa.int64()),
             "missing_frames": pa.array(dropout_missing_frames, type=pa.uint32()),
