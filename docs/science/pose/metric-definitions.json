@@ -82,7 +82,7 @@
     },
     {
       "algorithm_id": "pose.bilateral_geometry",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "status": "implemented",
       "measurement_class": "PIPELINE_DERIVED",
       "metrics": [

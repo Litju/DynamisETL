@@ -108,6 +108,7 @@ def test_bilateral_difference_uses_right_minus_left_at_exact_subject_times() -> 
     assert _value(result, "pose.bilateral.maximum_angle_time_offset.knee") == 0.0
     assert _value(result, "pose.bilateral.waveform_correlation.knee") > 0.95
     series = result.series[0].table
+    assert all(metric.subject_id == "player-1" for metric in result.metrics)
     assert series.column("t_rel_ns").to_pylist() == [0, 40_000_000, 80_000_000, 120_000_000]
     assert series.column("common_available_knee").to_pylist() == [1, 1, 1, 1]
     assert series.column("right_minus_left_knee_rad").to_pylist() == pytest.approx(

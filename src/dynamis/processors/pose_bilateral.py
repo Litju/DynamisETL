@@ -25,7 +25,7 @@ from dynamis.processors.spec import (
 )
 
 ALGORITHM_ID = "pose.bilateral_geometry"
-ALGORITHM_VERSION = "1.0.0"
+ALGORITHM_VERSION = "1.0.1"
 SERIES_NAME = "pose_bilateral_geometry"
 _TOKEN = re.compile(r"[^A-Za-z0-9]+")
 
@@ -167,6 +167,7 @@ def process_pose_bilateral(
 
     for subject_code, subject in enumerate(subjects):
         indexes = np.flatnonzero(entity_codes == subject_code)
+        scope = {**scope_base, "subject_id": subject}
         subject_times = times_ns[indexes]
         if np.any(np.diff(subject_times) <= 0):
             raise ValueError(
@@ -220,7 +221,7 @@ def process_pose_bilateral(
                     value=float(np.mean(valid)),
                     entity_id=subject,
                     provenance=provenance,
-                    **scope_base,
+                    **scope,
                 )
             )
             if valid_difference.size:
@@ -256,7 +257,7 @@ def process_pose_bilateral(
                             value=value,
                             entity_id=subject,
                             provenance=provenance,
-                            **scope_base,
+                            **scope,
                         )
                     )
                 if valid_difference.size >= 2:
@@ -271,7 +272,7 @@ def process_pose_bilateral(
                             value=float(np.max(valid_difference) - np.min(valid_difference)),
                             entity_id=subject,
                             provenance=provenance,
-                            **scope_base,
+                            **scope,
                         )
                     )
             if valid_difference.size >= 3:
@@ -292,7 +293,7 @@ def process_pose_bilateral(
                                 value=correlation,
                                 entity_id=subject,
                                 provenance=provenance,
-                                **scope_base,
+                                **scope,
                             )
                         )
                 left_max = np.max(valid_left)
@@ -317,7 +318,7 @@ def process_pose_bilateral(
                             value=offset_s,
                             entity_id=subject,
                             provenance=provenance,
-                            **scope_base,
+                            **scope,
                         )
                     )
         series_parts.append(pa.table(subject_columns))
