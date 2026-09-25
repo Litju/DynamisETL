@@ -1,6 +1,6 @@
 {
   "issue": "RES-113",
-  "capturedAt": "2026-09-25T07:00:01.468Z",
+  "capturedAt": "2026-09-25T09:27:06.943Z",
   "baseUrl": "http://127.0.0.1:5173",
   "backend": "WebGL2 production renderer",
   "browser": "Playwright Chromium with hardware WebGL enabled",
@@ -21,32 +21,32 @@
         "width": 1600,
         "height": 1000
       },
-      "shadowOffFps": 55,
+      "shadowOffFps": 57,
       "shadowOnFps": 54,
-      "fpsDelta": -1,
-      "shadowOffFrameP95Ms": 33.29999999999927,
-      "shadowOnFrameP95Ms": 33.29999999999927,
+      "fpsDelta": -3,
+      "shadowOffFrameP95Ms": 16.800000000000182,
+      "shadowOnFrameP95Ms": 33.30000000000018,
       "shadowOffDrawCallsP50": 24,
       "shadowOnDrawCallsP50": 24,
       "shadowPasses": 6,
-      "shadowPassDurationP50Ms": 0.10000000055879354,
-      "shadowPassDurationP95Ms": 0.20000000018626451
+      "shadowPassDurationP50Ms": 0.09999999962747097,
+      "shadowPassDurationP95Ms": 0.2000000011175871
     },
     {
       "viewport": {
         "width": 1440,
         "height": 900
       },
-      "shadowOffFps": 54,
-      "shadowOnFps": 54,
-      "fpsDelta": 0,
+      "shadowOffFps": 56,
+      "shadowOnFps": 55,
+      "fpsDelta": -1,
       "shadowOffFrameP95Ms": 16.80000000000109,
-      "shadowOnFrameP95Ms": 33.30000000000018,
+      "shadowOnFrameP95Ms": 33.29999999999927,
       "shadowOffDrawCallsP50": 24,
       "shadowOnDrawCallsP50": 24,
-      "shadowPasses": 7,
-      "shadowPassDurationP50Ms": 0.09999999962747097,
-      "shadowPassDurationP95Ms": 0.39999999944120646
+      "shadowPasses": 6,
+      "shadowPassDurationP50Ms": 0.19999999925494194,
+      "shadowPassDurationP95Ms": 0.2000000011175871
     }
   ],
   "runs": [
@@ -60,32 +60,32 @@
       "status": "ok",
       "selectionLatency": {
         "samplesMs": [
-          80.7,
-          62.8,
-          58,
-          33.4,
-          28.9,
-          29.4,
-          29.2,
-          29.8
+          112.9,
+          92.5,
+          85.4,
+          89.2,
+          55.6,
+          86.4,
+          81.9,
+          84.2
         ],
-        "p50Ms": 29.8,
-        "p95Ms": 80.7
+        "p50Ms": 85.4,
+        "p95Ms": 112.9
       },
       "measurement": {
-        "elapsedMs": 5022,
-        "fps": 55,
+        "elapsedMs": 5033,
+        "fps": 57,
         "frameIntervalMs": {
           "p50": 16.699999999999818,
-          "p95": 33.29999999999927,
-          "p99": 33.400000000000546,
-          "worst": 150.10000000000036
+          "p95": 16.80000000000109,
+          "p99": 33.399999999999636,
+          "worst": 100
         },
-        "renderPasses": 554,
+        "renderPasses": 576,
         "drawCallsPerRenderPass": {
           "p50": 24,
-          "p95": 103,
-          "mean": 56.71841155234657
+          "p95": 104,
+          "mean": 57.78472222222222
         },
         "trianglesPerRenderPassP50": 2546,
         "shadowPass": {
@@ -106,7 +106,7 @@
             "max": null
           }
         },
-        "jsHeapBytes": 140840649,
+        "jsHeapBytes": 136123986,
         "fieldCameraMode": "tactical-map",
         "shadowEnabled": false,
         "scalarCellCount": 294,
@@ -117,7 +117,7 @@
           "isWebGPURenderer": false
         }
       },
-      "sourceFrameIdentity": "tracking-period-1-a1150b16850c:307100000000"
+      "sourceFrameIdentity": "tracking-period-1-a1150b16850c:307060000000"
     },
     {
       "viewport": {
@@ -129,32 +129,32 @@
       "status": "ok",
       "selectionLatency": {
         "samplesMs": [
-          73.2,
-          60.1,
+          77,
+          87,
+          42.1,
+          32,
+          32.9,
+          31.8,
           31.1,
-          42.2,
-          44,
-          61,
-          62.2,
-          57.4
+          31.8
         ],
-        "p50Ms": 57.4,
-        "p95Ms": 73.2
+        "p50Ms": 32,
+        "p95Ms": 87
       },
       "measurement": {
         "elapsedMs": 5029,
-        "fps": 55,
+        "fps": 57,
         "frameIntervalMs": {
           "p50": 16.699999999999818,
-          "p95": 33.29999999999927,
-          "p99": 33.400000000001455,
-          "worst": 100
+          "p95": 16.800000000000182,
+          "p99": 33.30000000000109,
+          "worst": 133.29999999999927
         },
-        "renderPasses": 558,
+        "renderPasses": 572,
         "drawCallsPerRenderPass": {
           "p50": 24,
-          "p95": 103,
-          "mean": 56.763440860215056
+          "p95": 104,
+          "mean": 57.88286713286713
         },
         "trianglesPerRenderPassP50": 2410,
         "shadowPass": {
@@ -170,12 +170,12 @@
           "validSamples": 5,
           "cellsPerUpdate": 294,
           "durationMs": {
-            "p50": 0.6000000005587935,
-            "p95": 0.8000000007450581,
-            "max": 0.8000000007450581
+            "p50": 1.400000000372529,
+            "p95": 1.599999999627471,
+            "max": 1.599999999627471
           }
         },
-        "jsHeapBytes": 193236761,
+        "jsHeapBytes": 146220213,
         "fieldCameraMode": "structure-lift",
         "shadowEnabled": false,
         "scalarCellCount": 294,
@@ -186,7 +186,7 @@
           "isWebGPURenderer": false
         }
       },
-      "sourceFrameIdentity": "tracking-period-1-a1150b16850c:307180000000"
+      "sourceFrameIdentity": "tracking-period-1-a1150b16850c:306940000000"
     },
     {
       "viewport": {
@@ -198,40 +198,40 @@
       "status": "ok",
       "selectionLatency": {
         "samplesMs": [
-          105.9,
-          61.1,
-          46.5,
-          38.7,
-          39.3,
+          85.3,
+          59.8,
+          65.8,
+          62.2,
+          61.2,
+          54.8,
           35.4,
-          35.8,
-          35
+          35.4
         ],
-        "p50Ms": 38.7,
-        "p95Ms": 105.9
+        "p50Ms": 59.8,
+        "p95Ms": 85.3
       },
       "measurement": {
-        "elapsedMs": 5019,
+        "elapsedMs": 5026,
         "fps": 54,
         "frameIntervalMs": {
           "p50": 16.699999999999818,
-          "p95": 33.29999999999927,
+          "p95": 33.30000000000018,
           "p99": 50,
-          "worst": 150
+          "worst": 116.60000000000036
         },
-        "renderPasses": 546,
+        "renderPasses": 542,
         "drawCallsPerRenderPass": {
           "p50": 24,
           "p95": 103,
-          "mean": 57.095238095238095
+          "mean": 57.35055350553505
         },
         "trianglesPerRenderPassP50": 2410,
         "shadowPass": {
           "samples": 6,
           "durationMs": {
-            "p50": 0.10000000055879354,
-            "p95": 0.20000000018626451,
-            "max": 0.20000000018626451
+            "p50": 0.09999999962747097,
+            "p95": 0.2000000011175871,
+            "max": 0.2000000011175871
           }
         },
         "scalarSurfaceUpdate": {
@@ -239,12 +239,12 @@
           "validSamples": 5,
           "cellsPerUpdate": 294,
           "durationMs": {
-            "p50": 0.900000000372529,
-            "p95": 1.300000000745058,
-            "max": 1.300000000745058
+            "p50": 0.6000000014901161,
+            "p95": 0.6999999992549419,
+            "max": 0.6999999992549419
           }
         },
-        "jsHeapBytes": 197468296,
+        "jsHeapBytes": 135161465,
         "fieldCameraMode": "structure-lift",
         "shadowEnabled": true,
         "scalarCellCount": 294,
@@ -255,7 +255,7 @@
           "isWebGPURenderer": false
         }
       },
-      "sourceFrameIdentity": "tracking-period-1-a1150b16850c:307100000000"
+      "sourceFrameIdentity": "tracking-period-1-a1150b16850c:306940000000"
     },
     {
       "viewport": {
@@ -267,32 +267,32 @@
       "status": "ok",
       "selectionLatency": {
         "samplesMs": [
-          25.3,
-          139.4,
-          110,
-          134.7,
-          73.1,
-          83,
-          68,
-          104.3
+          19,
+          127,
+          122.5,
+          85.6,
+          79.7,
+          117.7,
+          110.3,
+          113.5
         ],
-        "p50Ms": 83,
-        "p95Ms": 139.4
+        "p50Ms": 110.3,
+        "p95Ms": 127
       },
       "measurement": {
-        "elapsedMs": 5022,
-        "fps": 55,
+        "elapsedMs": 5030,
+        "fps": 57,
         "frameIntervalMs": {
           "p50": 16.699999999999818,
-          "p95": 33.30000000000018,
-          "p99": 50,
-          "worst": 50
+          "p95": 16.80000000000109,
+          "p99": 33.399999999999636,
+          "worst": 33.5
         },
-        "renderPasses": 828,
+        "renderPasses": 864,
         "drawCallsPerRenderPass": {
           "p50": 16,
           "p95": 104,
-          "mean": 43.97826086956522
+          "mean": 44.041666666666664
         },
         "trianglesPerRenderPassP50": 2858,
         "shadowPass": {
@@ -313,7 +313,7 @@
             "max": null
           }
         },
-        "jsHeapBytes": 153643009,
+        "jsHeapBytes": 179269648,
         "fieldCameraMode": "tactical-map",
         "shadowEnabled": false,
         "scalarCellCount": 294,
@@ -324,7 +324,7 @@
           "isWebGPURenderer": false
         }
       },
-      "sourceFrameIdentity": "tracking-period-1-457d138baddf:126800000000"
+      "sourceFrameIdentity": "tracking-period-1-457d138baddf:127000000000"
     },
     {
       "viewport": {
@@ -336,32 +336,32 @@
       "status": "ok",
       "selectionLatency": {
         "samplesMs": [
-          83.1,
-          62.2,
-          58.4,
-          46.9,
-          28.6,
+          88.6,
+          69.1,
+          66.3,
+          46.5,
+          30.9,
           30.2,
-          26.2,
-          28.8
+          30.1,
+          36.1
         ],
-        "p50Ms": 30.2,
-        "p95Ms": 83.1
+        "p50Ms": 36.1,
+        "p95Ms": 88.6
       },
       "measurement": {
-        "elapsedMs": 5025,
+        "elapsedMs": 5043,
         "fps": 56,
         "frameIntervalMs": {
           "p50": 16.699999999999818,
           "p95": 16.800000000000182,
-          "p99": 33.399999999999636,
-          "worst": 133.39999999999964
+          "p99": 50,
+          "worst": 100
         },
         "renderPasses": 568,
         "drawCallsPerRenderPass": {
           "p50": 24,
           "p95": 103,
-          "mean": 56.889084507042256
+          "mean": 57.00528169014085
         },
         "trianglesPerRenderPassP50": 2546,
         "shadowPass": {
@@ -382,7 +382,7 @@
             "max": null
           }
         },
-        "jsHeapBytes": 197680518,
+        "jsHeapBytes": 216825602,
         "fieldCameraMode": "tactical-map",
         "shadowEnabled": false,
         "scalarCellCount": 294,
@@ -393,7 +393,7 @@
           "isWebGPURenderer": false
         }
       },
-      "sourceFrameIdentity": "tracking-period-1-a1150b16850c:307100000000"
+      "sourceFrameIdentity": "tracking-period-1-a1150b16850c:306980000000"
     },
     {
       "viewport": {
@@ -405,32 +405,32 @@
       "status": "ok",
       "selectionLatency": {
         "samplesMs": [
-          97.3,
-          79.7,
-          70.2,
-          64.7,
-          64.2,
-          42.1,
-          28.2,
-          29.6
+          73.7,
+          61.4,
+          67.6,
+          68.2,
+          47.1,
+          38.4,
+          29.6,
+          29.1
         ],
-        "p50Ms": 64.2,
-        "p95Ms": 97.3
+        "p50Ms": 47.1,
+        "p95Ms": 73.7
       },
       "measurement": {
-        "elapsedMs": 5032,
-        "fps": 54,
+        "elapsedMs": 5026,
+        "fps": 56,
         "frameIntervalMs": {
           "p50": 16.699999999999818,
           "p95": 16.80000000000109,
-          "p99": 66.60000000000036,
-          "worst": 149.89999999999964
+          "p99": 50,
+          "worst": 100
         },
-        "renderPasses": 546,
+        "renderPasses": 566,
         "drawCallsPerRenderPass": {
           "p50": 24,
-          "p95": 103,
-          "mean": 57.443223443223445
+          "p95": 104,
+          "mean": 57.618374558303884
         },
         "trianglesPerRenderPassP50": 2410,
         "shadowPass": {
@@ -442,16 +442,16 @@
           }
         },
         "scalarSurfaceUpdate": {
-          "samples": 5,
-          "validSamples": 5,
+          "samples": 4,
+          "validSamples": 4,
           "cellsPerUpdate": 294,
           "durationMs": {
-            "p50": 0.6999999992549419,
+            "p50": 0.599999999627471,
             "p95": 0.900000000372529,
             "max": 0.900000000372529
           }
         },
-        "jsHeapBytes": 205239224,
+        "jsHeapBytes": 163654179,
         "fieldCameraMode": "structure-lift",
         "shadowEnabled": false,
         "scalarCellCount": 294,
@@ -462,7 +462,7 @@
           "isWebGPURenderer": false
         }
       },
-      "sourceFrameIdentity": "tracking-period-1-a1150b16850c:307140000000"
+      "sourceFrameIdentity": "tracking-period-1-a1150b16850c:306980000000"
     },
     {
       "viewport": {
@@ -474,53 +474,53 @@
       "status": "ok",
       "selectionLatency": {
         "samplesMs": [
-          85.8,
-          56.9,
-          72.4,
-          68.2,
-          65.9,
-          55,
-          34.9,
-          34.9
+          77.7,
+          53.7,
+          55.8,
+          33.1,
+          34.5,
+          34,
+          32.8,
+          35.5
         ],
-        "p50Ms": 56.9,
-        "p95Ms": 85.8
+        "p50Ms": 34.5,
+        "p95Ms": 77.7
       },
       "measurement": {
-        "elapsedMs": 5052,
-        "fps": 54,
+        "elapsedMs": 5021,
+        "fps": 55,
         "frameIntervalMs": {
           "p50": 16.699999999999818,
-          "p95": 33.30000000000018,
+          "p95": 33.29999999999927,
           "p99": 50,
           "worst": 100
         },
-        "renderPasses": 544,
+        "renderPasses": 558,
         "drawCallsPerRenderPass": {
           "p50": 24,
           "p95": 103,
-          "mean": 57.15257352941177
+          "mean": 56.774193548387096
         },
         "trianglesPerRenderPassP50": 2410,
         "shadowPass": {
-          "samples": 7,
+          "samples": 6,
           "durationMs": {
-            "p50": 0.09999999962747097,
-            "p95": 0.39999999944120646,
-            "max": 0.39999999944120646
+            "p50": 0.19999999925494194,
+            "p95": 0.2000000011175871,
+            "max": 0.2000000011175871
           }
         },
         "scalarSurfaceUpdate": {
-          "samples": 6,
-          "validSamples": 6,
+          "samples": 5,
+          "validSamples": 5,
           "cellsPerUpdate": 294,
           "durationMs": {
-            "p50": 0.6999999992549419,
-            "p95": 1.099999999627471,
-            "max": 1.099999999627471
+            "p50": 1,
+            "p95": 1.299999998882413,
+            "max": 1.299999998882413
           }
         },
-        "jsHeapBytes": 206342298,
+        "jsHeapBytes": 162651031,
         "fieldCameraMode": "structure-lift",
         "shadowEnabled": true,
         "scalarCellCount": 294,
@@ -531,7 +531,7 @@
           "isWebGPURenderer": false
         }
       },
-      "sourceFrameIdentity": "tracking-period-1-a1150b16850c:307180000000"
+      "sourceFrameIdentity": "tracking-period-1-a1150b16850c:306900000000"
     },
     {
       "viewport": {
@@ -543,32 +543,32 @@
       "status": "ok",
       "selectionLatency": {
         "samplesMs": [
-          31.4,
-          138.9,
-          100,
-          91.4,
-          51.1,
-          74.9,
-          83.5,
-          100.2
+          18.8,
+          134.1,
+          92.9,
+          120.1,
+          106.6,
+          119.4,
+          107.2,
+          110.3
         ],
-        "p50Ms": 83.5,
-        "p95Ms": 138.9
+        "p50Ms": 107.2,
+        "p95Ms": 134.1
       },
       "measurement": {
-        "elapsedMs": 5046,
-        "fps": 55,
+        "elapsedMs": 5031,
+        "fps": 54,
         "frameIntervalMs": {
           "p50": 16.699999999999818,
-          "p95": 33.30000000000018,
-          "p99": 33.399999999999636,
-          "worst": 33.400000000001455
+          "p95": 33.30000000000109,
+          "p99": 50,
+          "worst": 50.100000000000364
         },
-        "renderPasses": 840,
+        "renderPasses": 819,
         "drawCallsPerRenderPass": {
           "p50": 16,
           "p95": 104,
-          "mean": 44.10952380952381
+          "mean": 44.1978021978022
         },
         "trianglesPerRenderPassP50": 2858,
         "shadowPass": {
@@ -589,7 +589,7 @@
             "max": null
           }
         },
-        "jsHeapBytes": 177317817,
+        "jsHeapBytes": 179027968,
         "fieldCameraMode": "tactical-map",
         "shadowEnabled": false,
         "scalarCellCount": 294,
@@ -600,7 +600,7 @@
           "isWebGPURenderer": false
         }
       },
-      "sourceFrameIdentity": "tracking-period-1-457d138baddf:126800000000"
+      "sourceFrameIdentity": "tracking-period-1-457d138baddf:127000000000"
     }
   ]
 }
