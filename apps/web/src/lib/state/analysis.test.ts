@@ -16,6 +16,8 @@ function reset() {
     selectedTeamId: null,
     selectedTacticalObjectId: null,
     hoveredTacticalObjectId: null,
+    tacticalRelationMode: "off",
+    scalarFieldMode: "heatmap",
     hoveredJoint: null,
     focusedPanel: "overview",
     interacting: false,
@@ -77,6 +79,8 @@ describe("transient analysis state spine", () => {
     store.selectTeam("home");
     store.selectTacticalObject("zone-1");
     store.hoverTacticalObject("zone-2");
+    store.setTacticalRelationMode("selected-triangles");
+    store.setScalarFieldMode("elevation");
     store.hoverJoint("knee");
     store.selectJoint("knee");
     useAnalysisStore.getState().resetTransient();
@@ -89,6 +93,8 @@ describe("transient analysis state spine", () => {
     expect(state.selectedTeamId).toBeNull();
     expect(state.selectedTacticalObjectId).toBeNull();
     expect(state.hoveredTacticalObjectId).toBeNull();
+    expect(state.tacticalRelationMode).toBe("off");
+    expect(state.scalarFieldMode).toBe("heatmap");
     expect(state.hoveredJoint).toBeNull();
     expect(state.selectedJoint).toBeNull();
     expect(state.committedTimeNs).toBe(42n);

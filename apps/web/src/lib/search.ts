@@ -13,7 +13,7 @@ export const DECIMAL_NS = /^-?\d+$/;
 
 export const WORKBENCH_VIEWS = ["overview", "signals", "field", "pose", "split", "provenance"] as const;
 export type WorkbenchView = (typeof WORKBENCH_VIEWS)[number];
-export const TACTICAL_VIEWS = ["live", "space", "shape", "range", "events", "report"] as const;
+export const TACTICAL_VIEWS = ["live", "structure", "relations", "space", "events", "range", "report"] as const;
 export type TacticalView = (typeof TACTICAL_VIEWS)[number];
 
 export const MODALITIES = [

@@ -29,7 +29,7 @@ const createPitchRenderer = vi.fn(async (..._args: unknown[]) => ({
 // reads as a value have to come with it.
 vi.mock("@/components/pitch/pitch-renderer", () => ({
   createPitchRenderer: (...args: unknown[]) => createPitchRenderer(...args),
-  DEFAULT_PITCH_LAYERS: { trails: true, labels: true, events: true, geometry: true, territory: false, influence: false },
+  DEFAULT_PITCH_LAYERS: { trails: true, labels: true, events: true, geometry: false, territory: false, influence: false },
   shortEntityLabel: (objectId: string) => objectId,
 }));
 

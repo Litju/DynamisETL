@@ -609,7 +609,10 @@ function PoseReady({
 }) {
   useEffect(() => onReady?.(), [onReady]);
   useFrame(({ camera }) => {
-    if (evidenceHostRef?.current) evidenceHostRef.current.dataset.viewCameraId = camera.uuid;
+    if (evidenceHostRef?.current) {
+      evidenceHostRef.current.dataset.viewCameraId = camera.uuid;
+      evidenceHostRef.current.dataset.cameraProjection = "isPerspectiveCamera" in camera && camera.isPerspectiveCamera ? "perspective" : "orthographic";
+    }
   });
   return null;
 }

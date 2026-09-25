@@ -10,8 +10,8 @@ from dynamis.processors.tactical_events import process_tactical_event_snapshots
 
 
 def test_levels_follow_the_capability_authority() -> None:
-    assert supported_levels("dfl-sportec-idsse") == ("A", "B", "C", "D")
-    assert supported_levels("skillcorner-opendata") == ("A", "B", "C")
+    assert supported_levels("dfl-sportec-idsse") == ("A", "B", "C", "D", "V3")
+    assert supported_levels("skillcorner-opendata") == ("A", "B", "C", "V3")
     assert supported_levels("womens-soccer-positioning") == ()
     assert supported_levels("unknown-dataset") == ()
 

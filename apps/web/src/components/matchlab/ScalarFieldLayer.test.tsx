@@ -1,11 +1,28 @@
 import { describe, expect, it } from "vitest";
 import ReactThreeTestRenderer from "@react-three/test-renderer";
-import { BoxGeometry, InstancedMesh, LineSegments, Matrix4 } from "three";
+import { InstancedMesh, LineSegments, Matrix4, Mesh } from "three";
 import type { MatchFrameContextValue } from "@/lib/match-frame-context";
 import { useAnalysisStore } from "@/lib/state/analysis";
 
-import { contourSegmentsForGrid, normalizeScalarValue, ScalarFieldLayer } from "@/components/matchlab/ScalarFieldLayer";
+import { contourSegmentsForGrid, elevationHeightM, normalizeScalarValue, ScalarFieldLayer } from "@/components/matchlab/ScalarFieldLayer";
+import type { ElevationSpec } from "@/components/matchlab/ScalarFieldLayer";
 import type { TacticalGridWindowBuffers } from "@/components/matchlab/frame-buffers";
+
+const ARRIVAL_TIME_ELEVATION: ElevationSpec = {
+  metricId: "test.fixed_domain",
+  measurementClass: "MODEL_ESTIMATED",
+  scientificDomain: { min: 0, max: 5 },
+  units: "s",
+  elevationTransform: {
+    kind: "linear-domain",
+    direction: "decreasing",
+    meaning: "Lower arrival time is shown higher.",
+  },
+  displayHeightLimitM: 2,
+  baseline: { meaning: "pitch-plane-offset", offsetM: 0.016 },
+  colorDomain: { min: 0, max: 5 },
+  legendCopy: "Earlier arrival is higher.",
+};
 
 describe("fixed-domain scalar rendering", () => {
   it("saturates color values at the declared domain without changing the source value", () => {
@@ -14,6 +31,13 @@ describe("fixed-domain scalar rendering", () => {
     expect(normalizeScalarValue(2.5, domain)).toBe(0.5);
     expect(normalizeScalarValue(8, domain)).toBe(1);
     expect(domain).toEqual({ min: 0, max: 5 });
+  });
+
+  it("uses a metric-specific, inverted display transform with an explicit baseline", () => {
+    expect(elevationHeightM(0, ARRIVAL_TIME_ELEVATION)).toBe(2);
+    expect(elevationHeightM(2.5, ARRIVAL_TIME_ELEVATION)).toBe(1);
+    expect(elevationHeightM(5, ARRIVAL_TIME_ELEVATION)).toBe(0);
+    expect(ARRIVAL_TIME_ELEVATION.scientificDomain).toEqual({ min: 0, max: 5 });
   });
 
   it("builds an isoline from fixed levels on a regular grid", () => {
@@ -31,10 +55,10 @@ describe("fixed-domain scalar rendering", () => {
     const segments = contourSegmentsForGrid(grid, 0, [0.5]);
     expect(segments).toHaveLength(6);
     expect(segments[0]).toBeCloseTo(0.5);
-    expect(segments[1]).toBeCloseTo(0.08);
+    expect(segments[1]).toBeCloseTo(0.018);
     expect(segments[2]).toBeCloseTo(0);
     expect(segments[3]).toBeCloseTo(0.5);
-    expect(segments[4]).toBeCloseTo(0.08);
+    expect(segments[4]).toBeCloseTo(0.018);
     expect(segments[5]).toBeCloseTo(-1);
   });
 
@@ -79,7 +103,7 @@ describe("fixed-domain scalar rendering", () => {
       const matrix = new Matrix4();
       mesh.getMatrixAt(1, matrix);
       expect(matrix.elements[12]).toBeCloseTo(1);
-      expect(matrix.elements[13]).toBeCloseTo(0.025);
+      expect(matrix.elements[13]).toBeCloseTo(0.016);
       await renderer.unmount();
     } finally {
       useAnalysisStore.setState({
@@ -89,7 +113,7 @@ describe("fixed-domain scalar rendering", () => {
     }
   });
 
-  it("uses contour lines and display-only boxes for the other scalar modes", async () => {
+  it("uses contour lines and a continuous display-only surface for analytical elevation", async () => {
     const previous = useAnalysisStore.getState();
     useAnalysisStore.setState({ playheadNs: 1n, committedTimeNs: 1n });
     const matchFrame = {
@@ -136,23 +160,24 @@ describe("fixed-domain scalar rendering", () => {
           spec={{
             metricId: "test.fixed_domain",
             method: "test fixture",
-            unit: "m",
+            unit: "s",
             measurementClass: "MODEL_ESTIMATED",
             domain: { min: 0, max: 5 },
             mode: "elevation",
-            elevationScaleM: 2,
+            elevationSpec: ARRIVAL_TIME_ELEVATION,
           }}
           matchFrame={matchFrame}
         />,
       );
       await elevation.advanceFrames(1, 1 / 60);
       const group = elevation.scene.find((node) => node.instance.name === "ScalarFieldLayer");
-      const mesh = elevation.scene.find((node) => node.instance instanceof InstancedMesh).instance as InstancedMesh;
+      const surface = elevation.scene.find((node) => node.instance instanceof Mesh && node.instance.geometry.getAttribute("position")?.count === 4).instance as Mesh;
       expect(group.instance.userData.displayOnlyElevation).toBe(true);
-      expect(mesh.geometry).toBeInstanceOf(BoxGeometry);
-      const matrix = new Matrix4();
-      mesh.getMatrixAt(1, matrix);
-      expect(matrix.elements[13]).toBeCloseTo(1.025);
+      expect(group.instance.userData.elevationSpec.legendCopy).toBe("Earlier arrival is higher.");
+      expect(surface.geometry.getIndex()?.count).toBe(6);
+      expect(surface.geometry.getAttribute("position").getY(0)).toBeCloseTo(2.016);
+      expect(surface.geometry.getAttribute("position").getY(1)).toBeCloseTo(0.016);
+      expect(buffers.values[0]).toBe(0);
       await elevation.unmount();
     } finally {
       useAnalysisStore.setState({

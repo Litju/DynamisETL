@@ -20,6 +20,8 @@ import type {
   TacticalPolygonWindowBuffers,
   TrackingWindowBuffers,
 } from "@/components/matchlab/frame-buffers";
+import { indexTacticalV3Frame } from "@/components/pitch/tactical-v3";
+import type { TacticalRow } from "@/components/pitch/tactical-overlay";
 import {
   type PitchPalette,
   type PitchRendererHandle,
@@ -29,9 +31,9 @@ import {
   type PitchEvent,
   type PitchLayers,
 } from "@/components/matchlab/render-types";
-import { FieldSceneView, type FieldSceneViewHandle } from "@/components/pitch/FieldSceneView";
+import { FieldSceneView, type FieldCameraMode, type FieldSceneViewHandle } from "@/components/pitch/FieldSceneView";
 import { eventStreams } from "@/lib/capabilities";
-import type { ArtifactRef, SessionDetail, StreamView } from "@/api/types";
+import type { ArtifactRef, SessionDetail, StreamView, TacticalSeriesView } from "@/api/types";
 import { useAnalysisContext } from "@/lib/analysis-context";
 import { useMatchFrameContext } from "@/lib/match-frame-context";
 import { ApiError } from "@/lib/api/client";
@@ -50,6 +52,7 @@ import {
   artifactQuery,
   sessionQuery,
   tacticalArtifactsQuery,
+  tacticalSeriesQuery,
   type WindowQuery,
 } from "@/lib/api/queries";
 import { readPalette } from "@/lib/chart-palette";
@@ -70,11 +73,17 @@ const MAX_EVENT_POINTS = 2_000;
  * them exact (the API's upper bound); a reduced response is never drawn.
  */
 const TACTICAL_MAX_POINTS = 100_000;
+const V3_BUCKET_NS = 30_000_000_000n;
+const V3_LOOKBACK_NS = 2_000_000_000n;
 /** Level C grids are emitted at most once per second (LEVEL-C-CONTRACT.md). */
 const INFLUENCE_MAX_AGE_NS = 1_500_000_000;
 const HULL_COLUMNS = ["t_rel_ns", "group_id", "hull_polygon_json"] as const;
 const TERRITORY_COLUMNS = ["t_rel_ns", "entity_id", "group_id", "cell_polygon_json"] as const;
 const INFLUENCE_COLUMNS = ["t_rel_ns", "x_m", "y_m", "owner_group_id", "arrival_time_s"] as const;
+
+function exactV3Rows(data: TacticalSeriesView | undefined): TacticalRow[] {
+  return data && data.meta.returned_rows === data.meta.source_rows ? data.rows as TacticalRow[] : [];
+}
 const EMPTY_POLYGONS: TacticalPolygonWindowBuffers = {
   frameTimesNs: new BigInt64Array(),
   framePolygonOffsets: new Uint32Array([0]),
@@ -501,6 +510,13 @@ function seriesArtifact(artifacts: readonly ArtifactRef[] | undefined, seriesNam
   return artifacts?.find((artifact) => artifact.artifact_metadata?.series_name === seriesName) ?? null;
 }
 
+function currentV3Window(timeNs: bigint | null): { readonly fromNs: bigint; readonly toNs: bigint } | null {
+  if (timeNs === null) return null;
+  const bucket = timeNs >= 0n ? timeNs / V3_BUCKET_NS : (timeNs - V3_BUCKET_NS + 1n) / V3_BUCKET_NS;
+  const start = bucket * V3_BUCKET_NS;
+  return { fromNs: start - V3_LOOKBACK_NS, toNs: start + V3_BUCKET_NS - 1n };
+}
+
 function readTeamPalette(): { teamA: string; teamB: string; halo: string } {
   if (typeof document === "undefined") return { teamA: "#8fc7ef", teamB: "#f0b454", halo: "#111418" };
   const styles = getComputedStyle(document.documentElement);
@@ -576,8 +592,14 @@ function PitchView({
     matchFrame?.selectedTrackingObjectId ?? context?.subjectId ?? context?.entityId ?? null;
   const selectedEntityRef = useRef(selectedEntityId);
   const committedRangeNs = useAnalysisStore((state) => state.committedRangeNs);
+  // PitchView already throttles playhead-driven DOM/query work to 5 Hz; keep
+  // tactical window keys bucketed without adding a per-source-frame React subscription.
+  const v3TimeNs = effectiveTimeNs(useAnalysisStore.getState());
+  const tacticalRelationMode = useAnalysisStore((state) => state.tacticalRelationMode);
+  const scalarFieldMode = useAnalysisStore((state) => state.scalarFieldMode);
   const [rendererReady, setRendererReady] = useState(false);
   const [layers, setLayers] = useState<PitchLayers>(DEFAULT_PITCH_LAYERS);
+  const [cameraMode, setCameraMode] = useState<FieldCameraMode>("tactical-map");
   const [influenceGridTimeNs, setInfluenceGridTimeNs] = useState<bigint | null>(null);
   const handleInfluenceGridTime = useCallback((timeNs: bigint | null) => {
     setInfluenceGridTimeNs((current) => current === timeNs ? current : timeNs);
@@ -600,6 +622,35 @@ function PitchView({
   const teamArtifact = seriesArtifact(tacticalArtifacts.data, "team_geometry");
   const territoryArtifact = seriesArtifact(tacticalArtifacts.data, "player_territory");
   const influenceArtifact = seriesArtifact(tacticalArtifacts.data, "influence_grid");
+  const unitsArtifact = seriesArtifact(tacticalArtifacts.data, "functional_unit_geometry");
+  const edgesArtifact = seriesArtifact(tacticalArtifacts.data, "shape_graph_edges");
+  const trianglesArtifact = seriesArtifact(tacticalArtifacts.data, "tactical_triangles");
+  const interactionsArtifact = seriesArtifact(tacticalArtifacts.data, "attacker_defender_interactions");
+  const possessionArtifact = seriesArtifact(tacticalArtifacts.data, "source_possession_context");
+  const v3Bounds = currentV3Window(v3TimeNs);
+  const v3Query = (artifact: ArtifactRef | null, enabled: boolean) => ({
+    ...tacticalSeriesQuery({
+      artifactId: artifact?.artifact_id ?? "",
+      fromNs: v3Bounds ? Number(v3Bounds.fromNs) : undefined,
+      toNs: v3Bounds ? Number(v3Bounds.toNs) : undefined,
+      maxPoints: TACTICAL_MAX_POINTS,
+    }),
+    enabled: Boolean(artifact && v3Bounds && enabled),
+  });
+  const fieldUnits = useQuery(v3Query(unitsArtifact, true));
+  const fieldEdges = useQuery(v3Query(edgesArtifact, tacticalRelationMode === "stable-graph" && (selectedEntityId !== null || Boolean(matchFrame?.selectedTeamId))));
+  const fieldTriangles = useQuery(v3Query(trianglesArtifact, tacticalRelationMode === "selected-triangles" && selectedEntityId !== null));
+  const fieldInteractions = useQuery(v3Query(interactionsArtifact, tacticalRelationMode === "attacker-defender" && selectedEntityId !== null));
+  const fieldPossession = useQuery(v3Query(possessionArtifact, true));
+  const v3Reduced = [fieldUnits.data, fieldPossession.data, fieldEdges.data, fieldTriangles.data, fieldInteractions.data]
+    .some((data) => data !== undefined && data.meta.returned_rows !== data.meta.source_rows);
+  const tacticalV3Index = useMemo(() => indexTacticalV3Frame({
+    units: exactV3Rows(fieldUnits.data),
+    edges: exactV3Rows(fieldEdges.data),
+    triangles: exactV3Rows(fieldTriangles.data),
+    interactions: exactV3Rows(fieldInteractions.data),
+    possession: exactV3Rows(fieldPossession.data),
+  }), [fieldEdges.data, fieldInteractions.data, fieldPossession.data, fieldTriangles.data, fieldUnits.data]);
   // Worker parses processor polygon JSON and groups exact frames before the
   // data reaches this view. Reduced windows are never treated as exact.
   const tacticalRequest = (artifactId: string | null, columns: readonly string[]) => ({
@@ -637,7 +688,8 @@ function PitchView({
   const reducedOverlay =
     (layers.geometry && teamTactical.data !== undefined && geometryBuffers === null) ||
     (layers.territory && territoryTactical.data !== undefined && territoryBuffers === null) ||
-    (layers.influence && influenceTactical.data !== undefined && influenceBuffers === null);
+    (layers.influence && influenceTactical.data !== undefined && influenceBuffers === null) ||
+    v3Reduced;
   const indexes = useMemo(() => ({
     geometry: geometryBuffers ?? EMPTY_POLYGONS,
     territory: territoryBuffers ?? EMPTY_POLYGONS,
@@ -848,7 +900,7 @@ function PitchView({
     });
   }, [pixiParityOracle]);
 
-  const currentTimeNs = effectiveTimeNs(useAnalysisStore.getState());
+  const currentTimeNs = v3TimeNs;
   const currentFrameIndex = trackingFrameIndexAt(trackingBuffers.frameTimesNs, currentTimeNs, maxGapNs);
   const summary = trackingFrameSummaryAt(trackingBuffers, currentFrameIndex);
   const selectedEntity = trackingEntityAt(trackingBuffers, currentFrameIndex, selectedEntityId);
@@ -857,7 +909,11 @@ function PitchView({
   const tacticalLoading =
     (layers.geometry && teamTactical.isFetching) ||
     (layers.territory && territoryTactical.isFetching) ||
-    (layers.influence && influenceTactical.isFetching);
+    (layers.influence && influenceTactical.isFetching) ||
+    fieldUnits.isFetching || fieldPossession.isFetching ||
+    (tacticalRelationMode === "stable-graph" && fieldEdges.isFetching) ||
+    (tacticalRelationMode === "selected-triangles" && fieldTriangles.isFetching) ||
+    (tacticalRelationMode === "attacker-defender" && fieldInteractions.isFetching);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -918,8 +974,8 @@ function PitchView({
             ) : null}
             {teamArtifact ? (
               <LayerToggle
-                label="Hull"
-                title="Level A convex hull per team at the current frame (deterministic)"
+                label="Occupied area"
+                title="Optional Level A convex-hull occupied-area summary per team at the current frame"
                 pressed={layers.geometry}
                 onToggle={() => setLayers((current) => ({ ...current, geometry: !current.geometry }))}
               />
@@ -943,15 +999,22 @@ function PitchView({
             ) : null}
             <button
               type="button"
+              aria-pressed={cameraMode === "tactical-map"}
+              onClick={() => { setCameraMode("tactical-map"); fieldSceneRef.current?.setCameraMode("tactical-map"); }}
+              className={cameraMode === "tactical-map" ? "t-control-compact rounded-control border border-accent/60 bg-accent/10 px-2 text-[11px] text-text-primary" : "t-control-compact rounded-control border border-border-subtle px-2 text-[11px] text-text-muted hover:border-border-strong hover:text-text-secondary"}
+            >Tactical Map</button>
+            <button type="button" aria-pressed={cameraMode === "structure-lift"} onClick={() => { setCameraMode("structure-lift"); fieldSceneRef.current?.setCameraMode("structure-lift"); }} className={cameraMode === "structure-lift" ? "t-control-compact rounded-control border border-accent/60 bg-accent/10 px-2 text-[11px] text-text-primary" : "t-control-compact rounded-control border border-border-subtle px-2 text-[11px] text-text-muted hover:border-border-strong hover:text-text-secondary"}>Structure Lift</button>
+            <button type="button" aria-pressed={cameraMode === "perspective"} onClick={() => { setCameraMode("perspective"); fieldSceneRef.current?.setCameraMode("perspective"); }} className={cameraMode === "perspective" ? "t-control-compact rounded-control border border-accent/60 bg-accent/10 px-2 text-[11px] text-text-primary" : "t-control-compact rounded-control border border-border-subtle px-2 text-[11px] text-text-muted hover:border-border-strong hover:text-text-secondary"}>Perspective Explore</button>
+            <button type="button" onClick={() => fieldSceneRef.current?.focusSelected()} disabled={!selectedEntity || selectedEntity.isBall} className="t-control-compact rounded-control border border-border-subtle px-2 text-[11px] text-text-muted disabled:opacity-40 hover:border-border-strong hover:text-text-secondary">Focus selected</button>
+            <button
+              type="button"
               onClick={() => {
                 if (pixiParityOracle) rendererRef.current?.resetView();
                 else fieldSceneRef.current?.resetView();
               }}
-              title="Frame the whole pitch again"
+              title="Reset the active camera preset"
               className="t-control-compact rounded-control border border-border-subtle px-2 text-[11px] text-text-muted transition-colors duration-quick hover:border-border-strong hover:text-text-secondary"
-            >
-              Reset view
-            </button>
+            >Reset camera</button>
           </div>
         </div>
       </header>
@@ -970,7 +1033,7 @@ function PitchView({
           data-frame-ns={summary === null ? "" : String(summary.tRelNs)}
           data-pitch-length-m={stream.pitch_dimensions_m?.length_m ?? ""}
           data-pitch-width-m={stream.pitch_dimensions_m?.width_m ?? ""}
-          className="h-full w-full"
+          className="relative h-full w-full"
         >
           {pixiParityOracle ? null : (
             <FieldSceneView
@@ -981,6 +1044,9 @@ function PitchView({
               geometryBuffers={indexes.geometry}
               territoryBuffers={indexes.territory}
               influenceBuffers={indexes.influence}
+              tacticalV3Index={tacticalV3Index}
+              tacticalRelationMode={tacticalRelationMode}
+              scalarFieldMode={scalarFieldMode}
               trackingMaxAgeNs={maxGapNs}
               influenceMaxAgeNs={INFLUENCE_MAX_AGE_NS}
               teamOrder={teamOrder}
@@ -1003,6 +1069,8 @@ function PitchView({
               layers={layers}
               onReady={handleSceneReady}
               onInfluenceGridTime={handleInfluenceGridTime}
+              cameraMode={cameraMode}
+              onCameraModeChange={setCameraMode}
             />
           )}
           {!pixiParityOracle ? (
@@ -1044,7 +1112,11 @@ function PitchView({
           )}
         </div>
         <div className="pointer-events-none absolute bottom-2 left-2 rounded-control border border-border-subtle bg-surface-1/90 px-2 py-1 text-[10px] text-text-muted">
-          {summary === null ? "—" : formatClockNs(BigInt(summary.tRelNs))} · wheel zoom, drag pan
+          {summary === null ? "—" : formatClockNs(BigInt(summary.tRelNs))} · {cameraMode === "tactical-map"
+            ? "Tactical Map · pan/zoom · rotation locked"
+            : cameraMode === "structure-lift"
+              ? "Structure Lift · orbit/pan/zoom"
+              : "Perspective Explore · orbit/pan/zoom"}
         </div>
         {reducedOverlay ? (
           <div role="status" className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-control border border-quality-warning/60 bg-surface-1/95 px-2 py-1 text-[11px] text-quality-warning">
@@ -1091,7 +1163,7 @@ function PitchView({
             Source event
           </span>
         ) : null}
-        {teamArtifact && layers.geometry ? <span>Hull: deterministic outline, current frame</span> : null}
+        {teamArtifact && layers.geometry ? <span>Occupied area: optional convex hull, current frame</span> : null}
         {territoryArtifact && layers.territory ? <span>Territory: clipped Voronoi, current frame</span> : null}
         {influenceArtifact && layers.influence ? (
           <span>
@@ -1100,6 +1172,7 @@ function PitchView({
           </span>
         ) : null}
         <span>Trails: committed range</span>
+        <span>Tracking: source-planar X/Y</span>
         <span className="mono ml-auto tabular">
           frame {currentFrameIndex >= 0 ? currentFrameIndex + 1 : "—"} / {trackingBuffers.frameTimesNs.length}
         </span>

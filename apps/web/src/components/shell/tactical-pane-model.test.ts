@@ -20,6 +20,7 @@ const CAPABILITY = {
     level_c_influence: "supported_partial_with_model_input_quality",
     level_d_event_linked: "unavailable",
     level_e_shape_phase: "unavailable",
+    matchlab_v3_functional_units: "supported_from_declared_roles",
   },
   quality_evidence: {},
   unavailable_reasons: [
@@ -94,6 +95,7 @@ describe("reportPayload (T-08)", () => {
       C: levelStatus("C", CAPABILITY, artifacts),
       D: levelStatus("D", CAPABILITY, artifacts),
       E: levelStatus("E", CAPABILITY, artifacts),
+      V3: levelStatus("V3", CAPABILITY, artifacts),
     };
     const payload = reportPayload({
       datasetId: "skillcorner-opendata",

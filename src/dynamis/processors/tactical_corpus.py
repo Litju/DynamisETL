@@ -24,6 +24,8 @@ from dynamis.processors.spec import ProcessorResult
 from dynamis.processors.tactical_events import process_tactical_event_snapshots
 from dynamis.processors.tactical_geometry import process_tactical_geometry
 from dynamis.processors.tactical_influence import process_tactical_influence
+from dynamis.processors.tactical_shape import process_tactical_shape
+from dynamis.processors.tactical_sources import load_tactical_source_authority
 from dynamis.processors.tactical_territory import process_tactical_territory
 
 #: Tracking-only tactical processors by capability level.
@@ -39,6 +41,13 @@ LEVEL_SERIES: dict[str, tuple[str, ...]] = {
     "B": ("player_territory", "team_territory"),
     "C": ("team_influence", "player_influence", "influence_grid"),
     "D": ("source_event_snapshots",),
+    "V3": (
+        "functional_unit_geometry",
+        "shape_graph_edges",
+        "tactical_triangles",
+        "attacker_defender_interactions",
+        "source_possession_context",
+    ),
 }
 
 LEVEL_ALGORITHMS: dict[str, str] = {
@@ -46,6 +55,7 @@ LEVEL_ALGORITHMS: dict[str, str] = {
     "B": "tactical.spatial_territory",
     "C": "tactical.arrival_time",
     "D": "tactical.source_event_snapshot",
+    "V3": "tactical.matchlab_shape",
 }
 
 _CAPABILITY_KEYS = {
@@ -53,6 +63,7 @@ _CAPABILITY_KEYS = {
     "B": "level_b_territory",
     "C": "level_c_influence",
     "D": "level_d_event_linked",
+    "V3": "matchlab_v3_functional_units",
 }
 
 
@@ -63,7 +74,7 @@ def _capability_matrix() -> dict[str, Any]:
 
 
 def supported_levels(dataset_id: str) -> tuple[str, ...]:
-    """Levels A-D the capability authority declares supported for a dataset."""
+    """Tactical levels declared supported by the capability authority."""
     payload = _capability_matrix()["datasets"].get(dataset_id)
     if payload is None:
         return ()
@@ -143,6 +154,42 @@ def materialize_event_level(
     )
 
 
+def materialize_matchlab_v3(
+    settings: Settings,
+    engine: Engine,
+    *,
+    dataset_id: str,
+    ref: SilverStreamRef,
+    table: pa.Table,
+    tracking_input: Any,
+    code_sha: str | None = None,
+) -> ProcessorRunResult:
+    """Run source-authorized MatchLab V3 geometry for one canonical stream."""
+    source = load_tactical_source_authority(
+        settings,
+        dataset_id=dataset_id,
+        trial_id=ref.trial_id,
+        tracking=table,
+    )
+    result = process_tactical_shape(
+        table,
+        role_by_player=source.role_by_player,
+        attacking_direction_by_team=source.attacking_direction_by_team,
+        possession=source.possession,
+        role_authority=source.role_authority,
+        direction_authority=source.direction_authority,
+    )
+    return execute_processor(
+        settings,
+        result=result,
+        dataset_id=dataset_id,
+        inputs=(*source.inputs, tracking_input),
+        series_key=ref.stream_id,
+        engine=engine,
+        code_sha=code_sha,
+    )
+
+
 def dataset_event_runs(settings: Settings, engine: Engine, *, dataset_id: str) -> dict[str, Any]:
     """Level D over every tracking period of a dataset with one event stream."""
     with engine.connect() as connection:
@@ -185,6 +232,7 @@ __all__ = [
     "dataset_event_runs",
     "event_snapshot_result",
     "materialize_event_level",
+    "materialize_matchlab_v3",
     "materialize_tracking_level",
     "supported_levels",
 ]

@@ -1,6 +1,7 @@
 import { Html } from "@react-three/drei";
 
 import { Polyline } from "@/components/matchlab/Polyline";
+import { FIELD_RENDER_DEPTH_M } from "@/components/matchlab/render-layer-depths";
 import type { TrailPoint } from "@/components/pitch/pitch-model";
 
 export interface ContextSubject {
@@ -30,11 +31,11 @@ export function ContextLayer({
   readonly alignment?: SourceAlignmentDisplay | null;
   readonly visible?: boolean;
 }) {
-  const trailPoints = trail.map((point) => [point.xM, 0.035, -point.yM] as const);
+  const trailPoints = trail.map((point) => [point.xM, FIELD_RENDER_DEPTH_M.trailPath, -point.yM] as const);
   const alignmentPoints = alignment
     ? [
-        [alignment.trackingXY[0], 0.06, -alignment.trackingXY[1]] as const,
-        [alignment.poseRootXY[0], 0.06, -alignment.poseRootXY[1]] as const,
+        [alignment.trackingXY[0], FIELD_RENDER_DEPTH_M.alignmentLine, -alignment.trackingXY[1]] as const,
+        [alignment.poseRootXY[0], FIELD_RENDER_DEPTH_M.alignmentLine, -alignment.poseRootXY[1]] as const,
       ]
     : [];
 
@@ -45,23 +46,14 @@ export function ContextLayer({
       ) : null}
       {selected ? (
         <group>
-          <mesh position={[selected.xM, 0.04, -selected.yM]} rotation={[-Math.PI / 2, 0, 0]}>
+          <mesh position={[selected.xM, FIELD_RENDER_DEPTH_M.groundRing, -selected.yM]} rotation={[-Math.PI / 2, 0, 0]}>
             <ringGeometry args={[0.45, 0.58, 36]} />
             <meshBasicMaterial color="#f4f7f6" transparent opacity={0.95} />
           </mesh>
-          <Html position={[selected.xM, 0.75, -selected.yM]} center distanceFactor={100}>
-            <span
-              role="note"
-              aria-label={"Selected player " + selected.label + " " + selected.id}
-              className="pointer-events-none whitespace-nowrap rounded border border-white/40 bg-black/80 px-1.5 py-0.5 text-[10px] text-white"
-            >
-              {selected.label} · {selected.id}
-            </span>
-          </Html>
         </group>
       ) : null}
       {hovered && hovered.id !== selected?.id ? (
-        <mesh position={[hovered.xM, 0.035, -hovered.yM]} rotation={[-Math.PI / 2, 0, 0]}>
+        <mesh position={[hovered.xM, FIELD_RENDER_DEPTH_M.groundRing, -hovered.yM]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[0.4, 0.48, 28]} />
           <meshBasicMaterial color="#dce7e3" transparent opacity={0.58} />
         </mesh>
@@ -72,7 +64,7 @@ export function ContextLayer({
           <Html
             position={[
               (alignment.trackingXY[0] + alignment.poseRootXY[0]) / 2,
-              0.4,
+              FIELD_RENDER_DEPTH_M.alignmentLabel,
               -(alignment.trackingXY[1] + alignment.poseRootXY[1]) / 2,
             ]}
             center

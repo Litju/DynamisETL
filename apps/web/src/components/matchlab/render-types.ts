@@ -55,7 +55,7 @@ export const DEFAULT_PITCH_LAYERS: PitchLayers = {
   trails: true,
   labels: true,
   events: true,
-  geometry: true,
+  geometry: false,
   territory: false,
   influence: false,
 };

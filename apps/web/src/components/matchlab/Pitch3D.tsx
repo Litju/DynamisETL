@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from "react";
-import { BufferAttribute, BufferGeometry, CylinderGeometry, DoubleSide } from "three";
+import { BufferAttribute, BufferGeometry, CylinderGeometry, DoubleSide, LineBasicMaterial, LineSegments } from "three";
+import { FIELD_RENDER_DEPTH_M } from "@/components/matchlab/render-layer-depths";
 
 export interface PitchDimensionsM {
   readonly lengthM: number;
@@ -16,7 +17,7 @@ const PENALTY_SPOT_M = 11;
 const CENTER_CIRCLE_RADIUS_M = 9.15;
 const CORNER_ARC_RADIUS_M = 1;
 const SPOT_RADIUS_M = 0.1;
-const LINE_Y = 0.012;
+const LINE_Y = FIELD_RENDER_DEPTH_M.pitchMarkings;
 
 type Point2 = readonly [xM: number, yM: number];
 
@@ -134,14 +135,50 @@ export function buildPitchMarkingPositions(dimensions: PitchDimensionsM): Float3
 
 function Goal({
   xM,
+  direction,
   postGeometry,
   crossbarGeometry,
 }: {
   readonly xM: number;
+  readonly direction: -1 | 1;
   readonly postGeometry: CylinderGeometry;
   readonly crossbarGeometry: CylinderGeometry;
 }) {
   const halfGoal = GOAL_FRAME_OUTER_WIDTH_M / 2;
+  const netLines = useMemo(() => {
+    const backX = xM + direction * 2.0;
+    const points: number[] = [];
+    const segment = (a: readonly [number, number, number], b: readonly [number, number, number]) => points.push(...a, ...b);
+    const frontSides = [-halfGoal, halfGoal] as const;
+    for (const side of frontSides) {
+      segment([xM, 0, -side], [backX, 0, -side]);
+      segment([xM, GOAL_HEIGHT_M, -side], [backX, GOAL_HEIGHT_M, -side]);
+      segment([backX, 0, -side], [backX, GOAL_HEIGHT_M, -side]);
+    }
+    segment([backX, 0, -halfGoal], [backX, 0, halfGoal]);
+    segment([backX, GOAL_HEIGHT_M, -halfGoal], [backX, GOAL_HEIGHT_M, halfGoal]);
+    for (let index = 1; index < 8; index += 1) {
+      const z = -halfGoal + (2 * halfGoal * index) / 8;
+      segment([backX, 0, z], [backX, GOAL_HEIGHT_M, z]);
+    }
+    for (let index = 1; index < 5; index += 1) {
+      const y = (GOAL_HEIGHT_M * index) / 5;
+      segment([backX, y, -halfGoal], [backX, y, halfGoal]);
+      for (const side of frontSides) segment([xM, y, -side], [backX, y, -side]);
+    }
+    return Float32Array.from(points);
+  }, [direction, halfGoal, xM]);
+  const netGeometry = useMemo(() => {
+    const geometry = new BufferGeometry();
+    geometry.setAttribute("position", new BufferAttribute(netLines, 3));
+    return geometry;
+  }, [netLines]);
+  const netMaterial = useMemo(() => new LineBasicMaterial({ color: "#d5e0db", transparent: true, opacity: 0.32 }), []);
+  const net = useMemo(() => new LineSegments(netGeometry, netMaterial), [netGeometry, netMaterial]);
+  useEffect(() => () => {
+    netGeometry.dispose();
+    netMaterial.dispose();
+  }, [netGeometry, netMaterial]);
   return (
     <group>
       {[-1, 1].map((side) => (
@@ -149,7 +186,6 @@ function Goal({
           key={side}
           geometry={postGeometry}
           position={[xM, GOAL_HEIGHT_M / 2, -side * halfGoal]}
-          castShadow
         >
           <meshStandardMaterial color="#eef3f1" />
         </mesh>
@@ -158,10 +194,10 @@ function Goal({
         geometry={crossbarGeometry}
         position={[xM, GOAL_HEIGHT_M, 0]}
         rotation={[Math.PI / 2, 0, 0]}
-        castShadow
       >
         <meshStandardMaterial color="#eef3f1" />
       </mesh>
+      <primitive object={net} dispose={null} />
     </group>
   );
 }
@@ -197,15 +233,19 @@ export function Pitch3D({ dimensions }: { readonly dimensions: PitchDimensionsM 
 
   return (
     <group name="Pitch3D" userData={{ lengthM, widthM }}>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+      <mesh position={[0, FIELD_RENDER_DEPTH_M.pitchEdgeCenter, 0]} receiveShadow>
+        <boxGeometry args={[lengthM + 2.8, FIELD_RENDER_DEPTH_M.pitchEdgeThickness, widthM + 0.6]} />
+        <meshStandardMaterial color="#0c2d21" roughness={0.96} />
+      </mesh>
+      <mesh position={[0, FIELD_RENDER_DEPTH_M.pitchSurface, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[lengthM, widthM]} />
-        <meshStandardMaterial color="#194234" roughness={0.94} />
+        <meshStandardMaterial color="#20523a" roughness={0.94} />
       </mesh>
       <mesh geometry={lineGeometry}>
         <meshBasicMaterial color="#e8eee9" side={DoubleSide} />
       </mesh>
-      <Goal xM={-lengthM / 2} postGeometry={postGeometry} crossbarGeometry={crossbarGeometry} />
-      <Goal xM={lengthM / 2} postGeometry={postGeometry} crossbarGeometry={crossbarGeometry} />
+      <Goal xM={-lengthM / 2} direction={-1} postGeometry={postGeometry} crossbarGeometry={crossbarGeometry} />
+      <Goal xM={lengthM / 2} direction={1} postGeometry={postGeometry} crossbarGeometry={crossbarGeometry} />
     </group>
   );
 }

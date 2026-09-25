@@ -15,8 +15,9 @@ import {
 
 import { TRACKING_KIND, trackingFrameIndexAt, type TrackingWindowBuffers } from "@/components/matchlab/frame-buffers";
 import type { MatchFrameContextValue } from "@/lib/match-frame-context";
+import { FIELD_RENDER_DEPTH_M } from "@/components/matchlab/render-layer-depths";
 
-const MARKER_Y = 0.025;
+const MARKER_Y = FIELD_RENDER_DEPTH_M.trackingMarker;
 
 export interface TrackingLayerPalette {
   readonly home: string;
@@ -97,7 +98,7 @@ export function TrackingLayer({
     () => () => {
       for (const mesh of [detectedMesh, extrapolatedMesh, unknownMesh]) {
         mesh.geometry.dispose();
-        (mesh.material as MeshBasicMaterial).dispose();
+        (mesh.material as MeshBasicMaterial | MeshStandardMaterial).dispose();
       }
       ballGeometry.dispose();
       ballMaterial.dispose();
@@ -167,7 +168,7 @@ export function TrackingLayer({
         ballId.current = entityId;
         if (ballRef.current) {
           ballRef.current.visible = true;
-          ballRef.current.position.set(xM, 0.16, -yM);
+          ballRef.current.position.set(xM, FIELD_RENDER_DEPTH_M.ballCenter, -yM);
           const selected = selectedId === entityId || hoveredId === entityId;
           ballRef.current.scale.setScalar(selected ? 1.35 : 1);
         }

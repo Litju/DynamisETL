@@ -19,6 +19,8 @@ export interface TimeRangeNs {
 
 export type PlaybackStatus = "idle" | "ready" | "buffering" | "ended";
 export type PlaybackDirection = -1 | 1;
+export type TacticalRelationMode = "off" | "stable-graph" | "selected-triangles" | "attacker-defender";
+export type ScalarFieldMode = "heatmap" | "contour" | "elevation";
 
 export interface AnalysisState {
   /** Live playback/scrub time; high-frequency and never URL-serialized directly. */
@@ -41,6 +43,8 @@ export interface AnalysisState {
   selectedTeamId: string | null;
   selectedTacticalObjectId: string | null;
   hoveredTacticalObjectId: string | null;
+  tacticalRelationMode: TacticalRelationMode;
+  scalarFieldMode: ScalarFieldMode;
   hoveredJoint: string | null;
   selectedJoint: string | null;
   focusedPanel: WorkbenchPanel;
@@ -66,6 +70,8 @@ export interface AnalysisState {
   selectTeam: (teamId: string | null) => void;
   selectTacticalObject: (objectId: string | null) => void;
   hoverTacticalObject: (objectId: string | null) => void;
+  setTacticalRelationMode: (mode: TacticalRelationMode) => void;
+  setScalarFieldMode: (mode: ScalarFieldMode) => void;
   hoverJoint: (jointId: string | null) => void;
   selectJoint: (jointId: string | null) => void;
   focusPanel: (panel: WorkbenchPanel) => void;
@@ -91,6 +97,8 @@ const TRANSIENT_DEFAULTS = {
   selectedTeamId: null,
   selectedTacticalObjectId: null,
   hoveredTacticalObjectId: null,
+  tacticalRelationMode: "off",
+  scalarFieldMode: "heatmap",
   hoveredJoint: null,
   selectedJoint: null,
   interacting: false,
@@ -109,6 +117,8 @@ export const useAnalysisStore = create<AnalysisState>()((set) => ({
   selectedTeamId: null,
   selectedTacticalObjectId: null,
   hoveredTacticalObjectId: null,
+  tacticalRelationMode: "off",
+  scalarFieldMode: "heatmap",
   hoveredJoint: null,
   selectedJoint: null,
   focusedPanel: "overview",
@@ -130,6 +140,8 @@ export const useAnalysisStore = create<AnalysisState>()((set) => ({
   selectTeam: (selectedTeamId) => set({ selectedTeamId }),
   selectTacticalObject: (selectedTacticalObjectId) => set({ selectedTacticalObjectId }),
   hoverTacticalObject: (hoveredTacticalObjectId) => set({ hoveredTacticalObjectId }),
+  setTacticalRelationMode: (tacticalRelationMode) => set({ tacticalRelationMode }),
+  setScalarFieldMode: (scalarFieldMode) => set({ scalarFieldMode }),
   hoverJoint: (jointId) => set({ hoveredJoint: jointId }),
   selectJoint: (jointId) => set({ selectedJoint: jointId }),
   focusPanel: (panel) => set({ focusedPanel: panel }),
