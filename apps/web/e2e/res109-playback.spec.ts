@@ -39,12 +39,12 @@ test("RES-109 Pose crosses multiple exact chunks and keeps telemetry on the live
     if (request.url().includes("/api/artifacts/pose-sample/window")) requests.push(request.url());
   });
   await page.goto("/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P1&view=pose&t_ns=0");
-  await expect(page.getByTestId("pose-canvas").locator("canvas")).toBeVisible();
+  await expect(page.getByTestId("matchlab-canvas").locator("canvas")).toBeVisible();
   const telemetry = page.getByTestId("pose-telemetry");
   await expect(telemetry).toBeVisible();
   const before = await playheadNs(page);
   await page.getByLabel("Playback rate").selectOption("4");
-  await page.getByRole("button", { name: "Play" }).click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
   await expect.poll(async () => Number(await playheadNs(page)), { timeout: 20_000 })
     .toBeGreaterThan(Number(before + 10_000_000_000n));
   const during = await playheadNs(page);
@@ -64,13 +64,13 @@ test("RES-109 Field crosses forward and reverse chunk boundaries without scope d
   await page.goto("/lab/skillcorner-opendata/1925299?stream=tracking-1&view=field&t_ns=0");
   await expect(page.getByTestId("pitch-canvas")).toBeVisible();
   await page.getByLabel("Playback rate").selectOption("4");
-  await page.getByRole("button", { name: "Play" }).click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
   await expect.poll(async () => Number(await playheadNs(page)), { timeout: 20_000 })
     .toBeGreaterThan(10_000_000_000);
   const forward = await playheadNs(page);
   const pause = page.getByRole("button", { name: "Pause" });
   if (await pause.count()) await pause.click();
-  await expect(page.getByRole("button", { name: "Play" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Play", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Reverse" }).click();
   await expect(page.getByTestId("playback-direction")).toHaveAttribute("data-direction", "reverse");
   await expect.poll(async () => Number(await playheadNs(page)), { timeout: 10_000 })
@@ -100,9 +100,9 @@ test("RES-109 delayed exact handoff is explicit BUFFERING and resumes", async ({
     await route.fallback();
   });
   await page.goto("/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P1&view=pose&t_ns=0");
-  await expect(page.getByTestId("pose-canvas").locator("canvas")).toBeVisible();
+  await expect(page.getByTestId("matchlab-canvas").locator("canvas")).toBeVisible();
   await page.getByLabel("Playback rate").selectOption("4");
-  await page.getByRole("button", { name: "Play" }).click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
   releaseNext?.();
   await expect(page.getByTestId("playback-buffering").first()).toBeVisible({ timeout: 2_500 });
   await expect(page.getByTestId("playback-buffering").first()).toBeHidden({ timeout: 8_000 });
@@ -126,7 +126,7 @@ test("RES-109 Pose seek exposes coordinate and camera ownership modes", async ({
 
 test("RES-109 §12 paused subject switch rewinds to the first exact observation", async ({ page }) => {
   await page.goto("/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P1&view=pose&t_ns=16000000000");
-  await expect(page.getByTestId("pose-canvas").locator("canvas")).toBeVisible();
+  await expect(page.getByTestId("matchlab-canvas").locator("canvas")).toBeVisible();
   await page.locator("#pose-subject").selectOption("SC-P2");
   await expect(page).toHaveURL(/subject=SC-P2/);
   await expect(page).toHaveURL(/t_ns=12000000000/);
@@ -135,13 +135,13 @@ test("RES-109 §12 paused subject switch rewinds to the first exact observation"
 
 test("RES-109 §12 playing subject switch stops playback without stale subject data", async ({ page }) => {
   await page.goto("/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P1&view=pose&t_ns=12000000000");
-  await expect(page.getByTestId("pose-canvas").locator("canvas")).toBeVisible();
+  await expect(page.getByTestId("matchlab-canvas").locator("canvas")).toBeVisible();
   await page.getByLabel("Playback rate").selectOption("4");
-  await page.getByRole("button", { name: "Play" }).click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
   await expect.poll(async () => Number(await playheadNs(page)), { timeout: 5_000 })
     .toBeGreaterThan(12_100_000_000);
   await page.locator("#pose-subject").selectOption("SC-P2");
-  await expect(page.getByRole("button", { name: "Play" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Play", exact: true })).toBeVisible();
   await expect(page).toHaveURL(/subject=SC-P2/);
   await expect(page).toHaveURL(/t_ns=12000000000/);
   await expect(page.getByTestId("pose-telemetry").getByText("29 observed · 0 unavailable")).toBeVisible();
@@ -166,9 +166,9 @@ test("RES-109 §12 buffering subject switch retires only the previous subject", 
     await route.fallback();
   });
   await page.goto("/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P1&view=pose&t_ns=0");
-  await expect(page.getByTestId("pose-canvas").locator("canvas")).toBeVisible();
+  await expect(page.getByTestId("matchlab-canvas").locator("canvas")).toBeVisible();
   await page.getByLabel("Playback rate").selectOption("4");
-  await page.getByRole("button", { name: "Play" }).click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
   await expect(page.getByTestId("playback-buffering").first()).toBeVisible({ timeout: 2_500 });
   await page.locator("#pose-subject").selectOption("SC-P2");
   await expect(page).toHaveURL(/subject=SC-P2/);
@@ -199,7 +199,7 @@ test("RES-109 §12 all-subject focus keeps the global exact query unscoped", asy
     if (request.url().includes("/api/artifacts/pose-sample/window")) requests.push(request.url());
   });
   await page.goto("/lab/skillcorner-opendata/1925299?stream=pose-1&subject=SC-P1&view=pose&t_ns=12000000000");
-  await expect(page.getByTestId("pose-canvas").locator("canvas")).toBeVisible();
+  await expect(page.getByTestId("matchlab-canvas").locator("canvas")).toBeVisible();
   await page.getByTestId("pose-all-subjects-toggle").click();
   await page.locator("#pose-subject").selectOption("SC-P2");
   await expect(page).toHaveURL(/subject=SC-P2/);

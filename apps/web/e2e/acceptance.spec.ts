@@ -99,13 +99,8 @@ test("2. selecting a player on the pitch updates the durable entity context", as
   const host = page.getByTestId("pitch-canvas");
   await expect(host).toBeVisible();
   await expect(page.getByText(/players · .* extrapolated/)).toBeVisible();
-  const canvas = host.locator("canvas");
-  const box = await canvas.boundingBox();
-  expect(box).not.toBeNull();
-  if (!box) return;
-  const scale = Math.min(box.width / 120, box.height / 80);
-  // p1 sits at (-5 m, 2 m) with the pitch origin at the canvas centre.
-  await page.mouse.click(box.x + box.width / 2 - 5 * scale, box.y + box.height / 2 - 2 * scale);
+  await expect(page.getByTestId("matchlab-canvas").locator("canvas")).toBeVisible();
+  await host.getByRole("button", { name: "Select player p1" }).click();
   // RES-112 F-06: the Field entity has its own durable key; the Pose subject
   // key is never overwritten by a pitch click.
   await expect(page).toHaveURL(/entity=p1/);

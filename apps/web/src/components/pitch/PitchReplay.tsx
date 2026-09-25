@@ -1003,7 +1003,7 @@ function PitchView({
       <div className="relative min-h-0 flex-1">
         <div
           ref={hostRef}
-          role="img"
+          role="region"
           aria-label={
             summary === null
               ? `Pitch replay for ${stream.stream_id}: no tracking frame at ${currentTimeNs === null ? "the current time" : formatClockNs(currentTimeNs)}`
