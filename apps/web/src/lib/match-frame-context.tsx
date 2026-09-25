@@ -188,7 +188,7 @@ export function MatchFrameContextProvider({
   const selectPlayer = useCallback<MatchFrameContextValue["selectPlayer"]>(
     (playerId, options) => {
       if (durable === null) return;
-      if (options?.origin === "pose") {
+      if (options?.origin === "pose" && durable.view === "matchlab") {
         useAnalysisStore.getState().setDashboardDomain("biomechanics");
       }
       if (playerId === null) {
@@ -239,10 +239,10 @@ export function MatchFrameContextProvider({
   );
   const selectTacticalObject = useCallback(
     (objectId: string | null) => {
-      if (objectId !== null) {
+      if (objectId !== null && durable?.view === "matchlab") {
         useAnalysisStore.getState().setDashboardDomain("tactical");
-        durable?.selectTacticalView?.("relations");
       }
+      if (objectId !== null) durable?.selectTacticalView?.("relations");
       useAnalysisStore.getState().selectTacticalObject(objectId);
     },
     [durable],

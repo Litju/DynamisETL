@@ -173,12 +173,12 @@ export const useAnalysisStore = create<AnalysisState>()((set) => ({
   setPoseAnalysisSection: (poseAnalysisSection) => set({ poseAnalysisSection }),
   setPoseDisplayMode: (poseDisplayMode) => set({ poseDisplayMode }),
   hoverJoint: (jointId) => set({ hoveredJoint: jointId }),
-  selectJoint: (jointId) => set({
+  selectJoint: (jointId) => set((state) => ({
     selectedJoint: jointId,
-    ...(jointId !== null
+    ...(jointId !== null && state.focusedPanel === "matchlab"
       ? { dashboardDomain: "biomechanics", poseAnalysisSection: "Selected joint" }
       : {}),
-  }),
+  })),
   focusPanel: (panel) => set({ focusedPanel: panel }),
   setInteracting: (interacting) => set({ interacting }),
   beginSubjectSwitch: (sourceSubjectId, targetTimeNs) =>
