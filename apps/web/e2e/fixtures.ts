@@ -536,6 +536,7 @@ function body(pathname: string): unknown | undefined {
   }
   if (pathname === "/api/tactical/methodology") return { metrics: [], authority: "RES-110" };
   if (pathname === "/api/tactical/artifacts") return [];
+  if (pathname === "/api/processing/artifacts") return [];
   if (pathname === "/api/artifacts/tracking-sample") return TRACKING_ARTIFACT;
   if (pathname === "/api/artifacts/pose-sample") {
     return { ...POSE_ARTIFACT, entity_observations: poseObservationsInRange(Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY) };

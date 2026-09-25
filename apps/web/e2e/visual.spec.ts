@@ -66,6 +66,13 @@ for (const shot of SHOTS) {
       consoleMessages.push(entry);
       consoleErrors.push(entry);
     });
+    page.on("response", (response) => {
+      if (response.status() >= 400) {
+        const entry = `http ${response.status()}: ${response.url()}`;
+        consoleMessages.push(entry);
+        consoleErrors.push(entry);
+      }
+    });
     await page.setViewportSize({ width: 1600, height: 1000 });
     await page.goto(shot.route);
     await page.waitForLoadState("networkidle");
