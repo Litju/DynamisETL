@@ -25,7 +25,7 @@ from dynamis.processors.spec import (
 )
 
 ALGORITHM_ID = "pose.bilateral_geometry"
-ALGORITHM_VERSION = "1.0.1"
+ALGORITHM_VERSION = "1.1.0"
 SERIES_NAME = "pose_bilateral_geometry"
 _TOKEN = re.compile(r"[^A-Za-z0-9]+")
 
@@ -187,8 +187,8 @@ def process_pose_bilateral(
             difference = np.full(indexes.size, np.nan, dtype=np.float64)
             difference[valid] = right[valid] - left[valid]
             token = _token(pair_name)
-            subject_columns[f"left_{token}_angle_rad"] = pa.array(left, type=pa.float64())
-            subject_columns[f"right_{token}_angle_rad"] = pa.array(right, type=pa.float64())
+            subject_columns[f"left_{token}_rad"] = pa.array(left, type=pa.float64())
+            subject_columns[f"right_{token}_rad"] = pa.array(right, type=pa.float64())
             subject_columns[f"right_minus_left_{token}_rad"] = pa.array(
                 difference, type=pa.float64()
             )

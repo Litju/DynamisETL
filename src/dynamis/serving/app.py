@@ -387,16 +387,12 @@ class PostgresServingBackend:
         )
         landmark_ref = by_series.get(("pose.landmark_kinematics", "pose_landmark_kinematics"))
         quality_ref = by_series.get(("pose.analysis_quality", "pose_analysis_quality"))
-        dropout_ref = by_series.get(("pose.analysis_quality", "pose_quality_dropout_intervals"))
-        if (
-            geometry_ref is None
-            or landmark_ref is None
-            or quality_ref is None
-            or dropout_ref is None
-        ):
+        bilateral_ref = by_series.get(("pose.bilateral_geometry", "pose_bilateral_geometry"))
+        if geometry_ref is None or landmark_ref is None or quality_ref is None:
             return None
         source_ref = self.artifact(stream.sample_artifact_ids[0])
-        if source_ref is None:
+        source_detail = self.artifact_detail(stream.sample_artifact_ids[0])
+        if source_ref is None or source_detail is None:
             return None
 
         token = landmark_name
@@ -428,19 +424,14 @@ class PostgresServingBackend:
             "available_landmark_count",
             "expected_landmark_count",
         ]
-        dropout_columns = [
-            "entity_id",
-            "joint_name",
-            "t_rel_ns",
-            "start_ns",
-            "end_ns_exclusive",
-            "missing_frames",
-            "duration_s",
-        ]
         source_columns = [
+            "t_rel_ns",
             "joint_name",
             "is_available",
             "error_m",
+            "x_m",
+            "y_m",
+            "z_m",
             "nominal_sampling_rate_hz",
         ]
 
@@ -467,14 +458,32 @@ class PostgresServingBackend:
         geometry_table = exact_window(geometry_ref, geometry_columns)
         landmark_table = exact_window(landmark_ref, landmark_columns)
         quality_table = exact_window(quality_ref, quality_columns)
-        dropout_table = exact_window(dropout_ref, dropout_columns, lower=None)
         source_checksums = {
             "source_pose": source_ref.checksum_sha256,
             "pose_geometry": geometry_ref.checksum_sha256,
             "pose_landmarks": landmark_ref.checksum_sha256,
             "pose_quality": quality_ref.checksum_sha256,
-            "pose_quality_dropouts": dropout_ref.checksum_sha256,
         }
+        bilateral_pair = (
+            "knee_included_angle"
+            if landmark_name in {"lKnee", "rKnee"}
+            else "hip_included_angle"
+            if landmark_name in {"lHip", "rHip"}
+            else None
+        )
+        bilateral_table = None
+        if bilateral_ref is not None and bilateral_pair is not None:
+            bilateral_table = exact_window(
+                bilateral_ref,
+                [
+                    "t_rel_ns",
+                    f"left_{bilateral_pair}_rad",
+                    f"right_{bilateral_pair}_rad",
+                    f"right_minus_left_{bilateral_pair}_rad",
+                    f"common_available_{bilateral_pair}",
+                ],
+            )
+            source_checksums["pose_bilateral"] = bilateral_ref.checksum_sha256
         result = process_pose_range(
             dataset_id=dataset_id,
             session_id=session_id,
@@ -484,12 +493,24 @@ class PostgresServingBackend:
             from_ns=from_ns,
             to_ns=to_ns,
             landmark_name=landmark_name,
+            sampling_rate_hz=stream.nominal_sampling_rate_hz or 0.0,
+            grid_origin_ns=source_detail.canonical_time_min_ns or 0,
             geometry=geometry_table,
             landmark_series=landmark_table,
             quality_frames=quality_table,
-            dropout_intervals=dropout_table,
+            bilateral_series=bilateral_table,
             source_pose=source_table,
             source_checksums=source_checksums,
+            input_series_versions={
+                "pose.geometry": geometry_ref.algorithm_version or "unknown",
+                "pose.landmark": landmark_ref.algorithm_version or "unknown",
+                "pose.quality": quality_ref.algorithm_version or "unknown",
+                **(
+                    {"pose.bilateral": bilateral_ref.algorithm_version or "unknown"}
+                    if bilateral_ref is not None
+                    else {}
+                ),
+            },
         )
         return PoseRangeReportView(
             algorithm_id=result.spec.algorithm_id,

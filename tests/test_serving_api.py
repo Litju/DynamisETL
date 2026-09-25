@@ -320,7 +320,7 @@ class FakeBackend:
         )
         return PoseRangeReportView(
             algorithm_id="pose.range_summary",
-            algorithm_version="1.0.0",
+            algorithm_version="1.1.0",
             parameters_hash="e" * 64,
             code_git_sha="f" * 40,
             dataset_id=dataset_id,

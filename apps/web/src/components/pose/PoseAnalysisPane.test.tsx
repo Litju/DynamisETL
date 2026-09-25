@@ -165,7 +165,7 @@ function installFetch(): void {
       if (url.pathname === "/api/pose/range-report") {
         return json({
           algorithm_id: "pose.range_summary",
-          algorithm_version: "1.0.0",
+          algorithm_version: "1.1.0",
           parameters_hash: "e".repeat(64),
           code_git_sha: "f".repeat(40),
           dataset_id: "skillcorner-opendata",
@@ -315,7 +315,7 @@ it("requests an exact range report from server-side processor series", async () 
   fireEvent.change(screen.getByRole("combobox", { name: "Select Pose landmark" }), { target: { value: "lKnee" } });
   fireEvent.click(screen.getByRole("tab", { name: "Range" }));
 
-  expect(await screen.findByText(/pose\.range_summary v1\.0\.0 · subject player-1 · exact processor inputs/)).toBeTruthy();
+  expect(await screen.findByText(/pose\.range_summary v1\.1\.0 · subject player-1 · exact processor inputs/)).toBeTruthy();
   expect(screen.getByText("Mean body-anchor-relative speed in selected range for lKnee")).toBeTruthy();
   expect(screen.getByText(/code SHA/)).toBeTruthy();
 });
