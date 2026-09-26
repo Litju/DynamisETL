@@ -41,8 +41,10 @@ from dynamis.contracts.sports import (
     TeamRosterMembership,
     canonical_sports_id,
     capability_profile_from_records,
+    catalog_rows_for_source,
     event_envelope_table,
     grain_artifact_layout,
+    grain_columns,
     openlineage_dataset,
     openlineage_event,
     openlineage_job,
@@ -161,6 +163,37 @@ def test_grain_axes_and_duplicate_validation() -> None:
     )
 
 
+def test_player_season_keeps_provider_position_groups_as_an_extra_axis() -> None:
+    grain = DataGrain(
+        kind=DataGrainKind.PLAYER_SEASON,
+        axes=("subject", "team", "competition_edition", "position_group"),
+    )
+    rows = [
+        {
+            "subject": "player-1",
+            "team": "team-1",
+            "competition_edition": "edition-1",
+            "position_group": "Central Defender",
+        },
+        {
+            "subject": "player-1",
+            "team": "team-1",
+            "competition_edition": "edition-1",
+            "position_group": "Full Back",
+        },
+    ]
+    validate_grain_rows(grain, rows)
+    assert grain_columns(
+        grain,
+        ("subject_id", "team_id", "competition_edition_id", "position_group"),
+    ) == ("subject_id", "team_id", "competition_edition_id", "position_group")
+    with pytest.raises(ValueError, match="optional position_group"):
+        DataGrain(
+            kind=DataGrainKind.PLAYER_SEASON,
+            axes=("subject", "team", "competition_edition", "competition_id"),
+        )
+
+
 def test_capabilities_are_order_independent_and_route_on_local_evidence() -> None:
     evidence = (
         CapabilityEvidence(
@@ -240,9 +273,11 @@ def test_catalog_state_path_and_failure_evidence() -> None:
             "sport_id": "football",
             "upstream_url": "https://example.org/tracking.jsonl",
             "rights": {"identifier": "MIT"},
+            "provider_metadata": {"provider_status": "not_started"},
             "discovered_at": datetime(2026, 1, 1, tzinfo=UTC),
         }
     )
+    assert entry.provider_metadata == {"provider_status": "not_started"}
     with pytest.raises(ValueError, match="invalid source catalog transition"):
         entry.transition(SourceCatalogState.READY)
     failed = entry.transition(
@@ -255,6 +290,26 @@ def test_catalog_state_path_and_failure_evidence() -> None:
         recovered.transition(SourceCatalogState.ACQUIRED).availability_state
         is SourceCatalogState.ACQUIRED
     )
+
+
+def test_skillcorner_registry_catalog_capabilities_are_family_specific() -> None:
+    from dynamis.registry import source_by_id, validate_registry
+
+    source = source_by_id(validate_registry(), "skillcorner-opendata")
+    rows = catalog_rows_for_source(source, datetime(2026, 1, 1, tzinfo=UTC))
+    capabilities = {row["registry_file_key"]: set(row["upstream_capabilities"]) for row in rows}
+
+    assert capabilities["data/matches/1996436/1996436_tracking_extrapolated.jsonl"] == {
+        "TRACKING",
+        "BALL_TRACKING",
+    }
+    assert capabilities["data/matches/1996436/1996436_dynamic_events.csv"] == {"EVENTS"}
+    assert capabilities["data/matches/1996436/1996436_phases_of_play.csv"] == {"PHASES"}
+    assert "raw/1996436.jsonl.zip" not in capabilities
+    assert capabilities["raw/1996435.jsonl.zip"] == {"POSE"}
+    assert capabilities["data/aggregates/aus1league_physicalaggregates_20242025.csv"] == {
+        "SEASON_AGGREGATE"
+    }
 
 
 def test_surface_event_clock_and_openlineage_contracts() -> None:

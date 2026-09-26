@@ -149,14 +149,16 @@ ALIGNMENT_STATEMENT = (
 )
 
 
-def tracking_stream_id(period: int) -> str:
-    """Canonical tracking stream identity for one period."""
-    return f"tracking-period-{period}"
+def tracking_stream_id(period: int, match_id: str | None = None) -> str:
+    """Canonical period identity, preserving the original 1925299 stream keys."""
+    scope = f"{match_id}-" if match_id and match_id != "1925299" else ""
+    return f"{scope}tracking-period-{period}"
 
 
-def pose_stream_id(period: int) -> str:
-    """Canonical pose stream identity for one period."""
-    return f"pose-period-{period}"
+def pose_stream_id(period: int, match_id: str | None = None) -> str:
+    """Canonical period identity, preserving the original 1925299 stream keys."""
+    scope = f"{match_id}-" if match_id and match_id != "1925299" else ""
+    return f"{scope}pose-period-{period}"
 
 
 def pitch_frame(pitch_length_m: float, pitch_width_m: float) -> CoordinateFrame:

@@ -23,6 +23,7 @@ from dynamis.config import Settings
 from dynamis.contracts import (
     AlgorithmSpec,
     DatasetSource,
+    ProcessingInput,
     ProcessingRun,
     ProcessingStatus,
     SkeletonDefinition,
@@ -535,6 +536,7 @@ def persist_source(connection, source: DatasetSource) -> dict[str, int]:
                     "asset_identity",
                     "expected_size_bytes",
                     "rights",
+                    "provider_metadata",
                     "upstream_capabilities",
                 )
             },
@@ -542,6 +544,248 @@ def persist_source(connection, source: DatasetSource) -> dict[str, int]:
         connection.execute(statement)
     written["source_catalog_entry"] = len(catalog_rows)
     return written
+
+
+def _advance_catalog_entry(connection, entry_id: str, target: SourceCatalogState) -> None:
+    row = (
+        connection.execute(
+            sa.select(SOURCE_CATALOG_TABLE).where(SOURCE_CATALOG_TABLE.c.entry_id == entry_id)
+        )
+        .mappings()
+        .one_or_none()
+    )
+    if row is None:
+        return
+    entry = SourceCatalogEntry.model_validate(dict(row))
+    recovery = {
+        SourceCatalogState.ACQUISITION_FAILED: SourceCatalogState.REGISTERED,
+        SourceCatalogState.MATERIALIZATION_FAILED: SourceCatalogState.ACQUIRED,
+        SourceCatalogState.VALIDATION_FAILED: SourceCatalogState.MATERIALIZED,
+    }
+    path = (
+        SourceCatalogState.UPSTREAM_AVAILABLE,
+        SourceCatalogState.REGISTERED,
+        SourceCatalogState.ACQUIRED,
+        SourceCatalogState.MATERIALIZED,
+        SourceCatalogState.READY,
+    )
+    while entry.availability_state != target:
+        current = entry.availability_state
+        if current in recovery:
+            next_state = recovery[current]
+        elif current in path and target in path and path.index(current) < path.index(target):
+            next_state = path[path.index(current) + 1]
+        else:
+            return
+        entry = entry.transition(next_state)
+    connection.execute(
+        SOURCE_CATALOG_TABLE.update()
+        .where(SOURCE_CATALOG_TABLE.c.entry_id == entry_id)
+        .values(
+            availability_state=entry.availability_state.value,
+            failure_stage=None,
+            failure_evidence=None,
+        )
+    )
+
+
+def persist_skillcorner_corpus(
+    connection, source: DatasetSource, corpus: dict[str, Any]
+) -> dict[str, int]:
+    """Upsert pinned SkillCorner semantics and metadata-only source entries."""
+    from dynamis.adapters.skillcorner.catalog import (
+        build_catalog_entries,
+        build_skillcorner_catalog_rows,
+        skillcorner_contest_catalog_id,
+    )
+
+    semantic = build_skillcorner_catalog_rows(corpus)
+    table_by_name = {
+        "sport": SPORT_TABLE,
+        "competition": COMPETITION_TABLE,
+        "competition_edition": COMPETITION_EDITION_TABLE,
+        "team": TEAM_TABLE,
+        "contest": CONTEST_TABLE,
+        "contest_team": CONTEST_TEAM_TABLE,
+        "contest_period": CONTEST_PERIOD_TABLE,
+        "provider_identity_crosswalk": PROVIDER_CROSSWALK_TABLE,
+    }
+    written = {
+        name: _upsert_refresh(connection, table_by_name[name], rows)
+        for name, rows in semantic.items()
+    }
+
+    entries = build_catalog_entries(source, corpus)
+    for row in entries:
+        row["availability_state"] = SourceCatalogState.REGISTERED.value
+    statement = pg_insert(SOURCE_CATALOG_TABLE).values(entries)
+    statement = statement.on_conflict_do_update(
+        index_elements=["entry_id"],
+        set_={
+            name: statement.excluded[name]
+            for name in (
+                "provider",
+                "dataset",
+                "registry_dataset_id",
+                "registry_version",
+                "registry_file_key",
+                "external_id",
+                "object_kind",
+                "sport_id",
+                "competition_id",
+                "competition_edition_id",
+                "teams",
+                "upstream_url",
+                "upstream_revision",
+                "asset_identity",
+                "expected_size_bytes",
+                "rights",
+                "provider_metadata",
+                "upstream_capabilities",
+            )
+        },
+    )
+    connection.execute(statement)
+    written["source_catalog_entry"] = len(entries)
+    for row in entries:
+        _advance_catalog_entry(connection, row["entry_id"], SourceCatalogState.REGISTERED)
+
+    for match in corpus["matches"]:
+        session_id = str(match["id"])
+        entry_id = skillcorner_contest_catalog_id(session_id)
+        context = connection.execute(
+            sa.select(SESSION_SPORT_CONTEXT_TABLE.c.session_id).where(
+                SESSION_SPORT_CONTEXT_TABLE.c.dataset_id == source.dataset_id,
+                SESSION_SPORT_CONTEXT_TABLE.c.session_id == session_id,
+            )
+        ).scalar_one_or_none()
+        if context is None:
+            continue
+        connection.execute(
+            SESSION_SPORT_CONTEXT_TABLE.update()
+            .where(
+                SESSION_SPORT_CONTEXT_TABLE.c.dataset_id == source.dataset_id,
+                SESSION_SPORT_CONTEXT_TABLE.c.session_id == session_id,
+            )
+            .values(source_catalog_entry_id=entry_id)
+        )
+        materialized = (
+            connection.execute(
+                sa.select(SENSOR_STREAM_TABLE.c.modality)
+                .join(
+                    SAMPLE_ARTIFACT_TABLE,
+                    sa.and_(
+                        SAMPLE_ARTIFACT_TABLE.c.dataset_id == SENSOR_STREAM_TABLE.c.dataset_id,
+                        SAMPLE_ARTIFACT_TABLE.c.stream_id == SENSOR_STREAM_TABLE.c.stream_id,
+                    ),
+                )
+                .where(
+                    SENSOR_STREAM_TABLE.c.dataset_id == source.dataset_id,
+                    SENSOR_STREAM_TABLE.c.session_id == session_id,
+                )
+                .distinct()
+            )
+            .scalars()
+            .all()
+        )
+        if materialized:
+            _advance_catalog_entry(connection, entry_id, SourceCatalogState.MATERIALIZED)
+    return written
+
+
+def persist_skillcorner_aggregate_artifacts(
+    connection,
+    *,
+    source: DatasetSource,
+    algorithm: AlgorithmSpec,
+    run_id: str,
+    source_checksums: dict[str, str],
+    artifacts: list[dict[str, Any]],
+    code_git_sha: str | None = None,
+) -> dict[str, int]:
+    """Record deterministic PLAYER_SEASON artifacts and their source lineage."""
+    completed_at = datetime.now(UTC)
+    _upsert_refresh(
+        connection,
+        ALGORITHM_SPEC_TABLE,
+        [
+            {
+                "algorithm_id": algorithm.algorithm_id,
+                "name": algorithm.name,
+                "version": algorithm.version,
+                "kind": algorithm.kind.value,
+                "code_git_sha": algorithm.code_git_sha,
+                "parameters": dict(algorithm.parameters),
+                "parameters_hash": algorithm.parameters_hash,
+                "description": algorithm.description,
+                "citation": algorithm.citation,
+            }
+        ],
+    )
+    run = ProcessingRun(
+        run_id=run_id,
+        dataset_id=source.dataset_id,
+        algorithm_id=algorithm.algorithm_id,
+        status=ProcessingStatus.COMPLETED,
+        code_git_sha=code_git_sha,
+        started_at=completed_at,
+        completed_at=completed_at,
+        inputs=tuple(
+            ProcessingInput(
+                artifact_id=f"bronze:{key.replace('/', ':')}",
+                checksum_sha256=checksum,
+                role=f"source aggregate {key.rsplit('_', 1)[-1]}",
+            )
+            for key, checksum in sorted(source_checksums.items())
+        ),
+        notes=(
+            "Pinned SkillCorner A-League 2024/2025 player-season aggregate ingestion; "
+            f"dataset={source.dataset_id}"
+        ),
+    )
+    _update_run(
+        connection,
+        PROCESSING_RUN_TABLE,
+        {
+            "run_id": run.run_id,
+            "dataset_id": run.dataset_id,
+            "algorithm_id": run.algorithm_id,
+            "status": run.status.value,
+            "code_git_sha": run.code_git_sha,
+            "parameters_hash": run.parameters_hash,
+            "dagster_run_id": run.dagster_run_id,
+            "started_at": run.started_at,
+            "completed_at": run.completed_at,
+            "input_checksums": [item.checksum_sha256 for item in run.inputs],
+            "notes": run.notes,
+        },
+    )
+    artifact_rows = [
+        {
+            "artifact_id": item["artifact_id"],
+            "dataset_id": source.dataset_id,
+            "run_id": run_id,
+            "artifact_type": "season_aggregate",
+            "layer": "silver",
+            "relative_path": item["relative_path"],
+            "checksum_sha256": item["checksum_sha256"],
+            "byte_size": item["byte_size"],
+            "row_count": item["row_count"],
+            "data_grain_kind": item["data_grain_kind"],
+            "data_grain_axes": item["data_grain_axes"],
+            "created_at": completed_at,
+            "artifact_metadata": item["artifact_metadata"],
+        }
+        for item in artifacts
+    ]
+    artifact_count = _upsert_refresh(connection, PROCESSING_ARTIFACT_TABLE, artifact_rows)
+    for artifact in artifacts:
+        _advance_catalog_entry(
+            connection,
+            artifact["artifact_metadata"]["source_catalog_entry_id"],
+            SourceCatalogState.READY,
+        )
+    return {"algorithm_spec": 1, "processing_run": 1, "processing_artifact": artifact_count}
 
 
 def persist_bronze_state(
@@ -1229,6 +1473,11 @@ def persist_ingest(
                 code_git_sha=code_git_sha,
             )
             written.update(run_written)
+            if dataset_id == "skillcorner-opendata" and result.streams:
+                from dynamis.adapters.skillcorner.catalog import skillcorner_contest_catalog_id
+
+                entry_id = skillcorner_contest_catalog_id(result.session_id)
+                _advance_catalog_entry(connection, entry_id, SourceCatalogState.MATERIALIZED)
     finally:
         if owns_engine:
             active.dispose()

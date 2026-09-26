@@ -40,6 +40,7 @@ from dynamis.serving.models import (
     SessionParticipantView,
     SessionSummary,
     SkeletonDisplayConnectionView,
+    SourceCapabilityView,
     StreamView,
     SubjectView,
     TrialView,
@@ -61,6 +62,136 @@ MEASUREMENT_CLASS_NEVER_MEANS: list[str] = [
     "A provider p90 error radius is not a confidence interval or probability.",
     "A rank correlation is not accuracy or validity.",
 ]
+
+
+def list_source_capabilities(connection: Connection, dataset_id: str) -> list[SourceCapabilityView]:
+    """Separate provider-available capability from locally materialized data."""
+    entries = (
+        connection.execute(
+            sa.text(
+                """
+            SELECT entry_id, external_id, object_kind, availability_state,
+                   upstream_capabilities, provider_metadata
+            FROM source_catalog_entry
+            WHERE dataset = :dataset_id AND object_kind IN ('contest', 'aggregate')
+            ORDER BY object_kind, external_id
+            """
+            ),
+            {"dataset_id": dataset_id},
+        )
+        .mappings()
+        .all()
+    )
+    if not entries:
+        return []
+
+    local: dict[str, set[str]] = {str(row["entry_id"]): set() for row in entries}
+    modalities = connection.execute(
+        sa.text(
+            """
+            SELECT ctx.source_catalog_entry_id, stream.modality
+            FROM session_sport_context AS ctx
+            JOIN sensor_stream AS stream
+              ON stream.dataset_id = ctx.dataset_id
+             AND stream.session_id = ctx.session_id
+            JOIN sample_artifact AS artifact
+              ON artifact.dataset_id = stream.dataset_id
+             AND artifact.stream_id = stream.stream_id
+            WHERE ctx.dataset_id = :dataset_id
+              AND ctx.source_catalog_entry_id IS NOT NULL
+            """
+        ),
+        {"dataset_id": dataset_id},
+    ).mappings()
+    modality_capabilities = {
+        "tracking": {"TRACKING", "BALL_TRACKING"},
+        "pose": {"POSE"},
+        "event": {"EVENTS"},
+    }
+    for row in modalities:
+        entry_id = str(row["source_catalog_entry_id"])
+        local.setdefault(entry_id, set()).update(modality_capabilities.get(row["modality"], set()))
+
+    aggregate_rows = connection.execute(
+        sa.text(
+            """
+            SELECT artifact_metadata ->> 'source_catalog_entry_id' AS entry_id,
+                   artifact_metadata ->> 'aggregate_family' AS family
+            FROM processing_artifact
+            WHERE dataset_id = :dataset_id
+              AND artifact_metadata ? 'source_catalog_entry_id'
+            """
+        ),
+        {"dataset_id": dataset_id},
+    ).mappings()
+    for row in aggregate_rows:
+        local.setdefault(str(row["entry_id"]), set()).add("SEASON_AGGREGATE")
+
+    file_states = {
+        str(row["registry_file_key"]): str(row["availability_state"])
+        for row in connection.execute(
+            sa.text(
+                """
+                SELECT registry_file_key, availability_state
+                FROM source_catalog_entry
+                WHERE registry_dataset_id = :dataset_id
+                  AND object_kind = 'release_asset'
+                  AND registry_file_key IS NOT NULL
+                """
+            ),
+            {"dataset_id": dataset_id},
+        ).mappings()
+    }
+    result: list[SourceCapabilityView] = []
+    for row in entries:
+        entry_id = str(row["entry_id"])
+        upstream = set(map(str, row["upstream_capabilities"] or ()))
+        materialized = local.get(entry_id, set())
+        metadata = dict(row["provider_metadata"] or {})
+        inventory = metadata.get("file_families", {})
+        if inventory:
+            source_file_states = {
+                family: file_states.get(asset["key"], "UPSTREAM_AVAILABLE")
+                for family, asset in inventory.items()
+            }
+            if metadata.get("pose_availability") == "UPSTREAM_UNAVAILABLE":
+                source_file_states["pose"] = "UPSTREAM_UNAVAILABLE"
+        else:
+            key = metadata.get("source_file_key")
+            source_file_states = (
+                {
+                    str(metadata.get("aggregate_family", "aggregate")): file_states.get(
+                        key, "UPSTREAM_AVAILABLE"
+                    )
+                }
+                if key
+                else {}
+            )
+        pending = sorted(upstream - materialized)
+        readiness = (
+            "READY"
+            if upstream and not pending
+            else "PARTIAL"
+            if materialized
+            else "NOT_MATERIALIZED"
+        )
+        result.append(
+            SourceCapabilityView(
+                entry_id=entry_id,
+                external_id=str(row["external_id"]),
+                object_kind=str(row["object_kind"]),
+                availability_state=str(row["availability_state"]),
+                source_readiness="UPSTREAM_AVAILABLE",
+                local_readiness=readiness,
+                upstream_capabilities=sorted(upstream),
+                local_capabilities=sorted(materialized),
+                pending_local_capabilities=pending,
+                provider_metadata=metadata,
+                source_file_states=source_file_states,
+            )
+        )
+    return result
+
 
 PROVENANCE_FIELDS: list[str] = [
     "measurement_class",

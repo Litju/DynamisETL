@@ -90,6 +90,7 @@ GRAIN_COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
     "trial": ("trial_id",),
     "sample_index": ("sample_index",),
     "stream": ("stream_id",),
+    "position_group": ("position_group",),
 }
 
 
@@ -259,6 +260,16 @@ class DataGrain(Contract):
                 raise ValueError(
                     "TRIAL_SERIES axes are subject/trial/sample_index with optional joint"
                 )
+        elif self.kind is DataGrainKind.PLAYER_SEASON:
+            if (
+                self.axes[: len(expected)] != expected
+                or len(self.axes) > len(expected) + 1
+                or any(axis != "position_group" for axis in self.axes[len(expected) :])
+            ):
+                raise ValueError(
+                    "PLAYER_SEASON axes are subject/team/competition_edition "
+                    "with optional position_group"
+                )
         elif self.axes != expected:
             raise ValueError(f"{self.kind.value} axes must be {expected}")
         if len(self.axes) != len(set(self.axes)):
@@ -358,6 +369,7 @@ class SourceCatalogEntry(Contract):
     asset_identity: str | None = None
     expected_size_bytes: int | None = Field(default=None, gt=0)
     rights: dict[str, Any]
+    provider_metadata: dict[str, Any] = Field(default_factory=dict)
     upstream_capabilities: tuple[str, ...] = ()
     discovered_at: AwareDatetime
     availability_state: SourceCatalogState = SourceCatalogState.REGISTERED
@@ -950,6 +962,13 @@ def provider_crosswalk(
     )
 
 
+def _capability_or_none(name: str) -> Capability | None:
+    try:
+        return Capability(name)
+    except ValueError:
+        return None
+
+
 def catalog_rows_for_source(source: Any, discovered_at: datetime) -> list[dict[str, Any]]:
     """Project registered registry files into metadata-only catalog rows."""
     modality_capabilities = {
@@ -961,7 +980,7 @@ def catalog_rows_for_source(source: Any, discovered_at: datetime) -> list[dict[s
         "lpt": Capability.LPT,
         "gnss": Capability.GNSS,
     }
-    capabilities = sorted(
+    source_capabilities = sorted(
         {
             modality_capabilities[item.value]
             for item in source.modalities
@@ -982,6 +1001,16 @@ def catalog_rows_for_source(source: Any, discovered_at: datetime) -> list[dict[s
             identity = f"registry:{source.dataset_id}:{version.version}:{file.key}"
             failed = version.retrieval.status.value == "failed"
             acquired = file.local_sha256 is not None
+            capabilities: list[Capability] = source_capabilities
+            if file.upstream_capabilities is not None:
+                capabilities = sorted(
+                    [
+                        capability
+                        for name in file.upstream_capabilities
+                        if (capability := _capability_or_none(name)) is not None
+                    ],
+                    key=lambda item: item.value,
+                )
             rows.append(
                 {
                     "entry_id": "src-"
@@ -1002,6 +1031,7 @@ def catalog_rows_for_source(source: Any, discovered_at: datetime) -> list[dict[s
                     "asset_identity": file.key,
                     "expected_size_bytes": file.size_bytes,
                     "rights": source.license.model_dump(mode="json"),
+                    "provider_metadata": {},
                     "upstream_capabilities": [item.value for item in capabilities],
                     "discovered_at": discovered_at,
                     "availability_state": (

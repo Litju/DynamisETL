@@ -121,9 +121,9 @@ def test_adapter_domain_declares_pose_skeleton_and_sync_alignments(bundle: dict[
     for alignment in domain.authorities.alignments:
         assert alignment.offset_ns == 0
         assert alignment.scale == 1.0
-        assert alignment.source_stream_id.startswith("pose-period-")
+        assert alignment.source_stream_id.startswith("9000001-pose-period-")
         assert alignment.target_stream_id == alignment.source_stream_id.replace(
-            "pose-", "tracking-"
+            "pose-", "tracking-", 1
         )
 
 
@@ -141,23 +141,23 @@ def test_synthetic_skillcorner_ingest_is_reconciled_and_contract_clean(
     assert result.reconciliation.all_balanced
     streams = {item.stream_id: item for item in result.streams}
     assert set(streams) == {
-        "tracking-period-1",
-        "tracking-period-2",
-        "pose-period-1",
-        "pose-period-2",
+        "9000001-tracking-period-1",
+        "9000001-tracking-period-2",
+        "9000001-pose-period-1",
+        "9000001-pose-period-2",
     }
     # Tracking: players 4/frame, ball canonical only when X/Y exist.
-    assert streams["tracking-period-1"].row_count == 23
-    assert streams["tracking-period-2"].row_count == 14
+    assert streams["9000001-tracking-period-1"].row_count == 23
+    assert streams["9000001-tracking-period-2"].row_count == 14
     # Pose: 5 player-frames with pose in period 1, 3 in period 2, 29 joints each.
-    assert streams["pose-period-1"].row_count == 145
-    assert streams["pose-period-2"].row_count == 87
+    assert streams["9000001-pose-period-1"].row_count == 145
+    assert streams["9000001-pose-period-2"].row_count == 87
 
     # The pose archive member is never expanded next to the canonical output.
     member_plaintext = list(tmp_settings.dataset_root.rglob("9000001.jsonl"))
     assert member_plaintext == []
 
-    pose_table = pq.read_table(streams["pose-period-1"].absolute_path)
+    pose_table = pq.read_table(streams["9000001-pose-period-1"].absolute_path)
     assert validate(pose_table, pose_table.schema) == ()
     assert set(pose_table.column("measurement_class").to_pylist()) == {"MODEL_ESTIMATED"}
     first_frame = pose_table.slice(0, 29)
@@ -198,10 +198,10 @@ def test_synthetic_skillcorner_ingest_is_reconciled_and_contract_clean(
     )
 
     pose_summaries = result.reconciliation.domain["pose"]
-    assert pose_summaries["pose-period-1"]["unavailable_joints"] == 1
-    assert pose_summaries["pose-period-1"]["observed_joints"] == 144
-    assert pose_summaries["pose-period-1"]["error_observed"] == 145
-    assert pose_summaries["pose-period-2"]["unavailable_joints"] == 0
+    assert pose_summaries["9000001-pose-period-1"]["unavailable_joints"] == 1
+    assert pose_summaries["9000001-pose-period-1"]["observed_joints"] == 144
+    assert pose_summaries["9000001-pose-period-1"]["error_observed"] == 145
+    assert pose_summaries["9000001-pose-period-2"]["unavailable_joints"] == 0
 
 
 def test_coincidence_analysis_reports_without_forcing_equality(bundle: dict[str, Path]) -> None:
@@ -437,8 +437,8 @@ def test_skillcorner_skeleton_and_alignment_provenance_is_idempotent(
         assert int(nullable_parents) == 29
         assert int(pose_streams) == 2
         assert alignments == [
-            ("pose-period-1", "tracking-period-1", 0, 1.0),
-            ("pose-period-2", "tracking-period-2", 0, 1.0),
+            ("9000001-pose-period-1", "9000001-tracking-period-1", 0, 1.0),
+            ("9000001-pose-period-2", "9000001-tracking-period-2", 0, 1.0),
         ]
     finally:
         control.dispose()

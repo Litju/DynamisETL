@@ -173,7 +173,8 @@ class TrackingCanonicalizer:
         period_record = self._metadata.period(period)
         if period_record is None:
             raise KeyError(f"match {self._metadata.match_id} declares no period {period}")
-        summary = TrackingPeriodSummary(period=period, stream_id=tracking_stream_id(period))
+        stream_id = tracking_stream_id(period, self._metadata.match_id)
+        summary = TrackingPeriodSummary(period=period, stream_id=stream_id)
         self._summaries[period] = summary
         return CanonicalStream(
             dataset_id=self._dataset_id,
@@ -356,7 +357,7 @@ class TrackingCanonicalizer:
             "trial_id": period.name,
             "subject_id": subject_id,
             "device_id": None,
-            "stream_id": tracking_stream_id(period.period),
+            "stream_id": tracking_stream_id(period.period, self._metadata.match_id),
             "sample_index": 0,
             "t_rel_ns": t_rel_ns,
             "timestamp_utc_ns": None,

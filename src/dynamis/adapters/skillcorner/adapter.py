@@ -11,9 +11,15 @@ never expands it.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 from dynamis.adapters.skillcorner import authorities
+from dynamis.adapters.skillcorner.catalog import (
+    NAMESPACE,
+    load_corpus_manifest,
+    skillcorner_contest_catalog_id,
+)
 from dynamis.adapters.skillcorner.metadata import (
     SkillCornerMatchMetadata,
     parse_match_metadata,
@@ -44,12 +50,16 @@ from dynamis.contracts.sports import (
     ClockDirection,
     ClockKind,
     ClockMapping,
+    Competition,
+    CompetitionEdition,
     Contest,
     ContestPeriod,
     ContestSide,
     ContestTeam,
     DataGrain,
     DataGrainKind,
+    EditionKind,
+    PeriodKind,
     ProviderIdentityCrosswalk,
     SessionSportContext,
     SpatialReference,
@@ -129,8 +139,10 @@ class SkillCornerMatchAdapter:
         for period in metadata.periods:
             alignments.append(
                 SyncAlignment(
-                    source_stream_id=authorities.pose_stream_id(period.period),
-                    target_stream_id=authorities.tracking_stream_id(period.period),
+                    source_stream_id=authorities.pose_stream_id(period.period, metadata.match_id),
+                    target_stream_id=authorities.tracking_stream_id(
+                        period.period, metadata.match_id
+                    ),
                     offset_ns=0,
                     scale=1.0,
                     sync_spec_id=authorities.SYNC_SPEC_ID,
@@ -256,7 +268,7 @@ class SkillCornerMatchAdapter:
                 SensorStream(
                     dataset_id=self.dataset_id,
                     session_id=metadata.session_id,
-                    stream_id=authorities.tracking_stream_id(period.period),
+                    stream_id=authorities.tracking_stream_id(period.period, metadata.match_id),
                     modality=Modality.TRACKING,
                     measurement_class=MeasurementClass.MODEL_ESTIMATED,
                     clock_id=authorities.CLOCK_ID,
@@ -283,7 +295,7 @@ class SkillCornerMatchAdapter:
                 SensorStream(
                     dataset_id=self.dataset_id,
                     session_id=metadata.session_id,
-                    stream_id=authorities.pose_stream_id(period.period),
+                    stream_id=authorities.pose_stream_id(period.period, metadata.match_id),
                     modality=Modality.POSE,
                     measurement_class=MeasurementClass.MODEL_ESTIMATED,
                     clock_id=authorities.CLOCK_ID,
@@ -305,29 +317,72 @@ class SkillCornerMatchAdapter:
                     data_grain=DataGrain(kind=DataGrainKind.JOINT_FRAME_SERIES),
                 )
             )
-        namespace = "skillcorner_opendata"
-        authority = f"match_metadata@{authorities.SKILLCORNER_SOURCE_REVISION}"
+        namespace = NAMESPACE
+        corpus = load_corpus_manifest()
+        index_match = next(
+            (item for item in corpus["matches"] if str(item["id"]) == metadata.match_id),
+            None,
+        )
+        upstream = corpus["upstream"]
+        revision = upstream["revision"]
+        authority = f"match.json@{revision}"
         sport = Sport(sport_id="football", code="football", display_name="Football")
         home_team_id = canonical_sports_id(namespace, SportsEntityKind.TEAM, metadata.home_team_id)
         away_team_id = canonical_sports_id(namespace, SportsEntityKind.TEAM, metadata.away_team_id)
         contest_id = canonical_sports_id(namespace, SportsEntityKind.CONTEST, metadata.match_id)
+        team_names = {
+            str(item["provider_team_id"]): item["display_name"] for item in corpus["teams"]
+        }
+        competition = (
+            Competition(
+                competition_id=canonical_sports_id(
+                    namespace, SportsEntityKind.COMPETITION, upstream["competition"]["provider_id"]
+                ),
+                sport_id=sport.sport_id,
+                name=upstream["competition"]["name"],
+            )
+            if index_match
+            else None
+        )
+        edition = (
+            CompetitionEdition(
+                edition_id=canonical_sports_id(
+                    namespace,
+                    SportsEntityKind.EDITION,
+                    upstream["competition_edition"]["provider_id"],
+                ),
+                competition_id=competition.competition_id,
+                label=upstream["season"]["label"],
+                kind=EditionKind.LEAGUE_SEASON,
+            )
+            if index_match and competition
+            else None
+        )
         sports_context = SportsContext(
             sport=sport,
+            competition=competition,
+            edition=edition,
             teams=(
                 Team(
                     team_id=home_team_id,
                     sport_id=sport.sport_id,
-                    display_name=metadata.home_team_name,
+                    display_name=team_names.get(metadata.home_team_id, metadata.home_team_name),
                 ),
                 Team(
                     team_id=away_team_id,
                     sport_id=sport.sport_id,
-                    display_name=metadata.away_team_name,
+                    display_name=team_names.get(metadata.away_team_id, metadata.away_team_name),
                 ),
             ),
             contest=Contest(
                 contest_id=contest_id,
                 sport_id=sport.sport_id,
+                competition_edition_id=edition.edition_id if edition else None,
+                scheduled_start_at=(
+                    datetime.fromisoformat(index_match["date_time"].replace("Z", "+00:00"))
+                    if index_match
+                    else metadata.kickoff_utc
+                ),
                 actual_start_at=metadata.kickoff_utc,
                 venue=metadata.stadium,
                 home_away_supported=True,
@@ -354,6 +409,7 @@ class SkillCornerMatchAdapter:
                     contest_period_id=f"{contest_id}:period:{period.period}",
                     contest_id=contest_id,
                     source_period_number=str(period.period),
+                    kind=(PeriodKind.HALF if period.period in {1, 2} else PeriodKind.OTHER),
                     label=period.name,
                     provider_namespace=namespace,
                 )
@@ -363,8 +419,29 @@ class SkillCornerMatchAdapter:
                 dataset_id=self.dataset_id,
                 session_id=metadata.session_id,
                 contest_id=contest_id,
+                source_catalog_entry_id=(
+                    skillcorner_contest_catalog_id(metadata.match_id) if index_match else None
+                ),
             ),
             crosswalks=(
+                *(
+                    (
+                        provider_crosswalk(
+                            provider_namespace=namespace,
+                            entity_kind=SportsEntityKind.COMPETITION,
+                            provider_entity_id=upstream["competition"]["provider_id"],
+                            source_authority=authority,
+                        ),
+                        provider_crosswalk(
+                            provider_namespace=namespace,
+                            entity_kind=SportsEntityKind.EDITION,
+                            provider_entity_id=upstream["competition_edition"]["provider_id"],
+                            source_authority=authority,
+                        ),
+                    )
+                    if index_match
+                    else ()
+                ),
                 provider_crosswalk(
                     provider_namespace=namespace,
                     entity_kind=SportsEntityKind.TEAM,

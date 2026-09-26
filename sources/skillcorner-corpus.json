@@ -1,0 +1,3210 @@
+{
+  "schema_version": 1,
+  "dataset_id": "skillcorner-opendata",
+  "provider_namespace": "skillcorner_opendata",
+  "upstream": {
+    "repository": "SkillCorner/opendata",
+    "revision": "4340d274572876239c154c90bc507a9b3250a656",
+    "match_index_key": "data/matches.json",
+    "match_index_git_blob_sha1": "be9f7fd6906cca93b0d04c79692c016a08a34d98",
+    "competition": {
+      "provider_id": "61",
+      "name": "A-League",
+      "area": "AUS",
+      "gender": "male",
+      "age_group": "adult"
+    },
+    "season": {
+      "provider_id": "95",
+      "label": "2024/2025",
+      "start_year": 2024,
+      "end_year": 2025
+    },
+    "competition_edition": {
+      "provider_id": "870",
+      "label": "2024/2025",
+      "source_label": "AUS - A-League - 2024/2025"
+    }
+  },
+  "pose": {
+    "repository": "SkillCorner/opendata-bodypose",
+    "revision": "a62e1ec1e3b82952042a7f7fa9dafd77c0e0822a",
+    "frame_rate_fps": 25,
+    "match_ids": [
+      "1925299",
+      "1996435"
+    ],
+    "files": [
+      {
+        "match_id": "1925299",
+        "key": "raw/1925299.jsonl.zip",
+        "size_bytes": 623408231,
+        "sha256": "0415665098d594fb5681815000f7a6312037788a3237910a9f41bb8de5c336a0",
+        "upstream_provider": "huggingface",
+        "upstream_revision": "a62e1ec1e3b82952042a7f7fa9dafd77c0e0822a"
+      },
+      {
+        "match_id": "1996435",
+        "key": "raw/1996435.jsonl.zip",
+        "size_bytes": 644327811,
+        "sha256": "64bcab2be9776172d062521d9a97e0e6f391fc9cacb331f9e42a6fe88cf8434b",
+        "upstream_provider": "huggingface",
+        "upstream_revision": "a62e1ec1e3b82952042a7f7fa9dafd77c0e0822a"
+      }
+    ]
+  },
+  "matches": [
+    {
+      "id": 2017461,
+      "date_time": "2025-05-17T09:35:00Z",
+      "home_team": {
+        "id": 868,
+        "short_name": "Melbourne V FC"
+      },
+      "away_team": {
+        "id": 4177,
+        "short_name": "Auckland FC"
+      },
+      "status": "closed",
+      "competition_id": 61,
+      "season_id": 95,
+      "competition_edition_id": 870,
+      "families": {
+        "match_metadata": {
+          "key": "data/matches/2017461/2017461_match.json",
+          "size_bytes": 28545,
+          "md5": "unknown",
+          "sha1": "281fd462ac1ca85a6d9ed2d5b5d5a7654627abe4",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "tracking": {
+          "key": "data/matches/2017461/2017461_tracking_extrapolated.jsonl",
+          "size_bytes": 89543442,
+          "md5": "unknown",
+          "sha1": "unknown",
+          "sha256": "59cfa5588efee041da439f44df5b5b92f2b7305571dc831164e3d05f7415787a",
+          "upstream_provider": "github",
+          "git_blob_sha1": "dda453946dcc75501a38d93a83feae65a7f80dbb"
+        },
+        "dynamic_events": {
+          "key": "data/matches/2017461/2017461_dynamic_events.csv",
+          "size_bytes": 3957366,
+          "md5": "unknown",
+          "sha1": "68380a92e6fa7c3df056a2e5addc00af1d1a393a",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "phases": {
+          "key": "data/matches/2017461/2017461_phases_of_play.csv",
+          "size_bytes": 118313,
+          "md5": "unknown",
+          "sha1": "83fbec6d78c9acfed20593545bfda121821365e9",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        }
+      },
+      "detail": {
+        "status": "closed",
+        "date_time": "2025-05-17T09:35:00Z",
+        "stadium": {
+          "id": 1480,
+          "name": "Melbourne Rectangular Stadium",
+          "city": "Melbourne",
+          "capacity": 30050
+        },
+        "home_team": {
+          "id": 868,
+          "name": "Melbourne Victory Football Club",
+          "short_name": "Melbourne V FC",
+          "acronym": "MEL"
+        },
+        "away_team": {
+          "id": 4177,
+          "name": "Auckland FC",
+          "short_name": "Auckland FC",
+          "acronym": "AUC"
+        },
+        "home_team_score": 0,
+        "away_team_score": 1,
+        "competition_edition": {
+          "id": 870,
+          "competition": {
+            "id": 61,
+            "area": "AUS",
+            "name": "A-League",
+            "gender": "male",
+            "age_group": "adult"
+          },
+          "season": {
+            "id": 95,
+            "start_year": 2024,
+            "end_year": 2025,
+            "name": "2024/2025"
+          },
+          "name": "AUS - A-League - 2024/2025"
+        },
+        "competition_round": {
+          "id": 606,
+          "name": "Round 1",
+          "round_number": 1,
+          "potential_overtime": false
+        },
+        "match_periods": [
+          {
+            "period": 1,
+            "name": "period_1",
+            "start_frame": 2510,
+            "end_frame": 30210,
+            "duration_frames": 27700,
+            "duration_minutes": 46.17
+          },
+          {
+            "period": 2,
+            "name": "period_2",
+            "start_frame": 39670,
+            "end_frame": 70420,
+            "duration_frames": 30750,
+            "duration_minutes": 51.25
+          }
+        ]
+      }
+    },
+    {
+      "id": 2016236,
+      "date_time": "2025-05-09T09:35:00Z",
+      "home_team": {
+        "id": 1803,
+        "short_name": "Western United"
+      },
+      "away_team": {
+        "id": 866,
+        "short_name": "Adelaide United"
+      },
+      "status": "closed",
+      "competition_id": 61,
+      "season_id": 95,
+      "competition_edition_id": 870,
+      "families": {
+        "match_metadata": {
+          "key": "data/matches/2016236/2016236_match.json",
+          "size_bytes": 33791,
+          "md5": "unknown",
+          "sha1": "8bb23c902bb3d5ea82092f6b9c8c20e2379fa67b",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "tracking": {
+          "key": "data/matches/2016236/2016236_tracking_extrapolated.jsonl",
+          "size_bytes": 94737872,
+          "md5": "unknown",
+          "sha1": "unknown",
+          "sha256": "d78555f9dfd7d1ce9de38066d3c98e6d54417c6d45d73b1f1ce7e26f07263d8f",
+          "upstream_provider": "github",
+          "git_blob_sha1": "c68f711f9c32d42aadfccd8e9a416b8a82e5fd0e"
+        },
+        "dynamic_events": {
+          "key": "data/matches/2016236/2016236_dynamic_events.csv",
+          "size_bytes": 4542962,
+          "md5": "unknown",
+          "sha1": "6dd13e08dc962c87ebd0392eadb60c06eec2d632",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "phases": {
+          "key": "data/matches/2016236/2016236_phases_of_play.csv",
+          "size_bytes": 133630,
+          "md5": "unknown",
+          "sha1": "8d0b1eefbbdae01260bd295d5133af6f02f8001d",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        }
+      },
+      "detail": {
+        "status": "closed",
+        "date_time": "2025-05-09T09:35:00Z",
+        "stadium": {
+          "id": 3837,
+          "name": "Ironbark Fields",
+          "city": "Melbourne",
+          "capacity": 5000
+        },
+        "home_team": {
+          "id": 1803,
+          "name": "Western United",
+          "short_name": "Western United",
+          "acronym": "WEU"
+        },
+        "away_team": {
+          "id": 866,
+          "name": "Adelaide United Football Club",
+          "short_name": "Adelaide United",
+          "acronym": "ADE"
+        },
+        "home_team_score": 3,
+        "away_team_score": 2,
+        "competition_edition": {
+          "id": 870,
+          "competition": {
+            "id": 61,
+            "area": "AUS",
+            "name": "A-League",
+            "gender": "male",
+            "age_group": "adult"
+          },
+          "season": {
+            "id": 95,
+            "start_year": 2024,
+            "end_year": 2025,
+            "name": "2024/2025"
+          },
+          "name": "AUS - A-League - 2024/2025"
+        },
+        "competition_round": {
+          "id": 606,
+          "name": "Round 1",
+          "round_number": 1,
+          "potential_overtime": false
+        },
+        "match_periods": [
+          {
+            "period": 1,
+            "name": "period_1",
+            "start_frame": 1170,
+            "end_frame": 31720,
+            "duration_frames": 30550,
+            "duration_minutes": 50.92
+          },
+          {
+            "period": 2,
+            "name": "period_2",
+            "start_frame": 41060,
+            "end_frame": 70550,
+            "duration_frames": 29490,
+            "duration_minutes": 49.15
+          }
+        ]
+      }
+    },
+    {
+      "id": 2015213,
+      "date_time": "2025-05-03T08:00:00Z",
+      "home_team": {
+        "id": 1803,
+        "short_name": "Western United"
+      },
+      "away_team": {
+        "id": 4177,
+        "short_name": "Auckland FC"
+      },
+      "status": "closed",
+      "competition_id": 61,
+      "season_id": 95,
+      "competition_edition_id": 870,
+      "families": {
+        "match_metadata": {
+          "key": "data/matches/2015213/2015213_match.json",
+          "size_bytes": 27937,
+          "md5": "unknown",
+          "sha1": "1d58d487d5ca7f8c9cfe28de8a9757e3fae2aff4",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "tracking": {
+          "key": "data/matches/2015213/2015213_tracking_extrapolated.jsonl",
+          "size_bytes": 102030769,
+          "md5": "unknown",
+          "sha1": "unknown",
+          "sha256": "413990d0024d84856ce1f2a16866b8887472c0cea22c61caef0d1f46505a609e",
+          "upstream_provider": "github",
+          "git_blob_sha1": "623dbb6a374c8f448f678d226233be618c4606a4"
+        },
+        "dynamic_events": {
+          "key": "data/matches/2015213/2015213_dynamic_events.csv",
+          "size_bytes": 4417152,
+          "md5": "unknown",
+          "sha1": "a4ce1f7555f6f9f53700823451b94f621785314e",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "phases": {
+          "key": "data/matches/2015213/2015213_phases_of_play.csv",
+          "size_bytes": 134493,
+          "md5": "unknown",
+          "sha1": "b46c9cb5b1cdc30e2ddd5b9a316547122e1ebeff",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        }
+      },
+      "detail": {
+        "status": "closed",
+        "date_time": "2025-05-03T08:00:00Z",
+        "stadium": {
+          "id": 3837,
+          "name": "Ironbark Fields",
+          "city": "Melbourne",
+          "capacity": 5000
+        },
+        "home_team": {
+          "id": 1803,
+          "name": "Western United",
+          "short_name": "Western United",
+          "acronym": "WEU"
+        },
+        "away_team": {
+          "id": 4177,
+          "name": "Auckland FC",
+          "short_name": "Auckland FC",
+          "acronym": "AUC"
+        },
+        "home_team_score": 4,
+        "away_team_score": 2,
+        "competition_edition": {
+          "id": 870,
+          "competition": {
+            "id": 61,
+            "area": "AUS",
+            "name": "A-League",
+            "gender": "male",
+            "age_group": "adult"
+          },
+          "season": {
+            "id": 95,
+            "start_year": 2024,
+            "end_year": 2025,
+            "name": "2024/2025"
+          },
+          "name": "AUS - A-League - 2024/2025"
+        },
+        "competition_round": {
+          "id": 4723,
+          "name": "",
+          "round_number": 29,
+          "potential_overtime": false
+        },
+        "match_periods": [
+          {
+            "period": 1,
+            "name": "period_1",
+            "start_frame": 2210,
+            "end_frame": 31040,
+            "duration_frames": 28830,
+            "duration_minutes": 48.05
+          },
+          {
+            "period": 2,
+            "name": "period_2",
+            "start_frame": 40280,
+            "end_frame": 71350,
+            "duration_frames": 31070,
+            "duration_minutes": 51.78
+          }
+        ]
+      }
+    },
+    {
+      "id": 2013725,
+      "date_time": "2025-04-27T07:00:00Z",
+      "home_team": {
+        "id": 1803,
+        "short_name": "Western United"
+      },
+      "away_team": {
+        "id": 869,
+        "short_name": "Sydney FC"
+      },
+      "status": "closed",
+      "competition_id": 61,
+      "season_id": 95,
+      "competition_edition_id": 870,
+      "families": {
+        "match_metadata": {
+          "key": "data/matches/2013725/2013725_match.json",
+          "size_bytes": 27899,
+          "md5": "unknown",
+          "sha1": "4309772e339cd1f9ebc2aeb4a429076287af3a00",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "tracking": {
+          "key": "data/matches/2013725/2013725_tracking_extrapolated.jsonl",
+          "size_bytes": 96059074,
+          "md5": "unknown",
+          "sha1": "unknown",
+          "sha256": "13eb83329814ed5f5d73da8f8ab5c5979d6c8a7858e89e28a7fa8072f91fb250",
+          "upstream_provider": "github",
+          "git_blob_sha1": "1354649bc1c6b7bff90eb9e44a7e22544b4ed4c1"
+        },
+        "dynamic_events": {
+          "key": "data/matches/2013725/2013725_dynamic_events.csv",
+          "size_bytes": 4508257,
+          "md5": "unknown",
+          "sha1": "bcca1fe2890119d20b9b7bd13c0a2f9245a7c5f0",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "phases": {
+          "key": "data/matches/2013725/2013725_phases_of_play.csv",
+          "size_bytes": 130821,
+          "md5": "unknown",
+          "sha1": "90d4885a26817703b0f7736b0e47703f59c3dc41",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        }
+      },
+      "detail": {
+        "status": "closed",
+        "date_time": "2025-04-27T07:00:00Z",
+        "stadium": {
+          "id": 3837,
+          "name": "Ironbark Fields",
+          "city": "Melbourne",
+          "capacity": 5000
+        },
+        "home_team": {
+          "id": 1803,
+          "name": "Western United",
+          "short_name": "Western United",
+          "acronym": "WEU"
+        },
+        "away_team": {
+          "id": 869,
+          "name": "Sydney Football Club",
+          "short_name": "Sydney FC",
+          "acronym": "SYD"
+        },
+        "home_team_score": 1,
+        "away_team_score": 0,
+        "competition_edition": {
+          "id": 870,
+          "competition": {
+            "id": 61,
+            "area": "AUS",
+            "name": "A-League",
+            "gender": "male",
+            "age_group": "adult"
+          },
+          "season": {
+            "id": 95,
+            "start_year": 2024,
+            "end_year": 2025,
+            "name": "2024/2025"
+          },
+          "name": "AUS - A-League - 2024/2025"
+        },
+        "competition_round": {
+          "id": 4657,
+          "name": "",
+          "round_number": 28,
+          "potential_overtime": false
+        },
+        "match_periods": [
+          {
+            "period": 1,
+            "name": "period_1",
+            "start_frame": 4040,
+            "end_frame": 31930,
+            "duration_frames": 27890,
+            "duration_minutes": 46.48
+          },
+          {
+            "period": 2,
+            "name": "period_2",
+            "start_frame": 40960,
+            "end_frame": 69860,
+            "duration_frames": 28900,
+            "duration_minutes": 48.17
+          }
+        ]
+      }
+    },
+    {
+      "id": 2011166,
+      "date_time": "2025-04-12T05:00:00Z",
+      "home_team": {
+        "id": 867,
+        "short_name": "Wellington P FC"
+      },
+      "away_team": {
+        "id": 868,
+        "short_name": "Melbourne V FC"
+      },
+      "status": "closed",
+      "competition_id": 61,
+      "season_id": 95,
+      "competition_edition_id": 870,
+      "families": {
+        "match_metadata": {
+          "key": "data/matches/2011166/2011166_match.json",
+          "size_bytes": 28420,
+          "md5": "unknown",
+          "sha1": "6468e14c07f0108c56cd3457544c106643161099",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "tracking": {
+          "key": "data/matches/2011166/2011166_tracking_extrapolated.jsonl",
+          "size_bytes": 87441570,
+          "md5": "unknown",
+          "sha1": "unknown",
+          "sha256": "8ec2937050930d87e4f52b2d65515f70ef8edd0ae2814bf40155c4448133390e",
+          "upstream_provider": "github",
+          "git_blob_sha1": "fbc2873cc5258e94f8746bceea454f0125782437"
+        },
+        "dynamic_events": {
+          "key": "data/matches/2011166/2011166_dynamic_events.csv",
+          "size_bytes": 3846412,
+          "md5": "unknown",
+          "sha1": "40750a5f2da06c032a10c7ca50953f8d89e78078",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "phases": {
+          "key": "data/matches/2011166/2011166_phases_of_play.csv",
+          "size_bytes": 121175,
+          "md5": "unknown",
+          "sha1": "0d191c3f8d3f373c41ee8110c2a196166c36e6e5",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        }
+      },
+      "detail": {
+        "status": "closed",
+        "date_time": "2025-04-12T05:00:00Z",
+        "stadium": {
+          "id": 2803,
+          "name": "Sky Stadium",
+          "city": "Wellington",
+          "capacity": 34500
+        },
+        "home_team": {
+          "id": 867,
+          "name": "Wellington Phoenix FC",
+          "short_name": "Wellington P FC",
+          "acronym": "WEL"
+        },
+        "away_team": {
+          "id": 868,
+          "name": "Melbourne Victory Football Club",
+          "short_name": "Melbourne V FC",
+          "acronym": "MEL"
+        },
+        "home_team_score": 2,
+        "away_team_score": 3,
+        "competition_edition": {
+          "id": 870,
+          "competition": {
+            "id": 61,
+            "area": "AUS",
+            "name": "A-League",
+            "gender": "male",
+            "age_group": "adult"
+          },
+          "season": {
+            "id": 95,
+            "start_year": 2024,
+            "end_year": 2025,
+            "name": "2024/2025"
+          },
+          "name": "AUS - A-League - 2024/2025"
+        },
+        "competition_round": {
+          "id": 631,
+          "name": "Round 26",
+          "round_number": 26,
+          "potential_overtime": false
+        },
+        "match_periods": [
+          {
+            "period": 1,
+            "name": "period_1",
+            "start_frame": 2300,
+            "end_frame": 31290,
+            "duration_frames": 28990,
+            "duration_minutes": 48.32
+          },
+          {
+            "period": 2,
+            "name": "period_2",
+            "start_frame": 41090,
+            "end_frame": 71390,
+            "duration_frames": 30300,
+            "duration_minutes": 50.5
+          }
+        ]
+      }
+    },
+    {
+      "id": 2010085,
+      "date_time": "2025-04-05T06:00:00Z",
+      "home_team": {
+        "id": 2380,
+        "short_name": "Melbourne City"
+      },
+      "away_team": {
+        "id": 870,
+        "short_name": "CC Mariners"
+      },
+      "status": "closed",
+      "competition_id": 61,
+      "season_id": 95,
+      "competition_edition_id": 870,
+      "families": {
+        "match_metadata": {
+          "key": "data/matches/2010085/2010085_match.json",
+          "size_bytes": 33744,
+          "md5": "unknown",
+          "sha1": "82b15d3e8cac13d0403259785302023ad89ab9ca",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "tracking": {
+          "key": "data/matches/2010085/2010085_tracking_extrapolated.jsonl",
+          "size_bytes": 92516156,
+          "md5": "unknown",
+          "sha1": "unknown",
+          "sha256": "04562d9754b2977c80430535e9b5733426bc4ce910db56fe7a3760876211ac5a",
+          "upstream_provider": "github",
+          "git_blob_sha1": "cbc77fbf800b88f1f49974c49d62d5c0acc53a95"
+        },
+        "dynamic_events": {
+          "key": "data/matches/2010085/2010085_dynamic_events.csv",
+          "size_bytes": 4484006,
+          "md5": "unknown",
+          "sha1": "ef8e9435749fae31c2b3f6bab01731c3d7ddc6b5",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "phases": {
+          "key": "data/matches/2010085/2010085_phases_of_play.csv",
+          "size_bytes": 115871,
+          "md5": "unknown",
+          "sha1": "dd1df31ea9e76118e99b8d1dc44377ebb72c4873",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        }
+      },
+      "detail": {
+        "status": "closed",
+        "date_time": "2025-04-05T06:00:00Z",
+        "stadium": {
+          "id": 619,
+          "name": "AAMI Park",
+          "city": "Melbourne",
+          "capacity": null
+        },
+        "home_team": {
+          "id": 2380,
+          "name": "Melbourne City FC",
+          "short_name": "Melbourne City",
+          "acronym": "MEL"
+        },
+        "away_team": {
+          "id": 870,
+          "name": "Central Coast Mariners Football Club",
+          "short_name": "CC Mariners",
+          "acronym": "CCM"
+        },
+        "home_team_score": 1,
+        "away_team_score": 0,
+        "competition_edition": {
+          "id": 870,
+          "competition": {
+            "id": 61,
+            "area": "AUS",
+            "name": "A-League",
+            "gender": "male",
+            "age_group": "adult"
+          },
+          "season": {
+            "id": 95,
+            "start_year": 2024,
+            "end_year": 2025,
+            "name": "2024/2025"
+          },
+          "name": "AUS - A-League - 2024/2025"
+        },
+        "competition_round": {
+          "id": 630,
+          "name": "Round 25",
+          "round_number": 25,
+          "potential_overtime": false
+        },
+        "match_periods": [
+          {
+            "period": 1,
+            "name": "period_1",
+            "start_frame": 10,
+            "end_frame": 29440,
+            "duration_frames": 29430,
+            "duration_minutes": 49.05
+          },
+          {
+            "period": 2,
+            "name": "period_2",
+            "start_frame": 29450,
+            "end_frame": 58990,
+            "duration_frames": 29540,
+            "duration_minutes": 49.23
+          }
+        ]
+      }
+    },
+    {
+      "id": 2007721,
+      "date_time": "2025-03-16T04:00:00Z",
+      "home_team": {
+        "id": 4177,
+        "short_name": "Auckland FC"
+      },
+      "away_team": {
+        "id": 870,
+        "short_name": "CC Mariners"
+      },
+      "status": "closed",
+      "competition_id": 61,
+      "season_id": 95,
+      "competition_edition_id": 870,
+      "families": {
+        "match_metadata": {
+          "key": "data/matches/2007721/2007721_match.json",
+          "size_bytes": 33745,
+          "md5": "unknown",
+          "sha1": "0bbbabf46dd7330bf8d16faf979fbf576f37218d",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "tracking": {
+          "key": "data/matches/2007721/2007721_tracking_extrapolated.jsonl",
+          "size_bytes": 92872706,
+          "md5": "unknown",
+          "sha1": "unknown",
+          "sha256": "fea913b8d4cbde8d85c6bdf5f1a4b3fd203b78227e976a171c8ab0946705d378",
+          "upstream_provider": "github",
+          "git_blob_sha1": "2ef15e0a762e293cd16084202da60dbd7a71803e"
+        },
+        "dynamic_events": {
+          "key": "data/matches/2007721/2007721_dynamic_events.csv",
+          "size_bytes": 4653039,
+          "md5": "unknown",
+          "sha1": "a55b5132980dc1b90ae909e64a2c0a55069d631b",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "phases": {
+          "key": "data/matches/2007721/2007721_phases_of_play.csv",
+          "size_bytes": 116997,
+          "md5": "unknown",
+          "sha1": "7b61a82555d8ea1fa958b5b0645e324cb08b59f0",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        }
+      },
+      "detail": {
+        "status": "closed",
+        "date_time": "2025-03-16T04:00:00Z",
+        "stadium": {
+          "id": 3811,
+          "name": "Mount Smart Stadium",
+          "city": "Auckland",
+          "capacity": 25000
+        },
+        "home_team": {
+          "id": 4177,
+          "name": "Auckland FC",
+          "short_name": "Auckland FC",
+          "acronym": "AUC"
+        },
+        "away_team": {
+          "id": 870,
+          "name": "Central Coast Mariners Football Club",
+          "short_name": "CC Mariners",
+          "acronym": "CCM"
+        },
+        "home_team_score": 2,
+        "away_team_score": 2,
+        "competition_edition": {
+          "id": 870,
+          "competition": {
+            "id": 61,
+            "area": "AUS",
+            "name": "A-League",
+            "gender": "male",
+            "age_group": "adult"
+          },
+          "season": {
+            "id": 95,
+            "start_year": 2024,
+            "end_year": 2025,
+            "name": "2024/2025"
+          },
+          "name": "AUS - A-League - 2024/2025"
+        },
+        "competition_round": {
+          "id": 628,
+          "name": "Round 23",
+          "round_number": 23,
+          "potential_overtime": false
+        },
+        "match_periods": [
+          {
+            "period": 1,
+            "name": "period_1",
+            "start_frame": 10,
+            "end_frame": 27710,
+            "duration_frames": 27700,
+            "duration_minutes": 46.17
+          },
+          {
+            "period": 2,
+            "name": "period_2",
+            "start_frame": 27720,
+            "end_frame": 57560,
+            "duration_frames": 29840,
+            "duration_minutes": 49.73
+          }
+        ]
+      }
+    },
+    {
+      "id": 2007448,
+      "date_time": "2025-03-15T10:45:00Z",
+      "home_team": {
+        "id": 871,
+        "short_name": "Perth Glory"
+      },
+      "away_team": {
+        "id": 1802,
+        "short_name": "Brisbane FC"
+      },
+      "status": "closed",
+      "competition_id": 61,
+      "season_id": 95,
+      "competition_edition_id": 870,
+      "families": {
+        "match_metadata": {
+          "key": "data/matches/2007448/2007448_match.json",
+          "size_bytes": 32670,
+          "md5": "unknown",
+          "sha1": "7798b2874d7593e33c9700ba19b12b380a64c65b",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "tracking": {
+          "key": "data/matches/2007448/2007448_tracking_extrapolated.jsonl",
+          "size_bytes": 90025383,
+          "md5": "unknown",
+          "sha1": "unknown",
+          "sha256": "12d00d6e4257218812df6e4c4263c49387ba0313a83ff8d826c4416828f9c798",
+          "upstream_provider": "github",
+          "git_blob_sha1": "8b0d91430bed0fe3217e8f0a9525ee744fb2d906"
+        },
+        "dynamic_events": {
+          "key": "data/matches/2007448/2007448_dynamic_events.csv",
+          "size_bytes": 4146729,
+          "md5": "unknown",
+          "sha1": "5aea97c02efd4bd0b6743ffddf61228ceda988d7",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "phases": {
+          "key": "data/matches/2007448/2007448_phases_of_play.csv",
+          "size_bytes": 113871,
+          "md5": "unknown",
+          "sha1": "aaf6577efc71bfa092998f675abb0ab4e33fb4bc",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        }
+      },
+      "detail": {
+        "status": "closed",
+        "date_time": "2025-03-15T10:45:00Z",
+        "stadium": {
+          "id": 1478,
+          "name": "Hbf Park",
+          "city": "Perth",
+          "capacity": 20500
+        },
+        "home_team": {
+          "id": 871,
+          "name": "Perth Glory Football Club",
+          "short_name": "Perth Glory",
+          "acronym": "PER"
+        },
+        "away_team": {
+          "id": 1802,
+          "name": "Brisbane Roar FC",
+          "short_name": "Brisbane FC",
+          "acronym": "BRR"
+        },
+        "home_team_score": 1,
+        "away_team_score": 3,
+        "competition_edition": {
+          "id": 870,
+          "competition": {
+            "id": 61,
+            "area": "AUS",
+            "name": "A-League",
+            "gender": "male",
+            "age_group": "adult"
+          },
+          "season": {
+            "id": 95,
+            "start_year": 2024,
+            "end_year": 2025,
+            "name": "2024/2025"
+          },
+          "name": "AUS - A-League - 2024/2025"
+        },
+        "competition_round": {
+          "id": 628,
+          "name": "Round 23",
+          "round_number": 23,
+          "potential_overtime": false
+        },
+        "match_periods": [
+          {
+            "period": 1,
+            "name": "period_1",
+            "start_frame": 10,
+            "end_frame": 28530,
+            "duration_frames": 28520,
+            "duration_minutes": 47.53
+          },
+          {
+            "period": 2,
+            "name": "period_2",
+            "start_frame": 28540,
+            "end_frame": 58080,
+            "duration_frames": 29540,
+            "duration_minutes": 49.23
+          }
+        ]
+      }
+    },
+    {
+      "id": 2006363,
+      "date_time": "2025-03-08T08:35:00Z",
+      "home_team": {
+        "id": 868,
+        "short_name": "Melbourne V FC"
+      },
+      "away_team": {
+        "id": 870,
+        "short_name": "CC Mariners"
+      },
+      "status": "closed",
+      "competition_id": 61,
+      "season_id": 95,
+      "competition_edition_id": 870,
+      "families": {
+        "match_metadata": {
+          "key": "data/matches/2006363/2006363_match.json",
+          "size_bytes": 33294,
+          "md5": "unknown",
+          "sha1": "edaf492c5fc4c98cb871a8ade25065e9a38d6ef7",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "tracking": {
+          "key": "data/matches/2006363/2006363_tracking_extrapolated.jsonl",
+          "size_bytes": 90591887,
+          "md5": "unknown",
+          "sha1": "unknown",
+          "sha256": "61dfdbd83f8e654127b249b8503f062338c14ec0c9e65404bcf70fb7c1346bd4",
+          "upstream_provider": "github",
+          "git_blob_sha1": "5880f8f797b3353814fa8e6af91e3554a945fefc"
+        },
+        "dynamic_events": {
+          "key": "data/matches/2006363/2006363_dynamic_events.csv",
+          "size_bytes": 4794999,
+          "md5": "unknown",
+          "sha1": "fcac96a21f909e4b2bad3a606dc89fabea263a6f",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "phases": {
+          "key": "data/matches/2006363/2006363_phases_of_play.csv",
+          "size_bytes": 119862,
+          "md5": "unknown",
+          "sha1": "d97071f5b62d284d9670dfd73b64a916df8a520f",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        }
+      },
+      "detail": {
+        "status": "closed",
+        "date_time": "2025-03-08T08:35:00Z",
+        "stadium": {
+          "id": 619,
+          "name": "AAMI Park",
+          "city": "Melbourne",
+          "capacity": null
+        },
+        "home_team": {
+          "id": 868,
+          "name": "Melbourne Victory Football Club",
+          "short_name": "Melbourne V FC",
+          "acronym": "MEL"
+        },
+        "away_team": {
+          "id": 870,
+          "name": "Central Coast Mariners Football Club",
+          "short_name": "CC Mariners",
+          "acronym": "CCM"
+        },
+        "home_team_score": 3,
+        "away_team_score": 0,
+        "competition_edition": {
+          "id": 870,
+          "competition": {
+            "id": 61,
+            "area": "AUS",
+            "name": "A-League",
+            "gender": "male",
+            "age_group": "adult"
+          },
+          "season": {
+            "id": 95,
+            "start_year": 2024,
+            "end_year": 2025,
+            "name": "2024/2025"
+          },
+          "name": "AUS - A-League - 2024/2025"
+        },
+        "competition_round": {
+          "id": 627,
+          "name": "Round 22",
+          "round_number": 22,
+          "potential_overtime": false
+        },
+        "match_periods": [
+          {
+            "period": 1,
+            "name": "period_1",
+            "start_frame": 10,
+            "end_frame": 28950,
+            "duration_frames": 28940,
+            "duration_minutes": 48.23
+          },
+          {
+            "period": 2,
+            "name": "period_2",
+            "start_frame": 28960,
+            "end_frame": 59090,
+            "duration_frames": 30130,
+            "duration_minutes": 50.22
+          }
+        ]
+      }
+    },
+    {
+      "id": 2006229,
+      "date_time": "2025-03-07T08:35:00Z",
+      "home_team": {
+        "id": 2380,
+        "short_name": "Melbourne City"
+      },
+      "away_team": {
+        "id": 1804,
+        "short_name": "Macarthur FC"
+      },
+      "status": "closed",
+      "competition_id": 61,
+      "season_id": 95,
+      "competition_edition_id": 870,
+      "families": {
+        "match_metadata": {
+          "key": "data/matches/2006229/2006229_match.json",
+          "size_bytes": 28213,
+          "md5": "unknown",
+          "sha1": "71bff731f85f5266dafd4fa073b52ef66eb91ff8",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "tracking": {
+          "key": "data/matches/2006229/2006229_tracking_extrapolated.jsonl",
+          "size_bytes": 90078007,
+          "md5": "unknown",
+          "sha1": "unknown",
+          "sha256": "3ee193ba01f1fe2cbce087eca8a881c21b8b0ea3485ae6c3d7e32e8b2f51e738",
+          "upstream_provider": "github",
+          "git_blob_sha1": "053f97dac07eaadb02d953dc92e4430fabc4087a"
+        },
+        "dynamic_events": {
+          "key": "data/matches/2006229/2006229_dynamic_events.csv",
+          "size_bytes": 4778846,
+          "md5": "unknown",
+          "sha1": "9bb819dd51aa1756a04013103199c776717f2413",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "phases": {
+          "key": "data/matches/2006229/2006229_phases_of_play.csv",
+          "size_bytes": 122340,
+          "md5": "unknown",
+          "sha1": "d0a3775cbdbda49b2cf5cef2981b4bdd4eb50fa2",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        }
+      },
+      "detail": {
+        "status": "closed",
+        "date_time": "2025-03-07T08:35:00Z",
+        "stadium": {
+          "id": 1480,
+          "name": "Melbourne Rectangular Stadium",
+          "city": "Melbourne",
+          "capacity": 30050
+        },
+        "home_team": {
+          "id": 2380,
+          "name": "Melbourne City FC",
+          "short_name": "Melbourne City",
+          "acronym": "MEL"
+        },
+        "away_team": {
+          "id": 1804,
+          "name": "Macarthur FC",
+          "short_name": "Macarthur FC",
+          "acronym": "MAC"
+        },
+        "home_team_score": 2,
+        "away_team_score": 0,
+        "competition_edition": {
+          "id": 870,
+          "competition": {
+            "id": 61,
+            "area": "AUS",
+            "name": "A-League",
+            "gender": "male",
+            "age_group": "adult"
+          },
+          "season": {
+            "id": 95,
+            "start_year": 2024,
+            "end_year": 2025,
+            "name": "2024/2025"
+          },
+          "name": "AUS - A-League - 2024/2025"
+        },
+        "competition_round": {
+          "id": 627,
+          "name": "Round 22",
+          "round_number": 22,
+          "potential_overtime": false
+        },
+        "match_periods": [
+          {
+            "period": 1,
+            "name": "period_1",
+            "start_frame": 10,
+            "end_frame": 28480,
+            "duration_frames": 28470,
+            "duration_minutes": 47.45
+          },
+          {
+            "period": 2,
+            "name": "period_2",
+            "start_frame": 28490,
+            "end_frame": 59270,
+            "duration_frames": 30780,
+            "duration_minutes": 51.3
+          }
+        ]
+      }
+    },
+    {
+      "id": 1996435,
+      "date_time": "2025-02-01T06:00:00Z",
+      "home_team": {
+        "id": 869,
+        "short_name": "Sydney FC"
+      },
+      "away_team": {
+        "id": 866,
+        "short_name": "Adelaide United"
+      },
+      "status": "closed",
+      "competition_id": 61,
+      "season_id": 95,
+      "competition_edition_id": 870,
+      "families": {
+        "match_metadata": {
+          "key": "data/matches/1996435/1996435_match.json",
+          "size_bytes": 27830,
+          "md5": "unknown",
+          "sha1": "4b6aea20c71dd1128228aff2d8a12d848a0109af",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "tracking": {
+          "key": "data/matches/1996435/1996435_tracking_extrapolated.jsonl",
+          "size_bytes": 88634016,
+          "md5": "unknown",
+          "sha1": "unknown",
+          "sha256": "f42764d8bde290e8f738fa21141cadbed75408314b0b337bbf1d5a3444540a02",
+          "upstream_provider": "github",
+          "git_blob_sha1": "6f068b84157e6f6b2f7b6f2631210ddf543f37fe"
+        },
+        "dynamic_events": {
+          "key": "data/matches/1996435/1996435_dynamic_events.csv",
+          "size_bytes": 4964532,
+          "md5": "unknown",
+          "sha1": "72454b398b9301c03fa31aca9ede35e4efa419c7",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "phases": {
+          "key": "data/matches/1996435/1996435_phases_of_play.csv",
+          "size_bytes": 120335,
+          "md5": "unknown",
+          "sha1": "4c616f64b0ddf8f8d759a3f70dce22745c033600",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        }
+      },
+      "detail": {
+        "status": "closed",
+        "date_time": "2025-02-01T06:00:00Z",
+        "stadium": {
+          "id": 2806,
+          "name": "Sydney Football Stadium",
+          "city": "Moore Park",
+          "capacity": 41900
+        },
+        "home_team": {
+          "id": 869,
+          "name": "Sydney Football Club",
+          "short_name": "Sydney FC",
+          "acronym": "SYD"
+        },
+        "away_team": {
+          "id": 866,
+          "name": "Adelaide United Football Club",
+          "short_name": "Adelaide United",
+          "acronym": "ADE"
+        },
+        "home_team_score": 4,
+        "away_team_score": 1,
+        "competition_edition": {
+          "id": 870,
+          "competition": {
+            "id": 61,
+            "area": "AUS",
+            "name": "A-League",
+            "gender": "male",
+            "age_group": "adult"
+          },
+          "season": {
+            "id": 95,
+            "start_year": 2024,
+            "end_year": 2025,
+            "name": "2024/2025"
+          },
+          "name": "AUS - A-League - 2024/2025"
+        },
+        "competition_round": {
+          "id": 622,
+          "name": "Round 17",
+          "round_number": 17,
+          "potential_overtime": false
+        },
+        "match_periods": [
+          {
+            "period": 1,
+            "name": "period_1",
+            "start_frame": 10,
+            "end_frame": 28020,
+            "duration_frames": 28010,
+            "duration_minutes": 46.68
+          },
+          {
+            "period": 2,
+            "name": "period_2",
+            "start_frame": 28030,
+            "end_frame": 57620,
+            "duration_frames": 29590,
+            "duration_minutes": 49.32
+          }
+        ]
+      }
+    },
+    {
+      "id": 1996436,
+      "date_time": "2025-02-01T04:00:00Z",
+      "home_team": {
+        "id": 4177,
+        "short_name": "Auckland FC"
+      },
+      "away_team": {
+        "id": 1804,
+        "short_name": "Macarthur FC"
+      },
+      "status": "closed",
+      "competition_id": 61,
+      "season_id": 95,
+      "competition_edition_id": 870,
+      "families": {
+        "match_metadata": {
+          "key": "data/matches/1996436/1996436_match.json",
+          "size_bytes": 32859,
+          "md5": "unknown",
+          "sha1": "61736f019eea4d8c97e891dfee3df7e169fc27ff",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "tracking": {
+          "key": "data/matches/1996436/1996436_tracking_extrapolated.jsonl",
+          "size_bytes": 88945845,
+          "md5": "unknown",
+          "sha1": "unknown",
+          "sha256": "fab9d331e06f3042c83ac17798901b49bb259c99a8f3b319cd0146263cde65e7",
+          "upstream_provider": "github",
+          "git_blob_sha1": "78b70bcba5d4dbf375bc43dd7188ef0da1a666b2"
+        },
+        "dynamic_events": {
+          "key": "data/matches/1996436/1996436_dynamic_events.csv",
+          "size_bytes": 3760511,
+          "md5": "unknown",
+          "sha1": "10bc71299944a2d8e15d38908d5a157f4316763f",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "phases": {
+          "key": "data/matches/1996436/1996436_phases_of_play.csv",
+          "size_bytes": 104584,
+          "md5": "unknown",
+          "sha1": "1e4533bcffac6d8407f1e17a3e89a73a1756da2a",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        }
+      },
+      "detail": {
+        "status": "closed",
+        "date_time": "2025-02-01T04:00:00Z",
+        "stadium": {
+          "id": 3811,
+          "name": "Mount Smart Stadium",
+          "city": "Auckland",
+          "capacity": 25000
+        },
+        "home_team": {
+          "id": 4177,
+          "name": "Auckland FC",
+          "short_name": "Auckland FC",
+          "acronym": "AUC"
+        },
+        "away_team": {
+          "id": 1804,
+          "name": "Macarthur FC",
+          "short_name": "Macarthur FC",
+          "acronym": "MAC"
+        },
+        "home_team_score": 2,
+        "away_team_score": 1,
+        "competition_edition": {
+          "id": 870,
+          "competition": {
+            "id": 61,
+            "area": "AUS",
+            "name": "A-League",
+            "gender": "male",
+            "age_group": "adult"
+          },
+          "season": {
+            "id": 95,
+            "start_year": 2024,
+            "end_year": 2025,
+            "name": "2024/2025"
+          },
+          "name": "AUS - A-League - 2024/2025"
+        },
+        "competition_round": {
+          "id": 622,
+          "name": "Round 17",
+          "round_number": 17,
+          "potential_overtime": false
+        },
+        "match_periods": [
+          {
+            "period": 1,
+            "name": "period_1",
+            "start_frame": 10,
+            "end_frame": 30140,
+            "duration_frames": 30130,
+            "duration_minutes": 50.22
+          },
+          {
+            "period": 2,
+            "name": "period_2",
+            "start_frame": 30150,
+            "end_frame": 60280,
+            "duration_frames": 30130,
+            "duration_minutes": 50.22
+          }
+        ]
+      }
+    },
+    {
+      "id": 1986691,
+      "date_time": "2025-01-26T06:00:00Z",
+      "home_team": {
+        "id": 2902,
+        "short_name": "Western Sydney"
+      },
+      "away_team": {
+        "id": 4177,
+        "short_name": "Auckland FC"
+      },
+      "status": "closed",
+      "competition_id": 61,
+      "season_id": 95,
+      "competition_edition_id": 870,
+      "families": {
+        "match_metadata": {
+          "key": "data/matches/1986691/1986691_match.json",
+          "size_bytes": 33792,
+          "md5": "unknown",
+          "sha1": "dee942a7a5464f0730aff27b93b5269f5697d88b",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "tracking": {
+          "key": "data/matches/1986691/1986691_tracking_extrapolated.jsonl",
+          "size_bytes": 88531597,
+          "md5": "unknown",
+          "sha1": "unknown",
+          "sha256": "630e946950fe459f5e48872b01a36e6dfc319cf9027e7b98156150bb6e2c30f6",
+          "upstream_provider": "github",
+          "git_blob_sha1": "4402bd9c59300005a9674882c5735299e55dc2f5"
+        },
+        "dynamic_events": {
+          "key": "data/matches/1986691/1986691_dynamic_events.csv",
+          "size_bytes": 4290910,
+          "md5": "unknown",
+          "sha1": "cf9f7a30cafb536c67c9f5afc3b176a9d7de066c",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "phases": {
+          "key": "data/matches/1986691/1986691_phases_of_play.csv",
+          "size_bytes": 115267,
+          "md5": "unknown",
+          "sha1": "ce1b2c410fd4130f0f385520e5c5c6f908a4a933",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        }
+      },
+      "detail": {
+        "status": "closed",
+        "date_time": "2025-01-26T06:00:00Z",
+        "stadium": {
+          "id": 1487,
+          "name": "Bankwest Stadium",
+          "city": "Parramatta",
+          "capacity": 30000
+        },
+        "home_team": {
+          "id": 2902,
+          "name": "Western Sydney Wanderers FC",
+          "short_name": "Western Sydney",
+          "acronym": "WES"
+        },
+        "away_team": {
+          "id": 4177,
+          "name": "Auckland FC",
+          "short_name": "Auckland FC",
+          "acronym": "AUC"
+        },
+        "home_team_score": 0,
+        "away_team_score": 1,
+        "competition_edition": {
+          "id": 870,
+          "competition": {
+            "id": 61,
+            "area": "AUS",
+            "name": "A-League",
+            "gender": "male",
+            "age_group": "adult"
+          },
+          "season": {
+            "id": 95,
+            "start_year": 2024,
+            "end_year": 2025,
+            "name": "2024/2025"
+          },
+          "name": "AUS - A-League - 2024/2025"
+        },
+        "competition_round": {
+          "id": 621,
+          "name": "Round 16",
+          "round_number": 16,
+          "potential_overtime": false
+        },
+        "match_periods": [
+          {
+            "period": 1,
+            "name": "period_1",
+            "start_frame": 10,
+            "end_frame": 27780,
+            "duration_frames": 27770,
+            "duration_minutes": 46.28
+          },
+          {
+            "period": 2,
+            "name": "period_2",
+            "start_frame": 27790,
+            "end_frame": 59090,
+            "duration_frames": 31300,
+            "duration_minutes": 52.17
+          }
+        ]
+      }
+    },
+    {
+      "id": 1959846,
+      "date_time": "2025-01-10T08:35:00Z",
+      "home_team": {
+        "id": 868,
+        "short_name": "Melbourne V FC"
+      },
+      "away_team": {
+        "id": 1803,
+        "short_name": "Western United"
+      },
+      "status": "closed",
+      "competition_id": 61,
+      "season_id": 95,
+      "competition_edition_id": 870,
+      "families": {
+        "match_metadata": {
+          "key": "data/matches/1959846/1959846_match.json",
+          "size_bytes": 32946,
+          "md5": "unknown",
+          "sha1": "3513a7cd787f59e3f8027ba17365c17d78878969",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "tracking": {
+          "key": "data/matches/1959846/1959846_tracking_extrapolated.jsonl",
+          "size_bytes": 87710167,
+          "md5": "unknown",
+          "sha1": "unknown",
+          "sha256": "5ba2d87f6fd1ba3138301b369bd9266be69416a2d799a3fba5b5ec8a52e1284b",
+          "upstream_provider": "github",
+          "git_blob_sha1": "13664e719ca355c2ab5e14899fe1c3dbefb007a7"
+        },
+        "dynamic_events": {
+          "key": "data/matches/1959846/1959846_dynamic_events.csv",
+          "size_bytes": 4499680,
+          "md5": "unknown",
+          "sha1": "dbe8ee1dd7c3890782cef8a886fb8b781e32c136",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "phases": {
+          "key": "data/matches/1959846/1959846_phases_of_play.csv",
+          "size_bytes": 128571,
+          "md5": "unknown",
+          "sha1": "9ba4d7dff66a1b73ae9fbc39a899c678e308f5e9",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        }
+      },
+      "detail": {
+        "status": "closed",
+        "date_time": "2025-01-10T08:35:00Z",
+        "stadium": {
+          "id": 619,
+          "name": "AAMI Park",
+          "city": "Melbourne",
+          "capacity": null
+        },
+        "home_team": {
+          "id": 868,
+          "name": "Melbourne Victory Football Club",
+          "short_name": "Melbourne V FC",
+          "acronym": "MEL"
+        },
+        "away_team": {
+          "id": 1803,
+          "name": "Western United",
+          "short_name": "Western United",
+          "acronym": "WEU"
+        },
+        "home_team_score": 3,
+        "away_team_score": 4,
+        "competition_edition": {
+          "id": 870,
+          "competition": {
+            "id": 61,
+            "area": "AUS",
+            "name": "A-League",
+            "gender": "male",
+            "age_group": "adult"
+          },
+          "season": {
+            "id": 95,
+            "start_year": 2024,
+            "end_year": 2025,
+            "name": "2024/2025"
+          },
+          "name": "AUS - A-League - 2024/2025"
+        },
+        "competition_round": {
+          "id": 618,
+          "name": "Round 13",
+          "round_number": 13,
+          "potential_overtime": false
+        },
+        "match_periods": [
+          {
+            "period": 1,
+            "name": "period_1",
+            "start_frame": 0,
+            "end_frame": 27960,
+            "duration_frames": 27960,
+            "duration_minutes": 46.6
+          },
+          {
+            "period": 2,
+            "name": "period_2",
+            "start_frame": 27970,
+            "end_frame": 58540,
+            "duration_frames": 30570,
+            "duration_minutes": 50.95
+          }
+        ]
+      }
+    },
+    {
+      "id": 1953632,
+      "date_time": "2024-12-31T08:00:00Z",
+      "home_team": {
+        "id": 870,
+        "short_name": "CC Mariners"
+      },
+      "away_team": {
+        "id": 2380,
+        "short_name": "Melbourne City"
+      },
+      "status": "not_started",
+      "competition_id": 61,
+      "season_id": 95,
+      "competition_edition_id": 870,
+      "families": {
+        "match_metadata": {
+          "key": "data/matches/1953632/1953632_match.json",
+          "size_bytes": 27767,
+          "md5": "unknown",
+          "sha1": "b63200aace34ada146ab615e776d9a022f1a72ad",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "tracking": {
+          "key": "data/matches/1953632/1953632_tracking_extrapolated.jsonl",
+          "size_bytes": 90027965,
+          "md5": "unknown",
+          "sha1": "unknown",
+          "sha256": "1c2014f97c3eff1ce2475203512c9d126930d7599c036105c9ac442d1de1667e",
+          "upstream_provider": "github",
+          "git_blob_sha1": "3e3a8f6fea63aab93dce0b15f0eae11c547437ca"
+        },
+        "dynamic_events": {
+          "key": "data/matches/1953632/1953632_dynamic_events.csv",
+          "size_bytes": 4643533,
+          "md5": "unknown",
+          "sha1": "2eacf92e64a6eee695af9b002880b6767ba31615",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "phases": {
+          "key": "data/matches/1953632/1953632_phases_of_play.csv",
+          "size_bytes": 114478,
+          "md5": "unknown",
+          "sha1": "bd5c07b7010bc00c73cedcef497aaaadf12a6455",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        }
+      },
+      "detail": {
+        "status": "not_started",
+        "date_time": "2024-12-31T08:00:00Z",
+        "stadium": {
+          "id": 1484,
+          "name": "Central Coast Stadium",
+          "city": "Gosford",
+          "capacity": 20119
+        },
+        "home_team": {
+          "id": 870,
+          "name": "Central Coast Mariners Football Club",
+          "short_name": "CC Mariners",
+          "acronym": "CCM"
+        },
+        "away_team": {
+          "id": 2380,
+          "name": "Melbourne City FC",
+          "short_name": "Melbourne City",
+          "acronym": "MEL"
+        },
+        "home_team_score": 1,
+        "away_team_score": 1,
+        "competition_edition": {
+          "id": 870,
+          "competition": {
+            "id": 61,
+            "area": "AUS",
+            "name": "A-League",
+            "gender": "male",
+            "age_group": "adult"
+          },
+          "season": {
+            "id": 95,
+            "start_year": 2024,
+            "end_year": 2025,
+            "name": "2024/2025"
+          },
+          "name": "AUS - A-League - 2024/2025"
+        },
+        "competition_round": {
+          "id": 616,
+          "name": "Round 11",
+          "round_number": 11,
+          "potential_overtime": false
+        },
+        "match_periods": [
+          {
+            "period": 1,
+            "name": "period_1",
+            "start_frame": 10,
+            "end_frame": 28970,
+            "duration_frames": 28960,
+            "duration_minutes": 48.27
+          },
+          {
+            "period": 2,
+            "name": "period_2",
+            "start_frame": 28980,
+            "end_frame": 59250,
+            "duration_frames": 30270,
+            "duration_minutes": 50.45
+          }
+        ]
+      }
+    },
+    {
+      "id": 1927964,
+      "date_time": "2024-12-22T06:00:00Z",
+      "home_team": {
+        "id": 2902,
+        "short_name": "Western Sydney"
+      },
+      "away_team": {
+        "id": 867,
+        "short_name": "Wellington P FC"
+      },
+      "status": "closed",
+      "competition_id": 61,
+      "season_id": 95,
+      "competition_edition_id": 870,
+      "families": {
+        "match_metadata": {
+          "key": "data/matches/1927964/1927964_match.json",
+          "size_bytes": 33400,
+          "md5": "unknown",
+          "sha1": "e42fb7edbd49c81e087d0d73cc885cc3095d6a20",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "tracking": {
+          "key": "data/matches/1927964/1927964_tracking_extrapolated.jsonl",
+          "size_bytes": 91049828,
+          "md5": "unknown",
+          "sha1": "unknown",
+          "sha256": "858c7a756ca3d33017f864775af5999d2c0f364e58ab60ae040c8b9ebab17827",
+          "upstream_provider": "github",
+          "git_blob_sha1": "fa22f7fbca40a66d046b675e59b2c6ba0db19af6"
+        },
+        "dynamic_events": {
+          "key": "data/matches/1927964/1927964_dynamic_events.csv",
+          "size_bytes": 5509112,
+          "md5": "unknown",
+          "sha1": "61ae1b281a540395512210910ca94d0058359fb8",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "phases": {
+          "key": "data/matches/1927964/1927964_phases_of_play.csv",
+          "size_bytes": 117263,
+          "md5": "unknown",
+          "sha1": "d1960e21564d61372824bf8a844c68b391e35abb",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        }
+      },
+      "detail": {
+        "status": "closed",
+        "date_time": "2024-12-22T06:00:00Z",
+        "stadium": {
+          "id": 2661,
+          "name": "CommBank Stadium",
+          "city": "Parramatta",
+          "capacity": 30000
+        },
+        "home_team": {
+          "id": 2902,
+          "name": "Western Sydney Wanderers FC",
+          "short_name": "Western Sydney",
+          "acronym": "WES"
+        },
+        "away_team": {
+          "id": 867,
+          "name": "Wellington Phoenix FC",
+          "short_name": "Wellington P FC",
+          "acronym": "WEL"
+        },
+        "home_team_score": 4,
+        "away_team_score": 1,
+        "competition_edition": {
+          "id": 870,
+          "competition": {
+            "id": 61,
+            "area": "AUS",
+            "name": "A-League",
+            "gender": "male",
+            "age_group": "adult"
+          },
+          "season": {
+            "id": 95,
+            "start_year": 2024,
+            "end_year": 2025,
+            "name": "2024/2025"
+          },
+          "name": "AUS - A-League - 2024/2025"
+        },
+        "competition_round": {
+          "id": 614,
+          "name": "Round 9",
+          "round_number": 9,
+          "potential_overtime": false
+        },
+        "match_periods": [
+          {
+            "period": 1,
+            "name": "period_1",
+            "start_frame": 10,
+            "end_frame": 28380,
+            "duration_frames": 28370,
+            "duration_minutes": 47.28
+          },
+          {
+            "period": 2,
+            "name": "period_2",
+            "start_frame": 28390,
+            "end_frame": 59070,
+            "duration_frames": 30680,
+            "duration_minutes": 51.13
+          }
+        ]
+      }
+    },
+    {
+      "id": 1925299,
+      "date_time": "2024-12-21T06:00:00Z",
+      "home_team": {
+        "id": 1802,
+        "short_name": "Brisbane FC"
+      },
+      "away_team": {
+        "id": 871,
+        "short_name": "Perth Glory"
+      },
+      "status": "closed",
+      "competition_id": 61,
+      "season_id": 95,
+      "competition_edition_id": 870,
+      "families": {
+        "match_metadata": {
+          "key": "data/matches/1925299/1925299_match.json",
+          "size_bytes": 28396,
+          "md5": "unknown",
+          "sha1": "62b69aba5be11f795ccdbcf65c6d07f662832b66",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "tracking": {
+          "key": "data/matches/1925299/1925299_tracking_extrapolated.jsonl",
+          "size_bytes": 97091519,
+          "md5": "unknown",
+          "sha1": "unknown",
+          "sha256": "48528be40ad82fa3e2b232e1af8d311705f7d6d119925ef199d2b59ea36fd3c9",
+          "upstream_provider": "github",
+          "git_blob_sha1": "524413c8696e438255c33e46e50149ba5b6bf2c2"
+        },
+        "dynamic_events": {
+          "key": "data/matches/1925299/1925299_dynamic_events.csv",
+          "size_bytes": 5043601,
+          "md5": "unknown",
+          "sha1": "09f226d38a3d9955d38ec32529a24c30c7958d22",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "phases": {
+          "key": "data/matches/1925299/1925299_phases_of_play.csv",
+          "size_bytes": 131104,
+          "md5": "unknown",
+          "sha1": "20c06b378f9a7181ab0e02de7c4a37779316386a",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        }
+      },
+      "detail": {
+        "status": "closed",
+        "date_time": "2024-12-21T06:00:00Z",
+        "stadium": {
+          "id": 2914,
+          "name": "Kayo Stadium",
+          "city": "Moreton Bay",
+          "capacity": 11507
+        },
+        "home_team": {
+          "id": 1802,
+          "name": "Brisbane Roar FC",
+          "short_name": "Brisbane FC",
+          "acronym": "BRR"
+        },
+        "away_team": {
+          "id": 871,
+          "name": "Perth Glory Football Club",
+          "short_name": "Perth Glory",
+          "acronym": "PER"
+        },
+        "home_team_score": 0,
+        "away_team_score": 1,
+        "competition_edition": {
+          "id": 870,
+          "competition": {
+            "id": 61,
+            "area": "AUS",
+            "name": "A-League",
+            "gender": "male",
+            "age_group": "adult"
+          },
+          "season": {
+            "id": 95,
+            "start_year": 2024,
+            "end_year": 2025,
+            "name": "2024/2025"
+          },
+          "name": "AUS - A-League - 2024/2025"
+        },
+        "competition_round": {
+          "id": 614,
+          "name": "Round 9",
+          "round_number": 9,
+          "potential_overtime": false
+        },
+        "match_periods": [
+          {
+            "period": 1,
+            "name": "period_1",
+            "start_frame": 10,
+            "end_frame": 30240,
+            "duration_frames": 30230,
+            "duration_minutes": 50.38
+          },
+          {
+            "period": 2,
+            "name": "period_2",
+            "start_frame": 30250,
+            "end_frame": 61300,
+            "duration_frames": 31050,
+            "duration_minutes": 51.75
+          }
+        ]
+      }
+    },
+    {
+      "id": 1899585,
+      "date_time": "2024-12-07T04:00:00Z",
+      "home_team": {
+        "id": 4177,
+        "short_name": "Auckland FC"
+      },
+      "away_team": {
+        "id": 867,
+        "short_name": "Wellington P FC"
+      },
+      "status": "closed",
+      "competition_id": 61,
+      "season_id": 95,
+      "competition_edition_id": 870,
+      "families": {
+        "match_metadata": {
+          "key": "data/matches/1899585/1899585_match.json",
+          "size_bytes": 27810,
+          "md5": "unknown",
+          "sha1": "42ca159d85dc59476bf5278961ccbda6633a3303",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "tracking": {
+          "key": "data/matches/1899585/1899585_tracking_extrapolated.jsonl",
+          "size_bytes": 85550410,
+          "md5": "unknown",
+          "sha1": "unknown",
+          "sha256": "90b6289ec2181192d1793ec6240fbbe8225ff0219c7956710c6278c31a661100",
+          "upstream_provider": "github",
+          "git_blob_sha1": "8fdf9cb1e792bb5c4b141155a29e402a83e7ad0c"
+        },
+        "dynamic_events": {
+          "key": "data/matches/1899585/1899585_dynamic_events.csv",
+          "size_bytes": 4375032,
+          "md5": "unknown",
+          "sha1": "4dd13e8daf676d6440db45735dea0b7b80aa67e5",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "phases": {
+          "key": "data/matches/1899585/1899585_phases_of_play.csv",
+          "size_bytes": 119735,
+          "md5": "unknown",
+          "sha1": "c8df923b064575d49179301f93cedf8727106951",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        }
+      },
+      "detail": {
+        "status": "closed",
+        "date_time": "2024-12-07T04:00:00Z",
+        "stadium": {
+          "id": 3811,
+          "name": "Mount Smart Stadium",
+          "city": "Auckland",
+          "capacity": 25000
+        },
+        "home_team": {
+          "id": 4177,
+          "name": "Auckland FC",
+          "short_name": "Auckland FC",
+          "acronym": "AUC"
+        },
+        "away_team": {
+          "id": 867,
+          "name": "Wellington Phoenix FC",
+          "short_name": "Wellington P FC",
+          "acronym": "WEL"
+        },
+        "home_team_score": 2,
+        "away_team_score": 1,
+        "competition_edition": {
+          "id": 870,
+          "competition": {
+            "id": 61,
+            "area": "AUS",
+            "name": "A-League",
+            "gender": "male",
+            "age_group": "adult"
+          },
+          "season": {
+            "id": 95,
+            "start_year": 2024,
+            "end_year": 2025,
+            "name": "2024/2025"
+          },
+          "name": "AUS - A-League - 2024/2025"
+        },
+        "competition_round": {
+          "id": 612,
+          "name": "Round 7",
+          "round_number": 7,
+          "potential_overtime": false
+        },
+        "match_periods": [
+          {
+            "period": 1,
+            "name": "period_1",
+            "start_frame": 10,
+            "end_frame": 29760,
+            "duration_frames": 29750,
+            "duration_minutes": 49.58
+          },
+          {
+            "period": 2,
+            "name": "period_2",
+            "start_frame": 29770,
+            "end_frame": 60530,
+            "duration_frames": 30760,
+            "duration_minutes": 51.27
+          }
+        ]
+      }
+    },
+    {
+      "id": 1886347,
+      "date_time": "2024-11-30T04:00:00Z",
+      "home_team": {
+        "id": 4177,
+        "short_name": "Auckland FC"
+      },
+      "away_team": {
+        "id": 1805,
+        "short_name": "Newcastle"
+      },
+      "status": "closed",
+      "competition_id": 61,
+      "season_id": 95,
+      "competition_edition_id": 870,
+      "families": {
+        "match_metadata": {
+          "key": "data/matches/1886347/1886347_match.json",
+          "size_bytes": 27541,
+          "md5": "unknown",
+          "sha1": "10779035f95d26a30adf8330c351e4cc4d16a513",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "tracking": {
+          "key": "data/matches/1886347/1886347_tracking_extrapolated.jsonl",
+          "size_bytes": 89280839,
+          "md5": "unknown",
+          "sha1": "unknown",
+          "sha256": "3577e2803da95390f8b2f85d47829eb55fbbfee6211c94adc65db0dc78e46b41",
+          "upstream_provider": "github",
+          "git_blob_sha1": "6c1d01ae3bafa28cf94e4b7a581fb3779effe4bd"
+        },
+        "dynamic_events": {
+          "key": "data/matches/1886347/1886347_dynamic_events.csv",
+          "size_bytes": 4918599,
+          "md5": "unknown",
+          "sha1": "2be820a13e2cb00da1868cb84ece20dfa64179d6",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "phases": {
+          "key": "data/matches/1886347/1886347_phases_of_play.csv",
+          "size_bytes": 121864,
+          "md5": "unknown",
+          "sha1": "2a37e6981af6f9b6e1f1878969927cd4234a549d",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        }
+      },
+      "detail": {
+        "status": "closed",
+        "date_time": "2024-11-30T04:00:00Z",
+        "stadium": {
+          "id": 3811,
+          "name": "Mount Smart Stadium",
+          "city": "Auckland",
+          "capacity": 25000
+        },
+        "home_team": {
+          "id": 4177,
+          "name": "Auckland FC",
+          "short_name": "Auckland FC",
+          "acronym": "AUC"
+        },
+        "away_team": {
+          "id": 1805,
+          "name": "Newcastle United Jets FC",
+          "short_name": "Newcastle",
+          "acronym": "NEW"
+        },
+        "home_team_score": 2,
+        "away_team_score": 0,
+        "competition_edition": {
+          "id": 870,
+          "competition": {
+            "id": 61,
+            "area": "AUS",
+            "name": "A-League",
+            "gender": "male",
+            "age_group": "adult"
+          },
+          "season": {
+            "id": 95,
+            "start_year": 2024,
+            "end_year": 2025,
+            "name": "2024/2025"
+          },
+          "name": "AUS - A-League - 2024/2025"
+        },
+        "competition_round": {
+          "id": 611,
+          "name": "Round 6",
+          "round_number": 6,
+          "potential_overtime": false
+        },
+        "match_periods": [
+          {
+            "period": 1,
+            "name": "period_1",
+            "start_frame": 10,
+            "end_frame": 27790,
+            "duration_frames": 27780,
+            "duration_minutes": 46.3
+          },
+          {
+            "period": 2,
+            "name": "period_2",
+            "start_frame": 27800,
+            "end_frame": 59060,
+            "duration_frames": 31260,
+            "duration_minutes": 52.1
+          }
+        ]
+      }
+    },
+    {
+      "id": 1874553,
+      "date_time": "2024-11-23T06:00:00Z",
+      "home_team": {
+        "id": 1802,
+        "short_name": "Brisbane FC"
+      },
+      "away_team": {
+        "id": 866,
+        "short_name": "Adelaide United"
+      },
+      "status": "closed",
+      "competition_id": 61,
+      "season_id": 95,
+      "competition_edition_id": 870,
+      "families": {
+        "match_metadata": {
+          "key": "data/matches/1874553/1874553_match.json",
+          "size_bytes": 33730,
+          "md5": "unknown",
+          "sha1": "51ef142ceba0f85700b376faf1fdbc4e4a728629",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "tracking": {
+          "key": "data/matches/1874553/1874553_tracking_extrapolated.jsonl",
+          "size_bytes": 90729279,
+          "md5": "unknown",
+          "sha1": "unknown",
+          "sha256": "ea97f58f8eaad925feaeacc6395ec24860dd80027af8a89450276adebd29d265",
+          "upstream_provider": "github",
+          "git_blob_sha1": "7439f0ba7da6bc03625258b98fe84a5bf770b72e"
+        },
+        "dynamic_events": {
+          "key": "data/matches/1874553/1874553_dynamic_events.csv",
+          "size_bytes": 4738858,
+          "md5": "unknown",
+          "sha1": "eed14775ef167397844c6178efd7944d9b7af317",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        },
+        "phases": {
+          "key": "data/matches/1874553/1874553_phases_of_play.csv",
+          "size_bytes": 115978,
+          "md5": "unknown",
+          "sha1": "a566fbbaf11cf47838cdf36e6d7fe17904b85f59",
+          "sha256": "unknown",
+          "upstream_provider": "github"
+        }
+      },
+      "detail": {
+        "status": "closed",
+        "date_time": "2024-11-23T06:00:00Z",
+        "stadium": {
+          "id": 2914,
+          "name": "Kayo Stadium",
+          "city": "Moreton Bay",
+          "capacity": 11507
+        },
+        "home_team": {
+          "id": 1802,
+          "name": "Brisbane Roar FC",
+          "short_name": "Brisbane FC",
+          "acronym": "BRR"
+        },
+        "away_team": {
+          "id": 866,
+          "name": "Adelaide United Football Club",
+          "short_name": "Adelaide United",
+          "acronym": "ADE"
+        },
+        "home_team_score": 2,
+        "away_team_score": 3,
+        "competition_edition": {
+          "id": 870,
+          "competition": {
+            "id": 61,
+            "area": "AUS",
+            "name": "A-League",
+            "gender": "male",
+            "age_group": "adult"
+          },
+          "season": {
+            "id": 95,
+            "start_year": 2024,
+            "end_year": 2025,
+            "name": "2024/2025"
+          },
+          "name": "AUS - A-League - 2024/2025"
+        },
+        "competition_round": {
+          "id": 610,
+          "name": "Round 5",
+          "round_number": 5,
+          "potential_overtime": false
+        },
+        "match_periods": [
+          {
+            "period": 1,
+            "name": "period_1",
+            "start_frame": 10,
+            "end_frame": 28990,
+            "duration_frames": 28980,
+            "duration_minutes": 48.3
+          },
+          {
+            "period": 2,
+            "name": "period_2",
+            "start_frame": 29000,
+            "end_frame": 60300,
+            "duration_frames": 31300,
+            "duration_minutes": 52.17
+          }
+        ]
+      }
+    }
+  ],
+  "aggregates": [
+    {
+      "family": "obr",
+      "source_population_rows": 407,
+      "distinct_player_count": 284,
+      "distinct_team_count": 13,
+      "competition_id": 61,
+      "season_id": 95,
+      "competition_edition_id": 870,
+      "asset": {
+        "key": "data/aggregates/aus1league_obraggregates_20242025.csv",
+        "size_bytes": 263921,
+        "md5": "unknown",
+        "sha1": "e02399fa68bded51b54ce1c97a463583225d3fee",
+        "sha256": "unknown",
+        "upstream_provider": "github"
+      }
+    },
+    {
+      "family": "passing",
+      "source_population_rows": 407,
+      "distinct_player_count": 284,
+      "distinct_team_count": 13,
+      "competition_id": 61,
+      "season_id": 95,
+      "competition_edition_id": 870,
+      "asset": {
+        "key": "data/aggregates/aus1league_passingaggregates_20242025.csv",
+        "size_bytes": 124039,
+        "md5": "unknown",
+        "sha1": "84c5e35a67282a689028fb500f529d5d11f003f8",
+        "sha256": "unknown",
+        "upstream_provider": "github"
+      }
+    },
+    {
+      "family": "physical",
+      "source_population_rows": 406,
+      "distinct_player_count": 268,
+      "distinct_team_count": 13,
+      "competition_id": 61,
+      "season_id": 95,
+      "competition_edition_id": 870,
+      "asset": {
+        "key": "data/aggregates/aus1league_physicalaggregates_20242025.csv",
+        "size_bytes": 167312,
+        "md5": "unknown",
+        "sha1": "b80308d7662c8923dc82e0721e0b6f17df827d2e",
+        "sha256": "unknown",
+        "upstream_provider": "github"
+      }
+    }
+  ],
+  "files": [
+    {
+      "key": "data/aggregates/aus1league_obraggregates_20242025.csv",
+      "size_bytes": 263921,
+      "md5": "unknown",
+      "sha1": "e02399fa68bded51b54ce1c97a463583225d3fee",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/aggregates/aus1league_passingaggregates_20242025.csv",
+      "size_bytes": 124039,
+      "md5": "unknown",
+      "sha1": "84c5e35a67282a689028fb500f529d5d11f003f8",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/aggregates/aus1league_physicalaggregates_20242025.csv",
+      "size_bytes": 167312,
+      "md5": "unknown",
+      "sha1": "b80308d7662c8923dc82e0721e0b6f17df827d2e",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches.json",
+      "size_bytes": 6648,
+      "md5": "unknown",
+      "sha1": "be9f7fd6906cca93b0d04c79692c016a08a34d98",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/1874553/1874553_dynamic_events.csv",
+      "size_bytes": 4738858,
+      "md5": "unknown",
+      "sha1": "eed14775ef167397844c6178efd7944d9b7af317",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/1874553/1874553_match.json",
+      "size_bytes": 33730,
+      "md5": "unknown",
+      "sha1": "51ef142ceba0f85700b376faf1fdbc4e4a728629",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/1874553/1874553_phases_of_play.csv",
+      "size_bytes": 115978,
+      "md5": "unknown",
+      "sha1": "a566fbbaf11cf47838cdf36e6d7fe17904b85f59",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/1874553/1874553_tracking_extrapolated.jsonl",
+      "size_bytes": 90729279,
+      "md5": "unknown",
+      "sha1": "unknown",
+      "sha256": "ea97f58f8eaad925feaeacc6395ec24860dd80027af8a89450276adebd29d265",
+      "upstream_provider": "github",
+      "git_blob_sha1": "7439f0ba7da6bc03625258b98fe84a5bf770b72e"
+    },
+    {
+      "key": "data/matches/1886347/1886347_dynamic_events.csv",
+      "size_bytes": 4918599,
+      "md5": "unknown",
+      "sha1": "2be820a13e2cb00da1868cb84ece20dfa64179d6",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/1886347/1886347_match.json",
+      "size_bytes": 27541,
+      "md5": "unknown",
+      "sha1": "10779035f95d26a30adf8330c351e4cc4d16a513",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/1886347/1886347_phases_of_play.csv",
+      "size_bytes": 121864,
+      "md5": "unknown",
+      "sha1": "2a37e6981af6f9b6e1f1878969927cd4234a549d",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/1886347/1886347_tracking_extrapolated.jsonl",
+      "size_bytes": 89280839,
+      "md5": "unknown",
+      "sha1": "unknown",
+      "sha256": "3577e2803da95390f8b2f85d47829eb55fbbfee6211c94adc65db0dc78e46b41",
+      "upstream_provider": "github",
+      "git_blob_sha1": "6c1d01ae3bafa28cf94e4b7a581fb3779effe4bd"
+    },
+    {
+      "key": "data/matches/1899585/1899585_dynamic_events.csv",
+      "size_bytes": 4375032,
+      "md5": "unknown",
+      "sha1": "4dd13e8daf676d6440db45735dea0b7b80aa67e5",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/1899585/1899585_match.json",
+      "size_bytes": 27810,
+      "md5": "unknown",
+      "sha1": "42ca159d85dc59476bf5278961ccbda6633a3303",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/1899585/1899585_phases_of_play.csv",
+      "size_bytes": 119735,
+      "md5": "unknown",
+      "sha1": "c8df923b064575d49179301f93cedf8727106951",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/1899585/1899585_tracking_extrapolated.jsonl",
+      "size_bytes": 85550410,
+      "md5": "unknown",
+      "sha1": "unknown",
+      "sha256": "90b6289ec2181192d1793ec6240fbbe8225ff0219c7956710c6278c31a661100",
+      "upstream_provider": "github",
+      "git_blob_sha1": "8fdf9cb1e792bb5c4b141155a29e402a83e7ad0c"
+    },
+    {
+      "key": "data/matches/1925299/1925299_dynamic_events.csv",
+      "size_bytes": 5043601,
+      "md5": "unknown",
+      "sha1": "09f226d38a3d9955d38ec32529a24c30c7958d22",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/1925299/1925299_match.json",
+      "size_bytes": 28396,
+      "md5": "unknown",
+      "sha1": "62b69aba5be11f795ccdbcf65c6d07f662832b66",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/1925299/1925299_phases_of_play.csv",
+      "size_bytes": 131104,
+      "md5": "unknown",
+      "sha1": "20c06b378f9a7181ab0e02de7c4a37779316386a",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/1925299/1925299_tracking_extrapolated.jsonl",
+      "size_bytes": 97091519,
+      "md5": "unknown",
+      "sha1": "unknown",
+      "sha256": "48528be40ad82fa3e2b232e1af8d311705f7d6d119925ef199d2b59ea36fd3c9",
+      "upstream_provider": "github",
+      "git_blob_sha1": "524413c8696e438255c33e46e50149ba5b6bf2c2"
+    },
+    {
+      "key": "data/matches/1927964/1927964_dynamic_events.csv",
+      "size_bytes": 5509112,
+      "md5": "unknown",
+      "sha1": "61ae1b281a540395512210910ca94d0058359fb8",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/1927964/1927964_match.json",
+      "size_bytes": 33400,
+      "md5": "unknown",
+      "sha1": "e42fb7edbd49c81e087d0d73cc885cc3095d6a20",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/1927964/1927964_phases_of_play.csv",
+      "size_bytes": 117263,
+      "md5": "unknown",
+      "sha1": "d1960e21564d61372824bf8a844c68b391e35abb",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/1927964/1927964_tracking_extrapolated.jsonl",
+      "size_bytes": 91049828,
+      "md5": "unknown",
+      "sha1": "unknown",
+      "sha256": "858c7a756ca3d33017f864775af5999d2c0f364e58ab60ae040c8b9ebab17827",
+      "upstream_provider": "github",
+      "git_blob_sha1": "fa22f7fbca40a66d046b675e59b2c6ba0db19af6"
+    },
+    {
+      "key": "data/matches/1953632/1953632_dynamic_events.csv",
+      "size_bytes": 4643533,
+      "md5": "unknown",
+      "sha1": "2eacf92e64a6eee695af9b002880b6767ba31615",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/1953632/1953632_match.json",
+      "size_bytes": 27767,
+      "md5": "unknown",
+      "sha1": "b63200aace34ada146ab615e776d9a022f1a72ad",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/1953632/1953632_phases_of_play.csv",
+      "size_bytes": 114478,
+      "md5": "unknown",
+      "sha1": "bd5c07b7010bc00c73cedcef497aaaadf12a6455",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/1953632/1953632_tracking_extrapolated.jsonl",
+      "size_bytes": 90027965,
+      "md5": "unknown",
+      "sha1": "unknown",
+      "sha256": "1c2014f97c3eff1ce2475203512c9d126930d7599c036105c9ac442d1de1667e",
+      "upstream_provider": "github",
+      "git_blob_sha1": "3e3a8f6fea63aab93dce0b15f0eae11c547437ca"
+    },
+    {
+      "key": "data/matches/1959846/1959846_dynamic_events.csv",
+      "size_bytes": 4499680,
+      "md5": "unknown",
+      "sha1": "dbe8ee1dd7c3890782cef8a886fb8b781e32c136",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/1959846/1959846_match.json",
+      "size_bytes": 32946,
+      "md5": "unknown",
+      "sha1": "3513a7cd787f59e3f8027ba17365c17d78878969",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/1959846/1959846_phases_of_play.csv",
+      "size_bytes": 128571,
+      "md5": "unknown",
+      "sha1": "9ba4d7dff66a1b73ae9fbc39a899c678e308f5e9",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/1959846/1959846_tracking_extrapolated.jsonl",
+      "size_bytes": 87710167,
+      "md5": "unknown",
+      "sha1": "unknown",
+      "sha256": "5ba2d87f6fd1ba3138301b369bd9266be69416a2d799a3fba5b5ec8a52e1284b",
+      "upstream_provider": "github",
+      "git_blob_sha1": "13664e719ca355c2ab5e14899fe1c3dbefb007a7"
+    },
+    {
+      "key": "data/matches/1986691/1986691_dynamic_events.csv",
+      "size_bytes": 4290910,
+      "md5": "unknown",
+      "sha1": "cf9f7a30cafb536c67c9f5afc3b176a9d7de066c",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/1986691/1986691_match.json",
+      "size_bytes": 33792,
+      "md5": "unknown",
+      "sha1": "dee942a7a5464f0730aff27b93b5269f5697d88b",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/1986691/1986691_phases_of_play.csv",
+      "size_bytes": 115267,
+      "md5": "unknown",
+      "sha1": "ce1b2c410fd4130f0f385520e5c5c6f908a4a933",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/1986691/1986691_tracking_extrapolated.jsonl",
+      "size_bytes": 88531597,
+      "md5": "unknown",
+      "sha1": "unknown",
+      "sha256": "630e946950fe459f5e48872b01a36e6dfc319cf9027e7b98156150bb6e2c30f6",
+      "upstream_provider": "github",
+      "git_blob_sha1": "4402bd9c59300005a9674882c5735299e55dc2f5"
+    },
+    {
+      "key": "data/matches/1996435/1996435_dynamic_events.csv",
+      "size_bytes": 4964532,
+      "md5": "unknown",
+      "sha1": "72454b398b9301c03fa31aca9ede35e4efa419c7",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/1996435/1996435_match.json",
+      "size_bytes": 27830,
+      "md5": "unknown",
+      "sha1": "4b6aea20c71dd1128228aff2d8a12d848a0109af",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/1996435/1996435_phases_of_play.csv",
+      "size_bytes": 120335,
+      "md5": "unknown",
+      "sha1": "4c616f64b0ddf8f8d759a3f70dce22745c033600",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/1996435/1996435_tracking_extrapolated.jsonl",
+      "size_bytes": 88634016,
+      "md5": "unknown",
+      "sha1": "unknown",
+      "sha256": "f42764d8bde290e8f738fa21141cadbed75408314b0b337bbf1d5a3444540a02",
+      "upstream_provider": "github",
+      "git_blob_sha1": "6f068b84157e6f6b2f7b6f2631210ddf543f37fe"
+    },
+    {
+      "key": "data/matches/1996436/1996436_dynamic_events.csv",
+      "size_bytes": 3760511,
+      "md5": "unknown",
+      "sha1": "10bc71299944a2d8e15d38908d5a157f4316763f",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/1996436/1996436_match.json",
+      "size_bytes": 32859,
+      "md5": "unknown",
+      "sha1": "61736f019eea4d8c97e891dfee3df7e169fc27ff",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/1996436/1996436_phases_of_play.csv",
+      "size_bytes": 104584,
+      "md5": "unknown",
+      "sha1": "1e4533bcffac6d8407f1e17a3e89a73a1756da2a",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/1996436/1996436_tracking_extrapolated.jsonl",
+      "size_bytes": 88945845,
+      "md5": "unknown",
+      "sha1": "unknown",
+      "sha256": "fab9d331e06f3042c83ac17798901b49bb259c99a8f3b319cd0146263cde65e7",
+      "upstream_provider": "github",
+      "git_blob_sha1": "78b70bcba5d4dbf375bc43dd7188ef0da1a666b2"
+    },
+    {
+      "key": "data/matches/2006229/2006229_dynamic_events.csv",
+      "size_bytes": 4778846,
+      "md5": "unknown",
+      "sha1": "9bb819dd51aa1756a04013103199c776717f2413",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/2006229/2006229_match.json",
+      "size_bytes": 28213,
+      "md5": "unknown",
+      "sha1": "71bff731f85f5266dafd4fa073b52ef66eb91ff8",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/2006229/2006229_phases_of_play.csv",
+      "size_bytes": 122340,
+      "md5": "unknown",
+      "sha1": "d0a3775cbdbda49b2cf5cef2981b4bdd4eb50fa2",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/2006229/2006229_tracking_extrapolated.jsonl",
+      "size_bytes": 90078007,
+      "md5": "unknown",
+      "sha1": "unknown",
+      "sha256": "3ee193ba01f1fe2cbce087eca8a881c21b8b0ea3485ae6c3d7e32e8b2f51e738",
+      "upstream_provider": "github",
+      "git_blob_sha1": "053f97dac07eaadb02d953dc92e4430fabc4087a"
+    },
+    {
+      "key": "data/matches/2006363/2006363_dynamic_events.csv",
+      "size_bytes": 4794999,
+      "md5": "unknown",
+      "sha1": "fcac96a21f909e4b2bad3a606dc89fabea263a6f",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/2006363/2006363_match.json",
+      "size_bytes": 33294,
+      "md5": "unknown",
+      "sha1": "edaf492c5fc4c98cb871a8ade25065e9a38d6ef7",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/2006363/2006363_phases_of_play.csv",
+      "size_bytes": 119862,
+      "md5": "unknown",
+      "sha1": "d97071f5b62d284d9670dfd73b64a916df8a520f",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/2006363/2006363_tracking_extrapolated.jsonl",
+      "size_bytes": 90591887,
+      "md5": "unknown",
+      "sha1": "unknown",
+      "sha256": "61dfdbd83f8e654127b249b8503f062338c14ec0c9e65404bcf70fb7c1346bd4",
+      "upstream_provider": "github",
+      "git_blob_sha1": "5880f8f797b3353814fa8e6af91e3554a945fefc"
+    },
+    {
+      "key": "data/matches/2007448/2007448_dynamic_events.csv",
+      "size_bytes": 4146729,
+      "md5": "unknown",
+      "sha1": "5aea97c02efd4bd0b6743ffddf61228ceda988d7",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/2007448/2007448_match.json",
+      "size_bytes": 32670,
+      "md5": "unknown",
+      "sha1": "7798b2874d7593e33c9700ba19b12b380a64c65b",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/2007448/2007448_phases_of_play.csv",
+      "size_bytes": 113871,
+      "md5": "unknown",
+      "sha1": "aaf6577efc71bfa092998f675abb0ab4e33fb4bc",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/2007448/2007448_tracking_extrapolated.jsonl",
+      "size_bytes": 90025383,
+      "md5": "unknown",
+      "sha1": "unknown",
+      "sha256": "12d00d6e4257218812df6e4c4263c49387ba0313a83ff8d826c4416828f9c798",
+      "upstream_provider": "github",
+      "git_blob_sha1": "8b0d91430bed0fe3217e8f0a9525ee744fb2d906"
+    },
+    {
+      "key": "data/matches/2007721/2007721_dynamic_events.csv",
+      "size_bytes": 4653039,
+      "md5": "unknown",
+      "sha1": "a55b5132980dc1b90ae909e64a2c0a55069d631b",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/2007721/2007721_match.json",
+      "size_bytes": 33745,
+      "md5": "unknown",
+      "sha1": "0bbbabf46dd7330bf8d16faf979fbf576f37218d",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/2007721/2007721_phases_of_play.csv",
+      "size_bytes": 116997,
+      "md5": "unknown",
+      "sha1": "7b61a82555d8ea1fa958b5b0645e324cb08b59f0",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/2007721/2007721_tracking_extrapolated.jsonl",
+      "size_bytes": 92872706,
+      "md5": "unknown",
+      "sha1": "unknown",
+      "sha256": "fea913b8d4cbde8d85c6bdf5f1a4b3fd203b78227e976a171c8ab0946705d378",
+      "upstream_provider": "github",
+      "git_blob_sha1": "2ef15e0a762e293cd16084202da60dbd7a71803e"
+    },
+    {
+      "key": "data/matches/2010085/2010085_dynamic_events.csv",
+      "size_bytes": 4484006,
+      "md5": "unknown",
+      "sha1": "ef8e9435749fae31c2b3f6bab01731c3d7ddc6b5",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/2010085/2010085_match.json",
+      "size_bytes": 33744,
+      "md5": "unknown",
+      "sha1": "82b15d3e8cac13d0403259785302023ad89ab9ca",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/2010085/2010085_phases_of_play.csv",
+      "size_bytes": 115871,
+      "md5": "unknown",
+      "sha1": "dd1df31ea9e76118e99b8d1dc44377ebb72c4873",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/2010085/2010085_tracking_extrapolated.jsonl",
+      "size_bytes": 92516156,
+      "md5": "unknown",
+      "sha1": "unknown",
+      "sha256": "04562d9754b2977c80430535e9b5733426bc4ce910db56fe7a3760876211ac5a",
+      "upstream_provider": "github",
+      "git_blob_sha1": "cbc77fbf800b88f1f49974c49d62d5c0acc53a95"
+    },
+    {
+      "key": "data/matches/2011166/2011166_dynamic_events.csv",
+      "size_bytes": 3846412,
+      "md5": "unknown",
+      "sha1": "40750a5f2da06c032a10c7ca50953f8d89e78078",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/2011166/2011166_match.json",
+      "size_bytes": 28420,
+      "md5": "unknown",
+      "sha1": "6468e14c07f0108c56cd3457544c106643161099",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/2011166/2011166_phases_of_play.csv",
+      "size_bytes": 121175,
+      "md5": "unknown",
+      "sha1": "0d191c3f8d3f373c41ee8110c2a196166c36e6e5",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/2011166/2011166_tracking_extrapolated.jsonl",
+      "size_bytes": 87441570,
+      "md5": "unknown",
+      "sha1": "unknown",
+      "sha256": "8ec2937050930d87e4f52b2d65515f70ef8edd0ae2814bf40155c4448133390e",
+      "upstream_provider": "github",
+      "git_blob_sha1": "fbc2873cc5258e94f8746bceea454f0125782437"
+    },
+    {
+      "key": "data/matches/2013725/2013725_dynamic_events.csv",
+      "size_bytes": 4508257,
+      "md5": "unknown",
+      "sha1": "bcca1fe2890119d20b9b7bd13c0a2f9245a7c5f0",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/2013725/2013725_match.json",
+      "size_bytes": 27899,
+      "md5": "unknown",
+      "sha1": "4309772e339cd1f9ebc2aeb4a429076287af3a00",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/2013725/2013725_phases_of_play.csv",
+      "size_bytes": 130821,
+      "md5": "unknown",
+      "sha1": "90d4885a26817703b0f7736b0e47703f59c3dc41",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/2013725/2013725_tracking_extrapolated.jsonl",
+      "size_bytes": 96059074,
+      "md5": "unknown",
+      "sha1": "unknown",
+      "sha256": "13eb83329814ed5f5d73da8f8ab5c5979d6c8a7858e89e28a7fa8072f91fb250",
+      "upstream_provider": "github",
+      "git_blob_sha1": "1354649bc1c6b7bff90eb9e44a7e22544b4ed4c1"
+    },
+    {
+      "key": "data/matches/2015213/2015213_dynamic_events.csv",
+      "size_bytes": 4417152,
+      "md5": "unknown",
+      "sha1": "a4ce1f7555f6f9f53700823451b94f621785314e",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/2015213/2015213_match.json",
+      "size_bytes": 27937,
+      "md5": "unknown",
+      "sha1": "1d58d487d5ca7f8c9cfe28de8a9757e3fae2aff4",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/2015213/2015213_phases_of_play.csv",
+      "size_bytes": 134493,
+      "md5": "unknown",
+      "sha1": "b46c9cb5b1cdc30e2ddd5b9a316547122e1ebeff",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/2015213/2015213_tracking_extrapolated.jsonl",
+      "size_bytes": 102030769,
+      "md5": "unknown",
+      "sha1": "unknown",
+      "sha256": "413990d0024d84856ce1f2a16866b8887472c0cea22c61caef0d1f46505a609e",
+      "upstream_provider": "github",
+      "git_blob_sha1": "623dbb6a374c8f448f678d226233be618c4606a4"
+    },
+    {
+      "key": "data/matches/2016236/2016236_dynamic_events.csv",
+      "size_bytes": 4542962,
+      "md5": "unknown",
+      "sha1": "6dd13e08dc962c87ebd0392eadb60c06eec2d632",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/2016236/2016236_match.json",
+      "size_bytes": 33791,
+      "md5": "unknown",
+      "sha1": "8bb23c902bb3d5ea82092f6b9c8c20e2379fa67b",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/2016236/2016236_phases_of_play.csv",
+      "size_bytes": 133630,
+      "md5": "unknown",
+      "sha1": "8d0b1eefbbdae01260bd295d5133af6f02f8001d",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/2016236/2016236_tracking_extrapolated.jsonl",
+      "size_bytes": 94737872,
+      "md5": "unknown",
+      "sha1": "unknown",
+      "sha256": "d78555f9dfd7d1ce9de38066d3c98e6d54417c6d45d73b1f1ce7e26f07263d8f",
+      "upstream_provider": "github",
+      "git_blob_sha1": "c68f711f9c32d42aadfccd8e9a416b8a82e5fd0e"
+    },
+    {
+      "key": "data/matches/2017461/2017461_dynamic_events.csv",
+      "size_bytes": 3957366,
+      "md5": "unknown",
+      "sha1": "68380a92e6fa7c3df056a2e5addc00af1d1a393a",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/2017461/2017461_match.json",
+      "size_bytes": 28545,
+      "md5": "unknown",
+      "sha1": "281fd462ac1ca85a6d9ed2d5b5d5a7654627abe4",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/2017461/2017461_phases_of_play.csv",
+      "size_bytes": 118313,
+      "md5": "unknown",
+      "sha1": "83fbec6d78c9acfed20593545bfda121821365e9",
+      "sha256": "unknown",
+      "upstream_provider": "github"
+    },
+    {
+      "key": "data/matches/2017461/2017461_tracking_extrapolated.jsonl",
+      "size_bytes": 89543442,
+      "md5": "unknown",
+      "sha1": "unknown",
+      "sha256": "59cfa5588efee041da439f44df5b5b92f2b7305571dc831164e3d05f7415787a",
+      "upstream_provider": "github",
+      "git_blob_sha1": "dda453946dcc75501a38d93a83feae65a7f80dbb"
+    },
+    {
+      "key": "raw/1925299.jsonl.zip",
+      "size_bytes": 623408231,
+      "md5": "unknown",
+      "sha1": "unknown",
+      "sha256": "0415665098d594fb5681815000f7a6312037788a3237910a9f41bb8de5c336a0",
+      "upstream_provider": "huggingface",
+      "upstream_revision": "a62e1ec1e3b82952042a7f7fa9dafd77c0e0822a"
+    },
+    {
+      "key": "raw/1996435.jsonl.zip",
+      "size_bytes": 644327811,
+      "md5": "unknown",
+      "sha1": "unknown",
+      "sha256": "64bcab2be9776172d062521d9a97e0e6f391fc9cacb331f9e42a6fe88cf8434b",
+      "upstream_provider": "huggingface",
+      "upstream_revision": "a62e1ec1e3b82952042a7f7fa9dafd77c0e0822a"
+    }
+  ],
+  "teams": [
+    {
+      "provider_team_id": "866",
+      "display_name": "Adelaide United Football Club",
+      "short_name": "Adelaide United"
+    },
+    {
+      "provider_team_id": "867",
+      "display_name": "Wellington Phoenix FC",
+      "short_name": "Wellington P FC"
+    },
+    {
+      "provider_team_id": "868",
+      "display_name": "Melbourne Victory Football Club",
+      "short_name": "Melbourne V FC"
+    },
+    {
+      "provider_team_id": "869",
+      "display_name": "Sydney Football Club",
+      "short_name": "Sydney FC"
+    },
+    {
+      "provider_team_id": "870",
+      "display_name": "Central Coast Mariners Football Club",
+      "short_name": "CC Mariners"
+    },
+    {
+      "provider_team_id": "871",
+      "display_name": "Perth Glory Football Club",
+      "short_name": "Perth Glory"
+    },
+    {
+      "provider_team_id": "1802",
+      "display_name": "Brisbane Roar FC",
+      "short_name": "Brisbane FC"
+    },
+    {
+      "provider_team_id": "1803",
+      "display_name": "Western United",
+      "short_name": "Western United"
+    },
+    {
+      "provider_team_id": "1804",
+      "display_name": "Macarthur FC",
+      "short_name": "Macarthur FC"
+    },
+    {
+      "provider_team_id": "1805",
+      "display_name": "Newcastle United Jets FC",
+      "short_name": "Newcastle"
+    },
+    {
+      "provider_team_id": "2380",
+      "display_name": "Melbourne City FC",
+      "short_name": "Melbourne City"
+    },
+    {
+      "provider_team_id": "2902",
+      "display_name": "Western Sydney Wanderers FC",
+      "short_name": "Western Sydney"
+    },
+    {
+      "provider_team_id": "4177",
+      "display_name": "Auckland FC",
+      "short_name": "Auckland FC"
+    }
+  ]
+}

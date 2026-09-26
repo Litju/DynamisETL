@@ -1282,6 +1282,9 @@ class SourceCatalogEntryRecord(Base):
     asset_identity: Mapped[str | None] = mapped_column(Text)
     expected_size_bytes: Mapped[int | None] = mapped_column(BigInteger)
     rights: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    provider_metadata: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=JSON_EMPTY_OBJECT
+    )
     upstream_capabilities: Mapped[list[Any]] = mapped_column(
         JSONB, nullable=False, server_default=JSON_EMPTY_ARRAY
     )
