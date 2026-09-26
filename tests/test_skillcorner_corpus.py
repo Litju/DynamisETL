@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+
+from dynamis.adapters.skillcorner.adapter import SkillCornerMatchAdapter
 from dynamis.adapters.skillcorner.aggregates import _canonicalize
 from dynamis.adapters.skillcorner.authorities import pose_stream_id, tracking_stream_id
 from dynamis.adapters.skillcorner.catalog import (
@@ -77,3 +80,43 @@ def test_skillcorner_match_stream_ids_preserve_legacy_and_scope_new_matches() ->
     assert pose_stream_id(1) == pose_stream_id(1, "1925299")
     assert tracking_stream_id(1, "1996435") != tracking_stream_id(1, "1925299")
     assert pose_stream_id(1, "1996435") != pose_stream_id(1, "1925299")
+
+
+def test_pinned_match_adapter_preserves_catalog_contest_provenance(tmp_path) -> None:
+    corpus = load_corpus_manifest()
+    source_match = next(item for item in corpus["matches"] if str(item["id"]) == "1996435")
+    match_path = tmp_path / "match.json"
+    details = {
+        **source_match["detail"],
+        "id": source_match["id"],
+        "pitch_length": 105.0,
+        "pitch_width": 68.0,
+        "players": [],
+    }
+    match_path.write_text(json.dumps(details), encoding="utf-8")
+    adapter = SkillCornerMatchAdapter(
+        match_json_path=match_path,
+        tracking_path=tmp_path / "tracking.jsonl",
+        pose_zip_path=tmp_path / "pose.zip",
+        version=corpus["upstream"]["revision"],
+    )
+
+    context = adapter.domain().sports_contexts[0]
+    crosswalks = {
+        (item.entity_kind.value, item.provider_entity_id): item for item in context.crosswalks
+    }
+    team = next(
+        item
+        for item in corpus["teams"]
+        if str(item["provider_team_id"]) == str(source_match["home_team"]["id"])
+    )
+
+    assert context.contest.source_authority == (
+        f"SkillCorner matches.json and match.json@{corpus['upstream']['revision']}"
+    )
+    assert crosswalks[("team", str(team["provider_team_id"]))].metadata == {
+        "short_name": team["short_name"]
+    }
+    assert crosswalks[("contest", "1996435")].metadata == {
+        "matches_json_status": source_match["status"]
+    }

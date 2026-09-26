@@ -65,7 +65,7 @@ from dynamis.serving.models import (
     StreamView,
     TrialView,
 )
-from dynamis.serving.repository import MetricFilters
+from dynamis.serving.repository import MetricFilters, _source_readiness
 from dynamis.storage.object_store import ObjectMetadata, S3ObjectStore
 
 LICENSE = LicenseView(
@@ -556,6 +556,8 @@ def test_source_capabilities_separate_upstream_and_local_readiness(client: TestC
     assert item["source_readiness"] == "UPSTREAM_AVAILABLE"
     assert item["local_readiness"] == "PARTIAL"
     assert item["pending_local_capabilities"] == ["EVENTS", "PHASES"]
+    assert _source_readiness("ACQUISITION_FAILED", {"TRACKING"}) == "UPSTREAM_FAILED"
+    assert _source_readiness("REGISTERED", set()) == "UPSTREAM_UNAVAILABLE"
 
 
 def test_pitch_dimensions_require_positive_finite_source_metres() -> None:

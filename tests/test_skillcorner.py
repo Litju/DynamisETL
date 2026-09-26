@@ -204,6 +204,29 @@ def test_synthetic_skillcorner_ingest_is_reconciled_and_contract_clean(
     assert pose_summaries["9000001-pose-period-2"]["unavailable_joints"] == 0
 
 
+def test_skillcorner_match_without_pose_materializes_tracking_only(
+    tmp_settings, bundle: dict[str, Path]
+) -> None:
+    result = ingest_skillcorner_match(
+        tmp_settings,
+        match_json_path=bundle["match_json"],
+        tracking_path=bundle["tracking"],
+        pose_zip_path=None,
+        version="synthetic",
+    )
+
+    assert result.reconciliation.all_balanced
+    assert len(result.streams) == 2
+    assert all(stream.modality == "tracking" for stream in result.streams)
+    assert not any(key.endswith(".jsonl.zip") for key in result.source_keys)
+    assert result.reconciliation.domain["pose_availability"] == {
+        "source": "UPSTREAM_UNAVAILABLE",
+        "local": "NOT_MATERIALIZED",
+    }
+    assert result.provider_domain.authorities.skeletons == ()
+    assert result.provider_domain.authorities.alignments == ()
+
+
 def test_coincidence_analysis_reports_without_forcing_equality(bundle: dict[str, Path]) -> None:
     report = analyse_coincidences(
         pose_zip_path=bundle["pose_zip"],

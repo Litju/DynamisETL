@@ -1,11 +1,10 @@
-"""SkillCorner Open Data match adapter: metadata + tracking + body pose.
+"""SkillCorner Open Data match adapter: metadata + tracking + optional body pose.
 
 The adapter owns provider semantics and emits canonical domain records
 (``Session``/``Subject``/``SessionParticipant``/``Trial``/``SensorStream``), the
-declared authorities (two frames, one clock, one synchronization spec, one
-29-landmark skeleton set and two explicit pose -> tracking alignments) and the
-canonical streams. It streams the ~3.3 GB pose member straight from the ZIP and
-never expands it.
+    declared authorities (frames, clock, synchronization, skeleton and alignment)
+    and the canonical streams. It streams any Pose member from the ZIP and never
+    expands it.
 """
 
 from __future__ import annotations
@@ -27,6 +26,7 @@ from dynamis.adapters.skillcorner.metadata import (
 from dynamis.adapters.skillcorner.pose import (
     CoincidenceReport,
     PoseCanonicalizer,
+    PosePeriodSummary,
     analyse_coincidences,
 )
 from dynamis.adapters.skillcorner.tracking import (
@@ -94,13 +94,13 @@ class SkillCornerMatchAdapter:
         *,
         match_json_path: Path,
         tracking_path: Path,
-        pose_zip_path: Path,
+        pose_zip_path: Path | None,
         version: str,
         batch_size: int = DEFAULT_BATCH_SIZE,
     ) -> None:
         self._match_json_path = Path(match_json_path)
         self._tracking_path = Path(tracking_path)
-        self._pose_zip_path = Path(pose_zip_path)
+        self._pose_zip_path = Path(pose_zip_path) if pose_zip_path is not None else None
         self._version = version
         self._batch_size = batch_size
         self._metadata: SkillCornerMatchMetadata | None = None
@@ -135,8 +135,9 @@ class SkillCornerMatchAdapter:
 
     def source_authorities(self) -> SourceAuthorities:
         metadata = self.metadata
+        has_pose = self._pose_zip_path is not None
         alignments: list[SyncAlignment] = []
-        for period in metadata.periods:
+        for period in metadata.periods if has_pose else ():
             alignments.append(
                 SyncAlignment(
                     source_stream_id=authorities.pose_stream_id(period.period, metadata.match_id),
@@ -159,12 +160,12 @@ class SkillCornerMatchAdapter:
         return SourceAuthorities(
             frames=(
                 authorities.pitch_frame(metadata.pitch_length_m, metadata.pitch_width_m),
-                authorities.pose_hybrid_frame(),
+                *((authorities.pose_hybrid_frame(),) if has_pose else ()),
             ),
             clocks=(authorities.match_clock(),),
             synchronizations=(authorities.source_sync_spec(),),
             alignments=tuple(alignments),
-            skeletons=(authorities.pose_skeleton(),),
+            skeletons=(authorities.pose_skeleton(),) if has_pose else (),
             spatial_references=(
                 SpatialReference(
                     spatial_reference_id=f"{authorities.TRACKING_FRAME_ID}:{metadata.match_id}",
@@ -291,32 +292,33 @@ class SkillCornerMatchAdapter:
                     data_grain=DataGrain(kind=DataGrainKind.FRAME_SERIES),
                 )
             )
-            streams.append(
-                SensorStream(
-                    dataset_id=self.dataset_id,
-                    session_id=metadata.session_id,
-                    stream_id=authorities.pose_stream_id(period.period, metadata.match_id),
-                    modality=Modality.POSE,
-                    measurement_class=MeasurementClass.MODEL_ESTIMATED,
-                    clock_id=authorities.CLOCK_ID,
-                    synchronization_spec_id=authorities.SYNC_SPEC_ID,
-                    coordinate_frame_id=authorities.POSE_FRAME_ID,
-                    skeleton_id=authorities.POSE_SKELETON_ID,
-                    trial_id=period.name,
-                    nominal_sampling_rate_hz=authorities.POSE_FRAME_RATE_HZ,
-                    si_units=("m",),
-                    source_unit="m",
-                    stream_metadata={
-                        "source_file_key": self._pose_zip_path.name,
-                        "provider_product": "body pose (25 fps, 29 landmarks)",
-                        "joint_rows_per_player_frame": len(authorities.POSE_LANDMARKS),
-                        "error_source_field": authorities.POSE_ERROR_SOURCE_FIELD,
-                        "error_source_to_si_scale": (authorities.POSE_ERROR_SOURCE_TO_SI_SCALE),
-                        "error_semantics": authorities.POSE_ERROR_SEMANTICS,
-                    },
-                    data_grain=DataGrain(kind=DataGrainKind.JOINT_FRAME_SERIES),
+            if self._pose_zip_path is not None:
+                streams.append(
+                    SensorStream(
+                        dataset_id=self.dataset_id,
+                        session_id=metadata.session_id,
+                        stream_id=authorities.pose_stream_id(period.period, metadata.match_id),
+                        modality=Modality.POSE,
+                        measurement_class=MeasurementClass.MODEL_ESTIMATED,
+                        clock_id=authorities.CLOCK_ID,
+                        synchronization_spec_id=authorities.SYNC_SPEC_ID,
+                        coordinate_frame_id=authorities.POSE_FRAME_ID,
+                        skeleton_id=authorities.POSE_SKELETON_ID,
+                        trial_id=period.name,
+                        nominal_sampling_rate_hz=authorities.POSE_FRAME_RATE_HZ,
+                        si_units=("m",),
+                        source_unit="m",
+                        stream_metadata={
+                            "source_file_key": self._pose_zip_path.name,
+                            "provider_product": "body pose (25 fps, 29 landmarks)",
+                            "joint_rows_per_player_frame": len(authorities.POSE_LANDMARKS),
+                            "error_source_field": authorities.POSE_ERROR_SOURCE_FIELD,
+                            "error_source_to_si_scale": (authorities.POSE_ERROR_SOURCE_TO_SI_SCALE),
+                            "error_semantics": authorities.POSE_ERROR_SEMANTICS,
+                        },
+                        data_grain=DataGrain(kind=DataGrainKind.JOINT_FRAME_SERIES),
+                    )
                 )
-            )
         namespace = NAMESPACE
         corpus = load_corpus_manifest()
         index_match = next(
@@ -325,7 +327,7 @@ class SkillCornerMatchAdapter:
         )
         upstream = corpus["upstream"]
         revision = upstream["revision"]
-        authority = f"match.json@{revision}"
+        authority = f"SkillCorner matches.json and match.json@{revision}"
         sport = Sport(sport_id="football", code="football", display_name="Football")
         home_team_id = canonical_sports_id(namespace, SportsEntityKind.TEAM, metadata.home_team_id)
         away_team_id = canonical_sports_id(namespace, SportsEntityKind.TEAM, metadata.away_team_id)
@@ -333,6 +335,7 @@ class SkillCornerMatchAdapter:
         team_names = {
             str(item["provider_team_id"]): item["display_name"] for item in corpus["teams"]
         }
+        teams_by_id = {str(item["provider_team_id"]): item for item in corpus["teams"]}
         competition = (
             Competition(
                 competition_id=canonical_sports_id(
@@ -431,12 +434,14 @@ class SkillCornerMatchAdapter:
                             entity_kind=SportsEntityKind.COMPETITION,
                             provider_entity_id=upstream["competition"]["provider_id"],
                             source_authority=authority,
+                            metadata={"name": upstream["competition"]["name"]},
                         ),
                         provider_crosswalk(
                             provider_namespace=namespace,
                             entity_kind=SportsEntityKind.EDITION,
                             provider_entity_id=upstream["competition_edition"]["provider_id"],
                             source_authority=authority,
+                            metadata={"label": upstream["season"]["label"]},
                         ),
                     )
                     if index_match
@@ -447,18 +452,27 @@ class SkillCornerMatchAdapter:
                     entity_kind=SportsEntityKind.TEAM,
                     provider_entity_id=metadata.home_team_id,
                     source_authority=authority,
+                    metadata={
+                        "short_name": teams_by_id.get(metadata.home_team_id, {}).get("short_name")
+                    },
                 ),
                 provider_crosswalk(
                     provider_namespace=namespace,
                     entity_kind=SportsEntityKind.TEAM,
                     provider_entity_id=metadata.away_team_id,
                     source_authority=authority,
+                    metadata={
+                        "short_name": teams_by_id.get(metadata.away_team_id, {}).get("short_name")
+                    },
                 ),
                 provider_crosswalk(
                     provider_namespace=namespace,
                     entity_kind=SportsEntityKind.CONTEST,
                     provider_entity_id=metadata.match_id,
                     source_authority=authority,
+                    metadata=(
+                        {"matches_json_status": index_match["status"]} if index_match else None
+                    ),
                 ),
                 *(
                     ProviderIdentityCrosswalk(
@@ -502,6 +516,9 @@ class SkillCornerMatchAdapter:
                 "measurement_note": (
                     "tracking and pose are provider broadcast-video model estimates; pose "
                     "coordinates are MODEL_ESTIMATED, never raw instrument measurements"
+                    if self._pose_zip_path is not None
+                    else "tracking is a provider broadcast-video model estimate, never an "
+                    "instrument measurement"
                 ),
             },
             sports_contexts=(sports_context,),
@@ -531,6 +548,8 @@ class SkillCornerMatchAdapter:
         return self.parse_tracking().summary(period)
 
     def parse_pose(self) -> PoseCanonicalizer:
+        if self._pose_zip_path is None:
+            raise ValueError(f"match {self.metadata.match_id} has no upstream Pose archive")
         if self._pose is None:
             self._pose = PoseCanonicalizer(
                 self._pose_zip_path,
@@ -541,12 +560,18 @@ class SkillCornerMatchAdapter:
         return self._pose
 
     def pose_streams(self) -> tuple[CanonicalStream, ...]:
+        if self._pose_zip_path is None:
+            return ()
         return self.parse_pose().streams()
 
-    def pose_summary(self, period: int):
+    def pose_summary(self, period: int) -> PosePeriodSummary | None:
+        if self._pose_zip_path is None:
+            return None
         return self.parse_pose().summary(period)
 
-    def coincidence_report(self, *, refresh: bool = False) -> CoincidenceReport:
+    def coincidence_report(self, *, refresh: bool = False) -> CoincidenceReport | None:
+        if self._pose_zip_path is None:
+            return None
         if self._coincidence_report is None or refresh:
             self._coincidence_report = analyse_coincidences(
                 pose_zip_path=self._pose_zip_path,

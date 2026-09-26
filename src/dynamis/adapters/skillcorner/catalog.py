@@ -150,8 +150,17 @@ def validate_upstream_corpus(
                 raise ValueError(
                     f"{key}: resolved SHA-256 disagrees with the pinned corpus manifest"
                 )
+            expected_sha1 = expected.get("sha1")
+            if expected_sha1 not in (None, "unknown"):
+                resolved_sha1 = resolved.git_blob_sha1 or resolved.upstream_sha1
+                if resolved_sha1 is None or expected_sha1.lower() != resolved_sha1.lower():
+                    raise ValueError(
+                        f"{key}: resolved SHA-1 disagrees with the pinned corpus manifest"
+                    )
             if declared.size_bytes != expected["size_bytes"]:
                 raise ValueError(f"{key}: registry size disagrees with the pinned corpus manifest")
+            if declared.sha1 not in ("unknown", expected_sha1):
+                raise ValueError(f"{key}: registry SHA-1 disagrees with the pinned corpus manifest")
         index_url = (
             f"https://raw.githubusercontent.com/{manifest['upstream']['repository']}/"
             f"{revision}/{manifest['upstream']['match_index_key']}"

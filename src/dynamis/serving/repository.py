@@ -64,6 +64,12 @@ MEASUREMENT_CLASS_NEVER_MEANS: list[str] = [
 ]
 
 
+def _source_readiness(availability_state: str, upstream_capabilities: set[str]) -> str:
+    if availability_state == "ACQUISITION_FAILED":
+        return "UPSTREAM_FAILED"
+    return "UPSTREAM_AVAILABLE" if upstream_capabilities else "UPSTREAM_UNAVAILABLE"
+
+
 def list_source_capabilities(connection: Connection, dataset_id: str) -> list[SourceCapabilityView]:
     """Separate provider-available capability from locally materialized data."""
     entries = (
@@ -181,7 +187,7 @@ def list_source_capabilities(connection: Connection, dataset_id: str) -> list[So
                 external_id=str(row["external_id"]),
                 object_kind=str(row["object_kind"]),
                 availability_state=str(row["availability_state"]),
-                source_readiness="UPSTREAM_AVAILABLE",
+                source_readiness=_source_readiness(str(row["availability_state"]), upstream),
                 local_readiness=readiness,
                 upstream_capabilities=sorted(upstream),
                 local_capabilities=sorted(materialized),
