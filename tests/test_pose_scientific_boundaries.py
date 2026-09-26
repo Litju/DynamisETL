@@ -84,7 +84,7 @@ def test_skillcorner_pose_coordinates_pass_through_unchanged(
         version="synthetic",
     )
     streams = {item.stream_id: item for item in result.streams}
-    table = pq.read_table(streams["pose-period-1"].absolute_path)
+    table = pq.read_table(streams["9000001-pose-period-1"].absolute_path)
     source = synthetic_skillcorner.joints_for(player_id=101, frame=0)["nose"]["xyz"]
     row = next(
         item

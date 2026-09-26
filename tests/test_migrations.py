@@ -18,7 +18,7 @@ from sqlalchemy.engine import Engine
 from dynamis.config import ENV_DB_SCHEMA, ENV_POSTGRES_URL, repository_root
 from dynamis.storage.tables import EXPECTED_TABLE_NAMES
 
-HEAD_REVISION = "0009_multisport_semantic_catalog"
+HEAD_REVISION = "0010_provider_catalog_meta"
 
 
 def _alembic_config(url: str) -> Config:
@@ -150,6 +150,11 @@ def test_migration_lifecycle_on_postgresql(
         assert int(schema_exists) == 1
         assert check_count >= 60
         assert foreign_keys >= 40
+        source_catalog_columns = {
+            column["name"]
+            for column in inspect(engine).get_columns("source_catalog_entry", schema=test_db_schema)
+        }
+        assert "provider_metadata" in source_catalog_columns
         # The intended schema is the one that received the objects.
         assert not (EXPECTED_TABLE_NAMES & _schema_tables(engine, "public"))
 

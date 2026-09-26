@@ -142,6 +142,7 @@ class RetrievalFile(Contract):
     sha256: Sha256Value = "unknown"
     upstream_provider: str | None = Field(default=None, min_length=1)
     upstream_revision: str | None = Field(default=None, min_length=1)
+    upstream_capabilities: tuple[str, ...] | None = None
     local_sha256: SHA256 | None = None
     retrieved_at: AwareDatetime | None = None
 

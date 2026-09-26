@@ -190,12 +190,53 @@ def _verify_existing(path: Path, item: PlannedFile) -> FileDigest:
 def _load_or_expect(
     settings: Settings, plan: AcquisitionPlan, registry: DatasetRegistry | None
 ) -> BronzeManifest:
+    document = registry if registry is not None else validate_registry()
+    source = source_by_id(document, plan.dataset_id)
+    expected = manifest_from_registry(source, source.version(plan.version))
     try:
-        return read_bronze_manifest(settings, dataset_id=plan.dataset_id, version=plan.version)
+        existing = read_bronze_manifest(settings, dataset_id=plan.dataset_id, version=plan.version)
     except FileNotFoundError:
-        document = registry if registry is not None else validate_registry()
-        source = source_by_id(document, plan.dataset_id)
-        return manifest_from_registry(source, source.version(plan.version))
+        return expected
+
+    previous = {item.key: item for item in existing.files}
+    expected_keys = {item.key for item in expected.files}
+    merged = []
+    for item in expected.files:
+        old = previous.get(item.key)
+        if old is None:
+            merged.append(item)
+            continue
+        for field in ("size_bytes", "upstream_md5", "upstream_sha1", "upstream_sha256"):
+            old_value = getattr(old, field)
+            expected_value = getattr(item, field)
+            if old_value is not None and expected_value is not None and old_value != expected_value:
+                raise ImmutableArtifactError(
+                    f"existing Bronze manifest identity for {item.key} conflicts with the registry"
+                )
+        merged.append(
+            item.model_copy(
+                update={
+                    "size_bytes": item.size_bytes or old.size_bytes,
+                    "upstream_md5": item.upstream_md5 or old.upstream_md5,
+                    "upstream_sha1": item.upstream_sha1 or old.upstream_sha1,
+                    "upstream_sha256": item.upstream_sha256 or old.upstream_sha256,
+                    "local_sha256": old.local_sha256,
+                    "retrieved_at": old.retrieved_at,
+                    "verified_at": old.verified_at,
+                    "upstream_url": old.upstream_url,
+                }
+            )
+        )
+    merged.extend(previous[key] for key in sorted(previous.keys() - expected_keys))
+    retrieval_times = [item.retrieved_at for item in merged if item.retrieved_at is not None]
+    verification_times = [item.verified_at for item in merged if item.verified_at is not None]
+    return expected.model_copy(
+        update={
+            "files": tuple(merged),
+            "retrieved_at": min(retrieval_times) if retrieval_times else existing.retrieved_at,
+            "verified_at": max(verification_times) if verification_times else existing.verified_at,
+        }
+    )
 
 
 def _stamp_upstream_urls(manifest: BronzeManifest, urls: dict[str, str]) -> BronzeManifest:

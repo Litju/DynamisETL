@@ -67,6 +67,20 @@ class DatasetDetail(DatasetSummary):
     adapter_id: str
 
 
+class SourceCapabilityView(BaseModel):
+    entry_id: str
+    external_id: str
+    object_kind: str
+    availability_state: str
+    source_readiness: str
+    local_readiness: str
+    upstream_capabilities: list[str]
+    local_capabilities: list[str]
+    pending_local_capabilities: list[str]
+    provider_metadata: dict[str, Any]
+    source_file_states: dict[str, str]
+
+
 class SubjectView(BaseModel):
     subject_id: str
     sex: str

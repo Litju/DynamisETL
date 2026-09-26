@@ -769,15 +769,15 @@ def ingest_skillcorner_match(
     *,
     match_json_path: Path,
     tracking_path: Path,
-    pose_zip_path: Path,
+    pose_zip_path: Path | None,
     version: str,
     row_group_size: int = DEFAULT_ROW_GROUP_SIZE,
     batch_size: int = DEFAULT_BATCH_SIZE,
 ) -> IngestResult:
-    """One SkillCorner match -> 10 Hz tracking + 25 Hz pose Silver streams.
+    """One SkillCorner match -> 10 Hz tracking and optional 25 Hz pose Silver streams.
 
-    The pose archive member is streamed directly from the ZIP; the ~3.3 GB
-    plaintext file is never expanded and no match-sized Python structure is
+    When present, the pose archive member is streamed directly from the ZIP;
+    its plaintext file is never expanded and no match-sized Python structure is
     materialized. Provider/model-estimated coordinates stay labelled
     ``MODEL_ESTIMATED``; the provider match clock, hybrid pose geometry and
     p90 error-radius semantics are preserved exactly, and pose/tracking XY
@@ -797,7 +797,7 @@ def ingest_skillcorner_match(
     source_keys = (
         f"data/matches/{metadata.match_id}/{metadata.match_id}_match.json",
         f"data/matches/{metadata.match_id}/{metadata.match_id}_tracking_extrapolated.jsonl",
-        f"raw/{metadata.match_id}.jsonl.zip",
+        *((f"raw/{metadata.match_id}.jsonl.zip",) if pose_zip_path is not None else ()),
     )
 
     streams = (*adapter.tracking_streams(), *adapter.pose_streams())
@@ -820,11 +820,9 @@ def ingest_skillcorner_match(
     for period in metadata.periods:
         tracking = adapter.tracking_summary(period.period)
         pose = adapter.pose_summary(period.period)
-        observed_player_ids |= tracking.seen_player_ids | pose.seen_player_ids
+        observed_player_ids |= tracking.seen_player_ids
         tracking_summaries[tracking.stream_id] = tracking.to_dict()
-        pose_summaries[pose.stream_id] = pose.to_dict()
         tracking_result = result_by_stream[tracking.stream_id]
-        pose_result = result_by_stream[pose.stream_id]
         reconciliations.append(
             StreamReconciliation(
                 stream_id=tracking.stream_id,
@@ -855,44 +853,52 @@ def ingest_skillcorner_match(
                 },
             )
         )
-        reconciliations.append(
-            StreamReconciliation(
-                stream_id=pose.stream_id,
-                modality=Modality.POSE.value,
-                subject_id=None,
-                trial_id=period.name,
-                source_records=pose.source_records,
-                canonical_rows=pose.canonical_rows,
-                quarantined_rows=pose.quarantined_rows,
-                ignored_records=0,
-                ignored_reasons={},
-                canonical_time_min_ns=pose_result.t_rel_min_ns,
-                canonical_time_max_ns=pose_result.t_rel_max_ns,
-                null_counts=pose_result.null_counts,
-                schema_valid=True,
-                units_valid=True,
-                coordinate_frame_id=pose_result.coordinate_frame_id,
-                checks={
-                    **pose.to_dict(),
-                    "frame_range": [period.start_frame, period.end_frame],
-                    "landmark_order_authority": (
-                        "data/bodypose/README.md at the pinned SkillCorner revision"
-                    ),
-                    "error_source_field": "p90_mae_cm",
-                    "error_source_to_si_scale": 0.01,
-                    "error_semantics": (
-                        "90th-percentile predicted error radius; never a probability or confidence"
-                    ),
-                    "player_frames_without_pose": (
-                        pose.player_frames - pose.player_frames_with_pose
-                    ),
-                    "missing_joints_imputed": False,
-                    "unavailable_joint_rows": pose.unavailable_joints,
-                },
+        if pose is not None:
+            observed_player_ids |= pose.seen_player_ids
+            pose_summaries[pose.stream_id] = pose.to_dict()
+            pose_result = result_by_stream[pose.stream_id]
+            reconciliations.append(
+                StreamReconciliation(
+                    stream_id=pose.stream_id,
+                    modality=Modality.POSE.value,
+                    subject_id=None,
+                    trial_id=period.name,
+                    source_records=pose.source_records,
+                    canonical_rows=pose.canonical_rows,
+                    quarantined_rows=pose.quarantined_rows,
+                    ignored_records=0,
+                    ignored_reasons={},
+                    canonical_time_min_ns=pose_result.t_rel_min_ns,
+                    canonical_time_max_ns=pose_result.t_rel_max_ns,
+                    null_counts=pose_result.null_counts,
+                    schema_valid=True,
+                    units_valid=True,
+                    coordinate_frame_id=pose_result.coordinate_frame_id,
+                    checks={
+                        **pose.to_dict(),
+                        "frame_range": [period.start_frame, period.end_frame],
+                        "landmark_order_authority": (
+                            "data/bodypose/README.md at the pinned SkillCorner revision"
+                        ),
+                        "error_source_field": "p90_mae_cm",
+                        "error_source_to_si_scale": 0.01,
+                        "error_semantics": (
+                            "90th-percentile predicted error radius; "
+                            "never a probability or confidence"
+                        ),
+                        "player_frames_without_pose": (
+                            pose.player_frames - pose.player_frames_with_pose
+                        ),
+                        "missing_joints_imputed": False,
+                        "unavailable_joint_rows": pose.unavailable_joints,
+                    },
+                )
             )
-        )
 
     unmatched_player_ids = sorted(declared_player_ids - observed_player_ids)
+    from dynamis.adapters.skillcorner.catalog import load_corpus_manifest
+
+    pose_source_available = metadata.match_id in set(load_corpus_manifest()["pose"]["match_ids"])
     receipt = ReconciliationReceipt(
         dataset_id=SKILLCORNER_DATASET_ID,
         version=version,
@@ -911,17 +917,25 @@ def ingest_skillcorner_match(
             "unmatched_declared_player_ids": unmatched_player_ids,
             "tracking": tracking_summaries,
             "pose": pose_summaries,
-            "pose_tracking_sync": coincidence.to_dict(),
+            "pose_tracking_sync": coincidence.to_dict() if coincidence else None,
+            "pose_availability": {
+                "source": (
+                    "UPSTREAM_AVAILABLE" if pose_source_available else "UPSTREAM_UNAVAILABLE"
+                ),
+                "local": "MATERIALIZED" if pose_zip_path is not None else "NOT_MATERIALIZED",
+            },
             "measurement_classes": {
                 "tracking": "MODEL_ESTIMATED",
-                "pose": "MODEL_ESTIMATED",
+                **({"pose": "MODEL_ESTIMATED"} if pose_zip_path is not None else {}),
             },
             "geometry": {
                 "tracking": "pitch-centred X/Y metres; source Z preserved unchanged",
                 "pose": (
                     "hybrid: pitch-global X/Y with source Z relative to the player centroid, "
                     "not pitch-registered"
-                ),
+                )
+                if pose_zip_path is not None
+                else "unavailable: no Pose asset is registered for this match",
                 "hidden_corrections": False,
                 "absolute_height_interpretation": False,
             },
@@ -933,10 +947,16 @@ def ingest_skillcorner_match(
         quarantine_artifacts=quarantine_artifacts,
         notes=(
             "MIT source (attribution requested): inputs and outputs stay outside Git.",
-            "Pose and tracking coordinates are provider broadcast-video model estimates "
-            "(MODEL_ESTIMATED), never raw instrument measurements.",
-            "Provider Z is preserved exactly: no global pitch registration for pose Z, no "
-            "absolute player-height interpretation, no hidden transform.",
+            *(
+                (
+                    "Pose and tracking coordinates are provider broadcast-video model estimates "
+                    "(MODEL_ESTIMATED), never raw instrument measurements.",
+                    "Provider Z is preserved exactly: no global pitch registration for pose Z, "
+                    "no absolute player-height interpretation, no hidden transform.",
+                )
+                if pose_zip_path is not None
+                else ("This match has no upstream Pose asset; no Pose stream was materialized.",)
+            ),
             "Player frames with joints=null remain explicit coverage counts; individual "
             "missing joints would stay is_available=false rows; nothing is imputed.",
             "No smoothing, interpolation, joint angle, angular velocity, ROM or inverse "

@@ -65,6 +65,7 @@ from dynamis.serving.models import (
     ServingStatus,
     SessionDetail,
     SessionSummary,
+    SourceCapabilityView,
     TacticalCapabilityView,
     TacticalEventPage,
     TacticalEventView,
@@ -91,6 +92,8 @@ class ServingBackend(Protocol):
     def datasets(self) -> list[DatasetSummary]: ...
 
     def dataset(self, dataset_id: str) -> DatasetDetail | None: ...
+
+    def source_capabilities(self, dataset_id: str) -> list[SourceCapabilityView]: ...
 
     def sessions(self, dataset_id: str) -> list[SessionSummary]: ...
 
@@ -204,6 +207,10 @@ class PostgresServingBackend:
     def dataset(self, dataset_id: str) -> DatasetDetail | None:
         with self._connect() as connection:
             return repository.dataset_detail(connection, dataset_id, gold_schema=self.gold_schema)
+
+    def source_capabilities(self, dataset_id: str) -> list[SourceCapabilityView]:
+        with self._connect() as connection:
+            return repository.list_source_capabilities(connection, dataset_id)
 
     def sessions(self, dataset_id: str) -> list[SessionSummary]:
         with self._connect() as connection:
@@ -689,6 +696,18 @@ def create_app(
     @app.get("/api/catalog/datasets", response_model=list[DatasetSummary], tags=["catalog"])
     def list_datasets(service: BackendDependency) -> list[DatasetSummary]:
         return service.datasets()
+
+    @app.get(
+        "/api/catalog/source-capabilities",
+        response_model=list[SourceCapabilityView],
+        tags=["catalog"],
+    )
+    def source_capabilities(
+        dataset_id: str, service: BackendDependency
+    ) -> list[SourceCapabilityView]:
+        if service.dataset(dataset_id) is None:
+            raise HTTPException(status_code=404, detail=f"dataset {dataset_id!r} is not registered")
+        return service.source_capabilities(dataset_id)
 
     @app.get("/api/catalog/datasets/{dataset_id}", response_model=DatasetDetail, tags=["catalog"])
     def dataset_detail(dataset_id: str, service: BackendDependency) -> DatasetDetail:

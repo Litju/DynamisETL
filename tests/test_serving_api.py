@@ -61,10 +61,11 @@ from dynamis.serving.models import (
     SessionDetail,
     SessionParticipantView,
     SessionSummary,
+    SourceCapabilityView,
     StreamView,
     TrialView,
 )
-from dynamis.serving.repository import MetricFilters
+from dynamis.serving.repository import MetricFilters, _source_readiness
 from dynamis.storage.object_store import ObjectMetadata, S3ObjectStore
 
 LICENSE = LicenseView(
@@ -222,6 +223,25 @@ class FakeBackend:
             initial_scope="match 1925299",
             adapter_id="skillcorner_adapter",
         )
+
+    def source_capabilities(self, dataset_id: str) -> list[SourceCapabilityView]:
+        if dataset_id != DATASET.dataset_id:
+            return []
+        return [
+            SourceCapabilityView(
+                entry_id="source-1925299",
+                external_id="contest:1925299",
+                object_kind="contest",
+                availability_state="MATERIALIZED",
+                source_readiness="UPSTREAM_AVAILABLE",
+                local_readiness="PARTIAL",
+                upstream_capabilities=["TRACKING", "BALL_TRACKING", "EVENTS", "PHASES", "POSE"],
+                local_capabilities=["TRACKING", "BALL_TRACKING", "POSE"],
+                pending_local_capabilities=["EVENTS", "PHASES"],
+                provider_metadata={"pose_availability": "UPSTREAM_AVAILABLE"},
+                source_file_states={"pose": "ACQUIRED"},
+            )
+        ]
 
     def sessions(self, dataset_id: str) -> list[SessionSummary]:
         return [
@@ -527,6 +547,19 @@ def test_catalog_routes_preserve_rights_and_measurement_context(client: TestClie
     assert session.json()["participants"][0]["group_label"] == "home"
 
 
+def test_source_capabilities_separate_upstream_and_local_readiness(client: TestClient) -> None:
+    response = client.get(
+        "/api/catalog/source-capabilities", params={"dataset_id": "skillcorner-opendata"}
+    )
+    assert response.status_code == 200
+    item = response.json()[0]
+    assert item["source_readiness"] == "UPSTREAM_AVAILABLE"
+    assert item["local_readiness"] == "PARTIAL"
+    assert item["pending_local_capabilities"] == ["EVENTS", "PHASES"]
+    assert _source_readiness("ACQUISITION_FAILED", {"TRACKING"}) == "UPSTREAM_FAILED"
+    assert _source_readiness("REGISTERED", set()) == "UPSTREAM_UNAVAILABLE"
+
+
 def test_pitch_dimensions_require_positive_finite_source_metres() -> None:
     assert PitchDimensionsView(length_m=105.0, width_m=68.0).width_m == 68.0
     with pytest.raises(ValueError):
@@ -638,6 +671,7 @@ def test_openapi_document_covers_the_locked_surface() -> None:
         "/api/health",
         "/api/serving/status",
         "/api/catalog/datasets",
+        "/api/catalog/source-capabilities",
         "/api/catalog/datasets/{dataset_id}",
         "/api/catalog/datasets/{dataset_id}/sessions",
         "/api/catalog/datasets/{dataset_id}/sessions/{session_id}",

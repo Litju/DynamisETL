@@ -329,7 +329,6 @@ def _ingest(args: argparse.Namespace) -> tuple[IngestResult, str]:
             for name, value in (
                 ("match metadata", metadata_path),
                 ("tracking", tracking),
-                ("pose archive", pose),
             )
             if value is None
         ]
@@ -337,7 +336,7 @@ def _ingest(args: argparse.Namespace) -> tuple[IngestResult, str]:
             raise PlanError(
                 f"SkillCorner ingestion requires the full match set; missing: {missing_skillcorner}"
             )
-        assert metadata_path is not None and tracking is not None and pose is not None
+        assert metadata_path is not None and tracking is not None
         result = ingest_skillcorner_match(
             config,
             match_json_path=metadata_path,
