@@ -116,6 +116,11 @@ def test_adapter_keeps_one_participant_across_sessions(bundle: dict[str, Path]) 
     pose_streams = [stream for stream in domain.streams if stream.modality is Modality.POSE]
     assert len(pose_streams) == 2
     assert all(
+        stream.data_grain is not None
+        and stream.data_grain.axes == ("subject", "trial", "sample_index", "joint")
+        for stream in pose_streams
+    )
+    assert all(
         stream.measurement_class is MeasurementClass.MODEL_ESTIMATED for stream in pose_streams
     )
     skeletons = {skeleton.skeleton_id: skeleton for skeleton in domain.authorities.skeletons}

@@ -277,8 +277,171 @@ def _check_matchlab_v3_invariants(contract: dict[str, Any]) -> None:
         raise ContractError("V3 must freeze renderer, multi-view, worker and WebGPU ADRs")
 
 
+def _check_multisport_v4_invariants(contract: dict[str, Any]) -> None:
+    if contract["contract_id"] != "dynamisdata-multisport-platform":
+        raise ContractError("V4 contract id must identify the multi-sport platform")
+    core = contract["scientific_core"]
+    if set(core["entities"]) != {
+        "Dataset",
+        "Session",
+        "Trial",
+        "Stream",
+        "Artifact",
+        "Run",
+        "Metric",
+        "Provenance",
+        "Quality",
+        "Rights",
+    }:
+        raise ContractError("V4 must preserve the accepted scientific core")
+    sports = contract["sports_semantics"]
+    expected_entities = {
+        "Sport",
+        "Competition",
+        "CompetitionEdition",
+        "Team",
+        "Contest",
+        "ContestTeam",
+        "ContestPeriod",
+        "TeamRosterMembership",
+        "SessionSportContext",
+    }
+    if set(sports["entities"]) != expected_entities:
+        raise ContractError("V4 sports semantics must include exactly the frozen overlay entities")
+    if "only when source authority establishes it" not in " ".join(sports["contest_rules"]):
+        raise ContractError("contest semantics must remain source-authoritative")
+    crosswalk_rule = contract["provider_identity_crosswalk"]["merge_rule"]
+    if "Display-name equality never merges" not in crosswalk_rule:
+        raise ContractError("provider identity crosswalk must prohibit name-only merges")
+
+    grains = contract["data_grain"]["kinds"]
+    expected_grains = {
+        "FRAME_SERIES",
+        "JOINT_FRAME_SERIES",
+        "EVENT_SERIES",
+        "PLAY_BY_PLAY",
+        "GAME_SUMMARY",
+        "PLAYER_GAME",
+        "TEAM_GAME",
+        "PLAYER_SEASON",
+        "TEAM_SEASON",
+        "TRIAL_SERIES",
+        "SENSOR_SERIES",
+    }
+    if set(grains) != expected_grains or not all(grains.values()):
+        raise ContractError("V4 data-grain vocabulary or axes changed")
+    if grains["PLAYER_SEASON"] != ["subject", "team", "competition_edition"]:
+        raise ContractError("PLAYER_SEASON axes must remain subject/team/competition edition")
+    if grains["FRAME_SERIES"] != ["contest", "period", "canonical_time", "entity"]:
+        raise ContractError("FRAME_SERIES axes must remain contest/period/time/entity")
+    if grains["JOINT_FRAME_SERIES"] != ["contest", "period", "canonical_time", "subject", "joint"]:
+        raise ContractError("JOINT_FRAME_SERIES axes must remain contest/period/time/subject/joint")
+    if contract["data_grain"]["axis_variants"] != {"TRIAL_SERIES": ["joint"]}:
+        raise ContractError("joint-valued trials must add joint to the declared grain axes")
+
+    catalog = contract["source_catalog"]
+    required_states = {
+        "UPSTREAM_AVAILABLE",
+        "REGISTERED",
+        "ACQUIRED",
+        "MATERIALIZED",
+        "READY",
+        "ACQUISITION_FAILED",
+        "MATERIALIZATION_FAILED",
+        "VALIDATION_FAILED",
+    }
+    if set(catalog["states"]) != required_states:
+        raise ContractError("SourceCatalogEntry must retain every local/upstream and failure state")
+    if "catalog discovery is metadata-only" not in catalog["rules"]:
+        raise ContractError("catalog discovery must never acquire dense data")
+
+    capabilities = contract["capability_profile"]
+    if "MODEL_ESTIMATED" not in capabilities["origins"]:
+        raise ContractError("capabilities must preserve model-estimated origin")
+    if "upstream and local capabilities are reported separately" not in capabilities["rules"]:
+        raise ContractError("capability profiles must separate upstream from local readiness")
+    routes = {item["product"]: item for item in contract["product_routing"]}
+    if set(routes) != {"MatchLab", "GameLab", "SeasonLab", "PerformanceLab"}:
+        raise ContractError("V4 product-routing matrix must cover the four contracted labs")
+    if "TRACKING" not in routes["MatchLab"]["requires_local_capabilities"]:
+        raise ContractError("MatchLab routing must require local spatial tracking capability")
+    if any(
+        "provider" in " ".join(item["requires_local_capabilities"]).lower()
+        for item in routes.values()
+    ):
+        raise ContractError("product routing must not select by provider name")
+
+    event = contract["event_envelope"]
+    for field in (
+        "contest_id",
+        "contest_period_id",
+        "sequence_index",
+        "provider_event_type",
+        "attributes_json",
+    ):
+        if field not in event["fields"]:
+            raise ContractError(f"cross-sport event envelope is missing {field}")
+    if "source event type is retained" not in event["rules"]:
+        raise ContractError("event envelope must preserve provider event types")
+    spatial = contract["spatial_reference"]
+    if "football pitch" not in spatial["surfaces"] or "basketball court" not in spatial["surfaces"]:
+        raise ContractError("spatial contract must represent both football and basketball surfaces")
+    if "no sport is normalized to a football pitch" not in spatial["rules"]:
+        raise ContractError("spatial contract must not normalize all sports to football geometry")
+    clock = contract["clock_authority"]
+    if "countdown clocks do not imply monotonic time" not in clock["rules"]:
+        raise ContractError(
+            "clock authority must prohibit inferring monotonic time from countdowns"
+        )
+    storage = contract["storage"]
+    if set(storage["table_format"]["prohibited_now"]) != {"Iceberg", "Delta"}:
+        raise ContractError("V4 initial storage must remain plain Parquet")
+    if len(storage["table_format"]["adoption_triggers"]) < 4:
+        raise ContractError("table-format adoption triggers must be recorded")
+    if storage["dense_authority"].find("PostgreSQL") >= 0:
+        raise ContractError("dense telemetry must stay outside PostgreSQL")
+    lineage = contract["openlineage_export"]
+    if lineage["runtime_dependency"] or "export-compatible" not in lineage["authority"]:
+        raise ContractError("OpenLineage must remain an export mapping, not a runtime dependency")
+
+    backfill = contract["backfill"]
+    for source in ("white-cmj-acc-grf", "gymaware-landmine-vision"):
+        if source not in backfill["sport_neutral_sources"]:
+            raise ContractError(f"{source} must remain valid without sports semantics")
+    if set(contract["out_of_scope"]) & {
+        "SportsDataverse",
+        "SkillCorner corpus expansion",
+        "SeasonLab implementation",
+        "Match Navigator",
+        "GameLab",
+        "basketball tracking ingestion",
+        "Iceberg",
+        "Delta",
+    } != {
+        "SportsDataverse",
+        "SkillCorner corpus expansion",
+        "SeasonLab implementation",
+        "Match Navigator",
+        "GameLab",
+        "basketball tracking ingestion",
+        "Iceberg",
+        "Delta",
+    }:
+        raise ContractError(
+            "RES-119 must keep V4 consumer work and table-format adoption out of scope"
+        )
+    if set(contract["adr_ids"]) != {
+        "ADR-001-sports-semantic-overlay",
+        "ADR-002-source-catalog",
+        "ADR-003-parquet-no-table-format",
+        "ADR-004-cross-sport-event-envelope",
+        "ADR-005-capability-product-routing",
+    }:
+        raise ContractError("V4 must freeze the five requested architecture decisions")
+
+
 def validate_files(root: Path) -> None:
-    for version in ("v2", "v3"):
+    for version in ("v2", "v3", "v4"):
         schema_path = root / "architecture" / f"system-{version}.schema.json"
         contract_path = root / "architecture" / f"system-{version}.json"
         schema = _load(schema_path)
@@ -286,8 +449,10 @@ def validate_files(root: Path) -> None:
         _validate(contract, schema, schema, "$")
         if version == "v2":
             _check_project_invariants(root, contract)
-        else:
+        elif version == "v3":
             _check_matchlab_v3_invariants(contract)
+        else:
+            _check_multisport_v4_invariants(contract)
 
 
 def main() -> None:
@@ -296,7 +461,7 @@ def main() -> None:
     args = parser.parse_args()
     validate_files(args.root.resolve())
     print(
-        f"architecture contracts PASSED: V2 and MatchLab V3 in "
+        f"architecture contracts PASSED: V2, MatchLab V3 and multi-sport V4 in "
         f"{args.root.resolve() / 'architecture'}"
     )
 

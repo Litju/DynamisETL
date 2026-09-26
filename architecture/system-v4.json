@@ -1,0 +1,103 @@
+{
+  "$schema": "./system-v4.schema.json",
+  "contract_id": "dynamisdata-multisport-platform",
+  "version": "4.0.0",
+  "status": "frozen",
+  "scope": "Sports semantic, source catalog, data-grain, capability routing, spatial/time and dense-storage contract above the accepted scientific core.",
+  "scientific_core": {
+    "entities": ["Dataset", "Session", "Trial", "Stream", "Artifact", "Run", "Metric", "Provenance", "Quality", "Rights"],
+    "authorities": ["immutable Bronze/Silver/Gold", "PostgreSQL semantic/control/Gold metadata", "Parquet/Arrow dense artifacts", "DuckDB/PyArrow read plane", "AlgorithmSpec parameters hash code SHA and input checksums"],
+    "rules": ["sports entities are an overlay and never rename the scientific core", "a Session is not a Contest", "dense telemetry never moves to PostgreSQL", "rights and provenance remain first-class"]
+  },
+  "sports_semantics": {
+    "entities": ["Sport", "Competition", "CompetitionEdition", "Team", "Contest", "ContestTeam", "ContestPeriod", "TeamRosterMembership", "SessionSportContext"],
+    "competition_edition_kinds": ["league_season", "tournament", "other"],
+    "period_kinds": ["half", "quarter", "period", "overtime", "set", "inning", "other"],
+    "contest_rules": ["contest references one Sport and a CompetitionEdition only when source authority establishes it", "home/away is represented only when declared by that sport/source", "contest periods retain source numbering and labels", "roster membership reuses the existing dataset-scoped Subject identity"]
+  },
+  "provider_identity_crosswalk": {
+    "fields": ["provider_namespace", "entity_kind", "provider_entity_id", "canonical_entity_id", "valid_from", "valid_to", "source_authority", "metadata"],
+    "entity_kinds": ["competition", "edition", "team", "contest", "subject"],
+    "merge_rule": "Display-name equality never merges entities. Heuristics may propose a mapping; a deterministic identifier or explicit mapping authority is required to accept it."
+  },
+  "data_grain": {
+    "version": "1",
+    "kinds": {
+      "FRAME_SERIES": ["contest", "period", "canonical_time", "entity"],
+      "JOINT_FRAME_SERIES": ["contest", "period", "canonical_time", "subject", "joint"],
+      "EVENT_SERIES": ["contest", "period", "sequence_index"],
+      "PLAY_BY_PLAY": ["contest", "period", "sequence_index"],
+      "GAME_SUMMARY": ["contest"],
+      "PLAYER_GAME": ["subject", "contest"],
+      "TEAM_GAME": ["team", "contest"],
+      "PLAYER_SEASON": ["subject", "team", "competition_edition"],
+      "TEAM_SEASON": ["team", "competition_edition"],
+      "TRIAL_SERIES": ["subject", "trial", "sample_index"],
+      "SENSOR_SERIES": ["subject", "stream", "canonical_time"]
+    },
+    "axis_variants": {"TRIAL_SERIES": ["joint"]},
+    "rule": "A declared grain's complete axes form the row key; every axis is present and non-null, and duplicate keys are rejected before publication."
+  },
+  "source_catalog": {
+    "fields": ["provider_dataset", "external_id", "object_kind", "sport", "competition", "edition", "teams", "upstream_url", "upstream_revision", "asset_identity", "expected_size_bytes", "rights", "upstream_capabilities", "discovered_at", "availability_state"],
+    "object_kinds": ["contest", "season_dataset", "release_asset", "aggregate"],
+    "states": ["UPSTREAM_AVAILABLE", "REGISTERED", "ACQUIRED", "MATERIALIZED", "READY", "ACQUISITION_FAILED", "MATERIALIZATION_FAILED", "VALIDATION_FAILED"],
+    "transitions": ["UPSTREAM_AVAILABLE>REGISTERED", "REGISTERED>ACQUIRED", "ACQUIRED>MATERIALIZED", "MATERIALIZED>READY"],
+    "rules": ["catalog discovery is metadata-only", "upstream availability is not a Session", "local readiness is separate from upstream capability", "failed states retain their failure stage and evidence", "promotion to Bronze requires deterministic acquisition checks"]
+  },
+  "capability_profile": {
+    "vocabulary": ["TRACKING", "BALL_TRACKING", "POSE", "EVENTS", "PHASES", "PLAY_BY_PLAY", "BOX_SCORE", "LINEUP", "LOCOMOTOR", "TACTICAL", "SEASON_AGGREGATE", "FORCE", "IMU", "LPT", "GNSS"],
+    "origins": ["SOURCE_CATALOG", "REGISTERED_STREAM", "MATERIALIZED_ARTIFACT", "ACCEPTED_PROCESSOR", "MODEL_ESTIMATED"],
+    "rules": ["profiles are derived deterministically from registered streams, artifacts, catalog evidence and accepted processors", "upstream and local capabilities are reported separately", "MODEL_ESTIMATED remains explicit", "provider name never selects a product"]
+  },
+  "product_routing": [
+    {"product": "MatchLab", "requires_local_capabilities": ["TRACKING"], "requires_grain": ["FRAME_SERIES"], "optional_capabilities": ["BALL_TRACKING", "POSE", "EVENTS", "PHASES", "TACTICAL"]},
+    {"product": "GameLab", "requires_local_capabilities": ["PLAY_BY_PLAY or EVENTS"], "requires_grain": ["PLAY_BY_PLAY or EVENT_SERIES"], "optional_capabilities": ["BOX_SCORE", "LINEUP"]},
+    {"product": "SeasonLab", "requires_local_capabilities": ["SEASON_AGGREGATE"], "requires_grain": ["PLAYER_SEASON or TEAM_SEASON"], "optional_capabilities": []},
+    {"product": "PerformanceLab", "requires_local_capabilities": ["FORCE or IMU or LPT or GNSS"], "requires_grain": ["TRIAL_SERIES or SENSOR_SERIES"], "optional_capabilities": []}
+  ],
+  "event_envelope": {
+    "schema_version": "1",
+    "fields": ["contest_id", "contest_period_id", "sequence_index", "source_event_id", "provider_namespace", "provider_event_type", "canonical_time_ns", "source_clock_json", "team_id", "subject_id", "location", "attributes_json", "attributes_schema_id", "attributes_schema_version"],
+    "rules": ["source event type is retained", "sport/provider attributes validate against a versioned schema", "location requires a declared SpatialReference", "canonical event-family normalization is optional and versioned"]
+  },
+  "spatial_reference": {
+    "fields": ["units", "dimensions", "origin", "axis_orientation", "handedness", "canonical_display_transform", "source_transform", "period_direction_semantics"],
+    "surfaces": ["football pitch", "basketball court", "ice hockey rink", "other declared sport surface"],
+    "rules": ["provider coordinates remain recoverable", "no sport is normalized to a football pitch", "transforms are explicit and versioned"]
+  },
+  "clock_authority": {
+    "concepts": ["monotonic_source_time", "canonical_contest_time", "period", "game_clock_up_or_down", "shot_or_possession_clock", "scheduled_utc", "actual_utc"],
+    "mapping_fields": ["mapping_id", "version", "source_clock_kind", "direction", "period_origin_ns", "scale", "offset_ns", "authority", "evidence"],
+    "rules": ["a sport adapter declares a versioned mapping to canonical t_rel_ns", "countdown clocks do not imply monotonic time", "SkillCorner Basketball acceptance preserves 25 fps wall time, period, countdown game clock and shot clock"]
+  },
+  "storage": {
+    "semantic_authority": "PostgreSQL stores semantic, catalog, provenance and Gold metadata only.",
+    "dense_authority": "Immutable Parquet/Arrow artifacts in object storage; DuckDB and PyArrow remain the initial read plane.",
+    "artifact_boundaries": {"FRAME_SERIES": "contest x period x modality", "JOINT_FRAME_SERIES": "contest x period x modality", "EVENT_SERIES": "season or release-scale file with contest/period/sequence columns", "PLAY_BY_PLAY": "season or release-scale file with contest/period/sequence columns", "PLAYER_SEASON": "competition edition x aggregate family", "TEAM_SEASON": "competition edition x aggregate family"},
+    "partition_keys": ["sport", "provider/source family", "competition edition", "grain/family"],
+    "partition_rules": ["partition only where it materially prunes reads", "avoid player/event high-cardinality directories and tiny files", "retain row-group statistics and projection/predicate pushdown"],
+    "table_format": {"initial": "Parquet", "prohibited_now": ["Iceberg", "Delta"], "adoption_triggers": ["concurrent multi-writer mutation", "large mutable tables requiring MERGE/UPDATE", "partition evolution without republishing", "table snapshots independent of artifact/run identity", "plain-file manifest planning becomes a measured bottleneck"]}
+  },
+  "openlineage_export": {
+    "runtime_dependency": false,
+    "mapping": {"AlgorithmSpec": "Job", "processor_run": "Run", "artifact_or_series": "Dataset", "checksums_and_field_mappings": "lineage facets where available"},
+    "authority": "Dynamis provenance remains authoritative; OpenLineage is an export-compatible mapping."
+  },
+  "backfill": {
+    "sports": ["football", "basketball", "baseball when explicit source metadata declares it"],
+    "contest_context_sources": ["dfl-sportec-idsse", "skillcorner-opendata when match metadata declares facts", "womens-soccer-positioning only at the declared matchday scope"],
+    "sport_neutral_sources": ["white-cmj-acc-grf", "gymaware-landmine-vision"],
+    "rules": ["retain existing Subject identities", "provider IDs enter only as crosswalk aliases", "do not invent competition, edition, team, contest or period facts", "catalog can list registered sources without acquiring files"]
+  },
+  "migration": {
+    "entry_sha": "05419cf9b40b4853500c893b068c581826de3de2",
+    "single_worktree": true,
+    "atomic_commits": true,
+    "steps": ["freeze V4 JSON/schema/docs/ADRs and validate", "add additive PostgreSQL semantic/catalog tables and grain metadata", "backfill explicit source facts and synchronize catalog metadata", "derive grain/capability/routing/spatial/clock/lineage contracts", "run full migration and current-product regression suites"],
+    "preserve": ["Dataset", "Session", "Trial", "Stream", "Artifact", "Run", "Metric", "MatchFrameContext", "immutable Bronze/Silver/Gold", "existing checksums and lineage"]
+  },
+  "out_of_scope": ["SportsDataverse", "SkillCorner corpus expansion", "SeasonLab implementation", "Match Navigator", "GameLab", "basketball tracking ingestion", "new providers", "UI work", "Iceberg", "Delta"],
+  "adr_ids": ["ADR-001-sports-semantic-overlay", "ADR-002-source-catalog", "ADR-003-parquet-no-table-format", "ADR-004-cross-sport-event-envelope", "ADR-005-capability-product-routing"],
+  "acceptance": ["V4 JSON and schema validate", "migration is additive and preserves existing rows", "SkillCorner/DFL facts can map through the sports overlay without renaming Session", "grain keys are validated", "catalog separates upstream and local readiness", "capabilities and routing are deterministic", "football and basketball spatial/time contracts are representable", "no dense telemetry is placed in PostgreSQL", "OpenLineage is export-only", "current MatchLab and laboratory regression suites remain green"]
+}

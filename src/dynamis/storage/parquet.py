@@ -18,6 +18,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from dynamis.contracts.schemas import schema_fingerprint
+from dynamis.contracts.sports import DataGrain, grain_columns, with_grain_metadata
 from dynamis.storage.atomic import atomic_write_path, sha256_file
 
 DEFAULT_COMPRESSION = "zstd"
@@ -61,8 +62,11 @@ def write_parquet_atomic(
     compression_level: int = DEFAULT_COMPRESSION_LEVEL,
     relative_to: Path | None = None,
     row_group_size: int | None = None,
+    grain: DataGrain | None = None,
 ) -> WrittenArtifact:
     """Write ``table`` to ``path`` as Parquet+Zstd, atomically."""
+    if grain is not None:
+        table = table.replace_schema_metadata(with_grain_metadata(table.schema, grain).metadata)
     target = Path(path)
     with atomic_write_path(target) as tmp:
         pq.write_table(
@@ -74,6 +78,8 @@ def write_parquet_atomic(
             row_group_size=row_group_size,
             write_statistics=True,
         )
+        if grain is not None:
+            _validate_grain_file(tmp, grain)
     relative = None
     if relative_to is not None:
         relative = target.resolve().relative_to(Path(relative_to).resolve()).as_posix()
@@ -107,7 +113,12 @@ def _write_row_groups(
     buffered = 0
     written = 0
     for batch in batches:
-        if batch.schema != schema:
+        compatible = (
+            batch.schema.remove_metadata() == schema.remove_metadata()
+            if schema.metadata and b"dynamis.data_grain_kind" in schema.metadata
+            else batch.schema == schema
+        )
+        if not compatible:
             raise ValueError(
                 "streaming batch schema does not match the declared canonical schema: "
                 f"batch={batch.schema.names} expected={schema.names}"
@@ -139,6 +150,7 @@ def write_parquet_streaming_atomic(
     compression: str = DEFAULT_COMPRESSION,
     compression_level: int = DEFAULT_COMPRESSION_LEVEL,
     relative_to: Path | None = None,
+    grain: DataGrain | None = None,
 ) -> WrittenArtifact:
     """Write a bounded Arrow batch stream to ``path`` as Parquet+Zstd, atomically.
 
@@ -148,6 +160,9 @@ def write_parquet_streaming_atomic(
     """
     if row_group_size <= 0:
         raise ValueError("row_group_size must be positive")
+    if grain is not None:
+        schema = with_grain_metadata(schema, grain)
+        grain_columns(grain, schema.names)
     target = Path(path)
     with atomic_write_path(target) as tmp:
         with pq.ParquetWriter(
@@ -167,6 +182,8 @@ def write_parquet_streaming_atomic(
             if row_count == 0:
                 # Parity with pq.write_table on an empty table: one empty row group.
                 writer.write_table(pa.Table.from_batches([], schema=schema))
+        if grain is not None:
+            _validate_grain_file(tmp, grain)
     relative = None
     if relative_to is not None:
         relative = target.resolve().relative_to(Path(relative_to).resolve()).as_posix()
@@ -183,6 +200,28 @@ def write_parquet_streaming_atomic(
 
 def read_parquet_schema(path: Path) -> pa.Schema:
     return pq.read_schema(Path(path))
+
+
+def _validate_grain_file(path: Path, grain: DataGrain) -> None:
+    """Check declared key uniqueness and completeness before atomic publication."""
+    import duckdb
+
+    columns = tuple(f'"{name}"' for name in grain_columns(grain, pq.read_schema(path).names))
+    key_columns = ", ".join(columns)
+    non_null = " OR ".join(f"{column} IS NULL" for column in columns)
+    parquet_source = "read_parquet(?, hive_partitioning=false)"
+    with duckdb.connect(":memory:") as connection:
+        missing = connection.execute(
+            f"SELECT 1 FROM {parquet_source} WHERE {non_null} LIMIT 1", [str(path)]
+        ).fetchone()
+        if missing is not None:
+            raise ValueError(f"{grain.kind.value} artifact has a null grain axis")
+        duplicate = connection.execute(
+            f"SELECT 1 FROM {parquet_source} GROUP BY {key_columns} HAVING count(*) > 1 LIMIT 1",
+            [str(path)],
+        ).fetchone()
+        if duplicate is not None:
+            raise ValueError(f"{grain.kind.value} artifact contains duplicate grain keys")
 
 
 def read_parquet_table(path: Path, *, columns: list[str] | None = None) -> pa.Table:

@@ -34,6 +34,12 @@ from dynamis.adapters.skillcorner.metadata import (
     SkillCornerMatchMetadata,
 )
 from dynamis.contracts import MeasurementClass, Modality, get_schema
+from dynamis.contracts.sports import (
+    DataGrain,
+    DataGrainKind,
+    SportsEntityKind,
+    canonical_sports_id,
+)
 from dynamis.pipeline.quarantine import (
     RULE_COORDINATE_MISSING,
     RULE_DUPLICATE_FRAME,
@@ -185,6 +191,9 @@ class TrackingCanonicalizer:
             schema=self._schema,
             stream_metadata={
                 "adapter": "skillcorner_opendata",
+                "contest_id": canonical_sports_id(
+                    "skillcorner_opendata", SportsEntityKind.CONTEST, self._metadata.match_id
+                ),
                 "source_file_key": self._path.name,
                 "provider_product": "broadcast tracking (computer-vision, extrapolated)",
                 "provider_is_detected_semantics": (
@@ -199,6 +208,7 @@ class TrackingCanonicalizer:
                     "broadcast computer-vision provider estimates, not an instrument measurement"
                 ),
             },
+            grain=DataGrain(kind=DataGrainKind.FRAME_SERIES),
         )
 
     def _quarantine(

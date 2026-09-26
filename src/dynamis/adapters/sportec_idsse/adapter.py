@@ -38,6 +38,32 @@ from dynamis.contracts import (
     Subject,
     Trial,
 )
+from dynamis.contracts.sports import (
+    ClockDirection,
+    ClockKind,
+    ClockMapping,
+    Competition,
+    CompetitionEdition,
+    Contest,
+    ContestPeriod,
+    ContestSide,
+    ContestTeam,
+    DataGrain,
+    DataGrainKind,
+    EditionKind,
+    PeriodKind,
+    ProviderIdentityCrosswalk,
+    SessionSportContext,
+    SpatialReference,
+    Sport,
+    SportsContext,
+    SportsEntityKind,
+    SurfaceGeometry,
+    Team,
+    TeamRosterMembership,
+    canonical_sports_id,
+    provider_crosswalk,
+)
 from dynamis.pipeline.streams import (
     DEFAULT_BATCH_SIZE,
     DEFAULT_ROW_GROUP_SIZE,
@@ -125,6 +151,7 @@ class IdsseMatchAdapter:
 
     def source_authorities(self) -> SourceAuthorities:
         metadata = self.metadata
+        kickoff_ns = round(metadata.kickoff_utc.timestamp() * 1_000_000_000)
         return SourceAuthorities(
             frames=(
                 authorities.center_frame(metadata.pitch_x_m, metadata.pitch_y_m),
@@ -132,6 +159,49 @@ class IdsseMatchAdapter:
             ),
             clocks=(authorities.utc_clock(metadata.kickoff_utc),),
             synchronizations=(authorities.source_sync_spec(),),
+            spatial_references=(
+                SpatialReference(
+                    spatial_reference_id=f"{authorities.CENTER_FRAME_ID}:{metadata.match_id}",
+                    version="1",
+                    units="m",
+                    origin={"x": 0.0, "y": 0.0, "z": 0.0},
+                    axis_orientation={"x": "long_axis", "y": "short_axis", "z": "up"},
+                    handedness="right",
+                    canonical_display_transform={"kind": "identity", "version": "1"},
+                    source_transform={
+                        "kind": "translation",
+                        "from_frame": authorities.CORNER_FRAME_ID,
+                        "to_frame": f"{authorities.CENTER_FRAME_ID}:{metadata.match_id}",
+                        "translation_m": [-metadata.pitch_x_m / 2, -metadata.pitch_y_m / 2, 0],
+                    },
+                ),
+            ),
+            surface_geometries=(
+                SurfaceGeometry(
+                    surface_id=f"dfl-pitch:{metadata.match_id}",
+                    version="1",
+                    sport_id="football",
+                    name="DFL/Sportec pitch",
+                    dimensions={"length_m": metadata.pitch_x_m, "width_m": metadata.pitch_y_m},
+                    spatial_reference_id=f"{authorities.CENTER_FRAME_ID}:{metadata.match_id}",
+                    spatial_reference_version="1",
+                    source_authority=f"matchinformation Environment.PitchX/PitchY@{self._version}",
+                ),
+            ),
+            clock_mappings=(
+                ClockMapping(
+                    mapping_id=f"dfl-kickoff-relative-utc:{metadata.match_id}",
+                    version="1",
+                    clock_kind=ClockKind.WALL_TIME,
+                    direction=ClockDirection.MONOTONIC,
+                    source_unit="ns",
+                    scale_to_ns=1.0,
+                    period_origin_ns=0,
+                    offset_ns=-kickoff_ns,
+                    authority=f"matchinformation KickoffTime@{self._version}",
+                    evidence={"kickoff_utc": metadata.kickoff_utc.isoformat()},
+                ),
+            ),
         )
 
     # -- domain ----------------------------------------------------------
@@ -212,6 +282,147 @@ class IdsseMatchAdapter:
             "period_total_times_ms": metadata.period_total_times_ms,
             "capture": "TRACAB optical tracking (DFL/Sportec provider)",
         }
+        namespace = "sportec_idsse"
+        authority = f"matchinformation@{self._version}"
+        sport = Sport(sport_id="football", code="football", display_name="Football")
+        competition_id = canonical_sports_id(
+            namespace, SportsEntityKind.COMPETITION, metadata.competition
+        )
+        edition_id = canonical_sports_id(
+            namespace,
+            SportsEntityKind.EDITION,
+            f"{metadata.competition}/{metadata.season}",
+        )
+        contest_id = canonical_sports_id(namespace, SportsEntityKind.CONTEST, metadata.match_id)
+        home_team_id = canonical_sports_id(
+            namespace, SportsEntityKind.TEAM, metadata.home_team.team_id
+        )
+        away_team_id = canonical_sports_id(
+            namespace, SportsEntityKind.TEAM, metadata.away_team.team_id
+        )
+        team_by_source_id = {
+            metadata.home_team.team_id: home_team_id,
+            metadata.away_team.team_id: away_team_id,
+        }
+        unsupported_team_ids = sorted(
+            {player.team_id for player in metadata.players} - set(team_by_source_id)
+        )
+        if unsupported_team_ids:
+            raise ValueError(
+                f"{metadata.match_id}: players reference unsupported team IDs: "
+                f"{', '.join(unsupported_team_ids)}"
+            )
+        sports_context = SportsContext(
+            sport=sport,
+            competition=Competition(
+                competition_id=competition_id,
+                sport_id=sport.sport_id,
+                name=metadata.competition,
+            ),
+            edition=CompetitionEdition(
+                edition_id=edition_id,
+                competition_id=competition_id,
+                label=metadata.season,
+                kind=EditionKind.LEAGUE_SEASON,
+            ),
+            teams=(
+                Team(
+                    team_id=home_team_id,
+                    sport_id=sport.sport_id,
+                    display_name=metadata.home_team.name,
+                ),
+                Team(
+                    team_id=away_team_id,
+                    sport_id=sport.sport_id,
+                    display_name=metadata.away_team.name,
+                ),
+            ),
+            contest=Contest(
+                contest_id=contest_id,
+                sport_id=sport.sport_id,
+                competition_edition_id=edition_id,
+                scheduled_start_at=metadata.planned_kickoff_utc,
+                actual_start_at=metadata.kickoff_utc,
+                venue=metadata.stadium or None,
+                home_away_supported=True,
+                source_authority=authority,
+            ),
+            contest_teams=(
+                ContestTeam(
+                    contest_id=contest_id, team_id=home_team_id, side=ContestSide.HOME, side_order=0
+                ),
+                ContestTeam(
+                    contest_id=contest_id, team_id=away_team_id, side=ContestSide.AWAY, side_order=1
+                ),
+            ),
+            periods=tuple(
+                ContestPeriod(
+                    contest_period_id=f"{contest_id}:period:{trial.trial_id}",
+                    contest_id=contest_id,
+                    source_period_number=trial.trial_id,
+                    kind=PeriodKind.OTHER,
+                    label=trial.label,
+                    provider_namespace=namespace,
+                )
+                for trial in trials
+            ),
+            roster_memberships=tuple(
+                TeamRosterMembership(
+                    dataset_id=self.dataset_id,
+                    subject_id=player.person_id,
+                    team_id=team_by_source_id[player.team_id],
+                    competition_edition_id=edition_id,
+                )
+                for player in metadata.players
+            ),
+            session=SessionSportContext(
+                dataset_id=self.dataset_id,
+                session_id=metadata.match_id,
+                contest_id=contest_id,
+            ),
+            crosswalks=(
+                provider_crosswalk(
+                    provider_namespace=namespace,
+                    entity_kind=SportsEntityKind.COMPETITION,
+                    provider_entity_id=metadata.competition,
+                    source_authority=authority,
+                ),
+                provider_crosswalk(
+                    provider_namespace=namespace,
+                    entity_kind=SportsEntityKind.EDITION,
+                    provider_entity_id=f"{metadata.competition}/{metadata.season}",
+                    source_authority=authority,
+                ),
+                provider_crosswalk(
+                    provider_namespace=namespace,
+                    entity_kind=SportsEntityKind.TEAM,
+                    provider_entity_id=metadata.home_team.team_id,
+                    source_authority=authority,
+                ),
+                provider_crosswalk(
+                    provider_namespace=namespace,
+                    entity_kind=SportsEntityKind.TEAM,
+                    provider_entity_id=metadata.away_team.team_id,
+                    source_authority=authority,
+                ),
+                provider_crosswalk(
+                    provider_namespace=namespace,
+                    entity_kind=SportsEntityKind.CONTEST,
+                    provider_entity_id=metadata.match_id,
+                    source_authority=authority,
+                ),
+                *(
+                    ProviderIdentityCrosswalk(
+                        provider_namespace=namespace,
+                        entity_kind=SportsEntityKind.SUBJECT,
+                        provider_entity_id=player.person_id,
+                        canonical_entity_id=f"{self.dataset_id}/{player.person_id}",
+                        source_authority=authority,
+                    )
+                    for player in metadata.players
+                ),
+            ),
+        )
         return ProviderDomain(
             session=session,
             subjects=tuple(subjects),
@@ -220,6 +431,7 @@ class IdsseMatchAdapter:
             streams=streams,
             authorities=self.source_authorities(),
             session_metadata=session_metadata,
+            sports_contexts=(sports_context,),
             participants_ignored={
                 "trainers": metadata.trainer_count,
                 "referees_and_officials": metadata.referee_count,
@@ -264,6 +476,7 @@ class IdsseMatchAdapter:
                             "width_m": metadata.pitch_y_m,
                         },
                     },
+                    data_grain=DataGrain(kind=DataGrainKind.FRAME_SERIES),
                 )
             )
         streams.append(
@@ -279,6 +492,7 @@ class IdsseMatchAdapter:
                 nominal_sampling_rate_hz=None,
                 si_units=("m",),
                 stream_metadata={"source_file_key": self._events_path.name},
+                data_grain=DataGrain(kind=DataGrainKind.EVENT_SERIES),
             )
         )
         return streams

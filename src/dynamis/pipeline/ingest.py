@@ -135,6 +135,8 @@ class IngestStreamResult:
     t_rel_min_ns: int | None
     t_rel_max_ns: int | None
     null_counts: dict[str, int]
+    data_grain_kind: str | None = None
+    data_grain_axes: tuple[str, ...] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -157,6 +159,8 @@ class IngestStreamResult:
             "t_rel_min_ns": self.t_rel_min_ns,
             "t_rel_max_ns": self.t_rel_max_ns,
             "null_counts": self.null_counts,
+            "data_grain_kind": self.data_grain_kind,
+            "data_grain_axes": list(self.data_grain_axes) if self.data_grain_axes else None,
         }
 
 
@@ -289,6 +293,7 @@ def write_canonical_stream(
         schema=file_schema,
         row_group_size=row_group_size,
         relative_to=settings.dataset_root,
+        grain=stream.grain,
     )
     violations = validator.finish()
     if violations:
@@ -316,6 +321,8 @@ def write_canonical_stream(
         t_rel_min_ns=validator.t_rel_min_ns,
         t_rel_max_ns=validator.t_rel_max_ns,
         null_counts=dict(validator.null_counts),
+        data_grain_kind=stream.grain.kind.value if stream.grain else None,
+        data_grain_axes=stream.grain.axes if stream.grain else None,
     )
 
 

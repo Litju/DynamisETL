@@ -414,6 +414,16 @@ def test_idsse_domain_registers_players_and_periods(
     assert len(domain.subjects) == 4
     assert len(domain.participants) == 4
     assert [trial.trial_id for trial in domain.trials] == ["period-1", "period-2"]
+    sports = domain.sports_contexts[0]
+    assert sports.sport.code == "football"
+    assert sports.competition is not None
+    assert sports.competition.name == adapter.metadata.competition
+    assert sports.edition is not None and sports.edition.label == adapter.metadata.season
+    assert len(sports.teams) == 2 and len(sports.periods) == 2
+    assert len(sports.roster_memberships) == len(domain.subjects)
+    assert len(domain.authorities.surface_geometries) == 1
+    assert domain.authorities.clock_mappings[0].source_unit == "ns"
+    assert domain.authorities.clock_mappings[0].offset_ns < 0
     assert [stream.stream_id for stream in domain.streams] == [
         "tracking-period-1",
         "tracking-period-2",
@@ -424,6 +434,43 @@ def test_idsse_domain_registers_players_and_periods(
     ]
     assert [item.subject_id for item in goalkeepers] == ["DFL-OBJ-A001"]
     assert domain.participants_ignored == {"trainers": 2, "referees_and_officials": 1}
+
+
+def test_idsse_rejects_roster_players_for_unsupported_team(
+    tmp_path: Path, dfl_files: dict[str, Path]
+) -> None:
+    tree = ET.parse(dfl_files["info"])
+    teams = tree.find(".//MatchInformation/Teams")
+    assert teams is not None
+    extra_team = ET.SubElement(
+        teams,
+        "Team",
+        {"TeamId": "DFL-CLU-EXTRA", "TeamName": "Extra FC", "Role": "other"},
+    )
+    players = ET.SubElement(extra_team, "Players")
+    ET.SubElement(
+        players,
+        "Player",
+        {
+            "PersonId": "DFL-OBJ-X001",
+            "ShirtNumber": "5",
+            "FirstName": "Extra",
+            "LastName": "Player",
+            "Shortname": "Extra Player",
+            "Starting": "false",
+            "PlayingPosition": "ST",
+            "TeamLeader": "false",
+        },
+    )
+    tree.write(dfl_files["info"], encoding="UTF-8", xml_declaration=True)
+
+    adapter = _adapter(tmp_path, dfl_files)
+    adapter.parse_positions()
+    with pytest.raises(
+        ValueError,
+        match="players reference unsupported team IDs: DFL-CLU-EXTRA",
+    ):
+        adapter.domain()
 
 
 def test_idsse_spill_files_are_removed_after_cleanup(

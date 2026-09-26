@@ -38,6 +38,7 @@ from dynamis.adapters.spl.authorities import (
     skeleton_id_for,
 )
 from dynamis.contracts import MeasurementClass, Modality, get_schema
+from dynamis.contracts.sports import DataGrain, DataGrainKind
 from dynamis.pipeline.quarantine import (
     RULE_NON_FINITE_VALUE,
     QuarantinedRecord,
@@ -283,6 +284,10 @@ class SplTrialCanonicalizer:
                 "session_specific_availability": True,
                 "parent_graph": "source publishes no parent graph; landmark_set only",
             },
+            grain=DataGrain(
+                kind=DataGrainKind.TRIAL_SERIES,
+                axes=("subject", "trial", "sample_index", "joint"),
+            ),
         )
 
     def _batches(self, summary: SplTrialSummary) -> Iterator[pa.RecordBatch]:

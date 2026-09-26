@@ -55,6 +55,12 @@ from dynamis.adapters.sportec_idsse.authorities import (
 )
 from dynamis.adapters.sportec_idsse.matchinfo import BALL_TEAM_ID, IdsseMatchMetadata
 from dynamis.contracts import TRACKING_SCHEMA, MeasurementClass, Modality
+from dynamis.contracts.sports import (
+    DataGrain,
+    DataGrainKind,
+    SportsEntityKind,
+    canonical_sports_id,
+)
 from dynamis.pipeline.quarantine import (
     RULE_COORDINATE_MISSING,
     RULE_COORDINATE_OUT_OF_RANGE,
@@ -482,12 +488,16 @@ class PositionsCanonicalizer:
                     nominal_sampling_rate_hz=25.0,
                     stream_metadata={
                         "adapter": "sportec_idsse",
+                        "contest_id": canonical_sports_id(
+                            "sportec_idsse", SportsEntityKind.CONTEST, session_id
+                        ),
                         "source_file_key": self._path.name,
                         "game_section": section,
                         "entities": str(summary.entity_count),
                         "frame_major": "true",
                         "unmapped_attributes": "D,A,M (no published semantics)",
                     },
+                    grain=DataGrain(kind=DataGrainKind.FRAME_SERIES),
                     schema=TRACKING_SCHEMA,
                     batches=self._merged_batches(section),
                 )

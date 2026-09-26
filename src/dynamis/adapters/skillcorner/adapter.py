@@ -40,6 +40,27 @@ from dynamis.contracts import (
     SyncAlignment,
     Trial,
 )
+from dynamis.contracts.sports import (
+    ClockDirection,
+    ClockKind,
+    ClockMapping,
+    Contest,
+    ContestPeriod,
+    ContestSide,
+    ContestTeam,
+    DataGrain,
+    DataGrainKind,
+    ProviderIdentityCrosswalk,
+    SessionSportContext,
+    SpatialReference,
+    Sport,
+    SportsContext,
+    SportsEntityKind,
+    SurfaceGeometry,
+    Team,
+    canonical_sports_id,
+    provider_crosswalk,
+)
 from dynamis.pipeline.quarantine import QuarantinedRecord
 from dynamis.pipeline.streams import (
     DEFAULT_BATCH_SIZE,
@@ -132,6 +153,51 @@ class SkillCornerMatchAdapter:
             synchronizations=(authorities.source_sync_spec(),),
             alignments=tuple(alignments),
             skeletons=(authorities.pose_skeleton(),),
+            spatial_references=(
+                SpatialReference(
+                    spatial_reference_id=f"{authorities.TRACKING_FRAME_ID}:{metadata.match_id}",
+                    version="1",
+                    units="m",
+                    origin={"x": 0.0, "y": 0.0, "z": 0.0},
+                    axis_orientation={"x": "long_axis", "y": "short_axis", "z": "source_undefined"},
+                    handedness="unspecified",
+                    canonical_display_transform={"kind": "identity", "version": "1"},
+                    source_transform={"kind": "identity", "version": "1"},
+                ),
+            ),
+            surface_geometries=(
+                SurfaceGeometry(
+                    surface_id=f"skillcorner-pitch:{metadata.match_id}",
+                    version="1",
+                    sport_id="football",
+                    name="SkillCorner pitch",
+                    dimensions={
+                        "length_m": metadata.pitch_length_m,
+                        "width_m": metadata.pitch_width_m,
+                    },
+                    spatial_reference_id=f"{authorities.TRACKING_FRAME_ID}:{metadata.match_id}",
+                    spatial_reference_version="1",
+                    source_authority=(
+                        "match_metadata pitch_length/pitch_width@"
+                        f"{authorities.SKILLCORNER_SOURCE_REVISION}"
+                    ),
+                ),
+            ),
+            clock_mappings=(
+                ClockMapping(
+                    mapping_id="skillcorner-match-clock",
+                    version="1",
+                    clock_kind=ClockKind.GAME_CLOCK,
+                    direction=ClockDirection.COUNT_UP,
+                    source_unit="s",
+                    scale_to_ns=1_000_000_000,
+                    period_origin_ns=0,
+                    authority=(
+                        f"SkillCorner source match clock@{authorities.SKILLCORNER_SOURCE_REVISION}"
+                    ),
+                    evidence={"format": "HH:MM:SS.cc", "periods": "source clock is preserved"},
+                ),
+            ),
         )
 
     # -- domain ----------------------------------------------------------
@@ -210,6 +276,7 @@ class SkillCornerMatchAdapter:
                             "width_m": metadata.pitch_width_m,
                         },
                     },
+                    data_grain=DataGrain(kind=DataGrainKind.FRAME_SERIES),
                 )
             )
             streams.append(
@@ -235,8 +302,99 @@ class SkillCornerMatchAdapter:
                         "error_source_to_si_scale": (authorities.POSE_ERROR_SOURCE_TO_SI_SCALE),
                         "error_semantics": authorities.POSE_ERROR_SEMANTICS,
                     },
+                    data_grain=DataGrain(kind=DataGrainKind.JOINT_FRAME_SERIES),
                 )
             )
+        namespace = "skillcorner_opendata"
+        authority = f"match_metadata@{authorities.SKILLCORNER_SOURCE_REVISION}"
+        sport = Sport(sport_id="football", code="football", display_name="Football")
+        home_team_id = canonical_sports_id(namespace, SportsEntityKind.TEAM, metadata.home_team_id)
+        away_team_id = canonical_sports_id(namespace, SportsEntityKind.TEAM, metadata.away_team_id)
+        contest_id = canonical_sports_id(namespace, SportsEntityKind.CONTEST, metadata.match_id)
+        sports_context = SportsContext(
+            sport=sport,
+            teams=(
+                Team(
+                    team_id=home_team_id,
+                    sport_id=sport.sport_id,
+                    display_name=metadata.home_team_name,
+                ),
+                Team(
+                    team_id=away_team_id,
+                    sport_id=sport.sport_id,
+                    display_name=metadata.away_team_name,
+                ),
+            ),
+            contest=Contest(
+                contest_id=contest_id,
+                sport_id=sport.sport_id,
+                actual_start_at=metadata.kickoff_utc,
+                venue=metadata.stadium,
+                home_away_supported=True,
+                source_authority=authority,
+            ),
+            contest_teams=(
+                ContestTeam(
+                    contest_id=contest_id,
+                    team_id=home_team_id,
+                    side=ContestSide.HOME,
+                    side_order=0,
+                    score=metadata.home_score,
+                ),
+                ContestTeam(
+                    contest_id=contest_id,
+                    team_id=away_team_id,
+                    side=ContestSide.AWAY,
+                    side_order=1,
+                    score=metadata.away_score,
+                ),
+            ),
+            periods=tuple(
+                ContestPeriod(
+                    contest_period_id=f"{contest_id}:period:{period.period}",
+                    contest_id=contest_id,
+                    source_period_number=str(period.period),
+                    label=period.name,
+                    provider_namespace=namespace,
+                )
+                for period in metadata.periods
+            ),
+            session=SessionSportContext(
+                dataset_id=self.dataset_id,
+                session_id=metadata.session_id,
+                contest_id=contest_id,
+            ),
+            crosswalks=(
+                provider_crosswalk(
+                    provider_namespace=namespace,
+                    entity_kind=SportsEntityKind.TEAM,
+                    provider_entity_id=metadata.home_team_id,
+                    source_authority=authority,
+                ),
+                provider_crosswalk(
+                    provider_namespace=namespace,
+                    entity_kind=SportsEntityKind.TEAM,
+                    provider_entity_id=metadata.away_team_id,
+                    source_authority=authority,
+                ),
+                provider_crosswalk(
+                    provider_namespace=namespace,
+                    entity_kind=SportsEntityKind.CONTEST,
+                    provider_entity_id=metadata.match_id,
+                    source_authority=authority,
+                ),
+                *(
+                    ProviderIdentityCrosswalk(
+                        provider_namespace=namespace,
+                        entity_kind=SportsEntityKind.SUBJECT,
+                        provider_entity_id=player.player_id,
+                        canonical_entity_id=f"{self.dataset_id}/{player.player_id}",
+                        source_authority=authority,
+                    )
+                    for player in metadata.players
+                ),
+            ),
+        )
         return ProviderDomain(
             session=session,
             subjects=subjects,
@@ -269,6 +427,7 @@ class SkillCornerMatchAdapter:
                     "coordinates are MODEL_ESTIMATED, never raw instrument measurements"
                 ),
             },
+            sports_contexts=(sports_context,),
         )
 
     def _declared_player_ids(self) -> list[str]:

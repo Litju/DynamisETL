@@ -38,6 +38,7 @@ from dynamis.contracts import (
     AlgorithmSpec,
     MetricValueKind,
 )
+from dynamis.contracts.sports import DataGrain
 from dynamis.contracts.units import assert_si_unit
 
 #: Stable, human-readable algorithm identity: lower-case segments joined by dots.
@@ -200,6 +201,7 @@ class SeriesOutput:
     name: str
     table: pa.Table
     description: str = ""
+    grain: DataGrain | None = None
 
     def __post_init__(self) -> None:
         if not self.name.strip():
