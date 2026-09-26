@@ -27,6 +27,15 @@ from dynamis.contracts import (
     ProcessingStatus,
     SkeletonDefinition,
 )
+from dynamis.contracts.sports import (
+    SourceCatalogEntry,
+    SourceCatalogState,
+    SportsContext,
+    SportsEntityKind,
+    canonical_sports_id,
+    catalog_rows_for_source,
+    provider_crosswalk_id,
+)
 from dynamis.pipeline.ingest import IngestResult
 from dynamis.pipeline.streams import ProviderDomain
 from dynamis.registry import source_by_id, validate_registry
@@ -36,7 +45,13 @@ from dynamis.storage.metadata import build_metadata
 _TABLES = build_metadata().tables
 
 ALGORITHM_SPEC_TABLE = _TABLES["algorithm_spec"]
+CLOCK_MAPPING_TABLE = _TABLES["clock_mapping"]
 CLOCK_TABLE = _TABLES["clock"]
+COMPETITION_TABLE = _TABLES["competition"]
+COMPETITION_EDITION_TABLE = _TABLES["competition_edition"]
+CONTEST_TABLE = _TABLES["contest"]
+CONTEST_PERIOD_TABLE = _TABLES["contest_period"]
+CONTEST_TEAM_TABLE = _TABLES["contest_team"]
 COORDINATE_FRAME_TABLE = _TABLES["coordinate_frame"]
 DATASET_SOURCE_TABLE = _TABLES["dataset_source"]
 DATASET_SOURCE_MODALITY_TABLE = _TABLES["dataset_source_modality"]
@@ -45,16 +60,24 @@ DATASET_VERSION_FILE_TABLE = _TABLES["dataset_version_file"]
 DERIVED_METRIC_TABLE = _TABLES["derived_metric"]
 DEVICE_TABLE = _TABLES["device"]
 LICENSE_POLICY_TABLE = _TABLES["license_policy"]
+PROVIDER_CROSSWALK_TABLE = _TABLES["provider_identity_crosswalk"]
 PROCESSING_ARTIFACT_TABLE = _TABLES["processing_artifact"]
 PROCESSING_RUN_TABLE = _TABLES["processing_run"]
 QUALITY_ISSUE_TABLE = _TABLES["quality_issue"]
 SAMPLE_ARTIFACT_TABLE = _TABLES["sample_artifact"]
+SESSION_SPORT_CONTEXT_TABLE = _TABLES["session_sport_context"]
+SPATIAL_REFERENCE_TABLE = _TABLES["spatial_reference"]
+SURFACE_GEOMETRY_TABLE = _TABLES["surface_geometry"]
 SENSOR_STREAM_TABLE = _TABLES["sensor_stream"]
 SESSION_TABLE = _TABLES["session"]
 SESSION_PARTICIPANT_TABLE = _TABLES["session_participant"]
 SKELETON_DEFINITION_TABLE = _TABLES["skeleton_definition"]
 SKELETON_JOINT_TABLE = _TABLES["skeleton_joint"]
 SUBJECT_TABLE = _TABLES["subject"]
+SPORT_TABLE = _TABLES["sport"]
+SOURCE_CATALOG_TABLE = _TABLES["source_catalog_entry"]
+TEAM_TABLE = _TABLES["team"]
+TEAM_ROSTER_MEMBERSHIP_TABLE = _TABLES["team_roster_membership"]
 SYNC_ALIGNMENT_TABLE = _TABLES["sync_alignment"]
 SYNCHRONIZATION_SPEC_TABLE = _TABLES["synchronization_spec"]
 TRIAL_TABLE = _TABLES["trial"]
@@ -111,6 +134,51 @@ def _upsert(connection, table: Table, rows: list[dict[str, Any]]) -> int:
         .returning(*primary_keys)
     )
     return len(connection.execute(statement).fetchall())
+
+
+def _upsert_refresh(connection, table: Table, rows: list[dict[str, Any]]) -> int:
+    """Converge declared semantic metadata while keeping deterministic identities."""
+    if not rows:
+        return 0
+    keys = [column.name for column in table.primary_key.columns]
+    statement = pg_insert(table).values(rows)
+    statement = statement.on_conflict_do_update(
+        index_elements=keys,
+        set_={
+            column.name: statement.excluded[column.name]
+            for column in table.columns
+            if column.name not in keys
+        },
+    )
+    connection.execute(statement)
+    return len(rows)
+
+
+def _transition_catalog_entry(
+    connection,
+    entry_id: str,
+    state: SourceCatalogState,
+    *,
+    evidence: dict[str, Any] | None = None,
+) -> None:
+    row = (
+        connection.execute(
+            sa.select(SOURCE_CATALOG_TABLE).where(SOURCE_CATALOG_TABLE.c.entry_id == entry_id)
+        )
+        .mappings()
+        .one()
+    )
+    current = SourceCatalogEntry.model_validate(dict(row))
+    updated = current.transition(state, evidence=evidence)
+    connection.execute(
+        SOURCE_CATALOG_TABLE.update()
+        .where(SOURCE_CATALOG_TABLE.c.entry_id == entry_id)
+        .values(
+            availability_state=updated.availability_state.value,
+            failure_stage=updated.failure_stage,
+            failure_evidence=updated.failure_evidence,
+        )
+    )
 
 
 def _upsert_alignment(connection, rows: list[dict[str, Any]]) -> int:
@@ -399,6 +467,8 @@ def persist_source(connection, source: DatasetSource) -> dict[str, int]:
             "dataset_id": source.dataset_id,
             "version": version.version,
             "key": item.key,
+            "upstream_provider": item.upstream_provider,
+            "upstream_revision": item.upstream_revision,
             "size_bytes": item.size_bytes,
             "upstream_md5": None if item.md5 == "unknown" else item.md5,
             "upstream_sha256": None if item.sha256 == "unknown" else item.sha256,
@@ -408,7 +478,68 @@ def persist_source(connection, source: DatasetSource) -> dict[str, int]:
         for version in source.versions
         for item in version.retrieval.files
     ]
-    written["dataset_version_file"] = _upsert(connection, DATASET_VERSION_FILE_TABLE, file_rows)
+    if file_rows:
+        file_statement = pg_insert(DATASET_VERSION_FILE_TABLE).values(file_rows)
+        file_statement = file_statement.on_conflict_do_update(
+            index_elements=["dataset_id", "version", "key"],
+            set_={
+                name: file_statement.excluded[name]
+                for name in (
+                    "upstream_provider",
+                    "upstream_revision",
+                    "size_bytes",
+                    "upstream_md5",
+                    "upstream_sha256",
+                )
+            },
+        )
+        connection.execute(file_statement)
+    written["dataset_version_file"] = len(file_rows)
+    sport_names = {
+        "football": "Football",
+        "basketball": "Basketball",
+        "ice_hockey": "Ice hockey",
+        "baseball": "Baseball",
+    }
+    if source.domain in sport_names:
+        written["sport"] = _upsert_refresh(
+            connection,
+            SPORT_TABLE,
+            [
+                {
+                    "sport_id": source.domain,
+                    "code": source.domain,
+                    "display_name": sport_names[source.domain],
+                }
+            ],
+        )
+    catalog_rows = catalog_rows_for_source(source, datetime.now(UTC))
+    if catalog_rows:
+        statement = pg_insert(SOURCE_CATALOG_TABLE).values(catalog_rows)
+        statement = statement.on_conflict_do_update(
+            index_elements=["entry_id"],
+            set_={
+                key: statement.excluded[key]
+                for key in (
+                    "provider",
+                    "dataset",
+                    "registry_dataset_id",
+                    "registry_version",
+                    "registry_file_key",
+                    "external_id",
+                    "object_kind",
+                    "sport_id",
+                    "upstream_url",
+                    "upstream_revision",
+                    "asset_identity",
+                    "expected_size_bytes",
+                    "rights",
+                    "upstream_capabilities",
+                )
+            },
+        )
+        connection.execute(statement)
+    written["source_catalog_entry"] = len(catalog_rows)
     return written
 
 
@@ -440,7 +571,167 @@ def persist_bronze_state(
                     retrieved_at=item.retrieved_at or manifest.retrieved_at,
                 )
             )
+            catalog_ids = connection.execute(
+                sa.select(SOURCE_CATALOG_TABLE.c.entry_id).where(
+                    SOURCE_CATALOG_TABLE.c.registry_dataset_id == dataset_id,
+                    SOURCE_CATALOG_TABLE.c.registry_version == version,
+                    SOURCE_CATALOG_TABLE.c.registry_file_key == item.key,
+                )
+            ).scalars()
+            for entry_id in catalog_ids:
+                status = connection.execute(
+                    sa.select(SOURCE_CATALOG_TABLE.c.availability_state).where(
+                        SOURCE_CATALOG_TABLE.c.entry_id == entry_id
+                    )
+                ).scalar_one()
+                if status in {
+                    SourceCatalogState.UPSTREAM_AVAILABLE,
+                    SourceCatalogState.ACQUISITION_FAILED,
+                }:
+                    _transition_catalog_entry(connection, entry_id, SourceCatalogState.REGISTERED)
+                    status = SourceCatalogState.REGISTERED
+                if status == SourceCatalogState.REGISTERED:
+                    _transition_catalog_entry(connection, entry_id, SourceCatalogState.ACQUIRED)
     return tuple(item.local_sha256 or "" for item in retrieved)
+
+
+def _persist_sports_contexts(connection, contexts: tuple[SportsContext, ...]) -> dict[str, int]:
+    rows: dict[str, list[dict[str, Any]]] = {
+        name: []
+        for name in (
+            "sport",
+            "competition",
+            "competition_edition",
+            "team",
+            "contest",
+            "contest_team",
+            "contest_period",
+            "team_roster_membership",
+            "session_sport_context",
+            "provider_identity_crosswalk",
+        )
+    }
+    for context in contexts:
+        item = context.sport
+        rows["sport"].append(
+            {"sport_id": item.sport_id, "code": item.code, "display_name": item.display_name}
+        )
+        if context.competition:
+            item = context.competition
+            rows["competition"].append(
+                {
+                    "competition_id": item.competition_id,
+                    "sport_id": item.sport_id,
+                    "name": item.name,
+                }
+            )
+        if context.edition:
+            item = context.edition
+            rows["competition_edition"].append(
+                {
+                    "edition_id": item.edition_id,
+                    "competition_id": item.competition_id,
+                    "label": item.label,
+                    "kind": item.kind.value,
+                    "starts_on": item.starts_on,
+                    "ends_on": item.ends_on,
+                }
+            )
+        rows["team"].extend(
+            {"team_id": item.team_id, "sport_id": item.sport_id, "display_name": item.display_name}
+            for item in context.teams
+        )
+        item = context.contest
+        rows["contest"].append(
+            {
+                "contest_id": item.contest_id,
+                "sport_id": item.sport_id,
+                "competition_edition_id": item.competition_edition_id,
+                "scheduled_start_at": item.scheduled_start_at,
+                "actual_start_at": item.actual_start_at,
+                "venue": item.venue,
+                "home_away_supported": item.home_away_supported,
+                "source_authority": item.source_authority,
+            }
+        )
+        rows["contest_team"].extend(
+            {
+                "contest_id": item.contest_id,
+                "team_id": item.team_id,
+                "side": item.side.value,
+                "side_order": item.side_order,
+                "score": item.score,
+            }
+            for item in context.contest_teams
+        )
+        rows["contest_period"].extend(
+            {
+                "contest_period_id": item.contest_period_id,
+                "contest_id": item.contest_id,
+                "source_period_number": item.source_period_number,
+                "kind": item.kind.value,
+                "label": item.label,
+                "provider_namespace": item.provider_namespace,
+                "start_ns": item.start_ns,
+                "end_ns": item.end_ns,
+            }
+            for item in context.periods
+        )
+        rows["team_roster_membership"].extend(
+            {
+                "membership_id": canonical_sports_id(
+                    f"{item.dataset_id}:{item.team_id}:{item.competition_edition_id}",
+                    SportsEntityKind.SUBJECT,
+                    f"{item.subject_id}:{item.valid_from}",
+                ),
+                "dataset_id": item.dataset_id,
+                "subject_id": item.subject_id,
+                "team_id": item.team_id,
+                "competition_edition_id": item.competition_edition_id,
+                "valid_from": item.valid_from,
+                "valid_to": item.valid_to,
+            }
+            for item in context.roster_memberships
+        )
+        item = context.session
+        rows["session_sport_context"].append(
+            {
+                "dataset_id": item.dataset_id,
+                "session_id": item.session_id,
+                "contest_id": item.contest_id,
+                "source_catalog_entry_id": item.source_catalog_entry_id,
+            }
+        )
+        rows["provider_identity_crosswalk"].extend(
+            {
+                "crosswalk_id": provider_crosswalk_id(item),
+                "provider_namespace": item.provider_namespace,
+                "entity_kind": item.entity_kind.value,
+                "provider_entity_id": item.provider_entity_id,
+                "canonical_entity_id": item.canonical_entity_id,
+                "valid_from": item.valid_from,
+                "valid_to": item.valid_to,
+                "source_authority": item.source_authority,
+                "metadata_json": item.metadata,
+            }
+            for item in context.crosswalks
+        )
+    table_by_name = {
+        "sport": SPORT_TABLE,
+        "competition": COMPETITION_TABLE,
+        "competition_edition": COMPETITION_EDITION_TABLE,
+        "team": TEAM_TABLE,
+        "contest": CONTEST_TABLE,
+        "contest_team": CONTEST_TEAM_TABLE,
+        "contest_period": CONTEST_PERIOD_TABLE,
+        "team_roster_membership": TEAM_ROSTER_MEMBERSHIP_TABLE,
+        "session_sport_context": SESSION_SPORT_CONTEXT_TABLE,
+        "provider_identity_crosswalk": PROVIDER_CROSSWALK_TABLE,
+    }
+    return {
+        name: _upsert_refresh(connection, table_by_name[name], values)
+        for name, values in rows.items()
+    }
 
 
 def persist_domain(connection, domain: ProviderDomain) -> dict[str, int]:
@@ -605,6 +896,8 @@ def persist_domain(connection, domain: ProviderDomain) -> dict[str, int]:
                 "nominal_sampling_rate_hz": stream.nominal_sampling_rate_hz,
                 "si_units": list(stream.si_units),
                 "source_unit": stream.source_unit,
+                "data_grain_kind": stream.data_grain.kind.value if stream.data_grain else None,
+                "data_grain_axes": list(stream.data_grain.axes) if stream.data_grain else None,
                 "stream_metadata": dict(stream.stream_metadata),
             }
             for stream in domain.streams
@@ -613,6 +906,62 @@ def persist_domain(connection, domain: ProviderDomain) -> dict[str, int]:
     # Alignments are persisted only after their endpoints and sync spec exist;
     # the composite foreign keys then prove the dataset-scoped pairing.
     written["sync_alignment"] = _upsert_alignment(connection, _alignment_rows(domain))
+    written.update(_persist_sports_contexts(connection, domain.sports_contexts))
+    written["clock_mapping"] = _upsert_refresh(
+        connection,
+        CLOCK_MAPPING_TABLE,
+        [
+            {
+                "mapping_id": item.mapping_id,
+                "version": item.version,
+                "clock_kind": item.clock_kind.value,
+                "direction": item.direction.value,
+                "source_unit": item.source_unit,
+                "scale_to_ns": item.scale_to_ns,
+                "source_origin": item.source_origin,
+                "period_origin_ns": item.period_origin_ns,
+                "offset_ns": item.offset_ns,
+                "authority": item.authority,
+                "evidence": item.evidence,
+            }
+            for item in domain.authorities.clock_mappings
+        ],
+    )
+    written["spatial_reference"] = _upsert_refresh(
+        connection,
+        SPATIAL_REFERENCE_TABLE,
+        [
+            {
+                "spatial_reference_id": item.spatial_reference_id,
+                "version": item.version,
+                "units": item.units,
+                "origin": item.origin,
+                "axis_orientation": item.axis_orientation,
+                "handedness": item.handedness,
+                "canonical_display_transform": item.canonical_display_transform,
+                "source_transform": item.source_transform,
+                "period_direction_semantics": item.period_direction_semantics,
+            }
+            for item in domain.authorities.spatial_references
+        ],
+    )
+    written["surface_geometry"] = _upsert_refresh(
+        connection,
+        SURFACE_GEOMETRY_TABLE,
+        [
+            {
+                "surface_id": item.surface_id,
+                "version": item.version,
+                "sport_id": item.sport_id,
+                "name": item.name,
+                "dimensions": item.dimensions,
+                "spatial_reference_id": item.spatial_reference_id,
+                "spatial_reference_version": item.spatial_reference_version,
+                "source_authority": item.source_authority,
+            }
+            for item in domain.authorities.surface_geometries
+        ],
+    )
     return written
 
 
@@ -700,6 +1049,8 @@ def persist_ingest_run(
                 "partition": stream.partition,
                 "coordinate_frame_id": stream.coordinate_frame_id,
                 "synchronization_spec_id": stream.synchronization_spec_id,
+                "data_grain_kind": stream.data_grain_kind,
+                "data_grain_axes": list(stream.data_grain_axes) if stream.data_grain_axes else None,
                 "created_at": completed_at,
             }
             for stream in result.streams
@@ -723,6 +1074,8 @@ def persist_ingest_run(
                 "schema_fingerprint": stream.schema_fingerprint,
                 "contract_schema_fingerprint": stream.contract_schema_fingerprint,
             },
+            "data_grain_kind": stream.data_grain_kind,
+            "data_grain_axes": list(stream.data_grain_axes) if stream.data_grain_axes else None,
         }
         for stream in result.streams
     ]
@@ -748,6 +1101,26 @@ def persist_ingest_run(
         processing_artifacts,
         dataset_id=dataset_id,
     )
+    catalog_keys = tuple(sorted(set(result.source_keys)))
+    if catalog_keys:
+        catalog_rows = connection.execute(
+            sa.select(
+                SOURCE_CATALOG_TABLE.c.entry_id,
+                SOURCE_CATALOG_TABLE.c.availability_state,
+            ).where(
+                SOURCE_CATALOG_TABLE.c.registry_dataset_id == dataset_id,
+                SOURCE_CATALOG_TABLE.c.registry_version == result.version,
+                SOURCE_CATALOG_TABLE.c.registry_file_key.in_(catalog_keys),
+            )
+        ).all()
+        materialized = 0
+        for catalog_entry_id, state in catalog_rows:
+            if state == SourceCatalogState.ACQUIRED:
+                _transition_catalog_entry(
+                    connection, catalog_entry_id, SourceCatalogState.MATERIALIZED
+                )
+                materialized += 1
+        written["source_catalog_materialized"] = materialized
     issues = _quality_issues(dataset_id, run_id, result)
     connection.execute(QUALITY_ISSUE_TABLE.delete().where(QUALITY_ISSUE_TABLE.c.run_id == run_id))
     written["quality_issue"] = _upsert(connection, QUALITY_ISSUE_TABLE, issues)

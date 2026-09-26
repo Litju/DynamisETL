@@ -30,6 +30,7 @@ from dynamis.contracts import (
     Subject,
     Trial,
 )
+from dynamis.contracts.sports import DataGrain, DataGrainKind
 from dynamis.pipeline.quarantine import QuarantinedRecord
 from dynamis.pipeline.streams import (
     DEFAULT_BATCH_SIZE,
@@ -222,6 +223,10 @@ class SplFreethrowAdapter:
                 "keypoint_count": len(canonicalizer.keypoints),
                 "session_specific_availability": True,
             },
+            data_grain=DataGrain(
+                kind=DataGrainKind.TRIAL_SERIES,
+                axes=("subject", "trial", "sample_index", "joint"),
+            ),
         )
 
     # -- canonical streams ----------------------------------------------

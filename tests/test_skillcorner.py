@@ -103,6 +103,21 @@ def test_adapter_domain_declares_pose_skeleton_and_sync_alignments(bundle: dict[
     skeleton = domain.authorities.skeletons[0]
     assert skeleton.topology is SkeletonTopology.LANDMARK_SET
     assert len(domain.authorities.alignments) == 2
+    sports = domain.sports_contexts[0]
+    assert sports.sport.code == "football"
+    assert sports.competition is None  # this accepted match.json has no competition fact
+    assert sports.contest.competition_edition_id is None
+    assert len(sports.teams) == 2 and len(sports.periods) == 2
+    assert all(
+        team.team_id not in {adapter.metadata.home_team_id, adapter.metadata.away_team_id}
+        for team in sports.teams
+    )
+    assert len(domain.authorities.surface_geometries) == 1
+    assert domain.authorities.surface_geometries[0].dimensions == {
+        "length_m": adapter.metadata.pitch_length_m,
+        "width_m": adapter.metadata.pitch_width_m,
+    }
+    assert domain.authorities.clock_mappings[0].to_canonical_ns(2700) == 2_700_000_000_000
     for alignment in domain.authorities.alignments:
         assert alignment.offset_ns == 0
         assert alignment.scale == 1.0

@@ -29,6 +29,14 @@ from dynamis.contracts import (
     Trial,
 )
 from dynamis.contracts.schemas import with_file_metadata
+from dynamis.contracts.sports import (
+    ClockMapping,
+    DataGrain,
+    SpatialReference,
+    SportsContext,
+    SurfaceGeometry,
+    with_grain_metadata,
+)
 
 #: Batch authority: the maximum rows an adapter may hold before emitting a batch.
 DEFAULT_BATCH_SIZE = 1 << 14
@@ -56,6 +64,7 @@ class CanonicalStream:
     nominal_sampling_rate_hz: float | None = None
     source_unit: str | None = None
     stream_metadata: dict[str, Any] = field(default_factory=dict)
+    grain: DataGrain | None = None
 
     @property
     def partition_modality(self) -> Modality:
@@ -71,11 +80,12 @@ class CanonicalStream:
                 continue
             if isinstance(value, (str, int, float, bool)):
                 extras[key] = str(value)
-        return with_file_metadata(
+        schema = with_file_metadata(
             self.schema,
             nominal_sampling_rate_hz=self.nominal_sampling_rate_hz,
             extras=extras,
         )
+        return with_grain_metadata(schema, self.grain) if self.grain is not None else schema
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,6 +103,9 @@ class SourceAuthorities:
     synchronizations: tuple[SynchronizationSpec, ...] = ()
     alignments: tuple[SyncAlignment, ...] = ()
     skeletons: tuple[SkeletonDefinition, ...] = ()
+    spatial_references: tuple[SpatialReference, ...] = ()
+    surface_geometries: tuple[SurfaceGeometry, ...] = ()
+    clock_mappings: tuple[ClockMapping, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,6 +129,7 @@ class ProviderDomain:
     session_metadata: dict[str, Any] = field(default_factory=dict)
     participants_ignored: dict[str, int] = field(default_factory=dict)
     sessions: tuple[Session, ...] = ()
+    sports_contexts: tuple[SportsContext, ...] = ()
 
     def __post_init__(self) -> None:
         if self.session is not None and self.sessions:

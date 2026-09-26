@@ -52,6 +52,7 @@ from dynamis.contracts import (
     SyncAlignment,
     Trial,
 )
+from dynamis.contracts.sports import DataGrain, DataGrainKind
 from dynamis.pipeline.quarantine import (
     RULE_MISSING_PAIRING,
     RULE_NON_FINITE_VALUE,
@@ -429,6 +430,7 @@ class WhiteCmjAdapter:
                 nominal_sampling_rate_hz=float(self._bundle.acc_sampling_rate_hz),
                 source_unit="g",
                 stream_metadata=self._stream_metadata(trial, index, "g"),
+                grain=DataGrain(kind=DataGrainKind.TRIAL_SERIES),
                 schema=IMU_SCHEMA,
                 batches=self._imu_batches(trial, index),
             )
@@ -447,6 +449,7 @@ class WhiteCmjAdapter:
             nominal_sampling_rate_hz=float(self._bundle.grf_sampling_rate_hz),
             source_unit="1",
             stream_metadata=self._stream_metadata(trial, index, "1"),
+            grain=DataGrain(kind=DataGrainKind.TRIAL_SERIES),
             schema=FORCE_SCHEMA,
             batches=self._force_batches(trial, index),
         )
@@ -470,6 +473,7 @@ class WhiteCmjAdapter:
                 si_units=("m/s**2",),
                 source_unit="g",
                 stream_metadata=self._stream_metadata(trial, trial.row_index, "g"),
+                data_grain=DataGrain(kind=DataGrainKind.TRIAL_SERIES),
             )
         return SensorStream(
             dataset_id=WHITE_DATASET_ID,
@@ -487,6 +491,7 @@ class WhiteCmjAdapter:
             si_units=("1",),
             source_unit="1",
             stream_metadata=self._stream_metadata(trial, trial.row_index, "1"),
+            data_grain=DataGrain(kind=DataGrainKind.TRIAL_SERIES),
         )
 
     # ------------------------------------------------------------------

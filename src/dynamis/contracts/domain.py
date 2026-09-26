@@ -59,6 +59,7 @@ from dynamis.contracts.enums import (
     SessionKind,
     Severity,
 )
+from dynamis.contracts.sports import DataGrain
 from dynamis.contracts.units import assert_si_unit
 
 Md5Value = MD5 | Literal["unknown"]
@@ -370,6 +371,7 @@ class SensorStream(Contract):
     si_units: tuple[str, ...] = ()
     source_unit: str | None = None
     stream_metadata: _JSON = Field(default_factory=dict)
+    data_grain: DataGrain | None = None
 
     @model_validator(mode="after")
     def check_stream(self) -> Self:
@@ -401,6 +403,7 @@ class SampleArtifact(Contract):
     partition: dict[str, str] = Field(default_factory=dict)
     coordinate_frame_id: Identifier | None = None
     synchronization_spec_id: Identifier | None = None
+    data_grain: DataGrain | None = None
     created_at: AwareDatetime | None = None
 
     @model_validator(mode="after")
@@ -488,6 +491,7 @@ class ProcessingArtifact(Contract):
     byte_size: int | None = Field(default=None, gt=0)
     row_count: int | None = Field(default=None, ge=0)
     created_at: AwareDatetime | None = None
+    data_grain: DataGrain | None = None
     artifact_metadata: _JSON = Field(default_factory=dict)
 
 

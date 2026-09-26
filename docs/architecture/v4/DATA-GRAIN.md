@@ -15,4 +15,4 @@
 | TRIAL_SERIES | subject, trial, sample_index |
 | SENSOR_SERIES | subject, stream, canonical_time |
 
-Dataset and artifact identity are enclosing scope, not substitutes for these axes. A provider table name or UI grouping never changes the grain. Unknown legacy artifacts may remain unannotated during additive migration; new V4 products must declare and validate their grain.
+Dataset and artifact identity are enclosing scope, not substitutes for these axes. Joint-valued trial rows append `joint` to `TRIAL_SERIES`; this represents SPL free-throw pose without pretending that a training session is a contest. A provider table name or UI grouping never changes the grain. Unknown legacy artifacts may remain unannotated during additive migration; new V4 products must declare and validate their grain.

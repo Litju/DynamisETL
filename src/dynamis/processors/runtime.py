@@ -26,6 +26,7 @@ from typing import Any
 from sqlalchemy import Engine
 
 from dynamis.config import Settings
+from dynamis.contracts.sports import DataGrain
 from dynamis.processors.persistence import (
     assert_persistable_code_sha,
     dev_allow_unknown_code_sha,
@@ -72,6 +73,7 @@ class ProcessedSeries:
 
     name: str
     artifact: WrittenArtifact
+    grain: DataGrain | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """JSON-serializable descriptor of this materialized series."""
@@ -82,6 +84,8 @@ class ProcessedSeries:
             "row_count": self.artifact.row_count,
             "byte_size": self.artifact.byte_size,
             "compression": self.artifact.compression,
+            "data_grain_kind": self.grain.kind.value if self.grain else None,
+            "data_grain_axes": list(self.grain.axes) if self.grain else None,
         }
 
 
@@ -208,8 +212,10 @@ def execute_processor(
             parameters_hash=parameters_hash,
             name=f"{series_key}.{series.name}",
         )
-        artifact = write_parquet_atomic(series.table, target, relative_to=settings.dataset_root)
-        processed.append(ProcessedSeries(name=series.name, artifact=artifact))
+        artifact = write_parquet_atomic(
+            series.table, target, relative_to=settings.dataset_root, grain=series.grain
+        )
+        processed.append(ProcessedSeries(name=series.name, artifact=artifact, grain=series.grain))
 
     persisted: dict[str, int] = {}
     if persist and engine is not None:
@@ -254,6 +260,8 @@ def execute_processor(
                 "checksum_sha256": item.artifact.checksum_sha256,
                 "byte_size": item.artifact.byte_size,
                 "row_count": item.artifact.row_count,
+                "data_grain_kind": item.grain.kind.value if item.grain else None,
+                "data_grain_axes": list(item.grain.axes) if item.grain else None,
                 "created_at": timestamp,
                 "artifact_metadata": {
                     "algorithm_id": result.spec.algorithm_id,

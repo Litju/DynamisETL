@@ -35,6 +35,7 @@
       "TRIAL_SERIES": ["subject", "trial", "sample_index"],
       "SENSOR_SERIES": ["subject", "stream", "canonical_time"]
     },
+    "axis_variants": {"TRIAL_SERIES": ["joint"]},
     "rule": "A declared grain's complete axes form the row key; every axis is present and non-null, and duplicate keys are rejected before publication."
   },
   "source_catalog": {

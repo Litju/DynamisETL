@@ -12,7 +12,7 @@ Provider IDs are aliases in a versioned crosswalk. Display names cannot merge en
 
 ## Data and products
 
-Every newly published canonical or derived analytical product declares one versioned data grain and exact axes. Duplicate complete axis keys fail publication. Catalog discovery remains metadata-only. `CapabilityProfile` reports upstream and local evidence separately, records its origin, and retains `MODEL_ESTIMATED`; deterministic product routes consume the local profile and available grains.
+Every V4 canonical or derived analytical product declares one versioned data grain and exact axes. Duplicate complete axis keys fail publication. Existing products without a defensible grain stay unannotated until migrated. Catalog discovery remains metadata-only. `CapabilityProfile` reports upstream, registered and materialized evidence separately, records its origin, and retains `MODEL_ESTIMATED`; deterministic product routes consume the materialized profile and available grains.
 
 Cross-sport events retain source event type and validate provider/sport attributes against a versioned schema. Spatial metadata names the actual surface and preserves reversible source transforms. Clock mappings declare how source time reaches canonical session/contest nanoseconds. No renderer or UI owns those scientific conversions.
 

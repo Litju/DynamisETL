@@ -208,6 +208,8 @@ class DatasetVersionFile(Base):
     dataset_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     version: Mapped[str] = mapped_column(String(128), primary_key=True)
     key: Mapped[str] = mapped_column(String(512), primary_key=True)
+    upstream_provider: Mapped[str | None] = mapped_column(String(128))
+    upstream_revision: Mapped[str | None] = mapped_column(String(256))
     size_bytes: Mapped[int | None] = mapped_column(BigInteger)
     upstream_md5: Mapped[str | None] = mapped_column(String(32))
     upstream_sha256: Mapped[str | None] = mapped_column(String(64))
@@ -666,6 +668,8 @@ class SensorStream(Base):
         JSONB, nullable=False, server_default=JSON_EMPTY_ARRAY
     )
     source_unit: Mapped[str | None] = mapped_column(String(64))
+    data_grain_kind: Mapped[str | None] = mapped_column(String(32))
+    data_grain_axes: Mapped[list[Any] | None] = mapped_column(JSONB(none_as_null=True))
     stream_metadata: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default=JSON_EMPTY_OBJECT
     )
@@ -689,6 +693,21 @@ class SensorStream(Base):
             "modality IN ('gnss', 'imu', 'force', 'lpt', 'tracking', 'event', 'pose')",
         ),
         _ck("sensor_stream", "measurement_class", MEASUREMENT_CLASS_SQL),
+        _ck(
+            "sensor_stream",
+            "grain_kind",
+            "data_grain_kind IS NULL OR data_grain_kind IN "
+            "('FRAME_SERIES', 'JOINT_FRAME_SERIES', 'EVENT_SERIES', 'PLAY_BY_PLAY', "
+            "'GAME_SUMMARY', 'PLAYER_GAME', 'TEAM_GAME', 'PLAYER_SEASON', 'TEAM_SEASON', "
+            "'TRIAL_SERIES', 'SENSOR_SERIES')",
+        ),
+        _ck(
+            "sensor_stream",
+            "grain_axes_pair",
+            "(data_grain_kind IS NULL AND data_grain_axes IS NULL) OR "
+            "(data_grain_kind IS NOT NULL AND data_grain_axes IS NOT NULL AND "
+            "jsonb_typeof(data_grain_axes) = 'array' AND jsonb_array_length(data_grain_axes) > 0)",
+        ),
         _ck(
             "sensor_stream",
             "positive_sampling_rate",
@@ -782,6 +801,8 @@ class SampleArtifact(Base):
     synchronization_spec_id: Mapped[str | None] = mapped_column(
         String(128), ForeignKey("synchronization_spec.sync_spec_id")
     )
+    data_grain_kind: Mapped[str | None] = mapped_column(String(32))
+    data_grain_axes: Mapped[list[Any] | None] = mapped_column(JSONB(none_as_null=True))
     created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (
@@ -803,6 +824,21 @@ class SampleArtifact(Base):
             "sample_artifact",
             "parquet_is_zstd",
             "format <> 'parquet' OR compression = 'zstd'",
+        ),
+        _ck(
+            "sample_artifact",
+            "grain_kind",
+            "data_grain_kind IS NULL OR data_grain_kind IN "
+            "('FRAME_SERIES', 'JOINT_FRAME_SERIES', 'EVENT_SERIES', 'PLAY_BY_PLAY', "
+            "'GAME_SUMMARY', 'PLAYER_GAME', 'TEAM_GAME', 'PLAYER_SEASON', 'TEAM_SEASON', "
+            "'TRIAL_SERIES', 'SENSOR_SERIES')",
+        ),
+        _ck(
+            "sample_artifact",
+            "grain_axes_pair",
+            "(data_grain_kind IS NULL AND data_grain_axes IS NULL) OR "
+            "(data_grain_kind IS NOT NULL AND data_grain_axes IS NOT NULL AND "
+            "jsonb_typeof(data_grain_axes) = 'array' AND jsonb_array_length(data_grain_axes) > 0)",
         ),
         _serving_index("ix_sample_artifact_dataset_stream", "dataset_id", "stream_id"),
         # Provenance resolves an input by its recorded checksum.
@@ -870,6 +906,8 @@ class ProcessingArtifact(Base):
     checksum_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     byte_size: Mapped[int | None] = mapped_column(BigInteger)
     row_count: Mapped[int | None] = mapped_column(BigInteger)
+    data_grain_kind: Mapped[str | None] = mapped_column(String(32))
+    data_grain_axes: Mapped[list[Any] | None] = mapped_column(JSONB(none_as_null=True))
     created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     artifact_metadata: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default=JSON_EMPTY_OBJECT
@@ -880,6 +918,21 @@ class ProcessingArtifact(Base):
         _ck("processing_artifact", "layer", LAYER_SQL),
         _ck("processing_artifact", "positive_size", "byte_size IS NULL OR byte_size > 0"),
         _ck("processing_artifact", "nonnegative_rows", "row_count IS NULL OR row_count >= 0"),
+        _ck(
+            "processing_artifact",
+            "grain_kind",
+            "data_grain_kind IS NULL OR data_grain_kind IN "
+            "('FRAME_SERIES', 'JOINT_FRAME_SERIES', 'EVENT_SERIES', 'PLAY_BY_PLAY', "
+            "'GAME_SUMMARY', 'PLAYER_GAME', 'TEAM_GAME', 'PLAYER_SEASON', 'TEAM_SEASON', "
+            "'TRIAL_SERIES', 'SENSOR_SERIES')",
+        ),
+        _ck(
+            "processing_artifact",
+            "grain_axes_pair",
+            "(data_grain_kind IS NULL AND data_grain_axes IS NULL) OR "
+            "(data_grain_kind IS NOT NULL AND data_grain_axes IS NOT NULL AND "
+            "jsonb_typeof(data_grain_axes) = 'array' AND jsonb_array_length(data_grain_axes) > 0)",
+        ),
         _serving_index("ix_processing_artifact_run", "run_id"),
         _serving_index("ix_processing_artifact_checksum", "checksum_sha256"),
     )
@@ -1018,10 +1071,381 @@ class DerivedMetric(Base):
     )
 
 
+class SportRecord(Base):
+    __tablename__ = "sport"
+
+    sport_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    code: Mapped[str] = mapped_column(String(32), nullable=False, unique=True)
+    display_name: Mapped[str] = mapped_column(String(128), nullable=False)
+
+    __table_args__ = (_ck("sport", "code", "code ~ '^[a-z][a-z0-9_]*$'"),)
+
+
+class CompetitionRecord(Base):
+    __tablename__ = "competition"
+
+    competition_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    sport_id: Mapped[str] = mapped_column(String(64), ForeignKey("sport.sport_id"), nullable=False)
+    name: Mapped[str] = mapped_column(String(256), nullable=False)
+
+
+class CompetitionEditionRecord(Base):
+    __tablename__ = "competition_edition"
+
+    edition_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    competition_id: Mapped[str] = mapped_column(
+        String(128), ForeignKey("competition.competition_id"), nullable=False
+    )
+    label: Mapped[str] = mapped_column(String(128), nullable=False)
+    kind: Mapped[str] = mapped_column(String(24), nullable=False)
+    starts_on: Mapped[date | None] = mapped_column(Date)
+    ends_on: Mapped[date | None] = mapped_column(Date)
+
+    __table_args__ = (
+        UniqueConstraint("competition_id", "label", name="uq_competition_edition_label"),
+        _ck("competition_edition", "kind", "kind IN ('league_season', 'tournament', 'other')"),
+        _ck(
+            "competition_edition",
+            "date_order",
+            "starts_on IS NULL OR ends_on IS NULL OR ends_on >= starts_on",
+        ),
+    )
+
+
+class TeamRecord(Base):
+    __tablename__ = "team"
+
+    team_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    sport_id: Mapped[str] = mapped_column(String(64), ForeignKey("sport.sport_id"), nullable=False)
+    display_name: Mapped[str] = mapped_column(String(256), nullable=False)
+
+
+class ContestRecord(Base):
+    __tablename__ = "contest"
+
+    contest_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    sport_id: Mapped[str] = mapped_column(String(64), ForeignKey("sport.sport_id"), nullable=False)
+    competition_edition_id: Mapped[str | None] = mapped_column(
+        String(128), ForeignKey("competition_edition.edition_id")
+    )
+    scheduled_start_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    actual_start_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    venue: Mapped[str | None] = mapped_column(String(256))
+    home_away_supported: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    source_authority: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class ContestTeamRecord(Base):
+    __tablename__ = "contest_team"
+
+    contest_id: Mapped[str] = mapped_column(
+        String(128), ForeignKey("contest.contest_id"), primary_key=True
+    )
+    team_id: Mapped[str] = mapped_column(String(128), ForeignKey("team.team_id"), primary_key=True)
+    side: Mapped[str] = mapped_column(String(16), nullable=False)
+    side_order: Mapped[int | None] = mapped_column(Integer)
+    score: Mapped[int | None] = mapped_column(Integer)
+
+    __table_args__ = (
+        _ck("contest_team", "side", "side IN ('home', 'away', 'neutral', 'unknown')"),
+        _ck("contest_team", "nonnegative_order", "side_order IS NULL OR side_order >= 0"),
+        _ck("contest_team", "nonnegative_score", "score IS NULL OR score >= 0"),
+    )
+
+
+class ContestPeriodRecord(Base):
+    __tablename__ = "contest_period"
+
+    contest_period_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    contest_id: Mapped[str] = mapped_column(
+        String(128), ForeignKey("contest.contest_id"), nullable=False
+    )
+    source_period_number: Mapped[str] = mapped_column(String(64), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False, server_default=text("'other'"))
+    label: Mapped[str | None] = mapped_column(String(128))
+    provider_namespace: Mapped[str | None] = mapped_column(String(128))
+    start_ns: Mapped[int | None] = mapped_column(BigInteger)
+    end_ns: Mapped[int | None] = mapped_column(BigInteger)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "contest_id",
+            "provider_namespace",
+            "source_period_number",
+            name="uq_contest_period_source_number",
+        ),
+        _ck(
+            "contest_period",
+            "kind",
+            "kind IN ('half', 'quarter', 'period', 'overtime', 'set', 'inning', 'other')",
+        ),
+        _ck(
+            "contest_period",
+            "time_order",
+            "start_ns IS NULL OR end_ns IS NULL OR end_ns >= start_ns",
+        ),
+    )
+
+
+class TeamRosterMembershipRecord(Base):
+    __tablename__ = "team_roster_membership"
+
+    membership_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    dataset_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    subject_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    team_id: Mapped[str] = mapped_column(String(128), ForeignKey("team.team_id"), nullable=False)
+    competition_edition_id: Mapped[str] = mapped_column(
+        String(128), ForeignKey("competition_edition.edition_id"), nullable=False
+    )
+    valid_from: Mapped[date | None] = mapped_column(Date)
+    valid_to: Mapped[date | None] = mapped_column(Date)
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["dataset_id", "subject_id"], ["subject.dataset_id", "subject.subject_id"]
+        ),
+        UniqueConstraint(
+            "dataset_id",
+            "subject_id",
+            "team_id",
+            "competition_edition_id",
+            "valid_from",
+            name="uq_team_roster_membership_scope",
+        ),
+        _ck(
+            "team_roster_membership",
+            "date_order",
+            "valid_from IS NULL OR valid_to IS NULL OR valid_to >= valid_from",
+        ),
+    )
+
+
+class ProviderIdentityCrosswalkRecord(Base):
+    __tablename__ = "provider_identity_crosswalk"
+
+    crosswalk_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    provider_namespace: Mapped[str] = mapped_column(String(128), nullable=False)
+    entity_kind: Mapped[str] = mapped_column(String(24), nullable=False)
+    provider_entity_id: Mapped[str] = mapped_column(String(256), nullable=False)
+    canonical_entity_id: Mapped[str] = mapped_column(String(256), nullable=False)
+    valid_from: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    valid_to: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    source_authority: Mapped[str] = mapped_column(Text, nullable=False)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=JSON_EMPTY_OBJECT
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "provider_namespace",
+            "entity_kind",
+            "provider_entity_id",
+            "valid_from",
+            name="uq_provider_crosswalk_alias_interval",
+        ),
+        _ck(
+            "provider_identity_crosswalk",
+            "entity_kind",
+            "entity_kind IN ('competition', 'edition', 'team', 'contest', 'subject')",
+        ),
+        _ck(
+            "provider_identity_crosswalk",
+            "validity_order",
+            "valid_from IS NULL OR valid_to IS NULL OR valid_to >= valid_from",
+        ),
+    )
+
+
+class SourceCatalogEntryRecord(Base):
+    __tablename__ = "source_catalog_entry"
+
+    entry_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    provider: Mapped[str] = mapped_column(String(128), nullable=False)
+    dataset: Mapped[str] = mapped_column(String(128), nullable=False)
+    registry_dataset_id: Mapped[str | None] = mapped_column(String(64))
+    registry_version: Mapped[str | None] = mapped_column(String(128))
+    registry_file_key: Mapped[str | None] = mapped_column(String(512))
+    external_id: Mapped[str] = mapped_column(Text, nullable=False)
+    object_kind: Mapped[str] = mapped_column(String(24), nullable=False)
+    sport_id: Mapped[str | None] = mapped_column(String(64), ForeignKey("sport.sport_id"))
+    competition_id: Mapped[str | None] = mapped_column(
+        String(128), ForeignKey("competition.competition_id")
+    )
+    competition_edition_id: Mapped[str | None] = mapped_column(
+        String(128), ForeignKey("competition_edition.edition_id")
+    )
+    teams: Mapped[list[Any]] = mapped_column(JSONB, nullable=False, server_default=JSON_EMPTY_ARRAY)
+    upstream_url: Mapped[str] = mapped_column(Text, nullable=False)
+    upstream_revision: Mapped[str | None] = mapped_column(String(256))
+    asset_identity: Mapped[str | None] = mapped_column(Text)
+    expected_size_bytes: Mapped[int | None] = mapped_column(BigInteger)
+    rights: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    upstream_capabilities: Mapped[list[Any]] = mapped_column(
+        JSONB, nullable=False, server_default=JSON_EMPTY_ARRAY
+    )
+    discovered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    availability_state: Mapped[str] = mapped_column(String(32), nullable=False)
+    failure_stage: Mapped[str | None] = mapped_column(String(24))
+    failure_evidence: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True))
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["registry_dataset_id", "registry_version", "registry_file_key"],
+            [
+                "dataset_version_file.dataset_id",
+                "dataset_version_file.version",
+                "dataset_version_file.key",
+            ],
+        ),
+        UniqueConstraint(
+            "provider", "dataset", "external_id", name="uq_source_catalog_external_identity"
+        ),
+        _ck(
+            "source_catalog_entry",
+            "object_kind",
+            "object_kind IN ('contest', 'season_dataset', 'release_asset', 'aggregate')",
+        ),
+        _ck(
+            "source_catalog_entry",
+            "positive_expected_size",
+            "expected_size_bytes IS NULL OR expected_size_bytes > 0",
+        ),
+        _ck(
+            "source_catalog_entry",
+            "registry_file_reference_pair",
+            "(registry_dataset_id IS NULL AND registry_version IS NULL "
+            "AND registry_file_key IS NULL) OR "
+            "(registry_dataset_id IS NOT NULL AND registry_version IS NOT NULL "
+            "AND registry_file_key IS NOT NULL)",
+        ),
+        _ck(
+            "source_catalog_entry",
+            "availability_state",
+            "availability_state IN ('UPSTREAM_AVAILABLE', 'REGISTERED', 'ACQUIRED', "
+            "'MATERIALIZED', 'READY', 'ACQUISITION_FAILED', 'MATERIALIZATION_FAILED', "
+            "'VALIDATION_FAILED')",
+        ),
+        _ck(
+            "source_catalog_entry",
+            "failure_state_evidence",
+            "(availability_state LIKE '%_FAILED' AND failure_stage IS NOT NULL "
+            "AND failure_evidence IS NOT NULL AND failure_evidence <> '{}'::jsonb) OR "
+            "(availability_state NOT LIKE '%_FAILED' AND failure_stage IS NULL "
+            "AND failure_evidence IS NULL)",
+        ),
+        _serving_index("ix_source_catalog_sport_state", "sport_id", "availability_state"),
+    )
+
+
+class SessionSportContextRecord(Base):
+    __tablename__ = "session_sport_context"
+
+    dataset_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    contest_id: Mapped[str] = mapped_column(
+        String(128), ForeignKey("contest.contest_id"), nullable=False
+    )
+    source_catalog_entry_id: Mapped[str | None] = mapped_column(
+        String(128), ForeignKey("source_catalog_entry.entry_id")
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["dataset_id", "session_id"], ["session.dataset_id", "session.session_id"]
+        ),
+    )
+
+
+class SpatialReferenceRecord(Base):
+    __tablename__ = "spatial_reference"
+
+    spatial_reference_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    version: Mapped[str] = mapped_column(String(32), primary_key=True)
+    units: Mapped[str] = mapped_column(String(32), nullable=False)
+    origin: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    axis_orientation: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    handedness: Mapped[str] = mapped_column(String(16), nullable=False)
+    canonical_display_transform: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    source_transform: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    period_direction_semantics: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=JSON_EMPTY_OBJECT
+    )
+
+    __table_args__ = (
+        _ck("spatial_reference", "handedness", "handedness IN ('right', 'left', 'unspecified')"),
+    )
+
+
+class SurfaceGeometryRecord(Base):
+    __tablename__ = "surface_geometry"
+
+    surface_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    version: Mapped[str] = mapped_column(String(32), primary_key=True)
+    sport_id: Mapped[str] = mapped_column(String(64), ForeignKey("sport.sport_id"), nullable=False)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    dimensions: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    spatial_reference_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    spatial_reference_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    source_authority: Mapped[str] = mapped_column(Text, nullable=False)
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["spatial_reference_id", "spatial_reference_version"],
+            ["spatial_reference.spatial_reference_id", "spatial_reference.version"],
+        ),
+    )
+
+
+class ClockMappingRecord(Base):
+    __tablename__ = "clock_mapping"
+
+    mapping_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    version: Mapped[str] = mapped_column(String(32), primary_key=True)
+    clock_kind: Mapped[str] = mapped_column(String(24), nullable=False)
+    direction: Mapped[str] = mapped_column(String(16), nullable=False)
+    source_unit: Mapped[str] = mapped_column(String(24), nullable=False)
+    scale_to_ns: Mapped[float] = mapped_column(Float, nullable=False)
+    source_origin: Mapped[float | None] = mapped_column(Float)
+    period_origin_ns: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    offset_ns: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default=text("0"))
+    authority: Mapped[str] = mapped_column(Text, nullable=False)
+    evidence: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+
+    __table_args__ = (
+        _ck(
+            "clock_mapping",
+            "clock_kind",
+            "clock_kind IN ('media_time', 'wall_time', 'game_clock', 'shot_clock', "
+            "'possession_clock')",
+        ),
+        _ck("clock_mapping", "direction", "direction IN ('monotonic', 'count_up', 'count_down')"),
+        _ck(
+            "clock_mapping",
+            "positive_finite_scale",
+            "scale_to_ns > 0 AND scale_to_ns <> 'NaN'::double precision "
+            "AND scale_to_ns <> 'Infinity'::double precision",
+        ),
+        _ck(
+            "clock_mapping",
+            "countdown_origin",
+            "direction <> 'count_down' OR source_origin IS NOT NULL",
+        ),
+        _ck("clock_mapping", "evidence_required", "evidence <> '{}'::jsonb"),
+    )
+
+
 EXPECTED_TABLE_NAMES = frozenset(
     {
         "algorithm_spec",
+        "clock_mapping",
         "clock",
+        "competition",
+        "competition_edition",
+        "contest",
+        "contest_period",
+        "contest_team",
         "coordinate_frame",
         "dataset_source",
         "dataset_source_modality",
@@ -1036,15 +1460,23 @@ EXPECTED_TABLE_NAMES = frozenset(
         "processing_run",
         "protocol",
         "quality_issue",
+        "provider_identity_crosswalk",
         "sample_artifact",
         "sensor_stream",
         "session",
         "session_participant",
+        "session_sport_context",
         "skeleton_definition",
         "skeleton_joint",
         "subject",
+        "sport",
+        "spatial_reference",
+        "source_catalog_entry",
+        "surface_geometry",
         "sync_alignment",
         "synchronization_spec",
         "trial",
+        "team",
+        "team_roster_membership",
     }
 )

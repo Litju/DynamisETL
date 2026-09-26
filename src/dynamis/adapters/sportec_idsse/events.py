@@ -31,6 +31,12 @@ import pyarrow as pa
 from dynamis.adapters.sportec_idsse.matchinfo import IdsseMatchMetadata
 from dynamis.contracts import EVENT_SCHEMA, FrameTransform, MeasurementClass, Modality
 from dynamis.contracts.frames import transform_points
+from dynamis.contracts.sports import (
+    DataGrain,
+    DataGrainKind,
+    SportsEntityKind,
+    canonical_sports_id,
+)
 from dynamis.pipeline.quarantine import (
     RULE_COORDINATE_OUT_OF_RANGE,
     RULE_NON_FINITE_VALUE,
@@ -500,10 +506,14 @@ class EventsCanonicalizer:
             nominal_sampling_rate_hz=None,
             stream_metadata={
                 "adapter": "sportec_idsse",
+                "contest_id": canonical_sports_id(
+                    "sportec_idsse", SportsEntityKind.CONTEST, self._session_id
+                ),
                 "source_file_key": self._path.name,
                 "ordering": "chronological (EventTime, EventId)",
                 "excluded": "Delete retraction events",
             },
+            grain=DataGrain(kind=DataGrainKind.EVENT_SERIES),
             schema=EVENT_SCHEMA,
             batches=self._batches(),
         )

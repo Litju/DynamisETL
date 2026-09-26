@@ -414,6 +414,16 @@ def test_idsse_domain_registers_players_and_periods(
     assert len(domain.subjects) == 4
     assert len(domain.participants) == 4
     assert [trial.trial_id for trial in domain.trials] == ["period-1", "period-2"]
+    sports = domain.sports_contexts[0]
+    assert sports.sport.code == "football"
+    assert sports.competition is not None
+    assert sports.competition.name == adapter.metadata.competition
+    assert sports.edition is not None and sports.edition.label == adapter.metadata.season
+    assert len(sports.teams) == 2 and len(sports.periods) == 2
+    assert len(sports.roster_memberships) == len(domain.subjects)
+    assert len(domain.authorities.surface_geometries) == 1
+    assert domain.authorities.clock_mappings[0].source_unit == "ns"
+    assert domain.authorities.clock_mappings[0].offset_ns < 0
     assert [stream.stream_id for stream in domain.streams] == [
         "tracking-period-1",
         "tracking-period-2",

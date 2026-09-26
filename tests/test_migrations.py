@@ -18,7 +18,7 @@ from sqlalchemy.engine import Engine
 from dynamis.config import ENV_DB_SCHEMA, ENV_POSTGRES_URL, repository_root
 from dynamis.storage.tables import EXPECTED_TABLE_NAMES
 
-HEAD_REVISION = "0008_skeleton_edges_seed"
+HEAD_REVISION = "0009_multisport_semantic_catalog"
 
 
 def _alembic_config(url: str) -> Config:
@@ -161,6 +161,234 @@ def test_migration_lifecycle_on_postgresql(
         # 3. Replay from clean state.
         command.upgrade(config, "head")
         assert EXPECTED_TABLE_NAMES <= _schema_tables(engine, test_db_schema)
+    finally:
+        _drop_schema(engine, test_db_schema)
+        engine.dispose()
+
+
+@pytest.mark.postgres
+def test_v4_backfill_keeps_laboratory_sources_neutral_and_existing_sessions(
+    postgres_url: str,
+    test_db_schema: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(ENV_POSTGRES_URL, postgres_url)
+    monkeypatch.setenv(ENV_DB_SCHEMA, test_db_schema)
+    config = _alembic_config(postgres_url)
+    engine = create_engine(postgres_url, future=True)
+
+    sources = (
+        ("dfl-sportec-idsse", "DFL", "football", "sportec_idsse", "match"),
+        ("skillcorner-opendata", "SkillCorner", "football", "skillcorner_opendata", "match"),
+        ("womens-soccer-positioning", "Zenodo", "football", "zenodo_wsoccer_positioning", "match"),
+        ("spl-open-data", "SPL", "basketball", "spl_freethrow", "laboratory"),
+        ("white-cmj-acc-grf", "Zenodo", "laboratory", "zenodo_white_cmj", "laboratory"),
+        (
+            "gymaware-landmine-vision",
+            "Zenodo",
+            "laboratory",
+            "zenodo_gymaware_landmine",
+            "laboratory",
+        ),
+    )
+    try:
+        _drop_schema(engine, test_db_schema)
+        command.upgrade(config, "0008_skeleton_edges_seed")
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    f'INSERT INTO "{test_db_schema}".license_policy '
+                    "(policy_id, identifier, status, attribution_required, noncommercial_only, "
+                    "share_alike, redistribution, local_only, restrictions) "
+                    "VALUES ('test-license', 'CC-BY-4.0', 'declared', true, false, false, "
+                    "'conditional', false, '[]'::jsonb)"
+                )
+            )
+            for dataset_id, provider, domain, adapter, session_kind in sources:
+                connection.execute(
+                    text(
+                        f'INSERT INTO "{test_db_schema}".dataset_source '
+                        "(dataset_id, name, provider, upstream_urls, domain, adapter_id, "
+                        "v1_role, initial_scope, license_policy_id) "
+                        "VALUES (:dataset_id, :dataset_id, :provider, "
+                        "'[\"https://example.org\"]'::jsonb, :domain, "
+                        ":adapter, 'test source', 'test slice', 'test-license')"
+                    ),
+                    {
+                        "dataset_id": dataset_id,
+                        "provider": provider,
+                        "domain": domain,
+                        "adapter": adapter,
+                    },
+                )
+                connection.execute(
+                    text(
+                        f'INSERT INTO "{test_db_schema}".dataset_version '
+                        "(dataset_id, version, upstream_url) "
+                        "VALUES (:dataset_id, 'v1', 'https://example.org/v1')"
+                    ),
+                    {"dataset_id": dataset_id},
+                )
+                connection.execute(
+                    text(
+                        f'INSERT INTO "{test_db_schema}".dataset_version_file '
+                        "(dataset_id, version, key, size_bytes) "
+                        "VALUES (:dataset_id, 'v1', 'release.json', 1)"
+                    ),
+                    {"dataset_id": dataset_id},
+                )
+                if session_kind == "match":
+                    connection.execute(
+                        text(
+                            f'INSERT INTO "{test_db_schema}".session '
+                            "(dataset_id, session_id, kind, label) "
+                            "VALUES (:dataset_id, 'session-1', 'match', 'accepted match')"
+                        ),
+                        {"dataset_id": dataset_id},
+                    )
+            for dataset_id, team_suffix in (
+                ("dfl-sportec-idsse", "dfl"),
+                ("skillcorner-opendata", "sc"),
+            ):
+                for suffix in ("home", "away"):
+                    subject_id = f"{team_suffix}-{suffix}"
+                    team_id = f"{team_suffix}-team-{suffix}"
+                    connection.execute(
+                        text(
+                            f'INSERT INTO "{test_db_schema}".subject '
+                            "(dataset_id, subject_id, sex, cohort) "
+                            "VALUES (:dataset_id, :subject_id, 'unspecified', :team_id)"
+                        ),
+                        {"dataset_id": dataset_id, "subject_id": subject_id, "team_id": team_id},
+                    )
+                    connection.execute(
+                        text(
+                            f'INSERT INTO "{test_db_schema}".session_participant '
+                            "(dataset_id, session_id, subject_id, role, group_label) "
+                            "VALUES (:dataset_id, 'session-1', :subject_id, 'player', :team_id)"
+                        ),
+                        {"dataset_id": dataset_id, "subject_id": subject_id, "team_id": team_id},
+                    )
+                connection.execute(
+                    text(
+                        f'INSERT INTO "{test_db_schema}".trial '
+                        "(dataset_id, session_id, trial_id, label) "
+                        "VALUES (:dataset_id, 'session-1', 'period-1', 'source period 1')"
+                    ),
+                    {"dataset_id": dataset_id},
+                )
+            connection.execute(
+                text(
+                    f'INSERT INTO "{test_db_schema}".clock '
+                    "(clock_id, timebase) VALUES ('dfl-clock', 'session_monotonic')"
+                )
+            )
+            connection.execute(
+                text(
+                    f'INSERT INTO "{test_db_schema}".synchronization_spec '
+                    "(sync_spec_id, method, reference_clock_id) "
+                    "VALUES ('dfl-sync', 'source_provided', 'dfl-clock')"
+                )
+            )
+            connection.execute(
+                text(
+                    f'INSERT INTO "{test_db_schema}".sensor_stream '
+                    "(dataset_id, stream_id, session_id, trial_id, modality, measurement_class, "
+                    "clock_id, synchronization_spec_id, nominal_sampling_rate_hz) "
+                    "VALUES ('dfl-sportec-idsse', 'tracking-1', 'session-1', 'period-1', "
+                    "'tracking', 'RAW_MEASURED', 'dfl-clock', 'dfl-sync', 25.0)"
+                )
+            )
+            connection.execute(
+                text(
+                    f'INSERT INTO "{test_db_schema}".sample_artifact '
+                    "(artifact_id, dataset_id, session_id, stream_id, layer, relative_path, "
+                    "format, compression, row_count, byte_size, checksum_sha256, schema_version) "
+                    "VALUES ('dfl-artifact', 'dfl-sportec-idsse', 'session-1', 'tracking-1', "
+                    "'silver', 'silver/tracking.parquet', 'parquet', 'zstd', 1, 1, :checksum, '1')"
+                ),
+                {"checksum": "a" * 64},
+            )
+
+        command.upgrade(config, "head")
+        with engine.connect() as connection:
+            session_count = connection.execute(
+                text(f'SELECT count(*) FROM "{test_db_schema}".session')
+            ).scalar_one()
+            subject_count = connection.execute(
+                text(f'SELECT count(*) FROM "{test_db_schema}".subject')
+            ).scalar_one()
+            catalog_rows = connection.execute(
+                text(
+                    f"SELECT dataset, sport_id, availability_state "
+                    f'FROM "{test_db_schema}".source_catalog_entry ORDER BY dataset'
+                )
+            ).all()
+            contests = connection.execute(
+                text(
+                    f'SELECT count(*) FROM "{test_db_schema}".contest '
+                    "WHERE competition_edition_id IS NULL"
+                )
+            ).scalar_one()
+            contest_ids = {
+                row[0]
+                for row in connection.execute(
+                    text(
+                        f'SELECT contest_id FROM "{test_db_schema}".contest '
+                        "WHERE contest_id IS NOT NULL"
+                    )
+                )
+            }
+            team_ids = {
+                row[0]
+                for row in connection.execute(text(f'SELECT team_id FROM "{test_db_schema}".team'))
+            }
+            contexts = connection.execute(
+                text(f'SELECT count(*) FROM "{test_db_schema}".session_sport_context')
+            ).scalar_one()
+            periods = connection.execute(
+                text(f'SELECT count(*) FROM "{test_db_schema}".contest_period')
+            ).scalar_one()
+            grain = connection.execute(
+                text(
+                    "SELECT s.data_grain_kind, s.data_grain_axes, "
+                    "a.data_grain_kind, a.data_grain_axes "
+                    f'FROM "{test_db_schema}".sensor_stream s '
+                    f'JOIN "{test_db_schema}".sample_artifact a '
+                    "USING (dataset_id, stream_id) WHERE s.stream_id = 'tracking-1'"
+                )
+            ).one()
+            sport_codes = {
+                row[0]
+                for row in connection.execute(text(f'SELECT code FROM "{test_db_schema}".sport'))
+            }
+        assert session_count == 3
+        assert subject_count == 4
+        assert contests == 2
+        from dynamis.contracts.sports import SportsEntityKind, canonical_sports_id
+
+        assert contest_ids == {
+            canonical_sports_id(namespace, SportsEntityKind.CONTEST, "session-1")
+            for namespace in ("sportec_idsse", "skillcorner_opendata")
+        }
+        assert team_ids == {
+            canonical_sports_id(namespace, SportsEntityKind.TEAM, f"{prefix}-team-{side}")
+            for namespace, prefix in (("sportec_idsse", "dfl"), ("skillcorner_opendata", "sc"))
+            for side in ("home", "away")
+        }
+        assert contexts == 2
+        assert periods == 2
+        assert grain.data_grain_kind == "FRAME_SERIES"
+        assert grain.data_grain_axes == ["contest", "period", "canonical_time", "entity"]
+        assert grain[2] == "FRAME_SERIES"
+        assert grain[3] == grain.data_grain_axes
+        assert sport_codes == {"football", "basketball"}
+        catalog_by_dataset = {row.dataset: row for row in catalog_rows}
+        assert len(catalog_by_dataset) == len(sources)
+        assert catalog_by_dataset["white-cmj-acc-grf"].sport_id is None
+        assert catalog_by_dataset["gymaware-landmine-vision"].sport_id is None
+        assert catalog_by_dataset["spl-open-data"].sport_id == "basketball"
+        assert all(row.availability_state == "REGISTERED" for row in catalog_rows)
     finally:
         _drop_schema(engine, test_db_schema)
         engine.dispose()

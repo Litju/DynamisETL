@@ -46,6 +46,12 @@ from dynamis.adapters.skillcorner.metadata import (
 )
 from dynamis.adapters.skillcorner.tracking import match_time_ns
 from dynamis.contracts import MeasurementClass, Modality, get_schema
+from dynamis.contracts.sports import (
+    DataGrain,
+    DataGrainKind,
+    SportsEntityKind,
+    canonical_sports_id,
+)
 from dynamis.pipeline.quarantine import (
     RULE_NON_FINITE_VALUE,
     RULE_SCHEMA_FAILURE,
@@ -200,6 +206,9 @@ class PoseCanonicalizer:
             schema=self._schema,
             stream_metadata={
                 "adapter": "skillcorner_opendata",
+                "contest_id": canonical_sports_id(
+                    "skillcorner_opendata", SportsEntityKind.CONTEST, self._metadata.match_id
+                ),
                 "source_file_key": self._zip_path.name,
                 "source_zip_member": self._metadata.match_id,
                 "provider_product": "body pose (25 fps, 29 landmarks)",
@@ -218,6 +227,7 @@ class PoseCanonicalizer:
                     "is_available=false and null coordinates; nothing is imputed"
                 ),
             },
+            grain=DataGrain(kind=DataGrainKind.JOINT_FRAME_SERIES),
         )
 
     def _quarantine(

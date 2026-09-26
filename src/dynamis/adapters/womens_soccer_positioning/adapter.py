@@ -51,6 +51,7 @@ from dynamis.contracts import (
     SessionParticipant,
     Subject,
 )
+from dynamis.contracts.sports import DataGrain, DataGrainKind
 from dynamis.pipeline.quarantine import (
     RULE_COORDINATE_OUT_OF_RANGE,
     RULE_NON_FINITE_VALUE,
@@ -242,6 +243,7 @@ class WomenWorkbookAdapter:
                 "unmapped_columns": ",".join(UNMAPPED_COLUMNS),
                 **DATUM_PROVENANCE,
             },
+            grain=DataGrain(kind=DataGrainKind.SENSOR_SERIES),
             schema=GNSS_SCHEMA,
             batches=self._batches_for_sheet(subject),
         )
@@ -293,6 +295,7 @@ class WomenWorkbookAdapter:
                     "provider_sheet": subject.sheet_name,
                     **DATUM_PROVENANCE,
                 },
+                data_grain=DataGrain(kind=DataGrainKind.SENSOR_SERIES),
             )
             for subject in self.subject_streams()
         )

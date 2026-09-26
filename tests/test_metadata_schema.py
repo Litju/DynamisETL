@@ -13,7 +13,7 @@ from dynamis.storage.tables import EXPECTED_TABLE_NAMES
 def test_metadata_contains_exactly_the_expected_tables() -> None:
     built = build_metadata()
     assert frozenset(built.tables) == EXPECTED_TABLE_NAMES
-    assert len(EXPECTED_TABLE_NAMES) == 26
+    assert len(EXPECTED_TABLE_NAMES) == 40
 
 
 def test_dense_samples_never_enter_postgresql() -> None:
