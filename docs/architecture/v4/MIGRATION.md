@@ -10,3 +10,7 @@ Entry: protected `main`, commit `05419cf9b40b4853500c893b068c581826de3de2`. Work
 6. Run the full upgrade/downgrade/replay/drift migration lifecycle and current Python, web, MatchLab and laboratory regressions.
 
 The migration is additive and does not rewrite scientific sample rows or alter existing entity identity. Downgrade removes only V4 structures and nullable V4 grain annotations; it does not modify legacy values. Current run checksums, quality, rights, provenance and MatchFrameContext remain authoritative.
+
+## MatchLab dense-read regression
+
+`benchmarks/architecture_v2/benchmark_backend.py --mode both --iterations 20` ran at implementation commit `107f070`. The current dense service remained below the published V2 p95 baselines on all five local workloads: White CMJ 62.65 ms (64.14), GNSS 137.06 ms (218.40), DFL tracking 80.46 ms (100.39), SkillCorner Pose 148.12 ms (198.30), and maximum allowed window 1,018.00 ms (1,129.47). The receipt is outside Git. On the maximum-window case the PyArrow reduced candidate was not semantically equivalent to the current service, so its timing is not accepted as a replacement result.
