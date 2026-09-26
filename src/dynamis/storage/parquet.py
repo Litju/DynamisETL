@@ -209,14 +209,15 @@ def _validate_grain_file(path: Path, grain: DataGrain) -> None:
     columns = tuple(f'"{name}"' for name in grain_columns(grain, pq.read_schema(path).names))
     key_columns = ", ".join(columns)
     non_null = " OR ".join(f"{column} IS NULL" for column in columns)
+    parquet_source = "read_parquet(?, hive_partitioning=false)"
     with duckdb.connect(":memory:") as connection:
         missing = connection.execute(
-            f"SELECT 1 FROM read_parquet(?) WHERE {non_null} LIMIT 1", [str(path)]
+            f"SELECT 1 FROM {parquet_source} WHERE {non_null} LIMIT 1", [str(path)]
         ).fetchone()
         if missing is not None:
             raise ValueError(f"{grain.kind.value} artifact has a null grain axis")
         duplicate = connection.execute(
-            f"SELECT 1 FROM read_parquet(?) GROUP BY {key_columns} HAVING count(*) > 1 LIMIT 1",
+            f"SELECT 1 FROM {parquet_source} GROUP BY {key_columns} HAVING count(*) > 1 LIMIT 1",
             [str(path)],
         ).fetchone()
         if duplicate is not None:

@@ -36,6 +36,24 @@ def test_grain_metadata_and_duplicate_gate_on_atomic_writer(tmp_path) -> None:
     assert not duplicate_path.exists()
 
 
+def test_grain_keys_come_from_parquet_not_hive_partition(tmp_path) -> None:
+    table = pa.table(
+        {
+            "session_id": ["session-1", "session-2"],
+            "trial_id": ["period-1", "period-1"],
+            "t_rel_ns": [0, 0],
+            "object_id": ["p1", "p1"],
+        }
+    )
+    path = tmp_path / "session_id=9000001" / "frames.parquet"
+    artifact = write_parquet_atomic(
+        table,
+        path,
+        grain=DataGrain(kind=DataGrainKind.FRAME_SERIES),
+    )
+    assert artifact.row_count == 2
+
+
 def test_streaming_writer_rejects_null_grain_axis_before_publish(tmp_path) -> None:
     table = pa.table(
         {
