@@ -471,3 +471,44 @@ def test_head_revision_matches_metadata_without_drift(
     finally:
         _drop_schema(engine, test_db_schema)
         engine.dispose()
+
+
+@pytest.mark.postgres
+def test_refresh_upsert_deduplicates_primary_keys(
+    postgres_url: str,
+    test_db_schema: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(ENV_POSTGRES_URL, postgres_url)
+    monkeypatch.setenv(ENV_DB_SCHEMA, test_db_schema)
+    config = _alembic_config(postgres_url)
+    engine = create_engine(postgres_url, future=True)
+
+    try:
+        _drop_schema(engine, test_db_schema)
+        command.upgrade(config, "head")
+        from dynamis.pipeline.persist import SPORT_TABLE, _upsert_refresh
+
+        with engine.begin() as connection:
+            connection.execute(text(f'SET search_path TO "{test_db_schema}", public'))
+            written = _upsert_refresh(
+                connection,
+                SPORT_TABLE,
+                [
+                    {"sport_id": "football", "code": "football", "display_name": "Football"},
+                    {
+                        "sport_id": "football",
+                        "code": "football",
+                        "display_name": "Football latest",
+                    },
+                ],
+            )
+            display_name = connection.execute(
+                text("SELECT display_name FROM sport WHERE sport_id = 'football'")
+            ).scalar_one()
+
+        assert written == 1
+        assert display_name == "Football latest"
+    finally:
+        _drop_schema(engine, test_db_schema)
+        engine.dispose()

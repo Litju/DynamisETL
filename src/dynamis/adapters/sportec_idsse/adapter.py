@@ -304,6 +304,14 @@ class IdsseMatchAdapter:
             metadata.home_team.team_id: home_team_id,
             metadata.away_team.team_id: away_team_id,
         }
+        unsupported_team_ids = sorted(
+            {player.team_id for player in metadata.players} - set(team_by_source_id)
+        )
+        if unsupported_team_ids:
+            raise ValueError(
+                f"{metadata.match_id}: players reference unsupported team IDs: "
+                f"{', '.join(unsupported_team_ids)}"
+            )
         sports_context = SportsContext(
             sport=sport,
             competition=Competition(

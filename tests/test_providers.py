@@ -436,6 +436,43 @@ def test_idsse_domain_registers_players_and_periods(
     assert domain.participants_ignored == {"trainers": 2, "referees_and_officials": 1}
 
 
+def test_idsse_rejects_roster_players_for_unsupported_team(
+    tmp_path: Path, dfl_files: dict[str, Path]
+) -> None:
+    tree = ET.parse(dfl_files["info"])
+    teams = tree.find(".//MatchInformation/Teams")
+    assert teams is not None
+    extra_team = ET.SubElement(
+        teams,
+        "Team",
+        {"TeamId": "DFL-CLU-EXTRA", "TeamName": "Extra FC", "Role": "other"},
+    )
+    players = ET.SubElement(extra_team, "Players")
+    ET.SubElement(
+        players,
+        "Player",
+        {
+            "PersonId": "DFL-OBJ-X001",
+            "ShirtNumber": "5",
+            "FirstName": "Extra",
+            "LastName": "Player",
+            "Shortname": "Extra Player",
+            "Starting": "false",
+            "PlayingPosition": "ST",
+            "TeamLeader": "false",
+        },
+    )
+    tree.write(dfl_files["info"], encoding="UTF-8", xml_declaration=True)
+
+    adapter = _adapter(tmp_path, dfl_files)
+    adapter.parse_positions()
+    with pytest.raises(
+        ValueError,
+        match="players reference unsupported team IDs: DFL-CLU-EXTRA",
+    ):
+        adapter.domain()
+
+
 def test_idsse_spill_files_are_removed_after_cleanup(
     tmp_path: Path, dfl_files: dict[str, Path]
 ) -> None:

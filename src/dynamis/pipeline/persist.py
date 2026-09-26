@@ -141,6 +141,7 @@ def _upsert_refresh(connection, table: Table, rows: list[dict[str, Any]]) -> int
     if not rows:
         return 0
     keys = [column.name for column in table.primary_key.columns]
+    rows = list({tuple(row[key] for key in keys): row for row in rows}.values())
     statement = pg_insert(table).values(rows)
     statement = statement.on_conflict_do_update(
         index_elements=keys,

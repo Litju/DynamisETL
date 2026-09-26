@@ -207,7 +207,7 @@ def _validate_grain_file(path: Path, grain: DataGrain) -> None:
     import duckdb
 
     columns = tuple(f'"{name}"' for name in grain_columns(grain, pq.read_schema(path).names))
-    text_columns = ", ".join(f"CAST({column} AS VARCHAR)" for column in columns)
+    key_columns = ", ".join(columns)
     non_null = " OR ".join(f"{column} IS NULL" for column in columns)
     with duckdb.connect(":memory:") as connection:
         missing = connection.execute(
@@ -216,8 +216,7 @@ def _validate_grain_file(path: Path, grain: DataGrain) -> None:
         if missing is not None:
             raise ValueError(f"{grain.kind.value} artifact has a null grain axis")
         duplicate = connection.execute(
-            f"SELECT 1 FROM (SELECT {text_columns} FROM read_parquet(?) "
-            f"GROUP BY {text_columns} HAVING count(*) > 1 LIMIT 1)",
+            f"SELECT 1 FROM read_parquet(?) GROUP BY {key_columns} HAVING count(*) > 1 LIMIT 1",
             [str(path)],
         ).fetchone()
         if duplicate is not None:
