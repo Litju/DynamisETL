@@ -1487,3 +1487,169 @@ def persist_ingest(
         run_id=run_id,
         rows_written={key: value for key, value in written.items() if value},
     )
+
+
+def _upsert_refresh_chunked(
+    connection, table: Table, rows: list[dict[str, Any]], *, chunk: int = 1000
+) -> int:
+    """``_upsert_refresh`` in bounded batches (PostgreSQL caps bind parameters)."""
+    return sum(
+        _upsert_refresh(connection, table, rows[start : start + chunk])
+        for start in range(0, len(rows), chunk)
+    )
+
+
+def persist_sportsdataverse(
+    connection,
+    *,
+    source: DatasetSource,
+    version: str,
+    semantic: dict[str, list[dict[str, Any]]],
+    clock_mappings: list[dict[str, Any]],
+    algorithm: AlgorithmSpec,
+    run_id: str,
+    source_checksums: dict[str, str],
+    artifacts: list[dict[str, Any]],
+    catalog_rows: list[dict[str, Any]],
+    pinned_catalog: dict[str, dict[str, Any]],
+) -> dict[str, int]:
+    """Persist SportsDataverse semantics, clocks, Silver artifacts and catalog state.
+
+    ``catalog_rows`` are metadata-only family-season entries (UPSTREAM_AVAILABLE);
+    ``pinned_catalog`` maps each pinned registry key to the sport/competition/
+    edition it now belongs to, so its registry-derived entry can advance to READY.
+    """
+    written: dict[str, int] = {}
+    table_by_name = {
+        "sport": SPORT_TABLE,
+        "competition": COMPETITION_TABLE,
+        "competition_edition": COMPETITION_EDITION_TABLE,
+        "team": TEAM_TABLE,
+        "contest": CONTEST_TABLE,
+        "contest_team": CONTEST_TEAM_TABLE,
+        "contest_period": CONTEST_PERIOD_TABLE,
+        "provider_identity_crosswalk": PROVIDER_CROSSWALK_TABLE,
+    }
+    for name in table_by_name:
+        written[name] = _upsert_refresh_chunked(connection, table_by_name[name], semantic[name])
+    written["clock_mapping"] = _upsert_refresh_chunked(
+        connection, CLOCK_MAPPING_TABLE, clock_mappings
+    )
+
+    completed_at = datetime.now(UTC)
+    _upsert_refresh(
+        connection,
+        ALGORITHM_SPEC_TABLE,
+        [
+            {
+                "algorithm_id": algorithm.algorithm_id,
+                "name": algorithm.name,
+                "version": algorithm.version,
+                "kind": algorithm.kind.value,
+                "code_git_sha": algorithm.code_git_sha,
+                "parameters": dict(algorithm.parameters),
+                "parameters_hash": algorithm.parameters_hash,
+                "description": algorithm.description,
+                "citation": algorithm.citation,
+            }
+        ],
+    )
+    run = ProcessingRun(
+        run_id=run_id,
+        dataset_id=source.dataset_id,
+        algorithm_id=algorithm.algorithm_id,
+        status=ProcessingStatus.COMPLETED,
+        code_git_sha=algorithm.code_git_sha,
+        started_at=completed_at,
+        completed_at=completed_at,
+        inputs=tuple(
+            ProcessingInput(
+                artifact_id=f"bronze:{key.replace('/', ':')}",
+                checksum_sha256=checksum,
+                role=f"release asset {key}",
+            )
+            for key, checksum in sorted(source_checksums.items())
+        ),
+        notes=f"SportsDataverse NBA/NHL canonicalization; snapshot={version}",
+    )
+    _update_run(
+        connection,
+        PROCESSING_RUN_TABLE,
+        {
+            "run_id": run.run_id,
+            "dataset_id": run.dataset_id,
+            "algorithm_id": run.algorithm_id,
+            "status": run.status.value,
+            "code_git_sha": run.code_git_sha,
+            "parameters_hash": run.parameters_hash,
+            "dagster_run_id": run.dagster_run_id,
+            "started_at": run.started_at,
+            "completed_at": run.completed_at,
+            "input_checksums": [item.checksum_sha256 for item in run.inputs],
+            "notes": run.notes,
+        },
+    )
+    written["processing_artifact"] = _upsert_refresh(
+        connection,
+        PROCESSING_ARTIFACT_TABLE,
+        [
+            {
+                "artifact_id": item["artifact_id"],
+                "dataset_id": source.dataset_id,
+                "run_id": run_id,
+                "artifact_type": item["artifact_type"],
+                "layer": "silver",
+                "relative_path": item["relative_path"],
+                "checksum_sha256": item["checksum_sha256"],
+                "byte_size": item["byte_size"],
+                "row_count": item["row_count"],
+                "data_grain_kind": item["data_grain_kind"],
+                "data_grain_axes": item["data_grain_axes"],
+                "created_at": completed_at,
+                "artifact_metadata": item["artifact_metadata"],
+            }
+            for item in artifacts
+        ],
+    )
+
+    if catalog_rows:
+        for start in range(0, len(catalog_rows), 500):
+            batch = catalog_rows[start : start + 500]
+            statement = pg_insert(SOURCE_CATALOG_TABLE).values(batch)
+            statement = statement.on_conflict_do_update(
+                index_elements=["entry_id"],
+                set_={
+                    name: statement.excluded[name]
+                    for name in (
+                        "sport_id",
+                        "competition_id",
+                        "competition_edition_id",
+                        "upstream_url",
+                        "upstream_revision",
+                        "asset_identity",
+                        "expected_size_bytes",
+                        "rights",
+                        "provider_metadata",
+                        "upstream_capabilities",
+                    )
+                },
+            )
+            connection.execute(statement)
+    written["source_catalog_entry"] = len(catalog_rows)
+    for key, placement in pinned_catalog.items():
+        entry_id = connection.execute(
+            sa.select(SOURCE_CATALOG_TABLE.c.entry_id).where(
+                SOURCE_CATALOG_TABLE.c.registry_dataset_id == source.dataset_id,
+                SOURCE_CATALOG_TABLE.c.registry_version == version,
+                SOURCE_CATALOG_TABLE.c.registry_file_key == key,
+            )
+        ).scalar_one_or_none()
+        if entry_id is None:
+            continue
+        connection.execute(
+            SOURCE_CATALOG_TABLE.update()
+            .where(SOURCE_CATALOG_TABLE.c.entry_id == entry_id)
+            .values(**placement)
+        )
+        _advance_catalog_entry(connection, entry_id, SourceCatalogState.READY)
+    return written
