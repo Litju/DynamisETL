@@ -25,6 +25,10 @@ from dynamis.serving.models import (
     DatasetDetail,
     DatasetSummary,
     DatasetVersionView,
+    GameEditionView,
+    GameFamilyRef,
+    GameSummaryView,
+    GameTeamView,
     LicenseView,
     MetricCatalogEntry,
     MetricDefinitionView,
@@ -1958,3 +1962,249 @@ def season_player_links(
         appearances=appearances,
         team_contest_ids=team_contests,
     )
+
+
+GAME_ARTIFACT_TYPES = ("play_by_play", "player_game", "team_game", "game_summary")
+
+
+def list_game_editions(connection: Connection) -> list[GameEditionView]:
+    """Editions with discrete game-grain artifacts. Metadata only."""
+    rows = (
+        connection.execute(
+            sa.text(
+                """
+            SELECT artifact.artifact_id, artifact.dataset_id, artifact.run_id,
+                   artifact.artifact_type, artifact.row_count, artifact.checksum_sha256,
+                   artifact.data_grain_kind, artifact.artifact_metadata,
+                   edition.edition_id, edition.label AS edition_label,
+                   edition.starts_on, edition.ends_on,
+                   competition.competition_id, competition.name AS competition_name,
+                   sport.sport_id, sport.display_name AS sport_name,
+                   source.provider,
+                   license.policy_id, license.identifier, license.status AS license_status,
+                   license.attribution_required, license.noncommercial_only,
+                   license.share_alike, license.redistribution, license.local_only,
+                   license.restrictions,
+                   (SELECT count(*) FROM contest
+                     WHERE contest.competition_edition_id = edition.edition_id) AS contests,
+                   (SELECT count(*) FROM contest
+                     WHERE contest.competition_edition_id = edition.edition_id
+                       AND contest.actual_start_at IS NOT NULL) AS completed
+            FROM processing_artifact AS artifact
+            JOIN competition_edition AS edition
+              ON edition.edition_id = artifact.artifact_metadata ->> 'competition_edition_id'
+            JOIN competition ON competition.competition_id = edition.competition_id
+            JOIN sport ON sport.sport_id = competition.sport_id
+            JOIN dataset_source AS source ON source.dataset_id = artifact.dataset_id
+            JOIN license_policy AS license ON license.policy_id = source.license_policy_id
+            WHERE artifact.artifact_type IN :types
+            ORDER BY sport.display_name, competition.name, edition.label, artifact.artifact_id
+            """
+            ).bindparams(sa.bindparam("types", expanding=True)),
+            {"types": list(GAME_ARTIFACT_TYPES)},
+        )
+        .mappings()
+        .all()
+    )
+    editions: dict[str, GameEditionView] = {}
+    for row in rows:
+        metadata = dict(row["artifact_metadata"] or {})
+        edition = editions.get(str(row["edition_id"]))
+        if edition is None:
+            edition = GameEditionView(
+                dataset_id=str(row["dataset_id"]),
+                provider=str(row["provider"]),
+                sport_id=str(row["sport_id"]),
+                sport_name=str(row["sport_name"]),
+                league_id=metadata.get("league_id"),
+                competition_id=str(row["competition_id"]),
+                competition_name=str(row["competition_name"]),
+                edition_id=str(row["edition_id"]),
+                edition_label=str(row["edition_label"]),
+                starts_on=_iso(row["starts_on"]),
+                ends_on=_iso(row["ends_on"]),
+                contest_count=int(row["contests"]),
+                completed_count=int(row["completed"]),
+                measurement_class="SOURCE_DERIVED",
+                license=_license_view(row),
+                families=[],
+            )
+            editions[edition.edition_id] = edition
+        if row["artifact_type"] == "play_by_play":
+            edition.score_reconciliation = dict(metadata.get("score_reconciliation") or {})
+            edition.clock_mapping_ids = [
+                str(item) for item in metadata.get("clock_mapping_ids", [])
+            ]
+        asset_id = metadata.get("release_asset_id")
+        edition.families.append(
+            GameFamilyRef(
+                family=str(metadata.get("family", row["artifact_type"])),
+                artifact_id=str(row["artifact_id"]),
+                artifact_type=str(row["artifact_type"]),
+                grain_kind=str(row["data_grain_kind"]),
+                row_count=int(row["row_count"]),
+                checksum_sha256=str(row["checksum_sha256"]),
+                run_id=str(row["run_id"]) if row["run_id"] else None,
+                source_file_key=metadata.get("source_file_key"),
+                release_tag=metadata.get("release_tag"),
+                release_asset_id=int(asset_id) if asset_id is not None else None,
+                snapshot=metadata.get("snapshot"),
+                freshness=dict(metadata.get("release_freshness") or {}),
+            )
+        )
+    return list(editions.values())
+
+
+_GAME_SELECT = """
+    SELECT contest.contest_id, contest.competition_edition_id, contest.sport_id,
+           contest.scheduled_start_at, contest.actual_start_at, contest.venue,
+           crosswalk.provider_entity_id AS provider_game_id,
+           crosswalk.metadata_json AS game_metadata,
+           (SELECT count(*) FROM contest_period AS period
+             WHERE period.contest_id = contest.contest_id) AS period_count
+    FROM contest
+    LEFT JOIN provider_identity_crosswalk AS crosswalk
+      ON crosswalk.entity_kind = 'contest'
+     AND crosswalk.canonical_entity_id = contest.contest_id
+"""
+
+
+def _game_teams(connection: Connection, contest_ids: list[str]) -> dict[str, list[GameTeamView]]:
+    if not contest_ids:
+        return {}
+    rows = (
+        connection.execute(
+            sa.text(
+                """
+            SELECT participation.contest_id, participation.team_id, team.display_name,
+                   participation.side, participation.score
+            FROM contest_team AS participation
+            JOIN team ON team.team_id = participation.team_id
+            WHERE participation.contest_id IN :contest_ids
+            ORDER BY participation.side_order NULLS LAST, team.display_name
+            """
+            ).bindparams(sa.bindparam("contest_ids", expanding=True)),
+            {"contest_ids": contest_ids},
+        )
+        .mappings()
+        .all()
+    )
+    teams: dict[str, list[GameTeamView]] = {}
+    for row in rows:
+        teams.setdefault(str(row["contest_id"]), []).append(
+            GameTeamView(
+                team_id=str(row["team_id"]),
+                display_name=str(row["display_name"]),
+                side=str(row["side"]),
+                score=row["score"],
+            )
+        )
+    return teams
+
+
+def _game_summary(row: Any, teams: list[GameTeamView]) -> GameSummaryView:
+    metadata = dict(row["game_metadata"] or {})
+    postseason = metadata.get("season_type") == 3 or metadata.get("game_type") == "P"
+    status = metadata.get("status") or metadata.get("game_state")
+    return GameSummaryView(
+        contest_id=str(row["contest_id"]),
+        provider_game_id=str(row["provider_game_id"]) if row["provider_game_id"] else None,
+        edition_id=str(row["competition_edition_id"]) if row["competition_edition_id"] else None,
+        sport_id=str(row["sport_id"]),
+        scheduled_start_at=_iso(row["scheduled_start_at"]),
+        actual_start_at=_iso(row["actual_start_at"]),
+        venue=row["venue"],
+        completed=bool(metadata.get("completed", row["actual_start_at"] is not None)),
+        postseason=bool(postseason),
+        status=str(status) if status is not None else None,
+        teams=teams,
+        period_count=int(row["period_count"]),
+        play_by_play_available=bool(metadata.get("play_by_play_available", False)),
+    )
+
+
+def list_games(
+    connection: Connection,
+    *,
+    edition_id: str,
+    team_id: str | None,
+    limit: int,
+    offset: int,
+) -> tuple[int, list[GameSummaryView]]:
+    where = "WHERE contest.competition_edition_id = :edition_id"
+    params: dict[str, Any] = {"edition_id": edition_id, "limit": limit, "offset": offset}
+    if team_id is not None:
+        where += (
+            " AND EXISTS (SELECT 1 FROM contest_team AS filter_team"
+            " WHERE filter_team.contest_id = contest.contest_id"
+            " AND filter_team.team_id = :team_id)"
+        )
+        params["team_id"] = team_id
+    total = int(
+        connection.execute(sa.text(f"SELECT count(*) FROM contest {where}"), params).scalar_one()
+    )
+    rows = (
+        connection.execute(
+            sa.text(
+                f"{_GAME_SELECT} {where} "
+                "ORDER BY contest.scheduled_start_at NULLS LAST, contest.contest_id "
+                "LIMIT :limit OFFSET :offset"
+            ),
+            params,
+        )
+        .mappings()
+        .all()
+    )
+    teams = _game_teams(connection, [str(row["contest_id"]) for row in rows])
+    return total, [_game_summary(row, teams.get(str(row["contest_id"]), [])) for row in rows]
+
+
+def game_summary(connection: Connection, contest_id: str) -> GameSummaryView | None:
+    row = (
+        connection.execute(
+            sa.text(f"{_GAME_SELECT} WHERE contest.contest_id = :contest_id"),
+            {"contest_id": contest_id},
+        )
+        .mappings()
+        .one_or_none()
+    )
+    if row is None:
+        return None
+    return _game_summary(row, _game_teams(connection, [contest_id]).get(contest_id, []))
+
+
+def game_periods(connection: Connection, contest_id: str) -> list[dict[str, Any]]:
+    return [
+        dict(row)
+        for row in connection.execute(
+            sa.text(
+                """
+            SELECT contest_period_id, source_period_number, kind, label, start_ns, end_ns
+            FROM contest_period WHERE contest_id = :contest_id
+            ORDER BY CAST(source_period_number AS integer)
+            """
+            ),
+            {"contest_id": contest_id},
+        ).mappings()
+    ]
+
+
+def subject_display_names(connection: Connection, subject_ids: list[str]) -> dict[str, str]:
+    """Display names recorded with the provider identity crosswalk (not a join key)."""
+    if not subject_ids:
+        return {}
+    rows = connection.execute(
+        sa.text(
+            """
+            SELECT canonical_entity_id, metadata_json ->> 'display_name' AS display_name
+            FROM provider_identity_crosswalk
+            WHERE entity_kind = 'subject' AND canonical_entity_id IN :ids
+            """
+        ).bindparams(sa.bindparam("ids", expanding=True)),
+        {"ids": subject_ids},
+    ).mappings()
+    return {
+        str(row["canonical_entity_id"]): str(row["display_name"])
+        for row in rows
+        if row["display_name"]
+    }

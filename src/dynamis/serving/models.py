@@ -736,3 +736,132 @@ class SeasonPlayerLinksView(BaseModel):
     provider_player_ids: list[str]
     appearances: list[SeasonContestLinkView]
     team_contest_ids: list[str]
+
+
+# ---------------------------------------------------------------------------
+# Games (PLAY_BY_PLAY / PLAYER_GAME / TEAM_GAME)
+# ---------------------------------------------------------------------------
+
+
+class GameFamilyRef(BaseModel):
+    family: str
+    artifact_id: str
+    artifact_type: str
+    grain_kind: str
+    row_count: int
+    checksum_sha256: str
+    run_id: str | None
+    source_file_key: str | None
+    release_tag: str | None
+    release_asset_id: int | None
+    snapshot: str | None
+    freshness: dict[str, Any] = Field(default_factory=dict)
+
+
+class GameEditionView(BaseModel):
+    """A competition edition that owns discrete game-grain data."""
+
+    dataset_id: str
+    provider: str
+    sport_id: str
+    sport_name: str
+    league_id: str | None
+    competition_id: str
+    competition_name: str
+    edition_id: str
+    edition_label: str
+    starts_on: str | None
+    ends_on: str | None
+    contest_count: int
+    completed_count: int
+    measurement_class: str
+    license: LicenseView
+    families: list[GameFamilyRef]
+    score_reconciliation: dict[str, Any] = Field(default_factory=dict)
+    clock_mapping_ids: list[str] = Field(default_factory=list)
+
+
+class GameTeamView(BaseModel):
+    team_id: str
+    display_name: str
+    side: str
+    score: int | None
+
+
+class GameSummaryView(BaseModel):
+    contest_id: str
+    provider_game_id: str | None
+    edition_id: str | None
+    sport_id: str
+    scheduled_start_at: str | None
+    actual_start_at: str | None
+    venue: str | None
+    completed: bool
+    postseason: bool
+    status: str | None
+    teams: list[GameTeamView]
+    period_count: int
+    play_by_play_available: bool
+
+
+class GamePage(BaseModel):
+    total: int
+    limit: int
+    offset: int
+    rows: list[GameSummaryView]
+
+
+class GamePeriodView(BaseModel):
+    contest_period_id: str
+    number: int
+    kind: str
+    label: str | None
+    start_ns: int | None
+    end_ns: int | None
+    event_count: int
+
+
+class GameDetailView(BaseModel):
+    summary: GameSummaryView
+    edition: GameEditionView
+    periods: list[GamePeriodView]
+    subjects: dict[str, str]
+    teams_by_id: dict[str, str]
+
+
+class GamePlayView(BaseModel):
+    contest_period_id: str
+    period_number: int
+    sequence_index: str
+    source_event_id: str
+    provider_event_type: str
+    canonical_time_ns: int | None
+    source_clock: dict[str, Any] | None
+    team_id: str | None
+    subject_id: str | None
+    attributes: dict[str, Any]
+    attributes_schema_id: str
+    attributes_schema_version: str
+
+
+class GamePlayPage(BaseModel):
+    contest_id: str
+    period: int | None
+    total: int
+    limit: int
+    offset: int
+    rows: list[GamePlayView]
+
+
+class GameBoxFamilyView(BaseModel):
+    family: str
+    grain_kind: str
+    artifact_id: str
+    columns: list[str]
+    rows: list[dict[str, Any]]
+
+
+class GameBoxView(BaseModel):
+    contest_id: str
+    grain: Literal["player", "team"]
+    families: list[GameBoxFamilyView]

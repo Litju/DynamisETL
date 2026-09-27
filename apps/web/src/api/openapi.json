@@ -992,6 +992,737 @@
         "title": "EntityObservationView",
         "type": "object"
       },
+      "GameBoxFamilyView": {
+        "properties": {
+          "artifact_id": {
+            "title": "Artifact Id",
+            "type": "string"
+          },
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "family": {
+            "title": "Family",
+            "type": "string"
+          },
+          "grain_kind": {
+            "title": "Grain Kind",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "family",
+          "grain_kind",
+          "artifact_id",
+          "columns",
+          "rows"
+        ],
+        "title": "GameBoxFamilyView",
+        "type": "object"
+      },
+      "GameBoxView": {
+        "properties": {
+          "contest_id": {
+            "title": "Contest Id",
+            "type": "string"
+          },
+          "families": {
+            "items": {
+              "$ref": "#/components/schemas/GameBoxFamilyView"
+            },
+            "title": "Families",
+            "type": "array"
+          },
+          "grain": {
+            "enum": [
+              "player",
+              "team"
+            ],
+            "title": "Grain",
+            "type": "string"
+          }
+        },
+        "required": [
+          "contest_id",
+          "grain",
+          "families"
+        ],
+        "title": "GameBoxView",
+        "type": "object"
+      },
+      "GameDetailView": {
+        "properties": {
+          "edition": {
+            "$ref": "#/components/schemas/GameEditionView"
+          },
+          "periods": {
+            "items": {
+              "$ref": "#/components/schemas/GamePeriodView"
+            },
+            "title": "Periods",
+            "type": "array"
+          },
+          "subjects": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Subjects",
+            "type": "object"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/GameSummaryView"
+          },
+          "teams_by_id": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Teams By Id",
+            "type": "object"
+          }
+        },
+        "required": [
+          "summary",
+          "edition",
+          "periods",
+          "subjects",
+          "teams_by_id"
+        ],
+        "title": "GameDetailView",
+        "type": "object"
+      },
+      "GameEditionView": {
+        "description": "A competition edition that owns discrete game-grain data.",
+        "properties": {
+          "clock_mapping_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Clock Mapping Ids",
+            "type": "array"
+          },
+          "competition_id": {
+            "title": "Competition Id",
+            "type": "string"
+          },
+          "competition_name": {
+            "title": "Competition Name",
+            "type": "string"
+          },
+          "completed_count": {
+            "title": "Completed Count",
+            "type": "integer"
+          },
+          "contest_count": {
+            "title": "Contest Count",
+            "type": "integer"
+          },
+          "dataset_id": {
+            "title": "Dataset Id",
+            "type": "string"
+          },
+          "edition_id": {
+            "title": "Edition Id",
+            "type": "string"
+          },
+          "edition_label": {
+            "title": "Edition Label",
+            "type": "string"
+          },
+          "ends_on": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ends On"
+          },
+          "families": {
+            "items": {
+              "$ref": "#/components/schemas/GameFamilyRef"
+            },
+            "title": "Families",
+            "type": "array"
+          },
+          "league_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "League Id"
+          },
+          "license": {
+            "$ref": "#/components/schemas/LicenseView"
+          },
+          "measurement_class": {
+            "title": "Measurement Class",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "score_reconciliation": {
+            "additionalProperties": true,
+            "title": "Score Reconciliation",
+            "type": "object"
+          },
+          "sport_id": {
+            "title": "Sport Id",
+            "type": "string"
+          },
+          "sport_name": {
+            "title": "Sport Name",
+            "type": "string"
+          },
+          "starts_on": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Starts On"
+          }
+        },
+        "required": [
+          "dataset_id",
+          "provider",
+          "sport_id",
+          "sport_name",
+          "league_id",
+          "competition_id",
+          "competition_name",
+          "edition_id",
+          "edition_label",
+          "starts_on",
+          "ends_on",
+          "contest_count",
+          "completed_count",
+          "measurement_class",
+          "license",
+          "families"
+        ],
+        "title": "GameEditionView",
+        "type": "object"
+      },
+      "GameFamilyRef": {
+        "properties": {
+          "artifact_id": {
+            "title": "Artifact Id",
+            "type": "string"
+          },
+          "artifact_type": {
+            "title": "Artifact Type",
+            "type": "string"
+          },
+          "checksum_sha256": {
+            "title": "Checksum Sha256",
+            "type": "string"
+          },
+          "family": {
+            "title": "Family",
+            "type": "string"
+          },
+          "freshness": {
+            "additionalProperties": true,
+            "title": "Freshness",
+            "type": "object"
+          },
+          "grain_kind": {
+            "title": "Grain Kind",
+            "type": "string"
+          },
+          "release_asset_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release Asset Id"
+          },
+          "release_tag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release Tag"
+          },
+          "row_count": {
+            "title": "Row Count",
+            "type": "integer"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "snapshot": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot"
+          },
+          "source_file_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source File Key"
+          }
+        },
+        "required": [
+          "family",
+          "artifact_id",
+          "artifact_type",
+          "grain_kind",
+          "row_count",
+          "checksum_sha256",
+          "run_id",
+          "source_file_key",
+          "release_tag",
+          "release_asset_id",
+          "snapshot"
+        ],
+        "title": "GameFamilyRef",
+        "type": "object"
+      },
+      "GamePage": {
+        "properties": {
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/GameSummaryView"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "limit",
+          "offset",
+          "rows"
+        ],
+        "title": "GamePage",
+        "type": "object"
+      },
+      "GamePeriodView": {
+        "properties": {
+          "contest_period_id": {
+            "title": "Contest Period Id",
+            "type": "string"
+          },
+          "end_ns": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Ns"
+          },
+          "event_count": {
+            "title": "Event Count",
+            "type": "integer"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "start_ns": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Ns"
+          }
+        },
+        "required": [
+          "contest_period_id",
+          "number",
+          "kind",
+          "label",
+          "start_ns",
+          "end_ns",
+          "event_count"
+        ],
+        "title": "GamePeriodView",
+        "type": "object"
+      },
+      "GamePlayPage": {
+        "properties": {
+          "contest_id": {
+            "title": "Contest Id",
+            "type": "string"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/GamePlayView"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "contest_id",
+          "period",
+          "total",
+          "limit",
+          "offset",
+          "rows"
+        ],
+        "title": "GamePlayPage",
+        "type": "object"
+      },
+      "GamePlayView": {
+        "properties": {
+          "attributes": {
+            "additionalProperties": true,
+            "title": "Attributes",
+            "type": "object"
+          },
+          "attributes_schema_id": {
+            "title": "Attributes Schema Id",
+            "type": "string"
+          },
+          "attributes_schema_version": {
+            "title": "Attributes Schema Version",
+            "type": "string"
+          },
+          "canonical_time_ns": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Time Ns"
+          },
+          "contest_period_id": {
+            "title": "Contest Period Id",
+            "type": "string"
+          },
+          "period_number": {
+            "title": "Period Number",
+            "type": "integer"
+          },
+          "provider_event_type": {
+            "title": "Provider Event Type",
+            "type": "string"
+          },
+          "sequence_index": {
+            "title": "Sequence Index",
+            "type": "string"
+          },
+          "source_clock": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Clock"
+          },
+          "source_event_id": {
+            "title": "Source Event Id",
+            "type": "string"
+          },
+          "subject_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject Id"
+          },
+          "team_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Id"
+          }
+        },
+        "required": [
+          "contest_period_id",
+          "period_number",
+          "sequence_index",
+          "source_event_id",
+          "provider_event_type",
+          "canonical_time_ns",
+          "source_clock",
+          "team_id",
+          "subject_id",
+          "attributes",
+          "attributes_schema_id",
+          "attributes_schema_version"
+        ],
+        "title": "GamePlayView",
+        "type": "object"
+      },
+      "GameSummaryView": {
+        "properties": {
+          "actual_start_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Start At"
+          },
+          "completed": {
+            "title": "Completed",
+            "type": "boolean"
+          },
+          "contest_id": {
+            "title": "Contest Id",
+            "type": "string"
+          },
+          "edition_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edition Id"
+          },
+          "period_count": {
+            "title": "Period Count",
+            "type": "integer"
+          },
+          "play_by_play_available": {
+            "title": "Play By Play Available",
+            "type": "boolean"
+          },
+          "postseason": {
+            "title": "Postseason",
+            "type": "boolean"
+          },
+          "provider_game_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Game Id"
+          },
+          "scheduled_start_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scheduled Start At"
+          },
+          "sport_id": {
+            "title": "Sport Id",
+            "type": "string"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "teams": {
+            "items": {
+              "$ref": "#/components/schemas/GameTeamView"
+            },
+            "title": "Teams",
+            "type": "array"
+          },
+          "venue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue"
+          }
+        },
+        "required": [
+          "contest_id",
+          "provider_game_id",
+          "edition_id",
+          "sport_id",
+          "scheduled_start_at",
+          "actual_start_at",
+          "venue",
+          "completed",
+          "postseason",
+          "status",
+          "teams",
+          "period_count",
+          "play_by_play_available"
+        ],
+        "title": "GameSummaryView",
+        "type": "object"
+      },
+      "GameTeamView": {
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "side": {
+            "title": "Side",
+            "type": "string"
+          },
+          "team_id": {
+            "title": "Team Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "team_id",
+          "display_name",
+          "side",
+          "score"
+        ],
+        "title": "GameTeamView",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -4941,6 +5672,295 @@
         "summary": "Provenance",
         "tags": [
           "provenance"
+        ]
+      }
+    },
+    "/api/games": {
+      "get": {
+        "operationId": "games_api_games_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "edition_id",
+            "required": true,
+            "schema": {
+              "maxLength": 256,
+              "minLength": 1,
+              "title": "Edition Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "team_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Team Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GamePage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Games",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/games/editions": {
+      "get": {
+        "operationId": "game_editions_api_games_editions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GameEditionView"
+                  },
+                  "title": "Response Game Editions Api Games Editions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Game Editions",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/games/{contest_id}": {
+      "get": {
+        "operationId": "game_api_games__contest_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "contest_id",
+            "required": true,
+            "schema": {
+              "title": "Contest Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameDetailView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Game",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/games/{contest_id}/box": {
+      "get": {
+        "operationId": "game_box_api_games__contest_id__box_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "contest_id",
+            "required": true,
+            "schema": {
+              "title": "Contest Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "grain",
+            "required": false,
+            "schema": {
+              "default": "player",
+              "enum": [
+                "player",
+                "team"
+              ],
+              "title": "Grain",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameBoxView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Game Box",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/games/{contest_id}/plays": {
+      "get": {
+        "operationId": "game_plays_api_games__contest_id__plays_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "contest_id",
+            "required": true,
+            "schema": {
+              "title": "Contest Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "period",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 20,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Period"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 500,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GamePlayPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Game Plays",
+        "tags": [
+          "games"
         ]
       }
     },

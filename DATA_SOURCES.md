@@ -213,6 +213,9 @@ documented mapping between them is published, so no reduction is fabricated.
   play-by-play and player/team box scores (~41 MiB). Release assets can be
   re-uploaded, so the local SHA-256 is the immutable Bronze identity and any live
   id/size/update drift fails the plan.
+- Serving with `DYNAMIS_SERVING_EXPOSURE=public` (unknown values fail closed to
+  `public`) refuses the play-by-play and box-score payloads of this local-only
+  source with state `rights_restricted`; catalog metadata stays browsable.
 
 ## Excluded from V1
 
