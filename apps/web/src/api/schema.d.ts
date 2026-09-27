@@ -169,6 +169,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/games": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Games */
+        get: operations["games_api_games_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/games/editions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Game Editions */
+        get: operations["game_editions_api_games_editions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/games/{contest_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Game */
+        get: operations["game_api_games__contest_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/games/{contest_id}/box": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Game Box */
+        get: operations["game_box_api_games__contest_id__box_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/games/{contest_id}/plays": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Game Plays */
+        get: operations["game_plays_api_games__contest_id__plays_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -837,6 +922,234 @@ export interface components {
             last_observed_ns: number;
             /** Observation Count */
             observation_count: number;
+        };
+        /** GameBoxFamilyView */
+        GameBoxFamilyView: {
+            /** Artifact Id */
+            artifact_id: string;
+            /** Columns */
+            columns: string[];
+            /** Family */
+            family: string;
+            /** Grain Kind */
+            grain_kind: string;
+            /** Rows */
+            rows: {
+                [key: string]: unknown;
+            }[];
+        };
+        /** GameBoxView */
+        GameBoxView: {
+            /** Contest Id */
+            contest_id: string;
+            /** Families */
+            families: components["schemas"]["GameBoxFamilyView"][];
+            /**
+             * Grain
+             * @enum {string}
+             */
+            grain: "player" | "team";
+        };
+        /** GameDetailView */
+        GameDetailView: {
+            edition: components["schemas"]["GameEditionView"];
+            /** Periods */
+            periods: components["schemas"]["GamePeriodView"][];
+            /** Subjects */
+            subjects: {
+                [key: string]: string;
+            };
+            summary: components["schemas"]["GameSummaryView"];
+            /** Teams By Id */
+            teams_by_id: {
+                [key: string]: string;
+            };
+        };
+        /**
+         * GameEditionView
+         * @description A competition edition that owns discrete game-grain data.
+         */
+        GameEditionView: {
+            /** Clock Mapping Ids */
+            clock_mapping_ids?: string[];
+            /** Competition Id */
+            competition_id: string;
+            /** Competition Name */
+            competition_name: string;
+            /** Completed Count */
+            completed_count: number;
+            /** Contest Count */
+            contest_count: number;
+            /** Dataset Id */
+            dataset_id: string;
+            /** Edition Id */
+            edition_id: string;
+            /** Edition Label */
+            edition_label: string;
+            /** Ends On */
+            ends_on: string | null;
+            /** Families */
+            families: components["schemas"]["GameFamilyRef"][];
+            /** League Id */
+            league_id: string | null;
+            license: components["schemas"]["LicenseView"];
+            /** Measurement Class */
+            measurement_class: string;
+            /** Provider */
+            provider: string;
+            /** Score Reconciliation */
+            score_reconciliation?: {
+                [key: string]: unknown;
+            };
+            /** Sport Id */
+            sport_id: string;
+            /** Sport Name */
+            sport_name: string;
+            /** Starts On */
+            starts_on: string | null;
+        };
+        /** GameFamilyRef */
+        GameFamilyRef: {
+            /** Artifact Id */
+            artifact_id: string;
+            /** Artifact Type */
+            artifact_type: string;
+            /** Checksum Sha256 */
+            checksum_sha256: string;
+            /** Family */
+            family: string;
+            /** Freshness */
+            freshness?: {
+                [key: string]: unknown;
+            };
+            /** Grain Kind */
+            grain_kind: string;
+            /** Release Asset Id */
+            release_asset_id: number | null;
+            /** Release Tag */
+            release_tag: string | null;
+            /** Row Count */
+            row_count: number;
+            /** Run Id */
+            run_id: string | null;
+            /** Snapshot */
+            snapshot: string | null;
+            /** Source File Key */
+            source_file_key: string | null;
+        };
+        /** GamePage */
+        GamePage: {
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /** Rows */
+            rows: components["schemas"]["GameSummaryView"][];
+            /** Total */
+            total: number;
+        };
+        /** GamePeriodView */
+        GamePeriodView: {
+            /** Contest Period Id */
+            contest_period_id: string;
+            /** End Ns */
+            end_ns: number | null;
+            /** Event Count */
+            event_count: number;
+            /** Kind */
+            kind: string;
+            /** Label */
+            label: string | null;
+            /** Number */
+            number: number;
+            /** Start Ns */
+            start_ns: number | null;
+        };
+        /** GamePlayPage */
+        GamePlayPage: {
+            /** Contest Id */
+            contest_id: string;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /** Period */
+            period: number | null;
+            /** Rows */
+            rows: components["schemas"]["GamePlayView"][];
+            /** Total */
+            total: number;
+        };
+        /** GamePlayView */
+        GamePlayView: {
+            /** Attributes */
+            attributes: {
+                [key: string]: unknown;
+            };
+            /** Attributes Schema Id */
+            attributes_schema_id: string;
+            /** Attributes Schema Version */
+            attributes_schema_version: string;
+            /** Canonical Time Ns */
+            canonical_time_ns: number | null;
+            /** Contest Period Id */
+            contest_period_id: string;
+            /** Period Number */
+            period_number: number;
+            /** Provider Event Type */
+            provider_event_type: string;
+            /** Sequence Index */
+            sequence_index: string;
+            /** Source Clock */
+            source_clock: {
+                [key: string]: unknown;
+            } | null;
+            /** Source Event Id */
+            source_event_id: string;
+            /** Subject Id */
+            subject_id: string | null;
+            /** Team Id */
+            team_id: string | null;
+        };
+        /** GameSummaryView */
+        GameSummaryView: {
+            /** Actual Start At */
+            actual_start_at: string | null;
+            /** Completed */
+            completed: boolean;
+            /** Contest Id */
+            contest_id: string;
+            /** Edition Id */
+            edition_id: string | null;
+            /** Period Count */
+            period_count: number;
+            /** Play By Play Available */
+            play_by_play_available: boolean;
+            /** Postseason */
+            postseason: boolean;
+            /** Provider Game Id */
+            provider_game_id: string | null;
+            /** Scheduled Start At */
+            scheduled_start_at: string | null;
+            /** Sport Id */
+            sport_id: string;
+            /** Status */
+            status: string | null;
+            /** Teams */
+            teams: components["schemas"]["GameTeamView"][];
+            /** Venue */
+            venue: string | null;
+        };
+        /** GameTeamView */
+        GameTeamView: {
+            /** Display Name */
+            display_name: string;
+            /** Score */
+            score: number | null;
+            /** Side */
+            side: string;
+            /** Team Id */
+            team_id: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -2195,6 +2508,159 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProvenanceGraph"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    games_api_games_get: {
+        parameters: {
+            query: {
+                edition_id: string;
+                team_id?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GamePage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    game_editions_api_games_editions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameEditionView"][];
+                };
+            };
+        };
+    };
+    game_api_games__contest_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameDetailView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    game_box_api_games__contest_id__box_get: {
+        parameters: {
+            query?: {
+                grain?: "player" | "team";
+            };
+            header?: never;
+            path: {
+                contest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameBoxView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    game_plays_api_games__contest_id__plays_get: {
+        parameters: {
+            query?: {
+                period?: number | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                contest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GamePlayPage"];
                 };
             };
             /** @description Validation Error */

@@ -28,6 +28,7 @@ unclear-rights data stay outside the code license boundary.
 | `spl-open-data` | MLSE Sport Performance Lab | CC-BY-NC-SA-4.0 (+ role-dependent exclusion) | conditional | Markerless sports 3D kinematics |
 | `tackle-workload` | Zenodo | unclear | prohibited (local-only) | Optional longitudinal workload extension |
 | `openbiomechanics` | Driveline Baseball R&D | CC-BY-NC-SA-4.0 (+ additional exclusion) | conditional | Optional force/mocap/high-performance validation |
+| `sportsdataverse` | SportsDataverse (GitHub releases) | CC-BY-4.0 (upstream API terms not granted) | prohibited (local-only) | Multi-sport play-by-play and box scores (NBA/NHL slices) |
 
 ## Rights evidence
 
@@ -196,6 +197,25 @@ documented mapping between them is published, so no reduction is fabricated.
   forbidden any use without a specific written commercial (paid) license.
 - Never treat this source as generally permissive. The adapter remains
   **optional and license-gated**.
+
+### `sportsdataverse`
+
+- <https://github.com/sportsdataverse/sportsdataverse-data> (GitHub releases);
+  release identity is the GitHub Releases API, pinned in
+  `sources/sportsdataverse-releases.json` (tag, asset id, size, update time and
+  each family's `timestamp.json`). README text is never release authority.
+- The data repository README declares **CC BY 4.0** for its release assets; the
+  repository code is MIT. The assets are scraped from ESPN and NHL public APIs
+  whose own terms SportsDataverse does not grant, so acquired data is
+  **local-only and never redistributed**. See `sources/rights_evidence.json`.
+- Every release family is catalogued metadata-first. Only the bounded acceptance
+  slice is pinned for acquisition: NBA 2025-26 and NHL 2025-26 schedule,
+  play-by-play and player/team box scores (~41 MiB). Release assets can be
+  re-uploaded, so the local SHA-256 is the immutable Bronze identity and any live
+  id/size/update drift fails the plan.
+- Serving with `DYNAMIS_SERVING_EXPOSURE=public` (unknown values fail closed to
+  `public`) refuses the play-by-play and box-score payloads of this local-only
+  source with state `rights_restricted`; catalog metadata stays browsable.
 
 ## Excluded from V1
 

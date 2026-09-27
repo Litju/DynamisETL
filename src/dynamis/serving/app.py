@@ -24,6 +24,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from dynamis.config import ConfigurationError, Settings
 from dynamis.config import settings as resolve_settings
 from dynamis.gold.publish import resolve_gold_schema
+from dynamis.serving import games as game_model
 from dynamis.serving import repository
 from dynamis.serving import season as season_model
 from dynamis.serving import tactical as tactical_authority
@@ -51,7 +52,16 @@ from dynamis.serving.models import (
     DatasetSummary,
     DenseWindow,
     EntityObservationView,
+    GameBoxFamilyView,
+    GameBoxView,
+    GameDetailView,
+    GameEditionView,
+    GamePage,
+    GamePeriodView,
+    GamePlayPage,
+    GamePlayView,
     HealthStatus,
+    LicenseView,
     MetricCatalogEntry,
     MetricMethodology,
     MetricPage,
@@ -93,6 +103,22 @@ ACCESS_LOG = logging.getLogger("dynamis.access")
 DEFAULT_PAGE_LIMIT = 100
 MAX_PAGE_LIMIT = 1000
 MAX_SEASON_METRICS = 160
+
+#: ``local`` serves every registered source to the operator's own machine;
+#: ``public`` refuses scientific payloads of local-only sources (metadata stays
+#: browsable). Unknown values fail closed to ``public``.
+ENV_SERVING_EXPOSURE = "DYNAMIS_SERVING_EXPOSURE"
+SERVING_EXPOSURES = ("local", "public")
+
+
+class RightsRestricted(RuntimeError):
+    """A local-only source's payload was requested in public exposure."""
+
+
+def serving_exposure() -> str:
+    raw = os.environ.get(ENV_SERVING_EXPOSURE, "local").strip().lower() or "local"
+    return raw if raw in SERVING_EXPOSURES else "public"
+
 
 ARROW_MEDIA_TYPE = "application/vnd.apache.arrow.stream"
 
@@ -223,6 +249,22 @@ class ServingBackend(Protocol):
     def season_player_links(
         self, edition_id: str, subject_id: str
     ) -> SeasonPlayerLinksView | None: ...
+
+    def game_editions(self) -> list[GameEditionView]: ...
+
+    def games(
+        self, edition_id: str, *, team_id: str | None, limit: int, offset: int
+    ) -> GamePage | None: ...
+
+    def game(self, contest_id: str) -> GameDetailView | None: ...
+
+    def game_plays(
+        self, contest_id: str, *, period: int | None, limit: int, offset: int
+    ) -> GamePlayPage | None: ...
+
+    def game_box(self, contest_id: str, grain: Literal["player", "team"]) -> GameBoxView | None: ...
+
+    def game_license(self, contest_id: str) -> LicenseView | None: ...
 
 
 class PostgresServingBackend:
@@ -722,6 +764,134 @@ class PostgresServingBackend:
             return None
         return SeasonProfileView(edition=edition, family=ref, **payload)
 
+    # -- Games (PLAY_BY_PLAY / PLAYER_GAME / TEAM_GAME) -------------------------
+
+    def game_editions(self) -> list[GameEditionView]:
+        with self._connect() as connection:
+            return repository.list_game_editions(connection)
+
+    def _game_edition(self, edition_id: str | None) -> GameEditionView | None:
+        if edition_id is None:
+            return None
+        return next((item for item in self.game_editions() if item.edition_id == edition_id), None)
+
+    def _family_path(self, edition: GameEditionView, family: str) -> tuple[str, Any] | None:
+        ref = next((item for item in edition.families if item.family == family), None)
+        if ref is None:
+            return None
+        artifact = self.artifact(ref.artifact_id)
+        if artifact is None:
+            return None
+        return ref.artifact_id, resolve_artifact_path(self.settings, artifact)
+
+    def games(
+        self, edition_id: str, *, team_id: str | None, limit: int, offset: int
+    ) -> GamePage | None:
+        if self._game_edition(edition_id) is None:
+            return None
+        with self._connect() as connection:
+            total, rows = repository.list_games(
+                connection, edition_id=edition_id, team_id=team_id, limit=limit, offset=offset
+            )
+        return GamePage(total=total, limit=limit, offset=offset, rows=rows)
+
+    def game(self, contest_id: str) -> GameDetailView | None:
+        with self._connect() as connection:
+            summary = repository.game_summary(connection, contest_id)
+            if summary is None:
+                return None
+            periods = repository.game_periods(connection, contest_id)
+        edition = self._game_edition(summary.edition_id)
+        if edition is None:
+            return None
+        pbp = self._family_path(edition, "pbp")
+        counts = game_model.period_event_counts(pbp[1], contest_id=contest_id) if pbp else {}
+        subject_ids: set[str] = set()
+        for family in ("player_game", "skater_game", "goalie_game"):
+            located = self._family_path(edition, family)
+            if located is None:
+                continue
+            _, rows = game_model.read_box(located[1], contest_id=contest_id)
+            subject_ids.update(str(row["subject_id"]) for row in rows if row.get("subject_id"))
+        with self._connect() as connection:
+            subjects = repository.subject_display_names(connection, sorted(subject_ids))
+        return GameDetailView(
+            summary=summary,
+            edition=edition,
+            periods=[
+                GamePeriodView(
+                    contest_period_id=str(row["contest_period_id"]),
+                    number=int(row["source_period_number"]),
+                    kind=str(row["kind"]),
+                    label=row["label"],
+                    start_ns=row["start_ns"],
+                    end_ns=row["end_ns"],
+                    event_count=counts.get(int(row["source_period_number"]), 0),
+                )
+                for row in periods
+            ],
+            subjects=subjects,
+            teams_by_id={team.team_id: team.display_name for team in summary.teams},
+        )
+
+    def game_license(self, contest_id: str) -> LicenseView | None:
+        with self._connect() as connection:
+            summary = repository.game_summary(connection, contest_id)
+        edition = self._game_edition(summary.edition_id) if summary else None
+        return edition.license if edition else None
+
+    def game_plays(
+        self, contest_id: str, *, period: int | None, limit: int, offset: int
+    ) -> GamePlayPage | None:
+        with self._connect() as connection:
+            summary = repository.game_summary(connection, contest_id)
+        if summary is None:
+            return None
+        edition = self._game_edition(summary.edition_id)
+        located = self._family_path(edition, "pbp") if edition else None
+        if located is None:
+            return None
+        total, rows = game_model.read_plays(
+            located[1], contest_id=contest_id, period=period, limit=limit, offset=offset
+        )
+        return GamePlayPage(
+            contest_id=contest_id,
+            period=period,
+            total=total,
+            limit=limit,
+            offset=offset,
+            rows=[GamePlayView(**row) for row in rows],
+        )
+
+    def game_box(self, contest_id: str, grain: Literal["player", "team"]) -> GameBoxView | None:
+        with self._connect() as connection:
+            summary = repository.game_summary(connection, contest_id)
+        if summary is None:
+            return None
+        edition = self._game_edition(summary.edition_id)
+        if edition is None:
+            return None
+        wanted = (
+            ("player_game", "skater_game", "goalie_game") if grain == "player" else ("team_game",)
+        )
+        families: list[GameBoxFamilyView] = []
+        for family in wanted:
+            located = self._family_path(edition, family)
+            if located is None:
+                continue
+            ref = next(item for item in edition.families if item.family == family)
+            columns, rows = game_model.read_box(located[1], contest_id=contest_id)
+            families.append(
+                GameBoxFamilyView(
+                    family=family,
+                    grain_kind=ref.grain_kind,
+                    artifact_id=ref.artifact_id,
+                    columns=columns,
+                    rows=rows,
+                )
+            )
+        return GameBoxView(contest_id=contest_id, grain=grain, families=families)
+
     def season_player_links(self, edition_id: str, subject_id: str) -> SeasonPlayerLinksView | None:
         edition = next(
             (item for item in self.season_editions() if item.edition_id == edition_id), None
@@ -779,6 +949,7 @@ def create_app(
     *,
     settings: Settings | None = None,
     backend: Any | None = None,
+    exposure: str | None = None,
 ) -> FastAPI:
     """Build the API application.
 
@@ -856,6 +1027,26 @@ def create_app(
             status_code=503,
             content={"detail": str(exc), "state": "unavailable_for_source"},
         )
+
+    exposure_mode = exposure if exposure in SERVING_EXPOSURES else serving_exposure()
+    app.state.exposure = exposure_mode
+
+    @app.exception_handler(RightsRestricted)
+    async def _rights_restricted(_request, exc: RightsRestricted) -> JSONResponse:
+        return JSONResponse(
+            status_code=451, content={"detail": str(exc), "state": "rights_restricted"}
+        )
+
+    def _require_payload_rights(service: ServingBackend, contest_id: str) -> None:
+        if exposure_mode != "public":
+            return
+        license = service.game_license(contest_id)
+        if license is None or license.local_only:
+            notice = license.notice if license else "rights unknown"
+            raise RightsRestricted(
+                f"contest {contest_id!r} comes from a local-only source; its play-by-play and "
+                f"box-score payloads are not served in public exposure ({notice})"
+            )
 
     @app.exception_handler(DenseWindowTooLarge)
     async def _window_too_large(_request, exc: DenseWindowTooLarge) -> JSONResponse:
@@ -1042,6 +1233,58 @@ def create_app(
             raise HTTPException(
                 status_code=404, detail=f"no season row for {subject_id!r} in {edition_id!r}"
             )
+        return found
+
+    @app.get("/api/games/editions", response_model=list[GameEditionView], tags=["games"])
+    def game_editions(service: BackendDependency) -> list[GameEditionView]:
+        return service.game_editions()
+
+    @app.get("/api/games", response_model=GamePage, tags=["games"])
+    def games(
+        service: BackendDependency,
+        edition_id: str = Query(min_length=1, max_length=256),
+        team_id: str | None = Query(default=None),
+        limit: int = Query(default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT),
+        offset: int = Query(default=0, ge=0),
+    ) -> GamePage:
+        found = service.games(edition_id, team_id=team_id, limit=limit, offset=offset)
+        if found is None:
+            raise HTTPException(status_code=404, detail=f"no game data for {edition_id!r}")
+        return found
+
+    @app.get("/api/games/{contest_id}", response_model=GameDetailView, tags=["games"])
+    def game(contest_id: str, service: BackendDependency) -> GameDetailView:
+        found = service.game(contest_id)
+        if found is None:
+            raise HTTPException(status_code=404, detail=f"contest {contest_id!r} has no game data")
+        return found
+
+    @app.get("/api/games/{contest_id}/plays", response_model=GamePlayPage, tags=["games"])
+    def game_plays(
+        contest_id: str,
+        service: BackendDependency,
+        period: int | None = Query(default=None, ge=1, le=20),
+        limit: int = Query(default=500, ge=1, le=MAX_PAGE_LIMIT),
+        offset: int = Query(default=0, ge=0),
+    ) -> GamePlayPage:
+        _require_payload_rights(service, contest_id)
+        found = service.game_plays(contest_id, period=period, limit=limit, offset=offset)
+        if found is None:
+            raise HTTPException(
+                status_code=404, detail=f"contest {contest_id!r} has no play-by-play"
+            )
+        return found
+
+    @app.get("/api/games/{contest_id}/box", response_model=GameBoxView, tags=["games"])
+    def game_box(
+        contest_id: str,
+        service: BackendDependency,
+        grain: Literal["player", "team"] = Query(default="player"),
+    ) -> GameBoxView:
+        _require_payload_rights(service, contest_id)
+        found = service.game_box(contest_id, grain)
+        if found is None:
+            raise HTTPException(status_code=404, detail=f"contest {contest_id!r} has no box score")
         return found
 
     @app.get("/api/catalog/datasets/{dataset_id}", response_model=DatasetDetail, tags=["catalog"])

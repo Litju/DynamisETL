@@ -747,6 +747,11 @@ def test_openapi_document_covers_the_locked_surface() -> None:
         "/api/artifacts/{artifact_id}",
         "/api/artifacts/{artifact_id}/observations",
         "/api/artifacts/{artifact_id}/window",
+        "/api/games/editions",
+        "/api/games",
+        "/api/games/{contest_id}",
+        "/api/games/{contest_id}/plays",
+        "/api/games/{contest_id}/box",
     ):
         assert path in paths, path
 

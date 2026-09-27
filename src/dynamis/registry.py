@@ -49,6 +49,7 @@ REQUIRED_LICENSE_IDENTIFIERS = {
     "gymaware-landmine-vision": "CC-BY-4.0",
     "dfl-sportec-idsse": "CC-BY-4.0",
     "skillcorner-opendata": "MIT",
+    "sportsdataverse": "CC-BY-4.0",
     "spl-open-data": "CC-BY-NC-SA-4.0",
     "openbiomechanics": "CC-BY-NC-SA-4.0",
 }

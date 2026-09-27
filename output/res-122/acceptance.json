@@ -1,0 +1,375 @@
+{
+  "editions": [
+    {
+      "competition": "NBA",
+      "contests": 1330,
+      "edition": "2025-26",
+      "families": {
+        "pbp": {
+          "checksum_sha256": "e8cf452977a97ada0ab60cee837e759b2873bd531055c40244f808bea63d4082",
+          "grain": "PLAY_BY_PLAY",
+          "release_asset_id": 552051414,
+          "rows": 642472
+        },
+        "player_game": {
+          "checksum_sha256": "4d36176f4868e69d7ab1653ef387583437e63efea2fb3bc5572f8d36c96ff4d7",
+          "grain": "PLAYER_GAME",
+          "release_asset_id": 552052712,
+          "rows": 34883
+        },
+        "schedule": {
+          "checksum_sha256": "27f865bab4a4137cbbecd01f866a7550ba8efb7b1e8a63e4de58703f7c098d98",
+          "grain": "GAME_SUMMARY",
+          "release_asset_id": 552053438,
+          "rows": 1330
+        },
+        "team_game": {
+          "checksum_sha256": "0effb629aec8d3ee9b8de1e4cbd91afb32219a2c7e9c411a3e83b9c7f18e232c",
+          "grain": "TEAM_GAME",
+          "release_asset_id": 552052211,
+          "rows": 2652
+        }
+      },
+      "local_only": true,
+      "sample_game": {
+        "attributes_schema": "sportsdataverse.espn_nba.pbp",
+        "away": "Houston Rockets",
+        "box_families": [
+          {
+            "family": "player_game",
+            "rows": 27
+          }
+        ],
+        "bytes": {
+          "box": 38976,
+          "detail": 8021,
+          "plays_500": 411573
+        },
+        "final": [
+          125,
+          124
+        ],
+        "home": "Oklahoma City Thunder",
+        "latency_ms": {
+          "box": 53.8,
+          "detail": 137.4,
+          "list": 32.2,
+          "plays_500": 86.4
+        },
+        "pbp_final_state": [
+          125,
+          124
+        ],
+        "periods": [
+          {
+            "event_count": 114,
+            "kind": "quarter",
+            "label": "1st Quarter",
+            "number": 1
+          },
+          {
+            "event_count": 125,
+            "kind": "quarter",
+            "label": "2nd Quarter",
+            "number": 2
+          },
+          {
+            "event_count": 120,
+            "kind": "quarter",
+            "label": "3rd Quarter",
+            "number": 3
+          },
+          {
+            "event_count": 110,
+            "kind": "quarter",
+            "label": "4th Quarter",
+            "number": 4
+          },
+          {
+            "event_count": 60,
+            "kind": "overtime",
+            "label": "OT",
+            "number": 5
+          },
+          {
+            "event_count": 66,
+            "kind": "overtime",
+            "label": "2OT",
+            "number": 6
+          }
+        ],
+        "plays_total": 595,
+        "provider_game_id": "401809243"
+      },
+      "score_reconciliation": {
+        "completed_games_with_pbp": 1325,
+        "discrepancy_examples": [
+          {
+            "game": 401871335,
+            "pbp": [
+              116,
+              108
+            ],
+            "schedule": [
+              116,
+              109
+            ]
+          },
+          {
+            "game": 401810990,
+            "pbp": [
+              129,
+              115
+            ],
+            "schedule": [
+              131,
+              115
+            ]
+          },
+          {
+            "game": 401858694,
+            "pbp": [
+              123,
+              96
+            ],
+            "schedule": [
+              123,
+              99
+            ]
+          },
+          {
+            "game": 401809242,
+            "pbp": [
+              141,
+              138
+            ],
+            "schedule": [
+              142,
+              138
+            ]
+          },
+          {
+            "game": 401810234,
+            "pbp": [
+              135,
+              141
+            ],
+            "schedule": [
+              135,
+              143
+            ]
+          },
+          {
+            "game": 401810203,
+            "pbp": [
+              99,
+              116
+            ],
+            "schedule": [
+              101,
+              116
+            ]
+          },
+          {
+            "game": 401810102,
+            "pbp": [
+              109,
+              120
+            ],
+            "schedule": [
+              109,
+              126
+            ]
+          },
+          {
+            "game": 401809511,
+            "pbp": [
+              114,
+              148
+            ],
+            "schedule": [
+              115,
+              148
+            ]
+          },
+          {
+            "game": 401809980,
+            "pbp": [
+              121,
+              110
+            ],
+            "schedule": [
+              121,
+              111
+            ]
+          }
+        ],
+        "final_score_matches": 1316,
+        "provider_score_discrepancies": 9,
+        "shootout_decided": 0
+      },
+      "sport": "Basketball"
+    },
+    {
+      "competition": "NHL",
+      "contests": 1394,
+      "edition": "2025-26",
+      "families": {
+        "goalie_game": {
+          "checksum_sha256": "1ee133f92ef61ae64fe9361e97bdfdfad79fe3e10086f45a75c56b1c3e21c8fc",
+          "grain": "PLAYER_GAME",
+          "release_asset_id": 486562419,
+          "rows": 5575
+        },
+        "pbp": {
+          "checksum_sha256": "09ffb10c0208356a2f844dba02eeaee157a66df067afa74ee548954755c52f50",
+          "grain": "PLAY_BY_PLAY",
+          "release_asset_id": 486562853,
+          "rows": 443569
+        },
+        "schedule": {
+          "checksum_sha256": "0bbf8f3ec493f09ec41b49ff14b604029c7036c9e105a1cd3c95febf4a3f4af7",
+          "grain": "GAME_SUMMARY",
+          "release_asset_id": 485384603,
+          "rows": 1394
+        },
+        "skater_game": {
+          "checksum_sha256": "20c525762b5f29c4de7dca72727b9b0d3b4cac8ec24fc06d662fd381cfe05f26",
+          "grain": "PLAYER_GAME",
+          "release_asset_id": 486562346,
+          "rows": 50183
+        },
+        "team_game": {
+          "checksum_sha256": "e7712abe52a9a466b106a5d6cecb27110dd1328e4d3a76d2cb2e13ca5b00b2e9",
+          "grain": "TEAM_GAME",
+          "release_asset_id": 486562440,
+          "rows": 2788
+        }
+      },
+      "local_only": true,
+      "sample_game": {
+        "attributes_schema": "sportsdataverse.nhl.pbp_lite",
+        "away": "Chicago Blackhawks",
+        "box_families": [
+          {
+            "family": "skater_game",
+            "rows": 36
+          },
+          {
+            "family": "goalie_game",
+            "rows": 4
+          }
+        ],
+        "bytes": {
+          "box": 27240,
+          "detail": 8002,
+          "plays_500": 351610
+        },
+        "final": [
+          3,
+          2
+        ],
+        "home": "Florida Panthers",
+        "latency_ms": {
+          "box": 74.1,
+          "detail": 104.4,
+          "list": 23.3,
+          "plays_500": 81.0
+        },
+        "pbp_final_state": [
+          3,
+          2
+        ],
+        "periods": [
+          {
+            "event_count": 130,
+            "kind": "period",
+            "label": null,
+            "number": 1
+          },
+          {
+            "event_count": 103,
+            "kind": "period",
+            "label": null,
+            "number": 2
+          },
+          {
+            "event_count": 128,
+            "kind": "period",
+            "label": null,
+            "number": 3
+          }
+        ],
+        "plays_total": 361,
+        "provider_game_id": "2025020001"
+      },
+      "score_reconciliation": {
+        "completed_games_with_pbp": 1394,
+        "discrepancy_examples": [],
+        "final_score_matches": 1275,
+        "provider_score_discrepancies": 0,
+        "schedule_games_without_team_identity": [],
+        "shootout_decided": 119
+      },
+      "sport": "Ice hockey"
+    }
+  ],
+  "pinned_assets": [
+    {
+      "asset_id": 552053438,
+      "key": "espn_nba_schedules/nba_schedule_2026.parquet",
+      "size_bytes": 525802,
+      "updated_at": "2026-09-09T05:18:08Z"
+    },
+    {
+      "asset_id": 552051414,
+      "key": "espn_nba_pbp/play_by_play_2026.parquet",
+      "size_bytes": 22436946,
+      "updated_at": "2026-09-09T05:16:34Z"
+    },
+    {
+      "asset_id": 552052712,
+      "key": "espn_nba_player_boxscores/player_box_2026.parquet",
+      "size_bytes": 606444,
+      "updated_at": "2026-09-09T05:17:36Z"
+    },
+    {
+      "asset_id": 552052211,
+      "key": "espn_nba_team_boxscores/team_box_2026.parquet",
+      "size_bytes": 140628,
+      "updated_at": "2026-09-09T05:17:10Z"
+    },
+    {
+      "asset_id": 485384603,
+      "key": "nhl_schedules/nhl_schedule_2026.parquet",
+      "size_bytes": 52380,
+      "updated_at": "2026-07-22T02:05:45Z"
+    },
+    {
+      "asset_id": 486562853,
+      "key": "nhl_pbp_lite/play_by_play_lite_2026.parquet",
+      "size_bytes": 19062775,
+      "updated_at": "2026-07-23T00:03:39Z"
+    },
+    {
+      "asset_id": 486562346,
+      "key": "nhl_skater_boxscores/skater_box_2026.parquet",
+      "size_bytes": 369744,
+      "updated_at": "2026-07-23T00:02:53Z"
+    },
+    {
+      "asset_id": 486562419,
+      "key": "nhl_goalie_boxscores/goalie_box_2026.parquet",
+      "size_bytes": 78221,
+      "updated_at": "2026-07-23T00:02:56Z"
+    },
+    {
+      "asset_id": 486562440,
+      "key": "nhl_team_boxscores/team_box_2026.parquet",
+      "size_bytes": 50202,
+      "updated_at": "2026-07-23T00:02:59Z"
+    }
+  ],
+  "release_families_catalogued": 355,
+  "snapshot": "sdv-2026-09-27"
+}

@@ -28,7 +28,10 @@ from dynamis.registry import (
     validate_registry,
 )
 
-EXPECTED_SOURCE_COUNT = 8
+EXPECTED_SOURCE_COUNT = 9
+#: Declared licenses that still stay local-only: SportsDataverse's CC BY 4.0 does
+#: not grant the upstream ESPN/NHL API terms its release assets are scraped from.
+DECLARED_LOCAL_ONLY = {"sportsdataverse"}
 UNCLEAR_RIGHTS = {
     "tackle-workload",
 }
@@ -61,7 +64,11 @@ def test_unclear_rights_sources_stay_local_only() -> None:
         assert policy.local_only
         assert policy.redistribution.value == "prohibited"
     local_only = {source.dataset_id for source in registry.sources if source.license.local_only}
-    assert local_only == UNCLEAR_RIGHTS
+    assert local_only == UNCLEAR_RIGHTS | DECLARED_LOCAL_ONLY
+    for dataset_id in DECLARED_LOCAL_ONLY:
+        policy = source_by_id(registry, dataset_id).license
+        assert policy.identifier is not None
+        assert policy.redistribution.value == "prohibited"
 
 
 def test_res104_promotes_white_and_gymaware_to_declared_cc_by() -> None:
@@ -215,7 +222,7 @@ def test_lookup_helpers_raise_for_unknown_ids() -> None:
 def test_describe_registry_reports_complete_modality_coverage() -> None:
     summary = describe_registry(validate_registry())
     assert "modality coverage: complete" in summary
-    assert "sources=8" in summary
+    assert f"sources={EXPECTED_SOURCE_COUNT}" in summary
 
 
 def test_registry_schema_version_is_enforced(tmp_path: Path) -> None:
