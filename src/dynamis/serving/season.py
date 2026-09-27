@@ -179,8 +179,8 @@ _RUN_TYPES: dict[str, str] = {
 
 _RUN_QUALIFIERS: dict[str, tuple[str, str]] = {
     "": ("Runs", "Off-ball runs of this type"),
-    "shotwithin10s": ("→ shot ≤10 s", "Runs followed by a team shot within 10 s"),
-    "goalwithin10s": ("→ goal ≤10 s", "Runs followed by a team goal within 10 s"),
+    "shotwithin10s": ("Shot within 10 s", "Runs followed by a team shot within 10 s"),
+    "goalwithin10s": ("Goal within 10 s", "Runs followed by a team goal within 10 s"),
     "targeted": ("Targeted", "Runs the ball carrier attempted to pass to"),
     "received": ("Received", "Runs on which the runner received the ball"),
     "abovehsr": ("Above HSR", "Runs reaching high-speed running"),
@@ -303,14 +303,14 @@ _PASSING: dict[str, tuple[str, str, str, str, str]] = {
         "Dangerous quick passes attempted",
     ),
     "pass_count_goalwithin10s_p30tip": (
-        "→ goal ≤10 s",
+        "Team goal within 10 s",
         "Outcome",
         "count",
         "per 30 min TIP",
         "Passes followed by a team goal within 10 s",
     ),
     "pass_count_shotwithin10s_p30tip": (
-        "→ shot ≤10 s",
+        "Team shot within 10 s",
         "Outcome",
         "count",
         "per 30 min TIP",
@@ -373,14 +373,14 @@ _PASSING: dict[str, tuple[str, str, str, str, str]] = {
         "Provider-modelled completion probability of passes to runs",
     ),
     "pass_count_torun_shotwithin10s_p30tip": (
-        "Pass-to-run → shot ≤10 s",
+        "Pass-to-run · shot within 10 s",
         "Pass to run",
         "count",
         "per 30 min TIP",
         "Passes to runs followed by a team shot within 10 s",
     ),
     "pass_count_torun_goalwithin10s_p30tip": (
-        "Pass-to-run → goal ≤10 s",
+        "Pass-to-run · goal within 10 s",
         "Pass to run",
         "count",
         "per 30 min TIP",
