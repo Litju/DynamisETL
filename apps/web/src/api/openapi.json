@@ -1514,6 +1514,11 @@
             "title": "Sequence Index",
             "type": "string"
           },
+          "source": {
+            "additionalProperties": true,
+            "title": "Source",
+            "type": "object"
+          },
           "source_clock": {
             "anyOf": [
               {
@@ -5933,6 +5938,24 @@
               "minimum": 0,
               "title": "Offset",
               "type": "integer"
+            }
+          },
+          {
+            "description": "Comma-separated preserved provider columns",
+            "in": "query",
+            "name": "source_columns",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated preserved provider columns",
+              "title": "Source Columns"
             }
           }
         ],

@@ -1100,6 +1100,10 @@ export interface components {
             provider_event_type: string;
             /** Sequence Index */
             sequence_index: string;
+            /** Source */
+            source?: {
+                [key: string]: unknown;
+            };
             /** Source Clock */
             source_clock: {
                 [key: string]: unknown;
@@ -2645,6 +2649,8 @@ export interface operations {
                 period?: number | null;
                 limit?: number;
                 offset?: number;
+                /** @description Comma-separated preserved provider columns */
+                source_columns?: string | null;
             };
             header?: never;
             path: {

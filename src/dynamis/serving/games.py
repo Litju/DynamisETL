@@ -50,6 +50,17 @@ def _clean(value: Any) -> Any:
     return value
 
 
+MAX_SOURCE_COLUMNS = 40
+
+
+def source_columns(path: Path) -> set[str]:
+    with duckdb.connect() as connection:
+        rows = connection.execute(
+            "SELECT name FROM parquet_schema(?) WHERE name LIKE 'src_%'", [str(path)]
+        ).fetchall()
+    return {str(row[0]).removeprefix("src_") for row in rows}
+
+
 def read_plays(
     path: Path,
     *,
@@ -57,14 +68,29 @@ def read_plays(
     period: int | None,
     limit: int,
     offset: int,
+    extra_columns: tuple[str, ...] = (),
 ) -> tuple[int, list[dict[str, Any]]]:
-    """Envelope rows of one contest in provider order, bounded and paged."""
+    """Envelope rows of one contest in provider order, bounded and paged.
+
+    ``extra_columns`` projects preserved provider columns (without their ``src_``
+    prefix) that a sport plug-in needs, e.g. hockey on-ice player ids; each must
+    exist in this artifact's schema.
+    """
+    if len(extra_columns) > MAX_SOURCE_COLUMNS:
+        raise GameDataError(f"at most {MAX_SOURCE_COLUMNS} source columns per request")
+    if extra_columns:
+        available = source_columns(path)
+        missing = sorted(set(extra_columns) - available)
+        if missing:
+            raise GameDataError(f"source columns are not in this artifact: {missing}")
     where = "contest_id = ?"
     params: list[Any] = [contest_id]
     if period is not None:
         where += " AND period_number = ?"
         params.append(period)
-    projection = ", ".join(ENVELOPE_FIELDS)
+    projection = ", ".join(
+        [*ENVELOPE_FIELDS, *(f'"src_{name}" AS "source__{name}"' for name in extra_columns)]
+    )
     with duckdb.connect() as connection:
         total_row = connection.execute(
             f"SELECT count(*) FROM read_parquet(?) WHERE {where}", [str(path), *params]
@@ -93,6 +119,7 @@ def read_plays(
                 "source_clock": json.loads(row["source_clock_json"])
                 if row["source_clock_json"]
                 else None,
+                "source": {name: _clean(row[f"source__{name}"]) for name in extra_columns},
             }
         )
     return int(total_row[0]) if total_row else 0, plays
@@ -112,8 +139,18 @@ def read_box(path: Path, *, contest_id: str) -> tuple[list[str], list[dict[str, 
         for name in names
         if not (name.startswith("src_") and name.endswith(_PRESENTATION_SUFFIXES))
     ]
-    columns = [name.removeprefix("src_") for name in keep]
-    rows = [{name.removeprefix("src_"): _clean(row[name]) for name in keep} for row in raw]
+    columns = [
+        f"source__{name.removeprefix('src_')}" if name.startswith("src_") else name for name in keep
+    ]
+    rows = [
+        {
+            (f"source__{name.removeprefix('src_')}" if name.startswith("src_") else name): _clean(
+                row[name]
+            )
+            for name in keep
+        }
+        for row in raw
+    ]
     return columns, rows
 
 

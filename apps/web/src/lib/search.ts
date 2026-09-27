@@ -124,6 +124,37 @@ export const seasonSearchSchema = z.object({
 });
 export type SeasonSearch = z.infer<typeof seasonSearchSchema>;
 
+export const GAME_BOX_VIEWS = ["player", "team"] as const;
+
+/**
+ * GameLab's durable context is owned by the router, using the V4 edition,
+ * contest, ContestPeriod, Team and Subject identifiers. Clock stays explicit
+ * in the URL because source clocks differ by sport and period.
+ */
+export const gameSearchSchema = z.object({
+  edition: optionalText,
+  game: optionalText,
+  team: optionalText,
+  period: z.preprocess((value) => {
+    const numeric = typeof value === "string" ? Number(value) : value;
+    return typeof numeric === "number" && Number.isInteger(numeric) && numeric >= 1 && numeric <= 20
+      ? String(numeric)
+      : undefined;
+  }, z.string().optional()),
+  clock: optionalText,
+  event: optionalText,
+  player: optionalText,
+  q: optionalText,
+  offset: z.preprocess((value) => {
+    const numeric = typeof value === "string" ? Number(value) : value;
+    return typeof numeric === "number" && Number.isInteger(numeric) && numeric >= 0
+      ? String(numeric)
+      : undefined;
+  }, z.string().optional()),
+  box: z.enum(GAME_BOX_VIEWS).optional().catch(undefined),
+});
+export type GameSearch = z.infer<typeof gameSearchSchema>;
+
 export const methodsSearchSchema = z.object({
   metric: optionalText,
   dataset: optionalText,
