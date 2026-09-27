@@ -108,7 +108,7 @@ def test_registry_refuses_unknown_columns_and_families() -> None:
     with pytest.raises(season.SeasonDataError, match="not covered"):
         season.family_metrics("physical", ["total_distance_full_all", "mystery_metric"])
     with pytest.raises(season.SeasonDataError, match="no registered metric resolver"):
-        season.family_metrics("shots", ["x"])
+        season.family_metrics("ice_hockey", ["x"])
     # Identity/provenance columns are never offered as metrics.
     assert season.family_metrics("physical", ["player_id", "team_name", "subject_id"]) == []
 

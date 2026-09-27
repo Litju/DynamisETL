@@ -829,6 +829,106 @@ class GameDetailView(BaseModel):
     teams_by_id: dict[str, str]
 
 
+class BasketballPeriodRangeView(BaseModel):
+    number: int
+    label: str
+    first_frame: int
+    first_active_frame: int
+    last_frame: int
+    frame_count: int
+    dead_time_frames: int
+
+
+class BasketballRosterPlayerView(BaseModel):
+    subject_id: str
+    provider_player_id: str
+    display_name: str
+    jersey: str | None
+    team_id: str | None
+    team_name: str | None
+
+
+class BasketballSpatialGameView(BaseModel):
+    game: GameDetailView
+    dataset_id: str
+    source_revision: str
+    frame_rate_hz: float
+    spatial_reference_id: str
+    units: str
+    origin: dict[str, float]
+    axis_orientation: dict[str, str]
+    court_dimensions: dict[str, float]
+    tracking_materialized: bool
+    events_materialized: bool
+    periods: list[BasketballPeriodRangeView]
+    players: list[BasketballRosterPlayerView]
+
+
+class BasketballPlayerPointView(BaseModel):
+    subject_id: str
+    provider_player_id: str
+    display_name: str
+    jersey: str | None
+    team_id: str | None
+    x: float
+    y: float
+    z: float | None
+    is_detected: bool | None
+
+
+class BasketballBallPointView(BaseModel):
+    x: float
+    y: float
+    z: float | None
+    is_detected: bool | None
+
+
+class BasketballFrameView(BaseModel):
+    frame_idx: int
+    period_number: int
+    wall_clock_ms: int
+    canonical_time_ns: int
+    game_clock_s: float | None
+    game_clock_stopped: bool
+    shot_clock_s: float | None
+    player_count: int
+    ball_present: bool
+    is_dead_time: bool
+    players: list[BasketballPlayerPointView]
+    ball: BasketballBallPointView | None
+
+
+class BasketballFramePage(BaseModel):
+    contest_id: str
+    period: int
+    from_frame: int
+    limit: int
+    total_frames: int
+    rows: list[BasketballFrameView]
+
+
+class BasketballEventView(BaseModel):
+    source_event_id: str
+    provider_event_type: str
+    contest_period_id: str
+    sequence_index: str
+    canonical_time_ns: int | None
+    source_clock: dict[str, Any] | None
+    team_id: str | None
+    subject_id: str | None
+    location: dict[str, float | None] | None
+    attributes: dict[str, Any]
+
+
+class BasketballEventPage(BaseModel):
+    contest_id: str
+    period: int | None
+    total: int
+    limit: int
+    offset: int
+    rows: list[BasketballEventView]
+
+
 class GamePlayView(BaseModel):
     contest_period_id: str
     period_number: int

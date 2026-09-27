@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-router";
 
 import { defineCatalogRoute } from "@/routes/catalog";
+import { defineBasketballRoute } from "@/routes/basketball";
 import { defineCompareRoute } from "@/routes/compare";
 import { defineGamesRoute } from "@/routes/games";
 import { defineLabRoute } from "@/routes/lab";
@@ -30,6 +31,7 @@ export function buildRouteTree() {
     defineLabRoute(root),
     defineCompareRoute(root),
     defineGamesRoute(root),
+    defineBasketballRoute(root),
     defineSeasonRoute(root),
     defineMethodsRoute(root),
     defineRunsRoute(root),

@@ -90,11 +90,13 @@ export function GameLab() {
 
   const contextEdition = detail.data?.edition ?? edition;
   const sport = contextEdition ? gameSport(contextEdition) : null;
+  const skillCornerBasketball =
+    contextEdition?.dataset_id === "skillcorner-basketball-opendata";
   const selectedPeriod = search.period ? Number(search.period) : undefined;
   const sourceColumns = sport ? sourceColumnsFor(sport) : [];
   const plays = useQuery({
     ...gamePlaysQuery(gameId, sourceColumns),
-    enabled: Boolean(gameId) && detail.isSuccess && sport !== null,
+    enabled: Boolean(gameId) && detail.isSuccess && sport !== null && !skillCornerBasketball,
   });
   const allPlays = plays.data?.rows ?? [];
   const playRows = selectedPeriod
@@ -103,7 +105,7 @@ export function GameLab() {
   const grain = search.box ?? "player";
   const box = useQuery({
     ...gameBoxQuery(gameId, grain),
-    enabled: Boolean(gameId) && detail.isSuccess,
+    enabled: Boolean(gameId) && detail.isSuccess && !skillCornerBasketball,
   });
 
   useEffect(() => {
@@ -116,7 +118,7 @@ export function GameLab() {
     }
   }, [detail.data, search.period, update]);
 
-  if (editionsQuery.isPending) return <LoadingPanel label="Loading NBA and NHL editions" />;
+  if (editionsQuery.isPending) return <LoadingPanel label="Loading game editions" />;
   if (editionsQuery.isError) {
     return <ErrorPanel error={editionsQuery.error} onRetry={() => void editionsQuery.refetch()} />;
   }
@@ -124,8 +126,8 @@ export function GameLab() {
     return (
       <StatePanel
         state="not_materialized"
-        title="No NBA or NHL game edition is available."
-        detail="GameLab opens contest, play-by-play and game box-score data from supported NBA or NHL editions."
+        title="No game edition is available."
+        detail="GameLab opens registered contest data when a supported competition edition is available."
       />
     );
   }
@@ -176,8 +178,14 @@ export function GameLab() {
       <header className="shrink-0 border-b border-border-subtle bg-surface-1 px-4 py-2">
         <div className="flex flex-wrap items-end gap-x-5 gap-y-2">
           <div className="flex items-baseline gap-3">
-            <h1 className="t-surface-title">GameLab</h1>
-            <span className="t-label">PLAY_BY_PLAY · PLAYER_GAME · TEAM_GAME</span>
+            <h1 className="t-surface-title">
+              {skillCornerBasketball ? "Basketball game" : "GameLab"}
+            </h1>
+            <span className="t-label">
+              {skillCornerBasketball
+                ? "TRACKING · BALL_TRACKING · EVENTS"
+                : "PLAY_BY_PLAY · PLAYER_GAME · TEAM_GAME"}
+            </span>
           </div>
           <label className="flex flex-col gap-1 text-[10px] text-text-muted">
             Competition edition
@@ -279,6 +287,7 @@ export function GameLab() {
             <ContestTable
               rows={filterGames(games.data.rows, search.q)}
               selectedId={gameId}
+              ariaLabel={skillCornerBasketball ? "ACB contests" : "NBA and NHL contests"}
               onSelect={chooseGame}
             />
           )}
@@ -286,18 +295,27 @@ export function GameLab() {
 
         <main className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(14rem,1fr)_minmax(12rem,0.78fr)] gap-px bg-border-subtle" aria-label="Game analysis">
           {detail.isSuccess ? (
-            <GameContext
-              detail={detail.data}
-              allPlays={allPlays}
-              playsComplete={plays.data ? plays.data.total === plays.data.rows.length : !plays.isPending}
-              period={period}
-              selectedPlay={selectedPlay}
-              selectedPlayerId={search.player ?? ""}
-              selectedTeamId={search.team ?? ""}
-              displayClock={selectedPlay ? clockLabel(selectedPlay) : search.clock ?? null}
-              onPlayer={(value) => update({ player: value || undefined })}
-              onTeam={(value) => update({ team: value || undefined })}
-            />
+            skillCornerBasketball ? (
+              <BasketballGameContext
+                detail={detail.data}
+                onOpenCourt={() =>
+                  void navigate({ to: "/basketball", search: { contest: gameId } })
+                }
+              />
+            ) : (
+              <GameContext
+                detail={detail.data}
+                allPlays={allPlays}
+                playsComplete={plays.data ? plays.data.total === plays.data.rows.length : !plays.isPending}
+                period={period}
+                selectedPlay={selectedPlay}
+                selectedPlayerId={search.player ?? ""}
+                selectedTeamId={search.team ?? ""}
+                displayClock={selectedPlay ? clockLabel(selectedPlay) : search.clock ?? null}
+                onPlayer={(value) => update({ player: value || undefined })}
+                onTeam={(value) => update({ team: value || undefined })}
+              />
+            )
           ) : detail.isPending && gameId ? (
             <LoadingPanel label="Loading game context" />
           ) : detail.isError && gameId ? (
@@ -307,10 +325,10 @@ export function GameLab() {
           )}
 
           <Panel
-            title="Play-by-play timeline"
+            title={skillCornerBasketball ? "Spatial contest" : "Play-by-play timeline"}
             bodyClassName="flex flex-col overflow-hidden"
             actions={
-              detail.data ? (
+              detail.data && !skillCornerBasketball ? (
                 <>
                   <button
                     type="button"
@@ -369,7 +387,24 @@ export function GameLab() {
               ) : null
             }
           >
-            {detail.isSuccess && plays.isPending ? (
+            {skillCornerBasketball ? (
+              <div className="flex h-full flex-col items-center justify-center gap-2 px-5 text-center">
+                <p className="t-section">25 Hz player and ball tracking</p>
+                <p className="t-body max-w-sm">
+                  Open the court view for source clocks, player selection, Dynamic Event marks
+                  and exact frame seeking.
+                </p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void navigate({ to: "/basketball", search: { contest: gameId } })
+                  }
+                  className="rounded-control border border-accent/50 bg-accent/10 px-3 py-1.5 text-[12px] text-text-primary hover:bg-accent/15"
+                >
+                  Open spatial court
+                </button>
+              </div>
+            ) : detail.isSuccess && plays.isPending ? (
               <LoadingPanel label="Loading this game's plays" />
             ) : plays.isError ? (
               <GameQueryState error={plays.error} onRetry={() => void plays.refetch()} />
@@ -386,47 +421,109 @@ export function GameLab() {
             )}
           </Panel>
 
-          <div className="grid min-h-0 grid-cols-2 gap-px bg-border-subtle">
-            <BoxScorePanel
-              detail={detail.data ?? null}
-              sport={sport}
-              grain={grain}
-              query={box}
-              selectedPlayerId={search.player ?? ""}
-              selectedTeamId={search.team ?? ""}
-              onGrain={(value) => update({ box: value })}
-              onPlayer={(row) => {
-                const subjectId = row.subject_id;
-                const teamId = row.team_id;
-                update({
-                  player: typeof subjectId === "string" ? subjectId : undefined,
-                  team: typeof teamId === "string" ? teamId : undefined,
-                });
-              }}
-              onTeam={(row) => update({ team: typeof row.team_id === "string" ? row.team_id : undefined })}
-            />
-            <EventDetailPanel
-              detail={detail.data ?? null}
-              sport={sport}
-              play={selectedPlay}
-              playerId={search.player ?? ""}
-              teamId={search.team ?? ""}
-              boxData={box.data ?? null}
-            />
-          </div>
+          {skillCornerBasketball && detail.data ? (
+            <div className="grid min-h-0 grid-cols-2 gap-px bg-border-subtle">
+              <Panel title="Season analytics" bodyClassName="flex flex-col justify-center gap-2 px-4">
+                <p className="t-body">Shots, Drives and Picks are available in this ACB season.</p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void navigate({
+                      to: "/season",
+                      search: {
+                        edition: detail.data!.edition.edition_id,
+                        family: "shots",
+                      },
+                    })
+                  }
+                  className="w-fit rounded-control border border-border-subtle px-3 py-1.5 text-[12px] text-text-secondary hover:bg-surface-2 hover:text-text-primary"
+                >
+                  Open Shots in SeasonLab
+                </button>
+              </Panel>
+              <Panel title="Source coverage" bodyClassName="flex flex-col justify-center gap-2 px-4">
+                <p className="t-body">
+                  The contest catalog is metadata-only. The court view reports local tracking
+                  and event availability for this selected game.
+                </p>
+                <span className="mono text-[10px] text-text-muted">
+                  SkillCorner · {detail.data.edition.edition_label} · {detail.data.summary.provider_game_id}
+                </span>
+              </Panel>
+            </div>
+          ) : (
+            <div className="grid min-h-0 grid-cols-2 gap-px bg-border-subtle">
+              <BoxScorePanel
+                detail={detail.data ?? null}
+                sport={sport}
+                grain={grain}
+                query={box}
+                selectedPlayerId={search.player ?? ""}
+                selectedTeamId={search.team ?? ""}
+                onGrain={(value) => update({ box: value })}
+                onPlayer={(row) => {
+                  const subjectId = row.subject_id;
+                  const teamId = row.team_id;
+                  update({
+                    player: typeof subjectId === "string" ? subjectId : undefined,
+                    team: typeof teamId === "string" ? teamId : undefined,
+                  });
+                }}
+                onTeam={(row) => update({ team: typeof row.team_id === "string" ? row.team_id : undefined })}
+              />
+              <EventDetailPanel
+                detail={detail.data ?? null}
+                sport={sport}
+                play={selectedPlay}
+                playerId={search.player ?? ""}
+                teamId={search.team ?? ""}
+                boxData={box.data ?? null}
+              />
+            </div>
+          )}
         </main>
       </div>
     </div>
   );
 }
 
+function BasketballGameContext({
+  detail,
+  onOpenCourt,
+}: {
+  detail: GameDetailView;
+  onOpenCourt: () => void;
+}) {
+  const [away, home] = orderedTeams(detail.summary);
+  return (
+    <section aria-label="Basketball game context" className="flex items-center gap-3 bg-surface-1 px-3 py-2">
+      <TeamScore team={away} side="Away" />
+      <span aria-hidden="true" className="t-label">at</span>
+      <TeamScore team={home} side="Home" />
+      <div className="hidden min-w-28 text-right text-[10px] text-text-muted md:block">
+        <div>{shortDate(detail.summary.scheduled_start_at)}</div>
+        <div>{detail.summary.status ?? (detail.summary.completed ? "Final" : "Scheduled")}</div>
+      </div>
+      <button
+        type="button"
+        onClick={onOpenCourt}
+        className="ml-auto rounded-control border border-accent/50 bg-accent/10 px-3 py-1.5 text-[12px] text-text-primary hover:bg-accent/15"
+      >
+        Open spatial court
+      </button>
+    </section>
+  );
+}
+
 function ContestTable({
   rows,
   selectedId,
+  ariaLabel,
   onSelect,
 }: {
   rows: readonly GameSummaryView[];
   selectedId: string;
+  ariaLabel: string;
   onSelect: (row: GameSummaryView) => void;
 }) {
   const columns = useMemo<DataTableColumn<GameSummaryView>[]>(
@@ -478,7 +575,7 @@ function ContestTable({
         emptyState={<StatePanel state="empty" title="No contests match this page filter." />}
         virtualizeAbove={24}
         rowHeight={48}
-        ariaLabel="NBA and NHL contests"
+        ariaLabel={ariaLabel}
       />
     </div>
   );

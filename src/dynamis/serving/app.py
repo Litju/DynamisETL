@@ -21,9 +21,11 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import Engine
 from sqlalchemy.exc import SQLAlchemyError
 
+from dynamis.adapters.skillcorner_basketball import authorities as basketball_authorities
 from dynamis.config import ConfigurationError, Settings
 from dynamis.config import settings as resolve_settings
 from dynamis.gold.publish import resolve_gold_schema
+from dynamis.serving import basketball as basketball_reader
 from dynamis.serving import games as game_model
 from dynamis.serving import repository
 from dynamis.serving import season as season_model
@@ -48,6 +50,9 @@ from dynamis.serving.dense import (
 from dynamis.serving.models import (
     ArtifactDetail,
     ArtifactRefView,
+    BasketballEventPage,
+    BasketballFramePage,
+    BasketballSpatialGameView,
     DatasetDetail,
     DatasetSummary,
     DenseWindow,
@@ -271,6 +276,16 @@ class ServingBackend(Protocol):
     def game_box(self, contest_id: str, grain: Literal["player", "team"]) -> GameBoxView | None: ...
 
     def game_license(self, contest_id: str) -> LicenseView | None: ...
+
+    def basketball_spatial_game(self, contest_id: str) -> BasketballSpatialGameView | None: ...
+
+    def basketball_frames(
+        self, contest_id: str, *, period: int, from_frame: int, limit: int
+    ) -> BasketballFramePage | None: ...
+
+    def basketball_events(
+        self, contest_id: str, *, period: int | None, limit: int, offset: int
+    ) -> BasketballEventPage | None: ...
 
 
 class PostgresServingBackend:
@@ -909,6 +924,85 @@ class PostgresServingBackend:
             )
         return GameBoxView(contest_id=contest_id, grain=grain, families=families)
 
+    def basketball_spatial_game(self, contest_id: str) -> BasketballSpatialGameView | None:
+        detail = self.game(contest_id)
+        if detail is None or detail.summary.sport_id != "basketball":
+            return None
+        with self._connect() as connection:
+            artifacts = repository.basketball_spatial_artifacts(connection, contest_id)
+            if artifacts is None:
+                return None
+            roster = repository.basketball_roster(
+                connection,
+                dataset_id=artifacts["dataset_id"],
+                session_id=artifacts["provider_game_id"],
+                contest_id=contest_id,
+                edition_id=detail.summary.edition_id or "",
+            )
+        clock = artifacts["frame_clock"]
+        periods = basketball_reader.period_ranges(self.settings, clock) if clock else []
+        reference = basketball_authorities.spatial_reference()
+        surface = basketball_authorities.surface_geometry()
+        return BasketballSpatialGameView(
+            game=detail,
+            dataset_id=artifacts["dataset_id"],
+            source_revision=artifacts["registry_version"],
+            frame_rate_hz=basketball_authorities.FRAME_RATE_HZ,
+            spatial_reference_id=reference.spatial_reference_id,
+            units=reference.units,
+            origin=reference.origin,
+            axis_orientation=reference.axis_orientation,
+            court_dimensions=surface.dimensions,
+            tracking_materialized=bool(artifacts["tracking"] and clock),
+            events_materialized=artifacts["events"] is not None,
+            periods=periods,
+            players=roster,
+        )
+
+    def basketball_frames(
+        self, contest_id: str, *, period: int, from_frame: int, limit: int
+    ) -> BasketballFramePage | None:
+        with self._connect() as connection:
+            artifacts = repository.basketball_spatial_artifacts(connection, contest_id)
+            if artifacts is None or not artifacts["frame_clock"] or not artifacts["tracking"]:
+                return None
+            detail = repository.game_summary(connection, contest_id)
+            if detail is None or detail.edition_id is None:
+                return None
+            roster = repository.basketball_roster(
+                connection,
+                dataset_id=artifacts["dataset_id"],
+                session_id=artifacts["provider_game_id"],
+                contest_id=contest_id,
+                edition_id=detail.edition_id,
+            )
+        return basketball_reader.read_frames(
+            self.settings,
+            contest_id=contest_id,
+            period=period,
+            from_frame=from_frame,
+            limit=limit,
+            frame_clock=artifacts["frame_clock"],
+            tracking=artifacts["tracking"],
+            roster=roster,
+        )
+
+    def basketball_events(
+        self, contest_id: str, *, period: int | None, limit: int, offset: int
+    ) -> BasketballEventPage | None:
+        with self._connect() as connection:
+            artifacts = repository.basketball_spatial_artifacts(connection, contest_id)
+        if artifacts is None or artifacts["events"] is None:
+            return None
+        return basketball_reader.read_events(
+            self.settings,
+            contest_id=contest_id,
+            period=period,
+            limit=limit,
+            offset=offset,
+            artifact=artifacts["events"],
+        )
+
     def season_player_links(self, edition_id: str, subject_id: str) -> SeasonPlayerLinksView | None:
         edition = next(
             (item for item in self.season_editions() if item.edition_id == edition_id), None
@@ -1311,6 +1405,65 @@ def create_app(
         found = service.game_box(contest_id, grain)
         if found is None:
             raise HTTPException(status_code=404, detail=f"contest {contest_id!r} has no box score")
+        return found
+
+    @app.get(
+        "/api/basketball/contests/{contest_id}",
+        response_model=BasketballSpatialGameView,
+        tags=["basketball"],
+    )
+    def basketball_spatial_game(
+        contest_id: str, service: BackendDependency
+    ) -> BasketballSpatialGameView:
+        found = service.basketball_spatial_game(contest_id)
+        if found is None:
+            raise HTTPException(
+                status_code=404, detail=f"basketball contest {contest_id!r} is not catalogued"
+            )
+        return found
+
+    @app.get(
+        "/api/basketball/contests/{contest_id}/frames",
+        response_model=BasketballFramePage,
+        tags=["basketball"],
+    )
+    def basketball_frames(
+        contest_id: str,
+        service: BackendDependency,
+        period: int = Query(ge=1, le=20),
+        from_frame: int = Query(default=0, ge=0),
+        limit: int = Query(default=125, ge=1, le=250),
+    ) -> BasketballFramePage:
+        _require_payload_rights(service, contest_id)
+        found = service.basketball_frames(
+            contest_id, period=period, from_frame=from_frame, limit=limit
+        )
+        if found is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"basketball tracking for contest {contest_id!r} is not materialized",
+            )
+        return found
+
+    @app.get(
+        "/api/basketball/contests/{contest_id}/events",
+        response_model=BasketballEventPage,
+        tags=["basketball"],
+    )
+    def basketball_events(
+        contest_id: str,
+        service: BackendDependency,
+        period: int | None = Query(default=None, ge=1, le=20),
+        limit: int = Query(default=250, ge=1, le=MAX_PAGE_LIMIT),
+        offset: int = Query(default=0, ge=0),
+    ) -> BasketballEventPage:
+        _require_payload_rights(service, contest_id)
+        found = service.basketball_events(contest_id, period=period, limit=limit, offset=offset)
+        if found is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"basketball events for contest {contest_id!r} are not materialized",
+            )
         return found
 
     @app.get("/api/catalog/datasets/{dataset_id}", response_model=DatasetDetail, tags=["catalog"])

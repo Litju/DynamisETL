@@ -25,6 +25,9 @@ const SURFACE_LABELS: Record<string, string> = {
   methods: "Methodology",
   runs: "Processing runs",
   quality: "Quality & rights",
+  basketball: "Basketball spatial game",
+  games: "GameLab",
+  season: "SeasonLab",
 };
 
 /**

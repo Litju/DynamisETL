@@ -542,6 +542,603 @@
         "title": "ArtifactRefView",
         "type": "object"
       },
+      "BasketballBallPointView": {
+        "properties": {
+          "is_detected": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Detected"
+          },
+          "x": {
+            "title": "X",
+            "type": "number"
+          },
+          "y": {
+            "title": "Y",
+            "type": "number"
+          },
+          "z": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Z"
+          }
+        },
+        "required": [
+          "x",
+          "y",
+          "z",
+          "is_detected"
+        ],
+        "title": "BasketballBallPointView",
+        "type": "object"
+      },
+      "BasketballEventPage": {
+        "properties": {
+          "contest_id": {
+            "title": "Contest Id",
+            "type": "string"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/BasketballEventView"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "contest_id",
+          "period",
+          "total",
+          "limit",
+          "offset",
+          "rows"
+        ],
+        "title": "BasketballEventPage",
+        "type": "object"
+      },
+      "BasketballEventView": {
+        "properties": {
+          "attributes": {
+            "additionalProperties": true,
+            "title": "Attributes",
+            "type": "object"
+          },
+          "canonical_time_ns": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Time Ns"
+          },
+          "contest_period_id": {
+            "title": "Contest Period Id",
+            "type": "string"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "provider_event_type": {
+            "title": "Provider Event Type",
+            "type": "string"
+          },
+          "sequence_index": {
+            "title": "Sequence Index",
+            "type": "string"
+          },
+          "source_clock": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Clock"
+          },
+          "source_event_id": {
+            "title": "Source Event Id",
+            "type": "string"
+          },
+          "subject_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject Id"
+          },
+          "team_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Id"
+          }
+        },
+        "required": [
+          "source_event_id",
+          "provider_event_type",
+          "contest_period_id",
+          "sequence_index",
+          "canonical_time_ns",
+          "source_clock",
+          "team_id",
+          "subject_id",
+          "location",
+          "attributes"
+        ],
+        "title": "BasketballEventView",
+        "type": "object"
+      },
+      "BasketballFramePage": {
+        "properties": {
+          "contest_id": {
+            "title": "Contest Id",
+            "type": "string"
+          },
+          "from_frame": {
+            "title": "From Frame",
+            "type": "integer"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "period": {
+            "title": "Period",
+            "type": "integer"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/BasketballFrameView"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "total_frames": {
+            "title": "Total Frames",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "contest_id",
+          "period",
+          "from_frame",
+          "limit",
+          "total_frames",
+          "rows"
+        ],
+        "title": "BasketballFramePage",
+        "type": "object"
+      },
+      "BasketballFrameView": {
+        "properties": {
+          "ball": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BasketballBallPointView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ball_present": {
+            "title": "Ball Present",
+            "type": "boolean"
+          },
+          "canonical_time_ns": {
+            "title": "Canonical Time Ns",
+            "type": "integer"
+          },
+          "frame_idx": {
+            "title": "Frame Idx",
+            "type": "integer"
+          },
+          "game_clock_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Game Clock S"
+          },
+          "game_clock_stopped": {
+            "title": "Game Clock Stopped",
+            "type": "boolean"
+          },
+          "is_dead_time": {
+            "title": "Is Dead Time",
+            "type": "boolean"
+          },
+          "period_number": {
+            "title": "Period Number",
+            "type": "integer"
+          },
+          "player_count": {
+            "title": "Player Count",
+            "type": "integer"
+          },
+          "players": {
+            "items": {
+              "$ref": "#/components/schemas/BasketballPlayerPointView"
+            },
+            "title": "Players",
+            "type": "array"
+          },
+          "shot_clock_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shot Clock S"
+          },
+          "wall_clock_ms": {
+            "title": "Wall Clock Ms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "frame_idx",
+          "period_number",
+          "wall_clock_ms",
+          "canonical_time_ns",
+          "game_clock_s",
+          "game_clock_stopped",
+          "shot_clock_s",
+          "player_count",
+          "ball_present",
+          "is_dead_time",
+          "players",
+          "ball"
+        ],
+        "title": "BasketballFrameView",
+        "type": "object"
+      },
+      "BasketballPeriodRangeView": {
+        "properties": {
+          "dead_time_frames": {
+            "title": "Dead Time Frames",
+            "type": "integer"
+          },
+          "first_active_frame": {
+            "title": "First Active Frame",
+            "type": "integer"
+          },
+          "first_frame": {
+            "title": "First Frame",
+            "type": "integer"
+          },
+          "frame_count": {
+            "title": "Frame Count",
+            "type": "integer"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "last_frame": {
+            "title": "Last Frame",
+            "type": "integer"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "number",
+          "label",
+          "first_frame",
+          "first_active_frame",
+          "last_frame",
+          "frame_count",
+          "dead_time_frames"
+        ],
+        "title": "BasketballPeriodRangeView",
+        "type": "object"
+      },
+      "BasketballPlayerPointView": {
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "is_detected": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Detected"
+          },
+          "jersey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jersey"
+          },
+          "provider_player_id": {
+            "title": "Provider Player Id",
+            "type": "string"
+          },
+          "subject_id": {
+            "title": "Subject Id",
+            "type": "string"
+          },
+          "team_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Id"
+          },
+          "x": {
+            "title": "X",
+            "type": "number"
+          },
+          "y": {
+            "title": "Y",
+            "type": "number"
+          },
+          "z": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Z"
+          }
+        },
+        "required": [
+          "subject_id",
+          "provider_player_id",
+          "display_name",
+          "jersey",
+          "team_id",
+          "x",
+          "y",
+          "z",
+          "is_detected"
+        ],
+        "title": "BasketballPlayerPointView",
+        "type": "object"
+      },
+      "BasketballRosterPlayerView": {
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "jersey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jersey"
+          },
+          "provider_player_id": {
+            "title": "Provider Player Id",
+            "type": "string"
+          },
+          "subject_id": {
+            "title": "Subject Id",
+            "type": "string"
+          },
+          "team_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Id"
+          },
+          "team_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Name"
+          }
+        },
+        "required": [
+          "subject_id",
+          "provider_player_id",
+          "display_name",
+          "jersey",
+          "team_id",
+          "team_name"
+        ],
+        "title": "BasketballRosterPlayerView",
+        "type": "object"
+      },
+      "BasketballSpatialGameView": {
+        "properties": {
+          "axis_orientation": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Axis Orientation",
+            "type": "object"
+          },
+          "court_dimensions": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Court Dimensions",
+            "type": "object"
+          },
+          "dataset_id": {
+            "title": "Dataset Id",
+            "type": "string"
+          },
+          "events_materialized": {
+            "title": "Events Materialized",
+            "type": "boolean"
+          },
+          "frame_rate_hz": {
+            "title": "Frame Rate Hz",
+            "type": "number"
+          },
+          "game": {
+            "$ref": "#/components/schemas/GameDetailView"
+          },
+          "origin": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Origin",
+            "type": "object"
+          },
+          "periods": {
+            "items": {
+              "$ref": "#/components/schemas/BasketballPeriodRangeView"
+            },
+            "title": "Periods",
+            "type": "array"
+          },
+          "players": {
+            "items": {
+              "$ref": "#/components/schemas/BasketballRosterPlayerView"
+            },
+            "title": "Players",
+            "type": "array"
+          },
+          "source_revision": {
+            "title": "Source Revision",
+            "type": "string"
+          },
+          "spatial_reference_id": {
+            "title": "Spatial Reference Id",
+            "type": "string"
+          },
+          "tracking_materialized": {
+            "title": "Tracking Materialized",
+            "type": "boolean"
+          },
+          "units": {
+            "title": "Units",
+            "type": "string"
+          }
+        },
+        "required": [
+          "game",
+          "dataset_id",
+          "source_revision",
+          "frame_rate_hz",
+          "spatial_reference_id",
+          "units",
+          "origin",
+          "axis_orientation",
+          "court_dimensions",
+          "tracking_materialized",
+          "events_materialized",
+          "periods",
+          "players"
+        ],
+        "title": "BasketballSpatialGameView",
+        "type": "object"
+      },
       "DatasetDetail": {
         "properties": {
           "adapter_id": {
@@ -5400,6 +5997,207 @@
         "summary": "Artifact Window",
         "tags": [
           "dense"
+        ]
+      }
+    },
+    "/api/basketball/contests/{contest_id}": {
+      "get": {
+        "operationId": "basketball_spatial_game_api_basketball_contests__contest_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "contest_id",
+            "required": true,
+            "schema": {
+              "title": "Contest Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BasketballSpatialGameView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Basketball Spatial Game",
+        "tags": [
+          "basketball"
+        ]
+      }
+    },
+    "/api/basketball/contests/{contest_id}/events": {
+      "get": {
+        "operationId": "basketball_events_api_basketball_contests__contest_id__events_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "contest_id",
+            "required": true,
+            "schema": {
+              "title": "Contest Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "period",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 20,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Period"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 250,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BasketballEventPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Basketball Events",
+        "tags": [
+          "basketball"
+        ]
+      }
+    },
+    "/api/basketball/contests/{contest_id}/frames": {
+      "get": {
+        "operationId": "basketball_frames_api_basketball_contests__contest_id__frames_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "contest_id",
+            "required": true,
+            "schema": {
+              "title": "Contest Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "period",
+            "required": true,
+            "schema": {
+              "maximum": 20,
+              "minimum": 1,
+              "title": "Period",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from_frame",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "From Frame",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 125,
+              "maximum": 250,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BasketballFramePage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Basketball Frames",
+        "tags": [
+          "basketball"
         ]
       }
     },

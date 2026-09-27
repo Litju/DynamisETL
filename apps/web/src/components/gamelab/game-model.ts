@@ -1,6 +1,6 @@
 import type { GameEditionView, GamePlayView } from "@/api/types";
 
-export type GameSport = "nba" | "nhl";
+export type GameSport = "nba" | "nhl" | "basketball";
 
 export const NHL_PLAY_SOURCE_COLUMNS = [
   "event_player_1_name",
@@ -32,6 +32,7 @@ export interface GameMetricColumn {
 }
 
 const BOX_METRICS: Record<GameSport, Record<string, readonly GameMetricColumn[]>> = {
+  basketball: {},
   nba: {
     player_game: [
       { key: "source__minutes", label: "MIN" },
@@ -88,7 +89,8 @@ const BOX_METRICS: Record<GameSport, Record<string, readonly GameMetricColumn[]>
 };
 
 export function gameSport(edition: GameEditionView): GameSport | null {
-  if (edition.league_id === "nba" || edition.sport_id === "basketball") return "nba";
+  if (edition.league_id === "nba") return "nba";
+  if (edition.sport_id === "basketball") return "basketball";
   if (edition.league_id === "nhl" || edition.sport_id === "ice_hockey") return "nhl";
   return null;
 }
@@ -107,6 +109,14 @@ export function metricColumns(
 }
 
 export function presentEvent(sport: GameSport, play: GamePlayView): EventPresentation {
+  if (sport === "basketball") {
+    return {
+      label: play.provider_event_type,
+      description: null,
+      facts: [],
+      schemaMatchesSport: false,
+    };
+  }
   const schema =
     sport === "nba" ? "sportsdataverse.espn_nba.pbp" : "sportsdataverse.nhl.pbp_lite";
   const schemaMatchesSport = play.attributes_schema_id === schema;
