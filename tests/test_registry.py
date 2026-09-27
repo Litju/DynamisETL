@@ -28,7 +28,7 @@ from dynamis.registry import (
     validate_registry,
 )
 
-EXPECTED_SOURCE_COUNT = 9
+EXPECTED_SOURCE_COUNT = 10
 #: Declared licenses that still stay local-only: SportsDataverse's CC BY 4.0 does
 #: not grant the upstream ESPN/NHL API terms its release assets are scraped from.
 DECLARED_LOCAL_ONLY = {"sportsdataverse"}

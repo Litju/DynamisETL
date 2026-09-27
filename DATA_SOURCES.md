@@ -25,6 +25,7 @@ unclear-rights data stay outside the code license boundary.
 | `gymaware-landmine-vision` | Zenodo | CC-BY-4.0 | conditional | LPT/VBT + video agreement |
 | `dfl-sportec-idsse` | Hugging Face (pysport) | CC-BY-4.0 | conditional | Elite optical tracking + synchronized events |
 | `skillcorner-opendata` | SkillCorner / PySport | MIT | conditional | Broadcast tracking/events/phases + football 3D pose |
+| `skillcorner-basketball-opendata` | SkillCorner / GitHub | MIT | conditional | ACB basketball tracking, Dynamic Events and Shots/Drives/Picks season aggregates |
 | `spl-open-data` | MLSE Sport Performance Lab | CC-BY-NC-SA-4.0 (+ role-dependent exclusion) | conditional | Markerless sports 3D kinematics |
 | `tackle-workload` | Zenodo | unclear | prohibited (local-only) | Optional longitudinal workload extension |
 | `openbiomechanics` | Driveline Baseball R&D | CC-BY-NC-SA-4.0 (+ additional exclusion) | conditional | Optional force/mocap/high-performance validation |
@@ -149,6 +150,24 @@ documented mapping between them is published, so no reduction is fabricated.
   accurate relative to the player centroid and is **not** registered in the pitch
   coordinate system, so it is never presented as absolute player height; frame
   Y/Z disagreements are measured at documented coincidences and never corrected.
+
+### `skillcorner-basketball-opendata`
+
+- [SkillCorner Open Data — Basketball](https://github.com/SkillCorner/opendata-basketball), pinned to
+  revision `4bbed2e35e8fdd2cf083e8c8b280b3e5381a2c66`.
+- License **MIT**; SkillCorner requests credit when its data is used.
+- The pinned metadata catalog registers all 10 ACB 2025-2026 sample games without acquiring
+  tracking or event payloads. `dynamis-fetch` requires an explicit key/game selection; one
+  selected game materializes 25 Hz player and ball tracking and Dynamic Events.
+- Tracking preserves the provider's court-centred feet coordinates and source axes. Canonical
+  tracking stores the explicit feet-to-metres conversion; dead-time frames retain their clocks
+  but have no position rows. Events link by exact frame or wall-clock keys, or by a unique
+  period + game-clock/shot-clock match; ambiguous and missing keys remain unlinked.
+- Shots, Drives and Picks are source player-season aggregates over 293 games, not totals rebuilt
+  from the 10 sample-game event files. They are offense-only across an 18-team season population;
+  the 10 sample games represent 17 teams. Provider total rows stay in checksummed Bronze and are
+  recorded as exclusions from the player × team season grain; player aliases use the pinned
+  `player_id_aliases.csv`.
 
 ### `spl-open-data`
 

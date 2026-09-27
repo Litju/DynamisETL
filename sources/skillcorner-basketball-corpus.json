@@ -1,0 +1,2425 @@
+{
+  "schema_version": 1,
+  "aggregates": [
+    {
+      "asset": {
+        "size_bytes": 601318,
+        "sha256": "unknown",
+        "upstream_capabilities": [
+          "SEASON_AGGREGATE"
+        ],
+        "key": "data/aggregates/acb_shotsaggregates_20252026.csv",
+        "sha1": "ea1d3651316e745ea15662ec6f4c44c79b285302"
+      },
+      "family": "shots"
+    },
+    {
+      "asset": {
+        "size_bytes": 162072,
+        "sha256": "unknown",
+        "upstream_capabilities": [
+          "SEASON_AGGREGATE"
+        ],
+        "key": "data/aggregates/acb_drivesaggregates_20252026.csv",
+        "sha1": "73f2403746ede57bdf48a2e2d3881a4749514ca5"
+      },
+      "family": "drives"
+    },
+    {
+      "asset": {
+        "size_bytes": 839870,
+        "sha256": "unknown",
+        "upstream_capabilities": [
+          "SEASON_AGGREGATE"
+        ],
+        "key": "data/aggregates/acb_picksaggregates_20252026.csv",
+        "sha1": "856477cea3af5d78722b8a098254e7821581e38a"
+      },
+      "family": "picks"
+    }
+  ],
+  "upstream": {
+    "repository": "SkillCorner/opendata-basketball",
+    "revision": "4bbed2e35e8fdd2cf083e8c8b280b3e5381a2c66",
+    "competition": {
+      "name": "Liga ACB",
+      "provider_id": "8"
+    },
+    "season": {
+      "label": "2025-2026",
+      "provider_id": "51"
+    },
+    "competition_edition": {
+      "provider_id": "211"
+    },
+    "match_index_git_blob_sha1": "6db83d7fa75a699270630c02efc330ce8a8d2e2b",
+    "match_index_key": "data/matches.json"
+  },
+  "files": [
+    {
+      "size_bytes": 4324,
+      "sha256": "unknown",
+      "upstream_capabilities": [],
+      "key": "data/matches.json",
+      "sha1": "6db83d7fa75a699270630c02efc330ce8a8d2e2b"
+    },
+    {
+      "size_bytes": 1062,
+      "sha256": "unknown",
+      "upstream_capabilities": [],
+      "key": "data/player_id_aliases.csv",
+      "sha1": "af2100462ea1aa7800a107207e2537a5b3642035"
+    },
+    {
+      "size_bytes": 601318,
+      "sha256": "unknown",
+      "upstream_capabilities": [
+        "SEASON_AGGREGATE"
+      ],
+      "key": "data/aggregates/acb_shotsaggregates_20252026.csv",
+      "sha1": "ea1d3651316e745ea15662ec6f4c44c79b285302"
+    },
+    {
+      "size_bytes": 162072,
+      "sha256": "unknown",
+      "upstream_capabilities": [
+        "SEASON_AGGREGATE"
+      ],
+      "key": "data/aggregates/acb_drivesaggregates_20252026.csv",
+      "sha1": "73f2403746ede57bdf48a2e2d3881a4749514ca5"
+    },
+    {
+      "size_bytes": 839870,
+      "sha256": "unknown",
+      "upstream_capabilities": [
+        "SEASON_AGGREGATE"
+      ],
+      "key": "data/aggregates/acb_picksaggregates_20252026.csv",
+      "sha1": "856477cea3af5d78722b8a098254e7821581e38a"
+    },
+    {
+      "size_bytes": 2253,
+      "sha256": "unknown",
+      "upstream_capabilities": [],
+      "key": "data/matches/114243/114243_game_data.json",
+      "sha1": "e969077a56d6d0b57022a6c3f8aaaa0cc002e63a"
+    },
+    {
+      "size_bytes": 3526294,
+      "sha256": "unknown",
+      "upstream_capabilities": [
+        "EVENTS"
+      ],
+      "key": "data/matches/114243/114243_dynamic_events.json",
+      "sha1": "fd4a48df294287c6e1771913297dd43f0f73cae5"
+    },
+    {
+      "size_bytes": 33707974,
+      "sha256": "a150110f57c365940ae1da32243cf924628c443ea16a85336c8cc4a674e05c0e",
+      "upstream_capabilities": [
+        "TRACKING",
+        "BALL_TRACKING"
+      ],
+      "key": "data/matches/114243/114243_tracking_data.jsonl.gz",
+      "sha1": "5b28079ac58fb14bb3865f2cc11cd831a4589c34"
+    },
+    {
+      "size_bytes": 2130,
+      "sha256": "unknown",
+      "upstream_capabilities": [],
+      "key": "data/matches/114234/114234_game_data.json",
+      "sha1": "9fd1a15ec5ab31873311b45641d777b748b2431e"
+    },
+    {
+      "size_bytes": 3465154,
+      "sha256": "unknown",
+      "upstream_capabilities": [
+        "EVENTS"
+      ],
+      "key": "data/matches/114234/114234_dynamic_events.json",
+      "sha1": "4a1facbcf29293f4eba2ec07a72d8f2358d85d5c"
+    },
+    {
+      "size_bytes": 31697559,
+      "sha256": "988b8a2ca3a8cc9c1c2a2838ab9a2d8d1add64cafd1113f0c63d2439f5164690",
+      "upstream_capabilities": [
+        "TRACKING",
+        "BALL_TRACKING"
+      ],
+      "key": "data/matches/114234/114234_tracking_data.jsonl.gz",
+      "sha1": "009de6229d4221be98632dd1028b50331a0c5fa3"
+    },
+    {
+      "size_bytes": 2098,
+      "sha256": "unknown",
+      "upstream_capabilities": [],
+      "key": "data/matches/114169/114169_game_data.json",
+      "sha1": "b671ed43f6c73006b8aa4b4051df7ece5f48cfe7"
+    },
+    {
+      "size_bytes": 3459130,
+      "sha256": "unknown",
+      "upstream_capabilities": [
+        "EVENTS"
+      ],
+      "key": "data/matches/114169/114169_dynamic_events.json",
+      "sha1": "19313805c4f27ffcd9d0437bfb20d10aa8392ab0"
+    },
+    {
+      "size_bytes": 45580755,
+      "sha256": "0b9f028febc7f7d46e7bd3d2bffa10c50ad85abbf0dd2a7937d5f32895e685f0",
+      "upstream_capabilities": [
+        "TRACKING",
+        "BALL_TRACKING"
+      ],
+      "key": "data/matches/114169/114169_tracking_data.jsonl.gz",
+      "sha1": "5a0b8a069dc98104a95d023d774bc28caa50bb5c"
+    },
+    {
+      "size_bytes": 2225,
+      "sha256": "unknown",
+      "upstream_capabilities": [],
+      "key": "data/matches/114099/114099_game_data.json",
+      "sha1": "e274adb9b4d7b9e97aca3cbd98b86cb8024eae0e"
+    },
+    {
+      "size_bytes": 3392618,
+      "sha256": "unknown",
+      "upstream_capabilities": [
+        "EVENTS"
+      ],
+      "key": "data/matches/114099/114099_dynamic_events.json",
+      "sha1": "0283c8affb2eda0bec623f562c7bb1ebfcece29e"
+    },
+    {
+      "size_bytes": 33060109,
+      "sha256": "1e4af3c2ea8f56f80a2b4adb56ffcf5abc479145c7dec55ebd7ebda652a2cc38",
+      "upstream_capabilities": [
+        "TRACKING",
+        "BALL_TRACKING"
+      ],
+      "key": "data/matches/114099/114099_tracking_data.jsonl.gz",
+      "sha1": "f9465d6dc6a1360ef6e540246b7f843c6b4b8cc4"
+    },
+    {
+      "size_bytes": 2168,
+      "sha256": "unknown",
+      "upstream_capabilities": [],
+      "key": "data/matches/114086/114086_game_data.json",
+      "sha1": "f302a354296028ff3ae3c7d65f0d1b610fd26d41"
+    },
+    {
+      "size_bytes": 3345025,
+      "sha256": "unknown",
+      "upstream_capabilities": [
+        "EVENTS"
+      ],
+      "key": "data/matches/114086/114086_dynamic_events.json",
+      "sha1": "4adddaa94608b22e0e847f03a4e6786b9b55ab86"
+    },
+    {
+      "size_bytes": 39842015,
+      "sha256": "df4043c143a6f7e3996089d4e20f19b25608a90b40f9a449d927dce89b0da846",
+      "upstream_capabilities": [
+        "TRACKING",
+        "BALL_TRACKING"
+      ],
+      "key": "data/matches/114086/114086_tracking_data.jsonl.gz",
+      "sha1": "c368dad45222f8ae0cb03e2b6f3ee1c17acc8eb6"
+    },
+    {
+      "size_bytes": 2271,
+      "sha256": "unknown",
+      "upstream_capabilities": [],
+      "key": "data/matches/178442/178442_game_data.json",
+      "sha1": "9ec380ecd92e5b63a96696b9b305639e78e7de68"
+    },
+    {
+      "size_bytes": 3572420,
+      "sha256": "unknown",
+      "upstream_capabilities": [
+        "EVENTS"
+      ],
+      "key": "data/matches/178442/178442_dynamic_events.json",
+      "sha1": "5bee35229ff145f84a3c530e4cd023e7901af5dd"
+    },
+    {
+      "size_bytes": 39067647,
+      "sha256": "03ed31f1f76eaaad39eefec90b7eb2ca6234fa3a20ee0bcf3279d12ab6f7cc09",
+      "upstream_capabilities": [
+        "TRACKING",
+        "BALL_TRACKING"
+      ],
+      "key": "data/matches/178442/178442_tracking_data.jsonl.gz",
+      "sha1": "850abe875c24f168d2ddb1a2619927794741f7a8"
+    },
+    {
+      "size_bytes": 2221,
+      "sha256": "unknown",
+      "upstream_capabilities": [],
+      "key": "data/matches/179612/179612_game_data.json",
+      "sha1": "259b9cd97ae0d161c42a5d79f95a132ce62d3b36"
+    },
+    {
+      "size_bytes": 3414961,
+      "sha256": "unknown",
+      "upstream_capabilities": [
+        "EVENTS"
+      ],
+      "key": "data/matches/179612/179612_dynamic_events.json",
+      "sha1": "77b54abd6c74b97350f9b068ff5ce486ed413707"
+    },
+    {
+      "size_bytes": 36191342,
+      "sha256": "9681027e1306a2e5d6a6b80459ea2fc0816f455e5b65508c8ba9f32cc85024b8",
+      "upstream_capabilities": [
+        "TRACKING",
+        "BALL_TRACKING"
+      ],
+      "key": "data/matches/179612/179612_tracking_data.jsonl.gz",
+      "sha1": "17d6a55e49e2c420746528d05dc96a2e3bdc28a4"
+    },
+    {
+      "size_bytes": 2260,
+      "sha256": "unknown",
+      "upstream_capabilities": [],
+      "key": "data/matches/184439/184439_game_data.json",
+      "sha1": "99f9738e9b7fe1a543f0b316b6d8623585ed3265"
+    },
+    {
+      "size_bytes": 3341994,
+      "sha256": "unknown",
+      "upstream_capabilities": [
+        "EVENTS"
+      ],
+      "key": "data/matches/184439/184439_dynamic_events.json",
+      "sha1": "edd6d653cdc9c8e06188b1d69deaa583f23a6170"
+    },
+    {
+      "size_bytes": 33809782,
+      "sha256": "a602b5c53d05eaebdb9e358945b8a92c42fb9fdc3e090f687b79224fa4d49bc1",
+      "upstream_capabilities": [
+        "TRACKING",
+        "BALL_TRACKING"
+      ],
+      "key": "data/matches/184439/184439_tracking_data.jsonl.gz",
+      "sha1": "9a84d7445f81697cbbde1ca7b63cf5b25df3242c"
+    },
+    {
+      "size_bytes": 2260,
+      "sha256": "unknown",
+      "upstream_capabilities": [],
+      "key": "data/matches/188630/188630_game_data.json",
+      "sha1": "224db3fd5dd21ab806a28b1d94a20ea10f12b73c"
+    },
+    {
+      "size_bytes": 3183718,
+      "sha256": "unknown",
+      "upstream_capabilities": [
+        "EVENTS"
+      ],
+      "key": "data/matches/188630/188630_dynamic_events.json",
+      "sha1": "1b6b1da590fe4789abefd4f4385ffabf60de7118"
+    },
+    {
+      "size_bytes": 31869680,
+      "sha256": "1a289ff627f8985f3f54021fc6e3ad5b97c11e7b5e85bbd1d1a0842b9d1a17c6",
+      "upstream_capabilities": [
+        "TRACKING",
+        "BALL_TRACKING"
+      ],
+      "key": "data/matches/188630/188630_tracking_data.jsonl.gz",
+      "sha1": "c3e3f580f46b36f40d909163dadedfd010106fa8"
+    },
+    {
+      "size_bytes": 2294,
+      "sha256": "unknown",
+      "upstream_capabilities": [],
+      "key": "data/matches/191313/191313_game_data.json",
+      "sha1": "9bef665640fadd9683bb121badf9ebd0435e6b1b"
+    },
+    {
+      "size_bytes": 3282745,
+      "sha256": "unknown",
+      "upstream_capabilities": [
+        "EVENTS"
+      ],
+      "key": "data/matches/191313/191313_dynamic_events.json",
+      "sha1": "dcee1a012632e4f1a38816d829e5b8ca79e8d7a6"
+    },
+    {
+      "size_bytes": 35898393,
+      "sha256": "a1c7cc6b5070686a8c5254a4a89627d289680c9f103bbe469b850f24a0742883",
+      "upstream_capabilities": [
+        "TRACKING",
+        "BALL_TRACKING"
+      ],
+      "key": "data/matches/191313/191313_tracking_data.jsonl.gz",
+      "sha1": "9cd9df1b258fd587a270848bb2f42503ac72a116"
+    }
+  ],
+  "matches": [
+    {
+      "match": {
+        "id": 114243,
+        "date_time": "2025-10-11T19:00:00Z",
+        "home_team": {
+          "id": 1330,
+          "name": "BAXI Manresa"
+        },
+        "away_team": {
+          "id": 1319,
+          "name": "Coviran Granada"
+        },
+        "home_score": 83,
+        "away_score": 68,
+        "competition_id": 8,
+        "competition_name": "Liga ACB",
+        "season_id": 51,
+        "competition_edition_id": 211,
+        "season": "2025-2026",
+        "status": "closed"
+      },
+      "detail": {
+        "gameId": 114243,
+        "date": "2025-10-11T19:00:00Z",
+        "competitionEditionId": 211,
+        "competitionId": 8,
+        "competitionName": "Liga ACB",
+        "seasonId": 51,
+        "seasonName": "2025-2026",
+        "dynamicEventsLastProcessingDate": "2026-07-17T12:38:51Z",
+        "trackingLastProcessingDate": "2026-07-17T12:39:01Z",
+        "physicalLastProcessingDate": "2026-07-17T12:38:51Z",
+        "homeTeam": {
+          "teamId": 1330,
+          "teamName": "BAXI Manresa",
+          "players": [
+            {
+              "playerId": 15630,
+              "firstName": "Kaodirichi",
+              "lastName": "Akobundu-Ehiogu",
+              "jersey": "0"
+            },
+            {
+              "playerId": 18503,
+              "firstName": "Grant",
+              "lastName": "Golden",
+              "jersey": "33"
+            },
+            {
+              "playerId": 18534,
+              "firstName": "Alfonso",
+              "lastName": "Plummer",
+              "jersey": "99"
+            },
+            {
+              "playerId": 35806,
+              "firstName": "Retin",
+              "lastName": "Obasohan",
+              "jersey": "32"
+            },
+            {
+              "playerId": 59179,
+              "firstName": "Louis",
+              "lastName": "Olinde",
+              "jersey": "19"
+            },
+            {
+              "playerId": 59180,
+              "firstName": "Alex",
+              "lastName": "Reyes",
+              "jersey": "8"
+            },
+            {
+              "playerId": 59181,
+              "firstName": "Marcis",
+              "lastName": "Steinbergs",
+              "jersey": "12"
+            },
+            {
+              "playerId": 59183,
+              "firstName": "Hugo",
+              "lastName": "Benitez",
+              "jersey": "2"
+            },
+            {
+              "playerId": 59184,
+              "firstName": "Agustin",
+              "lastName": "Ubal",
+              "jersey": "11"
+            },
+            {
+              "playerId": 59186,
+              "firstName": "Max",
+              "lastName": "Gaspa",
+              "jersey": "4"
+            },
+            {
+              "playerId": 59214,
+              "firstName": "Daniel",
+              "lastName": "Perez",
+              "jersey": "55"
+            },
+            {
+              "playerId": 59227,
+              "firstName": "Archange",
+              "lastName": "Izaw Bolavie",
+              "jersey": "47"
+            }
+          ]
+        },
+        "awayTeam": {
+          "teamId": 1319,
+          "teamName": "Coviran Granada",
+          "players": [
+            {
+              "playerId": 25271,
+              "firstName": "Elias",
+              "lastName": "Valtonen",
+              "jersey": "11"
+            },
+            {
+              "playerId": 25326,
+              "firstName": "Ivan",
+              "lastName": "Aurrecoechea",
+              "jersey": "15"
+            },
+            {
+              "playerId": 28247,
+              "firstName": "Zach",
+              "lastName": "Hankins",
+              "jersey": "35"
+            },
+            {
+              "playerId": 28648,
+              "firstName": "Travis",
+              "lastName": "Munnings",
+              "jersey": "22"
+            },
+            {
+              "playerId": 35028,
+              "firstName": "Matt",
+              "lastName": "Thomas",
+              "jersey": "13"
+            },
+            {
+              "playerId": 59217,
+              "firstName": "Luka",
+              "lastName": "Bozic",
+              "jersey": "29"
+            },
+            {
+              "playerId": 59219,
+              "firstName": "Beka",
+              "lastName": "Burjanadze",
+              "jersey": "77"
+            },
+            {
+              "playerId": 59220,
+              "firstName": "Jonathan",
+              "lastName": "Rousselle",
+              "jersey": "2"
+            },
+            {
+              "playerId": 59221,
+              "firstName": "Jovan",
+              "lastName": "Kljajic",
+              "jersey": "23"
+            },
+            {
+              "playerId": 59232,
+              "firstName": "Eduardo",
+              "lastName": "Duran",
+              "jersey": "16"
+            },
+            {
+              "playerId": 59233,
+              "firstName": "Micah",
+              "lastName": "Speight",
+              "jersey": "3"
+            },
+            {
+              "playerId": 59301,
+              "firstName": "Babatunde",
+              "lastName": "Olumuyiwa",
+              "jersey": "7"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "match": {
+        "id": 114234,
+        "date_time": "2025-10-18T19:00:00Z",
+        "home_team": {
+          "id": 1331,
+          "name": "Casademont Zaragoza"
+        },
+        "away_team": {
+          "id": 1322,
+          "name": "Leche Rio Breogan"
+        },
+        "home_score": 84,
+        "away_score": 88,
+        "competition_id": 8,
+        "competition_name": "Liga ACB",
+        "season_id": 51,
+        "competition_edition_id": 211,
+        "season": "2025-2026",
+        "status": "closed"
+      },
+      "detail": {
+        "gameId": 114234,
+        "date": "2025-10-18T19:00:00Z",
+        "competitionEditionId": 211,
+        "competitionId": 8,
+        "competitionName": "Liga ACB",
+        "seasonId": 51,
+        "seasonName": "2025-2026",
+        "dynamicEventsLastProcessingDate": "2026-07-17T12:38:09Z",
+        "trackingLastProcessingDate": "2026-07-17T12:38:18Z",
+        "physicalLastProcessingDate": "2026-07-17T12:38:08Z",
+        "homeTeam": {
+          "teamId": 1331,
+          "teamName": "Casademont Zaragoza",
+          "players": [
+            {
+              "playerId": 15780,
+              "firstName": "Erik",
+              "lastName": "Stevenson",
+              "jersey": "3"
+            },
+            {
+              "playerId": 23482,
+              "firstName": "Joel",
+              "lastName": "Soriano",
+              "jersey": "12"
+            },
+            {
+              "playerId": 31739,
+              "firstName": "Trae",
+              "lastName": "Bell-Haynes",
+              "jersey": "2"
+            },
+            {
+              "playerId": 35222,
+              "firstName": "Devin",
+              "lastName": "Robinson",
+              "jersey": "00"
+            },
+            {
+              "playerId": 35852,
+              "firstName": "DJ",
+              "lastName": "Stephens",
+              "jersey": "20"
+            },
+            {
+              "playerId": 59204,
+              "firstName": "Bojan",
+              "lastName": "Dubljevic",
+              "jersey": "14"
+            },
+            {
+              "playerId": 59205,
+              "firstName": "Santiago",
+              "lastName": "Yusta",
+              "jersey": "4"
+            },
+            {
+              "playerId": 59206,
+              "firstName": "Miguel",
+              "lastName": "Gonzalez",
+              "jersey": "7"
+            },
+            {
+              "playerId": 59207,
+              "firstName": "Marco",
+              "lastName": "Spissu",
+              "jersey": "0"
+            },
+            {
+              "playerId": 59208,
+              "firstName": "Joaquin Nazar",
+              "lastName": "Rodriguez Olivera",
+              "jersey": "15"
+            },
+            {
+              "playerId": 59527,
+              "firstName": "Jaime",
+              "lastName": "Fernandez Manzanares",
+              "jersey": "10"
+            }
+          ]
+        },
+        "awayTeam": {
+          "teamId": 1322,
+          "teamName": "Leche Rio Breogan",
+          "players": [
+            {
+              "playerId": 24280,
+              "firstName": "Keandre",
+              "lastName": "Cook",
+              "jersey": "1"
+            },
+            {
+              "playerId": 28410,
+              "firstName": "Francisco",
+              "lastName": "Alonso",
+              "jersey": "10"
+            },
+            {
+              "playerId": 58474,
+              "firstName": "DeWayne",
+              "lastName": "Russell",
+              "jersey": "4"
+            },
+            {
+              "playerId": 58771,
+              "firstName": "Mihajlo",
+              "lastName": "Andric",
+              "jersey": "37"
+            },
+            {
+              "playerId": 59103,
+              "firstName": "Dragan",
+              "lastName": "Apic",
+              "jersey": "8"
+            },
+            {
+              "playerId": 59104,
+              "firstName": "Dominik",
+              "lastName": "Mavra",
+              "jersey": "19"
+            },
+            {
+              "playerId": 59105,
+              "firstName": "Arturs",
+              "lastName": "Kurucs",
+              "jersey": "47"
+            },
+            {
+              "playerId": 59106,
+              "firstName": "Jordan",
+              "lastName": "Sakho",
+              "jersey": "18"
+            },
+            {
+              "playerId": 59107,
+              "firstName": "Aleksandar",
+              "lastName": "Aranitovic",
+              "jersey": "17"
+            },
+            {
+              "playerId": 59108,
+              "firstName": "Bakary",
+              "lastName": "Dibba",
+              "jersey": "0"
+            },
+            {
+              "playerId": 59110,
+              "firstName": "Danko",
+              "lastName": "Brankovic",
+              "jersey": "22"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "match": {
+        "id": 114169,
+        "date_time": "2025-12-14T11:30:00Z",
+        "home_team": {
+          "id": 1334,
+          "name": "CB UCAM Murcia"
+        },
+        "away_team": {
+          "id": 1336,
+          "name": "Club Joventut Badalona"
+        },
+        "home_score": 80,
+        "away_score": 77,
+        "competition_id": 8,
+        "competition_name": "Liga ACB",
+        "season_id": 51,
+        "competition_edition_id": 211,
+        "season": "2025-2026",
+        "status": "closed"
+      },
+      "detail": {
+        "gameId": 114169,
+        "date": "2025-12-14T11:30:00Z",
+        "competitionEditionId": 211,
+        "competitionId": 8,
+        "competitionName": "Liga ACB",
+        "seasonId": 51,
+        "seasonName": "2025-2026",
+        "dynamicEventsLastProcessingDate": "2026-07-17T12:32:10Z",
+        "trackingLastProcessingDate": "2026-07-17T12:32:21Z",
+        "physicalLastProcessingDate": "2026-07-17T12:32:10Z",
+        "homeTeam": {
+          "teamId": 1334,
+          "teamName": "CB UCAM Murcia",
+          "players": [
+            {
+              "playerId": 8673,
+              "firstName": "Zach",
+              "lastName": "Hicks",
+              "jersey": "24"
+            },
+            {
+              "playerId": 15362,
+              "firstName": "Michael",
+              "lastName": "Forrest",
+              "jersey": "1"
+            },
+            {
+              "playerId": 15394,
+              "firstName": "David",
+              "lastName": "Dejulius",
+              "jersey": "5"
+            },
+            {
+              "playerId": 24504,
+              "firstName": "Jonah",
+              "lastName": "Radebaugh",
+              "jersey": "12"
+            },
+            {
+              "playerId": 59036,
+              "firstName": "Howard",
+              "lastName": "Sant-Roos",
+              "jersey": "8"
+            },
+            {
+              "playerId": 59089,
+              "firstName": "Moussa",
+              "lastName": "Diagne",
+              "jersey": "21"
+            },
+            {
+              "playerId": 59090,
+              "firstName": "Emanuel Ion",
+              "lastName": "Cate",
+              "jersey": "15"
+            },
+            {
+              "playerId": 59091,
+              "firstName": "Sander",
+              "lastName": "Raieste",
+              "jersey": "2"
+            },
+            {
+              "playerId": 59092,
+              "firstName": "Toni",
+              "lastName": "Nakic",
+              "jersey": "99"
+            },
+            {
+              "playerId": 59093,
+              "firstName": "Wilhelm",
+              "lastName": "Falk",
+              "jersey": "13"
+            },
+            {
+              "playerId": 59094,
+              "firstName": "De La Torre",
+              "lastName": "Ruben Lopez",
+              "jersey": "16"
+            },
+            {
+              "playerId": 59095,
+              "firstName": "Dylan",
+              "lastName": "Ennis",
+              "jersey": "31"
+            }
+          ]
+        },
+        "awayTeam": {
+          "teamId": 1336,
+          "teamName": "Club Joventut Badalona",
+          "players": [
+            {
+              "playerId": 30735,
+              "firstName": "Cameron",
+              "lastName": "Hunt",
+              "jersey": "24"
+            },
+            {
+              "playerId": 34905,
+              "firstName": "Henri",
+              "lastName": "Drell",
+              "jersey": "0"
+            },
+            {
+              "playerId": 34943,
+              "firstName": "Ricky",
+              "lastName": "Rubio",
+              "jersey": "9"
+            },
+            {
+              "playerId": 59096,
+              "firstName": "Ante",
+              "lastName": "Tomic",
+              "jersey": "44"
+            },
+            {
+              "playerId": 59097,
+              "firstName": "Adam",
+              "lastName": "Hanga",
+              "jersey": "88"
+            },
+            {
+              "playerId": 59098,
+              "firstName": "Guillem",
+              "lastName": "Vives",
+              "jersey": "16"
+            },
+            {
+              "playerId": 59099,
+              "firstName": "Ludvig",
+              "lastName": "Hakanson",
+              "jersey": "12"
+            },
+            {
+              "playerId": 59100,
+              "firstName": "Yannick",
+              "lastName": "Kraag",
+              "jersey": "1"
+            },
+            {
+              "playerId": 59101,
+              "firstName": "Miguel",
+              "lastName": "Allen Montesdeoca",
+              "jersey": "21"
+            },
+            {
+              "playerId": 59102,
+              "firstName": "Michael",
+              "lastName": "Ruzic",
+              "jersey": "23"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "match": {
+        "id": 114099,
+        "date_time": "2026-01-31T20:00:00Z",
+        "home_team": {
+          "id": 1315,
+          "name": "Basquet Girona"
+        },
+        "away_team": {
+          "id": 1316,
+          "name": "San Pablo Burgos"
+        },
+        "home_score": 77,
+        "away_score": 71,
+        "competition_id": 8,
+        "competition_name": "Liga ACB",
+        "season_id": 51,
+        "competition_edition_id": 211,
+        "season": "2025-2026",
+        "status": "closed"
+      },
+      "detail": {
+        "gameId": 114099,
+        "date": "2026-01-31T20:00:00Z",
+        "competitionEditionId": 211,
+        "competitionId": 8,
+        "competitionName": "Liga ACB",
+        "seasonId": 51,
+        "seasonName": "2025-2026",
+        "dynamicEventsLastProcessingDate": "2026-07-17T12:23:56Z",
+        "trackingLastProcessingDate": "2026-07-17T12:24:04Z",
+        "physicalLastProcessingDate": "2026-07-17T12:23:55Z",
+        "homeTeam": {
+          "teamId": 1315,
+          "teamName": "Basquet Girona",
+          "players": [
+            {
+              "playerId": 19069,
+              "firstName": "Nikola",
+              "lastName": "Maric",
+              "jersey": "25"
+            },
+            {
+              "playerId": 28336,
+              "firstName": "Otis",
+              "lastName": "Livingston II",
+              "jersey": "11"
+            },
+            {
+              "playerId": 28390,
+              "firstName": "Mark",
+              "lastName": "Hughes",
+              "jersey": "8"
+            },
+            {
+              "playerId": 31700,
+              "firstName": "Martinas",
+              "lastName": "Geben",
+              "jersey": "12"
+            },
+            {
+              "playerId": 58436,
+              "firstName": "Derek Ryan",
+              "lastName": "Needham",
+              "jersey": "5"
+            },
+            {
+              "playerId": 59187,
+              "firstName": "Jose",
+              "lastName": "Ignacio Vildoza",
+              "jersey": "10"
+            },
+            {
+              "playerId": 59188,
+              "firstName": "Sergi",
+              "lastName": "Martinez Costa",
+              "jersey": "23"
+            },
+            {
+              "playerId": 59189,
+              "firstName": "Josep",
+              "lastName": "Busquets",
+              "jersey": "4"
+            },
+            {
+              "playerId": 59190,
+              "firstName": "Mindaugas",
+              "lastName": "Susinskas",
+              "jersey": "29"
+            },
+            {
+              "playerId": 59191,
+              "firstName": "Guillem",
+              "lastName": "Ferrando Porro",
+              "jersey": "9"
+            },
+            {
+              "playerId": 59192,
+              "firstName": "Juan",
+              "lastName": "Fernandez",
+              "jersey": "21"
+            }
+          ]
+        },
+        "awayTeam": {
+          "teamId": 1316,
+          "teamName": "San Pablo Burgos",
+          "players": [
+            {
+              "playerId": 18363,
+              "firstName": "Jermaine",
+              "lastName": "Samuels",
+              "jersey": "00"
+            },
+            {
+              "playerId": 22895,
+              "firstName": "Jhivvan Jameel",
+              "lastName": "Jackson Melendez",
+              "jersey": "56"
+            },
+            {
+              "playerId": 24684,
+              "firstName": "Jon Axel",
+              "lastName": "Gudmundsson",
+              "jersey": "6"
+            },
+            {
+              "playerId": 28032,
+              "firstName": "Ethan",
+              "lastName": "Happ",
+              "jersey": "27"
+            },
+            {
+              "playerId": 34945,
+              "firstName": "Raul",
+              "lastName": "Neto",
+              "jersey": "19"
+            },
+            {
+              "playerId": 59075,
+              "firstName": "Augusto",
+              "lastName": "Lima",
+              "jersey": "32"
+            },
+            {
+              "playerId": 59131,
+              "firstName": "Pablo",
+              "lastName": "Almazan Sierra",
+              "jersey": "8"
+            },
+            {
+              "playerId": 59132,
+              "firstName": "Luke",
+              "lastName": "Fischer",
+              "jersey": "40"
+            },
+            {
+              "playerId": 59133,
+              "firstName": "Leonardo Simoes",
+              "lastName": "Meindl",
+              "jersey": "23"
+            },
+            {
+              "playerId": 59134,
+              "firstName": "Gonzalo",
+              "lastName": "Corbalan",
+              "jersey": "10"
+            },
+            {
+              "playerId": 59201,
+              "firstName": "Juan",
+              "lastName": "Rubio",
+              "jersey": "7"
+            },
+            {
+              "playerId": 59202,
+              "firstName": "Yannick",
+              "lastName": "Nzosa",
+              "jersey": "3"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "match": {
+        "id": 114086,
+        "date_time": "2026-02-08T17:00:00Z",
+        "home_team": {
+          "id": 1328,
+          "name": "Dreamland Gran Canaria"
+        },
+        "away_team": {
+          "id": 1326,
+          "name": "Bitci Baskonia"
+        },
+        "home_score": 75,
+        "away_score": 97,
+        "competition_id": 8,
+        "competition_name": "Liga ACB",
+        "season_id": 51,
+        "competition_edition_id": 211,
+        "season": "2025-2026",
+        "status": "closed"
+      },
+      "detail": {
+        "gameId": 114086,
+        "date": "2026-02-08T17:00:00Z",
+        "competitionEditionId": 211,
+        "competitionId": 8,
+        "competitionName": "Liga ACB",
+        "seasonId": 51,
+        "seasonName": "2025-2026",
+        "dynamicEventsLastProcessingDate": "2026-07-17T12:23:44Z",
+        "trackingLastProcessingDate": "2026-07-17T12:23:16Z",
+        "physicalLastProcessingDate": "2026-07-17T12:23:06Z",
+        "homeTeam": {
+          "teamId": 1328,
+          "teamName": "Dreamland Gran Canaria",
+          "players": [
+            {
+              "playerId": 15347,
+              "firstName": "Isaiah",
+              "lastName": "Wong",
+              "jersey": "2"
+            },
+            {
+              "playerId": 19426,
+              "firstName": "Kur",
+              "lastName": "Kuath",
+              "jersey": "23"
+            },
+            {
+              "playerId": 25182,
+              "firstName": "Eric",
+              "lastName": "Vila",
+              "jersey": "4"
+            },
+            {
+              "playerId": 32336,
+              "firstName": "Kassius",
+              "lastName": "Robertson",
+              "jersey": "30"
+            },
+            {
+              "playerId": 35402,
+              "firstName": "Nico",
+              "lastName": "Brussino",
+              "jersey": "9"
+            },
+            {
+              "playerId": 59153,
+              "firstName": "Louis",
+              "lastName": "Labeyrie",
+              "jersey": "21"
+            },
+            {
+              "playerId": 59154,
+              "firstName": "Andrew",
+              "lastName": "Albicy",
+              "jersey": "6"
+            },
+            {
+              "playerId": 59155,
+              "firstName": "Miquel",
+              "lastName": "Salvo",
+              "jersey": "10"
+            },
+            {
+              "playerId": 59156,
+              "firstName": "Pierre",
+              "lastName": "Pelos",
+              "jersey": "13"
+            },
+            {
+              "playerId": 59157,
+              "firstName": "Mike",
+              "lastName": "Tobey",
+              "jersey": "18"
+            },
+            {
+              "playerId": 59158,
+              "firstName": "Ziga",
+              "lastName": "Samar",
+              "jersey": "5"
+            },
+            {
+              "playerId": 59295,
+              "firstName": "Carlos",
+              "lastName": "Alocen",
+              "jersey": "12"
+            }
+          ]
+        },
+        "awayTeam": {
+          "teamId": 1326,
+          "teamName": "Bitci Baskonia",
+          "players": [
+            {
+              "playerId": 22724,
+              "firstName": "Eugene",
+              "lastName": "Omoruyi",
+              "jersey": "5"
+            },
+            {
+              "playerId": 24268,
+              "firstName": "Trent",
+              "lastName": "Forrest",
+              "jersey": "11"
+            },
+            {
+              "playerId": 24597,
+              "firstName": "Mamadi",
+              "lastName": "Diakite",
+              "jersey": "1"
+            },
+            {
+              "playerId": 24949,
+              "firstName": "Markus",
+              "lastName": "Howard",
+              "jersey": "0"
+            },
+            {
+              "playerId": 34992,
+              "firstName": "Timothe",
+              "lastName": "Luwawu-Cabarrot",
+              "jersey": "9"
+            },
+            {
+              "playerId": 35096,
+              "firstName": "Rodions",
+              "lastName": "Kurucs",
+              "jersey": "7"
+            },
+            {
+              "playerId": 59135,
+              "firstName": "Matteo",
+              "lastName": "Spagnolo",
+              "jersey": "10"
+            },
+            {
+              "playerId": 59136,
+              "firstName": "Gytis",
+              "lastName": "Radzevicius",
+              "jersey": "17"
+            },
+            {
+              "playerId": 59137,
+              "firstName": "Clement",
+              "lastName": "Frisch",
+              "jersey": "25"
+            },
+            {
+              "playerId": 59138,
+              "firstName": "Khalifa",
+              "lastName": "Diop",
+              "jersey": "18"
+            },
+            {
+              "playerId": 59139,
+              "firstName": "Rafael",
+              "lastName": "Villar Cornago",
+              "jersey": "4"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "match": {
+        "id": 178442,
+        "date_time": "2026-03-21T18:00:00Z",
+        "home_team": {
+          "id": 1332,
+          "name": "BC MoraBanc Andorra"
+        },
+        "away_team": {
+          "id": 1335,
+          "name": "Bilbao Basket"
+        },
+        "home_score": 98,
+        "away_score": 102,
+        "competition_id": 8,
+        "competition_name": "Liga ACB",
+        "season_id": 51,
+        "competition_edition_id": 211,
+        "season": "2025-2026",
+        "status": "closed"
+      },
+      "detail": {
+        "gameId": 178442,
+        "date": "2026-03-21T18:00:00Z",
+        "competitionEditionId": 211,
+        "competitionId": 8,
+        "competitionName": "Liga ACB",
+        "seasonId": 51,
+        "seasonName": "2025-2026",
+        "dynamicEventsLastProcessingDate": "2026-07-19T14:18:56Z",
+        "trackingLastProcessingDate": "2026-07-19T14:19:09Z",
+        "physicalLastProcessingDate": "2026-07-19T14:18:56Z",
+        "homeTeam": {
+          "teamId": 1332,
+          "teamName": "BC MoraBanc Andorra",
+          "players": [
+            {
+              "playerId": 11845,
+              "firstName": "Justin",
+              "lastName": "McKoy",
+              "jersey": "22"
+            },
+            {
+              "playerId": 15369,
+              "firstName": "Sir'Jabari",
+              "lastName": "Rice",
+              "jersey": "10"
+            },
+            {
+              "playerId": 22847,
+              "firstName": "Yves",
+              "lastName": "Pons",
+              "jersey": "35"
+            },
+            {
+              "playerId": 28591,
+              "firstName": "Ruben",
+              "lastName": "Guerrero",
+              "jersey": "32"
+            },
+            {
+              "playerId": 31457,
+              "firstName": "Shannon",
+              "lastName": "Evans",
+              "jersey": "0"
+            },
+            {
+              "playerId": 35581,
+              "firstName": "Aaron",
+              "lastName": "Best",
+              "jersey": "3"
+            },
+            {
+              "playerId": 59167,
+              "firstName": "Jose Francisco",
+              "lastName": "Ortega Soriano",
+              "jersey": "13"
+            },
+            {
+              "playerId": 59170,
+              "firstName": "Artem",
+              "lastName": "Pustovyi",
+              "jersey": "99"
+            },
+            {
+              "playerId": 59211,
+              "firstName": "Konstantin Iroslavov",
+              "lastName": "Kostadinov",
+              "jersey": "15"
+            },
+            {
+              "playerId": 59234,
+              "firstName": "Aaron",
+              "lastName": "Ganal",
+              "jersey": "8"
+            },
+            {
+              "playerId": 59374,
+              "firstName": "Kyle",
+              "lastName": "Kuric",
+              "jersey": "24"
+            },
+            {
+              "playerId": 59475,
+              "firstName": "Stan",
+              "lastName": "Okoye",
+              "jersey": "11"
+            }
+          ]
+        },
+        "awayTeam": {
+          "teamId": 1335,
+          "teamName": "Bilbao Basket",
+          "players": [
+            {
+              "playerId": 23056,
+              "firstName": "Justin",
+              "lastName": "Jaworski",
+              "jersey": "7"
+            },
+            {
+              "playerId": 28155,
+              "firstName": "Martin",
+              "lastName": "Krampelj",
+              "jersey": "10"
+            },
+            {
+              "playerId": 35376,
+              "firstName": "Darrun",
+              "lastName": "Hilliard",
+              "jersey": "11"
+            },
+            {
+              "playerId": 35821,
+              "firstName": "Luke",
+              "lastName": "Petrasek",
+              "jersey": "18"
+            },
+            {
+              "playerId": 59146,
+              "firstName": "Margiris",
+              "lastName": "Normantas",
+              "jersey": "2"
+            },
+            {
+              "playerId": 59147,
+              "firstName": "Tryggvi",
+              "lastName": "Hlinason",
+              "jersey": "32"
+            },
+            {
+              "playerId": 59148,
+              "firstName": "Stefan",
+              "lastName": "Lazarevic",
+              "jersey": "73"
+            },
+            {
+              "playerId": 59149,
+              "firstName": "Aleix",
+              "lastName": "Font",
+              "jersey": "22"
+            },
+            {
+              "playerId": 59150,
+              "firstName": "Amar",
+              "lastName": "Sylla",
+              "jersey": "20"
+            },
+            {
+              "playerId": 59151,
+              "firstName": "Melwin",
+              "lastName": "Jan Pantzar",
+              "jersey": "19"
+            },
+            {
+              "playerId": 59152,
+              "firstName": "Bassala",
+              "lastName": "Bagayoko",
+              "jersey": "13"
+            },
+            {
+              "playerId": 92799,
+              "firstName": "Aimar",
+              "lastName": "Mintegui",
+              "jersey": "6"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "match": {
+        "id": 179612,
+        "date_time": "2026-04-12T10:30:00Z",
+        "home_team": {
+          "id": 1339,
+          "name": "Malaga"
+        },
+        "away_team": {
+          "id": 1325,
+          "name": "Valencia BC"
+        },
+        "home_score": 89,
+        "away_score": 96,
+        "competition_id": 8,
+        "competition_name": "Liga ACB",
+        "season_id": 51,
+        "competition_edition_id": 211,
+        "season": "2025-2026",
+        "status": "closed"
+      },
+      "detail": {
+        "gameId": 179612,
+        "date": "2026-04-12T10:30:00Z",
+        "competitionEditionId": 211,
+        "competitionId": 8,
+        "competitionName": "Liga ACB",
+        "seasonId": 51,
+        "seasonName": "2025-2026",
+        "dynamicEventsLastProcessingDate": "2026-08-28T16:31:59Z",
+        "trackingLastProcessingDate": "2026-08-28T16:33:00Z",
+        "physicalLastProcessingDate": "2026-08-28T16:34:23Z",
+        "homeTeam": {
+          "teamId": 1339,
+          "teamName": "Malaga",
+          "players": [
+            {
+              "playerId": 15452,
+              "firstName": "Chase",
+              "lastName": "Audige",
+              "jersey": "1"
+            },
+            {
+              "playerId": 22729,
+              "firstName": "Chris",
+              "lastName": "Duarte",
+              "jersey": "27"
+            },
+            {
+              "playerId": 24056,
+              "firstName": "Killian",
+              "lastName": "Tillie",
+              "jersey": "33"
+            },
+            {
+              "playerId": 35326,
+              "firstName": "James",
+              "lastName": "Webb",
+              "jersey": "3"
+            },
+            {
+              "playerId": 58359,
+              "firstName": "Justin",
+              "lastName": "Cobbs",
+              "jersey": "11"
+            },
+            {
+              "playerId": 59123,
+              "firstName": "Alberto",
+              "lastName": "Diaz",
+              "jersey": "9"
+            },
+            {
+              "playerId": 59124,
+              "firstName": "Augustine",
+              "lastName": "Rubit",
+              "jersey": "21"
+            },
+            {
+              "playerId": 59125,
+              "firstName": "Jonathan",
+              "lastName": "Barreiro",
+              "jersey": "7"
+            },
+            {
+              "playerId": 59126,
+              "firstName": "Emir",
+              "lastName": "Sulejmanovic",
+              "jersey": "19"
+            },
+            {
+              "playerId": 59127,
+              "firstName": "Aleksander",
+              "lastName": "Balcerowski",
+              "jersey": "2"
+            },
+            {
+              "playerId": 59213,
+              "firstName": "Kendrick",
+              "lastName": "Perry",
+              "jersey": "55"
+            },
+            {
+              "playerId": 59237,
+              "firstName": "Nihad",
+              "lastName": "Dedovic",
+              "jersey": "14"
+            }
+          ]
+        },
+        "awayTeam": {
+          "teamId": 1325,
+          "teamName": "Valencia BC",
+          "players": [
+            {
+              "playerId": 446,
+              "firstName": "Kameron",
+              "lastName": "Taylor",
+              "jersey": "1"
+            },
+            {
+              "playerId": 15487,
+              "firstName": "Omari",
+              "lastName": "Moore",
+              "jersey": "10"
+            },
+            {
+              "playerId": 22740,
+              "firstName": "Nathan",
+              "lastName": "Reuvers",
+              "jersey": "3"
+            },
+            {
+              "playerId": 24598,
+              "firstName": "Braxton",
+              "lastName": "Key",
+              "jersey": "7"
+            },
+            {
+              "playerId": 31587,
+              "firstName": "Darius",
+              "lastName": "Thompson",
+              "jersey": "13"
+            },
+            {
+              "playerId": 31918,
+              "firstName": "Yankuba",
+              "lastName": "Sima",
+              "jersey": "77"
+            },
+            {
+              "playerId": 35475,
+              "firstName": "Isaac",
+              "lastName": "Nogues",
+              "jersey": "32"
+            },
+            {
+              "playerId": 59140,
+              "firstName": "Josep",
+              "lastName": "Puerto",
+              "jersey": "2"
+            },
+            {
+              "playerId": 59141,
+              "firstName": "Jaime",
+              "lastName": "Pradilla",
+              "jersey": "4"
+            },
+            {
+              "playerId": 59142,
+              "firstName": "Brancou",
+              "lastName": "Badio",
+              "jersey": "0"
+            },
+            {
+              "playerId": 59143,
+              "firstName": "Neal",
+              "lastName": "Sako",
+              "jersey": "12"
+            },
+            {
+              "playerId": 59144,
+              "firstName": "Jean Claudio",
+              "lastName": "Montero",
+              "jersey": "8"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "match": {
+        "id": 184439,
+        "date_time": "2026-04-19T17:00:00Z",
+        "home_team": {
+          "id": 1338,
+          "name": "Real Madrid"
+        },
+        "away_team": {
+          "id": 1333,
+          "name": "Lenovo Tenerife"
+        },
+        "home_score": 90,
+        "away_score": 95,
+        "competition_id": 8,
+        "competition_name": "Liga ACB",
+        "season_id": 51,
+        "competition_edition_id": 211,
+        "season": "2025-2026",
+        "status": "closed"
+      },
+      "detail": {
+        "gameId": 184439,
+        "date": "2026-04-19T17:00:00Z",
+        "competitionEditionId": 211,
+        "competitionId": 8,
+        "competitionName": "Liga ACB",
+        "seasonId": 51,
+        "seasonName": "2025-2026",
+        "dynamicEventsLastProcessingDate": "2026-07-18T19:02:20Z",
+        "trackingLastProcessingDate": "2026-07-18T19:02:42Z",
+        "physicalLastProcessingDate": "2026-07-18T19:03:25Z",
+        "homeTeam": {
+          "teamId": 1338,
+          "teamName": "Real Madrid",
+          "players": [
+            {
+              "playerId": 25431,
+              "firstName": "Andres",
+              "lastName": "Feliz Sarita",
+              "jersey": "24"
+            },
+            {
+              "playerId": 28010,
+              "firstName": "Chuma",
+              "lastName": "Okeke",
+              "jersey": "8"
+            },
+            {
+              "playerId": 34832,
+              "firstName": "Alex",
+              "lastName": "Len",
+              "jersey": "25"
+            },
+            {
+              "playerId": 34838,
+              "firstName": "Trey",
+              "lastName": "Lyles",
+              "jersey": "0"
+            },
+            {
+              "playerId": 34896,
+              "firstName": "Usman",
+              "lastName": "Garuba Alari",
+              "jersey": "16"
+            },
+            {
+              "playerId": 34919,
+              "firstName": "Theo",
+              "lastName": "Maledon",
+              "jersey": "12"
+            },
+            {
+              "playerId": 34982,
+              "firstName": "Facundo",
+              "lastName": "Campazzo",
+              "jersey": "7"
+            },
+            {
+              "playerId": 35726,
+              "firstName": "David",
+              "lastName": "Kramer",
+              "jersey": "1"
+            },
+            {
+              "playerId": 36019,
+              "firstName": "Walter",
+              "lastName": "Tavares",
+              "jersey": "22"
+            },
+            {
+              "playerId": 59174,
+              "firstName": "Sergio",
+              "lastName": "Llull",
+              "jersey": "23"
+            },
+            {
+              "playerId": 59175,
+              "firstName": "Gabriele",
+              "lastName": "Procida",
+              "jersey": "9"
+            },
+            {
+              "playerId": 59215,
+              "firstName": "Alberto",
+              "lastName": "Abalde",
+              "jersey": "6"
+            }
+          ]
+        },
+        "awayTeam": {
+          "teamId": 1333,
+          "teamName": "Lenovo Tenerife",
+          "players": [
+            {
+              "playerId": 34854,
+              "firstName": "Patty",
+              "lastName": "Mills",
+              "jersey": "88"
+            },
+            {
+              "playerId": 59112,
+              "firstName": "Joan",
+              "lastName": "Sastre",
+              "jersey": "15"
+            },
+            {
+              "playerId": 59113,
+              "firstName": "Aaron",
+              "lastName": "Doornekamp",
+              "jersey": "42"
+            },
+            {
+              "playerId": 59114,
+              "firstName": "Tim",
+              "lastName": "Abromaitis",
+              "jersey": "21"
+            },
+            {
+              "playerId": 59115,
+              "firstName": "Thomas",
+              "lastName": "Scrubb",
+              "jersey": "11"
+            },
+            {
+              "playerId": 59116,
+              "firstName": "Jaime",
+              "lastName": "Fernandez Bernabe",
+              "jersey": "3"
+            },
+            {
+              "playerId": 59117,
+              "firstName": "Rokas",
+              "lastName": "Giedraitis",
+              "jersey": "31"
+            },
+            {
+              "playerId": 59118,
+              "firstName": "Giorgi",
+              "lastName": "Shermadini",
+              "jersey": "19"
+            },
+            {
+              "playerId": 59119,
+              "firstName": "Francisco",
+              "lastName": "Guerra",
+              "jersey": "35"
+            },
+            {
+              "playerId": 59120,
+              "firstName": "Bruno",
+              "lastName": "Fitipaldo",
+              "jersey": "6"
+            },
+            {
+              "playerId": 59121,
+              "firstName": "Hector",
+              "lastName": "Alderete Diaz",
+              "jersey": "33"
+            },
+            {
+              "playerId": 59122,
+              "firstName": "Marcelinho",
+              "lastName": "Huertas",
+              "jersey": "9"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "match": {
+        "id": 188630,
+        "date_time": "2026-05-03T17:00:00Z",
+        "home_team": {
+          "id": 1340,
+          "name": "BC Barcelona"
+        },
+        "away_team": {
+          "id": 1328,
+          "name": "Dreamland Gran Canaria"
+        },
+        "home_score": 91,
+        "away_score": 69,
+        "competition_id": 8,
+        "competition_name": "Liga ACB",
+        "season_id": 51,
+        "competition_edition_id": 211,
+        "season": "2025-2026",
+        "status": "closed"
+      },
+      "detail": {
+        "gameId": 188630,
+        "date": "2026-05-03T17:00:00Z",
+        "competitionEditionId": 211,
+        "competitionId": 8,
+        "competitionName": "Liga ACB",
+        "seasonId": 51,
+        "seasonName": "2025-2026",
+        "dynamicEventsLastProcessingDate": "2026-07-18T20:23:41Z",
+        "trackingLastProcessingDate": "2026-07-18T20:24:28Z",
+        "physicalLastProcessingDate": "2026-07-18T20:23:14Z",
+        "homeTeam": {
+          "teamId": 1340,
+          "teamName": "BC Barcelona",
+          "players": [
+            {
+              "playerId": 15680,
+              "firstName": "Miles",
+              "lastName": "Norris",
+              "jersey": "5"
+            },
+            {
+              "playerId": 18522,
+              "firstName": "Myles",
+              "lastName": "Cale",
+              "jersey": "3"
+            },
+            {
+              "playerId": 34962,
+              "firstName": "Willy",
+              "lastName": "Hernangomez",
+              "jersey": "14"
+            },
+            {
+              "playerId": 59160,
+              "firstName": "Tornike",
+              "lastName": "Shengelia",
+              "jersey": "23"
+            },
+            {
+              "playerId": 59161,
+              "firstName": "Juan Ignacio",
+              "lastName": "Marcos",
+              "jersey": "2"
+            },
+            {
+              "playerId": 59162,
+              "firstName": "Dario",
+              "lastName": "Brizuela",
+              "jersey": "8"
+            },
+            {
+              "playerId": 59163,
+              "firstName": "Kevin",
+              "lastName": "Punter",
+              "jersey": "0"
+            },
+            {
+              "playerId": 59164,
+              "firstName": "Joel",
+              "lastName": "Parra Lopez",
+              "jersey": "44"
+            },
+            {
+              "playerId": 59165,
+              "firstName": "Youssoupha",
+              "lastName": "Fall",
+              "jersey": "19"
+            },
+            {
+              "playerId": 59229,
+              "firstName": "Sayon",
+              "lastName": "Keita",
+              "jersey": "41"
+            },
+            {
+              "playerId": 59246,
+              "firstName": "Daniel",
+              "lastName": "Gonzalez",
+              "jersey": "47"
+            },
+            {
+              "playerId": 59290,
+              "firstName": "Juan Nunez",
+              "lastName": "Garcia",
+              "jersey": "17"
+            }
+          ]
+        },
+        "awayTeam": {
+          "teamId": 1328,
+          "teamName": "Dreamland Gran Canaria",
+          "players": [
+            {
+              "playerId": 15347,
+              "firstName": "Isaiah",
+              "lastName": "Wong",
+              "jersey": "2"
+            },
+            {
+              "playerId": 25182,
+              "firstName": "Eric",
+              "lastName": "Vila",
+              "jersey": "4"
+            },
+            {
+              "playerId": 31539,
+              "firstName": "Chimezie",
+              "lastName": "Metu",
+              "jersey": "25"
+            },
+            {
+              "playerId": 32336,
+              "firstName": "Kassius",
+              "lastName": "Robertson",
+              "jersey": "30"
+            },
+            {
+              "playerId": 35402,
+              "firstName": "Nico",
+              "lastName": "Brussino",
+              "jersey": "9"
+            },
+            {
+              "playerId": 59156,
+              "firstName": "Pierre",
+              "lastName": "Pelos",
+              "jersey": "13"
+            },
+            {
+              "playerId": 59157,
+              "firstName": "Mike",
+              "lastName": "Tobey",
+              "jersey": "18"
+            },
+            {
+              "playerId": 59158,
+              "firstName": "Ziga",
+              "lastName": "Samar",
+              "jersey": "5"
+            },
+            {
+              "playerId": 59159,
+              "firstName": "Loucas",
+              "lastName": "Nzambi Maniema",
+              "jersey": "1"
+            },
+            {
+              "playerId": 59295,
+              "firstName": "Carlos",
+              "lastName": "Alocen",
+              "jersey": "12"
+            },
+            {
+              "playerId": 61550,
+              "firstName": "Brandon",
+              "lastName": "Jefferson",
+              "jersey": "21"
+            },
+            {
+              "playerId": 94471,
+              "firstName": "Mervedi Kasekelayi",
+              "lastName": "Miteo",
+              "jersey": "27"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "match": {
+        "id": 191313,
+        "date_time": "2026-05-29T18:30:00Z",
+        "home_team": {
+          "id": 1322,
+          "name": "Leche Rio Breogan"
+        },
+        "away_team": {
+          "id": 1331,
+          "name": "Casademont Zaragoza"
+        },
+        "home_score": 94,
+        "away_score": 95,
+        "competition_id": 8,
+        "competition_name": "Liga ACB",
+        "season_id": 51,
+        "competition_edition_id": 211,
+        "season": "2025-2026",
+        "status": "closed"
+      },
+      "detail": {
+        "gameId": 191313,
+        "date": "2026-05-29T18:30:00Z",
+        "competitionEditionId": 211,
+        "competitionId": 8,
+        "competitionName": "Liga ACB",
+        "seasonId": 51,
+        "seasonName": "2025-2026",
+        "dynamicEventsLastProcessingDate": "2026-07-18T20:49:57Z",
+        "trackingLastProcessingDate": "2026-07-18T20:50:07Z",
+        "physicalLastProcessingDate": "2026-07-18T20:49:56Z",
+        "homeTeam": {
+          "teamId": 1322,
+          "teamName": "Leche Rio Breogan",
+          "players": [
+            {
+              "playerId": 28410,
+              "firstName": "Francisco",
+              "lastName": "Alonso",
+              "jersey": "10"
+            },
+            {
+              "playerId": 58474,
+              "firstName": "DeWayne",
+              "lastName": "Russell",
+              "jersey": "4"
+            },
+            {
+              "playerId": 58771,
+              "firstName": "Mihajlo",
+              "lastName": "Andric",
+              "jersey": "37"
+            },
+            {
+              "playerId": 59103,
+              "firstName": "Dragan",
+              "lastName": "Apic",
+              "jersey": "8"
+            },
+            {
+              "playerId": 59104,
+              "firstName": "Dominik",
+              "lastName": "Mavra",
+              "jersey": "19"
+            },
+            {
+              "playerId": 59105,
+              "firstName": "Arturs",
+              "lastName": "Kurucs",
+              "jersey": "47"
+            },
+            {
+              "playerId": 59107,
+              "firstName": "Aleksandar",
+              "lastName": "Aranitovic",
+              "jersey": "17"
+            },
+            {
+              "playerId": 59108,
+              "firstName": "Bakary",
+              "lastName": "Dibba",
+              "jersey": "0"
+            },
+            {
+              "playerId": 59109,
+              "firstName": "Erik",
+              "lastName": "Quintela",
+              "jersey": "23"
+            },
+            {
+              "playerId": 59110,
+              "firstName": "Danko",
+              "lastName": "Brankovic",
+              "jersey": "22"
+            },
+            {
+              "playerId": 59386,
+              "firstName": "Ivan",
+              "lastName": "Cruz Uceda",
+              "jersey": "33"
+            },
+            {
+              "playerId": 63998,
+              "firstName": "Jordan",
+              "lastName": "Walker",
+              "jersey": "2"
+            }
+          ]
+        },
+        "awayTeam": {
+          "teamId": 1331,
+          "teamName": "Casademont Zaragoza",
+          "players": [
+            {
+              "playerId": 28857,
+              "firstName": "Justin",
+              "lastName": "Wright-Foreman",
+              "jersey": "3"
+            },
+            {
+              "playerId": 31739,
+              "firstName": "Trae",
+              "lastName": "Bell-Haynes",
+              "jersey": "2"
+            },
+            {
+              "playerId": 35222,
+              "firstName": "Devin",
+              "lastName": "Robinson",
+              "jersey": "00"
+            },
+            {
+              "playerId": 35852,
+              "firstName": "DJ",
+              "lastName": "Stephens",
+              "jersey": "20"
+            },
+            {
+              "playerId": 58361,
+              "firstName": "Gabriel",
+              "lastName": "Olaseni",
+              "jersey": "11"
+            },
+            {
+              "playerId": 59204,
+              "firstName": "Bojan",
+              "lastName": "Dubljevic",
+              "jersey": "14"
+            },
+            {
+              "playerId": 59205,
+              "firstName": "Santiago",
+              "lastName": "Yusta",
+              "jersey": "4"
+            },
+            {
+              "playerId": 59206,
+              "firstName": "Miguel",
+              "lastName": "Gonzalez",
+              "jersey": "7"
+            },
+            {
+              "playerId": 59207,
+              "firstName": "Marco",
+              "lastName": "Spissu",
+              "jersey": "0"
+            },
+            {
+              "playerId": 59208,
+              "firstName": "Joaquin Nazar",
+              "lastName": "Rodriguez Olivera",
+              "jersey": "15"
+            },
+            {
+              "playerId": 59209,
+              "firstName": "Youssouf",
+              "lastName": "Traore",
+              "jersey": "23"
+            },
+            {
+              "playerId": 59527,
+              "firstName": "Jaime",
+              "lastName": "Fernandez Manzanares",
+              "jersey": "10"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "teams": [
+    {
+      "provider_team_id": "1315",
+      "display_name": "Basquet Girona"
+    },
+    {
+      "provider_team_id": "1316",
+      "display_name": "San Pablo Burgos"
+    },
+    {
+      "provider_team_id": "1319",
+      "display_name": "Coviran Granada"
+    },
+    {
+      "provider_team_id": "1322",
+      "display_name": "Leche Rio Breogan"
+    },
+    {
+      "provider_team_id": "1325",
+      "display_name": "Valencia BC"
+    },
+    {
+      "provider_team_id": "1326",
+      "display_name": "Bitci Baskonia"
+    },
+    {
+      "provider_team_id": "1328",
+      "display_name": "Dreamland Gran Canaria"
+    },
+    {
+      "provider_team_id": "1330",
+      "display_name": "BAXI Manresa"
+    },
+    {
+      "provider_team_id": "1331",
+      "display_name": "Casademont Zaragoza"
+    },
+    {
+      "provider_team_id": "1332",
+      "display_name": "BC MoraBanc Andorra"
+    },
+    {
+      "provider_team_id": "1333",
+      "display_name": "Lenovo Tenerife"
+    },
+    {
+      "provider_team_id": "1334",
+      "display_name": "CB UCAM Murcia"
+    },
+    {
+      "provider_team_id": "1335",
+      "display_name": "Bilbao Basket"
+    },
+    {
+      "provider_team_id": "1336",
+      "display_name": "Club Joventut Badalona"
+    },
+    {
+      "provider_team_id": "1338",
+      "display_name": "Real Madrid"
+    },
+    {
+      "provider_team_id": "1339",
+      "display_name": "Malaga"
+    },
+    {
+      "provider_team_id": "1340",
+      "display_name": "BC Barcelona"
+    }
+  ],
+  "player_aliases": [
+    {
+      "player_id": "59129",
+      "player_name": "Nihad Djedovic",
+      "canonical_player_id": "59129",
+      "canonical_player_name": "Nihad Djedovic",
+      "acb_player_id": "20202039"
+    },
+    {
+      "player_id": "59237",
+      "player_name": "Nihad Dedovic",
+      "canonical_player_id": "59129",
+      "canonical_player_name": "Nihad Djedovic",
+      "acb_player_id": "20202039"
+    },
+    {
+      "player_id": "92815",
+      "player_name": "Alejandro REYES",
+      "canonical_player_id": "59180",
+      "canonical_player_name": "Alex Reyes",
+      "acb_player_id": "20204133"
+    },
+    {
+      "player_id": "59180",
+      "player_name": "Alex Reyes",
+      "canonical_player_id": "59180",
+      "canonical_player_name": "Alex Reyes",
+      "acb_player_id": "20204133"
+    },
+    {
+      "player_id": "32852",
+      "player_name": "Ruben Lopez",
+      "canonical_player_id": "32852",
+      "canonical_player_name": "Ruben Lopez",
+      "acb_player_id": "30000132"
+    },
+    {
+      "player_id": "59094",
+      "player_name": "De La Torre Ruben Lopez",
+      "canonical_player_id": "32852",
+      "canonical_player_name": "Ruben Lopez",
+      "acb_player_id": "30000132"
+    },
+    {
+      "player_id": "27976",
+      "player_name": "Christ Koumadje",
+      "canonical_player_id": "27976",
+      "canonical_player_name": "Christ Koumadje",
+      "acb_player_id": "30000550"
+    },
+    {
+      "player_id": "94602",
+      "player_name": "Khalifa KOUMADJE",
+      "canonical_player_id": "27976",
+      "canonical_player_name": "Christ Koumadje",
+      "acb_player_id": "30000550"
+    },
+    {
+      "player_id": "11247",
+      "player_name": "Kameron Milton Allante Taylor",
+      "canonical_player_id": "11247",
+      "canonical_player_name": "Kameron Milton Allante Taylor",
+      "acb_player_id": "30001981"
+    },
+    {
+      "player_id": "446",
+      "player_name": "Kameron Taylor",
+      "canonical_player_id": "11247",
+      "canonical_player_name": "Kameron Milton Allante Taylor",
+      "acb_player_id": "30001981"
+    },
+    {
+      "player_id": "58436",
+      "player_name": "Derek Ryan Needham",
+      "canonical_player_id": "58436",
+      "canonical_player_name": "Derek Ryan Needham",
+      "acb_player_id": "30003946"
+    },
+    {
+      "player_id": "58625",
+      "player_name": "Derek Needham",
+      "canonical_player_id": "58436",
+      "canonical_player_name": "Derek Ryan Needham",
+      "acb_player_id": "30003946"
+    },
+    {
+      "player_id": "84394",
+      "player_name": "Pepe Vildoza",
+      "canonical_player_id": "59187",
+      "canonical_player_name": "Jose Ignacio Vildoza",
+      "acb_player_id": "30003990"
+    },
+    {
+      "player_id": "59187",
+      "player_name": "Jose Ignacio Vildoza",
+      "canonical_player_id": "59187",
+      "canonical_player_name": "Jose Ignacio Vildoza",
+      "acb_player_id": "30003990"
+    },
+    {
+      "player_id": "83339",
+      "player_name": "Josep Perez",
+      "canonical_player_id": "35554",
+      "canonical_player_name": "Jassel Perez",
+      "acb_player_id": "30005191"
+    },
+    {
+      "player_id": "35554",
+      "player_name": "Jassel Perez",
+      "canonical_player_id": "35554",
+      "canonical_player_name": "Jassel Perez",
+      "acb_player_id": "30005191"
+    },
+    {
+      "player_id": "22915",
+      "player_name": "Isaiah Washington",
+      "canonical_player_id": "22915",
+      "canonical_player_name": "Isaiah Washington",
+      "acb_player_id": "30005207"
+    },
+    {
+      "player_id": "84388",
+      "player_name": "Dandre Washington",
+      "canonical_player_id": "22915",
+      "canonical_player_name": "Isaiah Washington",
+      "acb_player_id": "30005207"
+    }
+  ]
+}

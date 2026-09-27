@@ -36,6 +36,12 @@ from dynamis.adapters.skillcorner.authorities import (
 from dynamis.adapters.skillcorner.authorities import (
     adapter_algorithm_spec as skillcorner_algorithm_spec,
 )
+from dynamis.adapters.skillcorner_basketball.adapter import (
+    adapter_algorithm_spec as skillcorner_basketball_algorithm_spec,
+)
+from dynamis.adapters.skillcorner_basketball.authorities import (
+    DATASET_ID as SKILLCORNER_BASKETBALL_DATASET_ID,
+)
 from dynamis.adapters.spl.adapter import SplTrialSource
 from dynamis.adapters.spl.authorities import (
     SPL_DATASET_ID,
@@ -58,6 +64,7 @@ from dynamis.pipeline.ingest import (
     IngestResult,
     ingest_dfl_match,
     ingest_gymaware_landmine,
+    ingest_skillcorner_basketball_game,
     ingest_skillcorner_match,
     ingest_spl_trials,
     ingest_white_cmj,
@@ -82,6 +89,9 @@ SUPPORTED_DATASETS = {
     "white-cmj-acc-grf": "White CMJ accelerometer + vGRF (per-trial IMU + force)",
     "gymaware-landmine-vision": "GymAware landmine press + vision (source metrics)",
     "skillcorner-opendata": "SkillCorner Open Data (tracking + body pose)",
+    SKILLCORNER_BASKETBALL_DATASET_ID: (
+        "SkillCorner Basketball Open Data (25 Hz tracking + Dynamic Events)"
+    ),
     "spl-open-data": "SPL Open Data (basketball free-throw pose)",
 }
 
@@ -146,12 +156,12 @@ def _default_session(dataset_id: str, keys: Sequence[str]) -> str:
         return "white-cmj-release"
     if dataset_id == GYMAWARE_DATASET_ID:
         return "gymaware-landmine-release"
-    if dataset_id == SKILLCORNER_DATASET_ID:
+    if dataset_id in {SKILLCORNER_DATASET_ID, SKILLCORNER_BASKETBALL_DATASET_ID}:
         for key in keys:
             match = SKILLCORNER_MATCH_TOKEN.search(key)
             if match:
                 return match.group("match")
-        raise PlanError("cannot derive the SkillCorner match identity from the selected keys")
+        raise PlanError("cannot derive the SkillCorner game identity from the selected keys")
     if dataset_id == SPL_DATASET_ID:
         for key in keys:
             match = SPL_PARTICIPANT_TOKEN.search(key)
@@ -188,6 +198,11 @@ def _write_discovery(
     def first(token: str) -> Path | None:
         return next((path for key, path in paths.items() if token in key), None)
 
+    if args.dataset_id == SKILLCORNER_BASKETBALL_DATASET_ID:
+        raise PlanError(
+            "basketball frame and event discovery is emitted by the materialization receipt; "
+            "omit --discovery"
+        )
     if args.dataset_id == WOMENS_DATASET_ID:
         workbook = first(".xlsx")
         if workbook is None:
@@ -303,6 +318,40 @@ def _ingest(args: argparse.Namespace) -> tuple[IngestResult, str]:
             config, workbook_path=workbook, version=args.version, session_id=session_id
         )
         return result, session_id
+    if args.dataset_id == SKILLCORNER_BASKETBALL_DATASET_ID:
+        game_data = next(
+            (path for key, path in paths.items() if key.endswith("_game_data.json")), None
+        )
+        tracking = next(
+            (path for key, path in paths.items() if key.endswith("_tracking_data.jsonl.gz")), None
+        )
+        events = next(
+            (path for key, path in paths.items() if key.endswith("_dynamic_events.json")), None
+        )
+        missing = [
+            name
+            for name, value in (
+                ("game metadata", game_data),
+                ("tracking", tracking),
+                ("Dynamic Events", events),
+            )
+            if value is None
+        ]
+        if missing:
+            raise PlanError(
+                "SkillCorner basketball ingestion requires one game's full file set; "
+                f"missing: {missing}"
+            )
+        assert game_data is not None and tracking is not None and events is not None
+        result = ingest_skillcorner_basketball_game(
+            config,
+            game_data_path=game_data,
+            tracking_path=tracking,
+            dynamic_events_path=events,
+            version=args.version,
+            batch_size=args.batch_size or 16384,
+        )
+        return result, session_id
     if args.dataset_id == WHITE_DATASET_ID:
         npz = next((path for key, path in paths.items() if key == WHITE_NPZ_KEY), None)
         if npz is None:
@@ -398,7 +447,12 @@ def _persist(args: argparse.Namespace, result: IngestResult, session_id: str) ->
     suffix = "res97"
     if args.dataset_id in {WHITE_DATASET_ID, GYMAWARE_DATASET_ID}:
         suffix = "res98"
-    elif args.dataset_id in {SKILLCORNER_DATASET_ID, SPL_DATASET_ID}:
+    elif args.dataset_id == SKILLCORNER_BASKETBALL_DATASET_ID:
+        suffix = "res124"
+    elif args.dataset_id in {
+        SKILLCORNER_DATASET_ID,
+        SPL_DATASET_ID,
+    }:
         suffix = "res99"
     return persist_ingest(
         config,
@@ -421,6 +475,8 @@ def _adapter_algorithm(dataset_id: str):
         return gymaware_algorithm_spec()
     if dataset_id == SKILLCORNER_DATASET_ID:
         return skillcorner_algorithm_spec()
+    if dataset_id == SKILLCORNER_BASKETBALL_DATASET_ID:
+        return skillcorner_basketball_algorithm_spec()
     if dataset_id == SPL_DATASET_ID:
         return spl_algorithm_spec()
     return idsse_algorithm_spec()

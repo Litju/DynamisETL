@@ -24,6 +24,19 @@ from dynamis.adapters.skillcorner.adapter import SkillCornerMatchAdapter
 from dynamis.adapters.skillcorner.authorities import POSE_LANDMARKS, SKILLCORNER_DATASET_ID
 from dynamis.adapters.skillcorner.discovery import discover_skillcorner
 from dynamis.adapters.skillcorner.metadata import parse_match_metadata
+from dynamis.adapters.skillcorner_basketball import authorities as basketball_authorities
+from dynamis.adapters.skillcorner_basketball.adapter import materialized_domain as basketball_domain
+from dynamis.adapters.skillcorner_basketball.catalog import (
+    edition_id as basketball_edition_id,
+)
+from dynamis.adapters.skillcorner_basketball.catalog import (
+    load_corpus_manifest,
+)
+from dynamis.adapters.skillcorner_basketball.events import build_event_table
+from dynamis.adapters.skillcorner_basketball.tracking import (
+    BasketballTrackingCanonicalizer,
+    write_frame_clock,
+)
 from dynamis.adapters.spl.adapter import SplFreethrowAdapter, SplTrialSource
 from dynamis.adapters.spl.authorities import SPL_DATASET_ID
 from dynamis.adapters.spl.discovery import discover_spl
@@ -48,7 +61,7 @@ from dynamis.adapters.womens_soccer_positioning.authorities import (
 )
 from dynamis.adapters.womens_soccer_positioning.discovery import discover_workbook
 from dynamis.config import Settings
-from dynamis.contracts import Modality
+from dynamis.contracts import MeasurementClass, Modality
 from dynamis.contracts.schemas import schema_fingerprint, schema_version_of
 from dynamis.pipeline.quarantine import QuarantinedRecord, QuarantineSink
 from dynamis.pipeline.reconcile import (
@@ -67,7 +80,7 @@ from dynamis.pipeline.streams import (
 from dynamis.quality.checks import QualityError
 from dynamis.quality.streaming import StreamingValidator
 from dynamis.rights import assert_dataset_root_outside_repository
-from dynamis.storage.parquet import write_parquet_streaming_atomic
+from dynamis.storage.parquet import write_parquet_atomic, write_parquet_streaming_atomic
 from dynamis.storage.paths import (
     ensure_dataset_layout,
     partition_values,
@@ -178,6 +191,7 @@ class IngestResult:
     quarantine_records: tuple[QuarantinedRecord, ...] = ()
     domain: dict[str, Any] = field(default_factory=dict)
     source_metrics: tuple[SourceMetricObservation, ...] = ()
+    sidecar_artifacts: tuple[dict[str, Any], ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -190,6 +204,7 @@ class IngestResult:
             "receipt_path": self.receipt_path,
             "domain": self.domain,
             "reconciliation": self.reconciliation.to_dict(),
+            "sidecar_artifacts": list(self.sidecar_artifacts),
         }
 
 
@@ -979,6 +994,314 @@ def ingest_skillcorner_match(
         provider_domain=adapter.domain(),
         quarantine_records=tuple(sink.all_records()),
         domain=dict(receipt.domain),
+    )
+
+
+def ingest_skillcorner_basketball_game(
+    settings: Settings,
+    *,
+    game_data_path: Path,
+    tracking_path: Path,
+    dynamic_events_path: Path,
+    version: str,
+    row_group_size: int = DEFAULT_ROW_GROUP_SIZE,
+    batch_size: int = DEFAULT_BATCH_SIZE,
+) -> IngestResult:
+    """Materialize one selected ACB game into 25 Hz tracking and V4 events."""
+    from dynamis.contracts.sports import (
+        DataGrain,
+        DataGrainKind,
+        SportsEntityKind,
+        canonical_sports_id,
+    )
+
+    dataset_id = basketball_authorities.DATASET_ID
+    assert_local_only_boundary(settings, dataset_id)
+    ensure_dataset_layout(settings)
+    corpus = load_corpus_manifest()
+    canonical_edition_id = basketball_edition_id(corpus)
+    game_data = json.loads(Path(game_data_path).read_text(encoding="utf-8"))
+    game_id = str(game_data.get("gameId", ""))
+    if not game_id:
+        raise ValueError("SkillCorner basketball game_data has no gameId")
+    catalog_item = next(
+        (item for item in corpus["matches"] if str(item["match"]["id"]) == game_id), None
+    )
+    if catalog_item is None or game_data != catalog_item["detail"]:
+        raise ValueError(f"game_data.json does not match the pinned ACB catalog for {game_id}")
+    player_aliases = {
+        str(alias["player_id"]): str(alias["canonical_player_id"])
+        for alias in corpus.get("player_aliases", [])
+    }
+
+    tracking_key = f"data/matches/{game_id}/{game_id}_tracking_data.jsonl.gz"
+    events_key = f"data/matches/{game_id}/{game_id}_dynamic_events.json"
+    frame_clock_path = (
+        settings.dataset_root
+        / "silver"
+        / f"dataset_id={dataset_id}"
+        / "modality=basketball_frame_clock"
+        / f"session_id={game_id}"
+        / "frame_clock.parquet"
+    )
+    frame_clock, frame_clock_written = write_frame_clock(
+        tracking_path,
+        game_id=game_id,
+        session_id=game_id,
+        output_path=frame_clock_path,
+        dataset_root=settings.dataset_root,
+        batch_size=batch_size,
+        row_group_size=row_group_size,
+    )
+    tracking = BasketballTrackingCanonicalizer(
+        path=tracking_path,
+        game_id=game_id,
+        game_data=game_data,
+        frame_clock=frame_clock,
+        batch_size=batch_size,
+        player_aliases=player_aliases,
+    )
+    streams = tracking.streams()
+    results: list[IngestStreamResult] = []
+    tracking_reconciliations: list[StreamReconciliation] = []
+    for stream in streams:
+        result = write_canonical_stream(settings, stream, row_group_size=row_group_size)
+        results.append(result)
+        summary = tracking.summary(int(str(stream.trial_id).removeprefix("period-")))
+        period_summary = frame_clock.periods[summary.period]
+        tracking_reconciliations.append(
+            StreamReconciliation(
+                stream_id=summary.stream_id,
+                modality=Modality.TRACKING.value,
+                subject_id=None,
+                trial_id=stream.trial_id,
+                source_records=summary.player_entries + summary.ball_observations,
+                canonical_rows=result.row_count,
+                quarantined_rows=0,
+                ignored_records=0,
+                canonical_time_min_ns=result.t_rel_min_ns,
+                canonical_time_max_ns=result.t_rel_max_ns,
+                null_counts=result.null_counts,
+                schema_valid=True,
+                units_valid=True,
+                coordinate_frame_id=basketball_authorities.COURT_FRAME_ID,
+                checks={
+                    **summary.to_dict(),
+                    "nominal_sampling_rate_hz": basketball_authorities.FRAME_RATE_HZ,
+                    "source_frame_count": period_summary.frame_count,
+                    "dead_time_frames": period_summary.dead_time_frames,
+                    "source_units": "ft",
+                    "canonical_units": "m",
+                    "source_to_si_scale": basketball_authorities.FT_TO_M,
+                    "court_reference_id": basketball_authorities.COURT_REFERENCE_ID,
+                    "positions_fabricated": False,
+                },
+            )
+        )
+
+    contest = canonical_sports_id(
+        basketball_authorities.NAMESPACE, SportsEntityKind.CONTEST, game_id
+    )
+    provider_team_ids = {
+        str(game_data["homeTeam"]["teamId"]): canonical_sports_id(
+            basketball_authorities.NAMESPACE,
+            SportsEntityKind.TEAM,
+            str(game_data["homeTeam"]["teamId"]),
+        ),
+        str(game_data["awayTeam"]["teamId"]): canonical_sports_id(
+            basketball_authorities.NAMESPACE,
+            SportsEntityKind.TEAM,
+            str(game_data["awayTeam"]["teamId"]),
+        ),
+    }
+    events_table, event_summary = build_event_table(
+        path=dynamic_events_path,
+        frame_clock_path=frame_clock_written.path,
+        game_id=game_id,
+        provider_team_ids=provider_team_ids,
+        source_revision=version,
+        player_aliases=player_aliases,
+    )
+    domain = basketball_domain(
+        corpus=corpus,
+        catalog_item=catalog_item,
+        frame_clock=frame_clock,
+        tracking=tracking,
+    )
+    events_path = (
+        settings.dataset_root
+        / "silver"
+        / f"dataset_id={dataset_id}"
+        / "modality=event_envelope"
+        / f"session_id={game_id}"
+        / "dynamic_events.parquet"
+    )
+    events_written = write_parquet_atomic(
+        events_table,
+        events_path,
+        relative_to=settings.dataset_root,
+        row_group_size=row_group_size,
+        grain=DataGrain(kind=DataGrainKind.PLAY_BY_PLAY),
+    )
+
+    frame_clock_artifact = {
+        "artifact_id": (
+            f"skillcorner-basketball-frames-{game_id}-{frame_clock_written.checksum_sha256[:12]}"
+        ),
+        "dataset_id": dataset_id,
+        "run_id": f"run-{game_id.lower()}-basketball",
+        "artifact_type": "basketball_frame_clock",
+        "layer": "silver",
+        "relative_path": frame_clock_written.relative_path,
+        "checksum_sha256": frame_clock_written.checksum_sha256,
+        "byte_size": frame_clock_written.byte_size,
+        "row_count": frame_clock_written.row_count,
+        "data_grain_kind": None,
+        "data_grain_axes": None,
+        "artifact_metadata": {
+            "dataset_id": dataset_id,
+            "session_id": game_id,
+            "contest_id": contest,
+            "provider_game_id": game_id,
+            "family": "frame_clock",
+            "source_file_key": tracking_key,
+            "source_revision": version,
+            "frame_rate_hz": basketball_authorities.FRAME_RATE_HZ,
+            "spatial_reference_id": basketball_authorities.COURT_REFERENCE_ID,
+        },
+    }
+    event_artifact = {
+        "artifact_id": (
+            f"skillcorner-basketball-events-{game_id}-{events_written.checksum_sha256[:12]}"
+        ),
+        "dataset_id": dataset_id,
+        "run_id": f"run-{game_id.lower()}-basketball",
+        "artifact_type": "play_by_play",
+        "layer": "silver",
+        "relative_path": events_written.relative_path,
+        "checksum_sha256": events_written.checksum_sha256,
+        "byte_size": events_written.byte_size,
+        "row_count": events_written.row_count,
+        "data_grain_kind": DataGrainKind.PLAY_BY_PLAY.value,
+        "data_grain_axes": list(DataGrain(kind=DataGrainKind.PLAY_BY_PLAY).axes),
+        "artifact_metadata": {
+            "dataset_id": dataset_id,
+            "session_id": game_id,
+            "contest_id": contest,
+            "provider_game_id": game_id,
+            "competition_edition_id": canonical_edition_id,
+            "family": "basketball_events",
+            "source_file_key": events_key,
+            "source_revision": version,
+            "source_catalog_entry_id": None,
+            "spatial_reference_id": basketball_authorities.COURT_REFERENCE_ID,
+            "clock_mapping_ids": [
+                item.mapping_id for item in basketball_authorities.clock_mappings()
+            ],
+            "linked_events": event_summary["linked_events"],
+            "unlinked_events": event_summary["unlinked_events"],
+            "linkage_reconciliation": event_summary["linkage_reconciliation"],
+            "attributes_schema_id": event_summary["attribute_schema"],
+            "envelope_schema": event_summary["event_envelope_schema"],
+        },
+    }
+    sidecars = (frame_clock_artifact, event_artifact)
+    cadence_interval_count = sum(frame_clock.wall_clock_delta_counts_ms.values())
+    cadence_40ms_count = frame_clock.wall_clock_delta_counts_ms.get(40, 0)
+    cadence_fraction = (
+        cadence_40ms_count / cadence_interval_count if cadence_interval_count else 0.0
+    )
+    receipt_domain = {
+        "match_id": game_id,
+        "competition": str(corpus["upstream"]["competition"]["name"]),
+        "competition_edition_id": canonical_edition_id,
+        "source_revision": version,
+        "tracking": frame_clock.to_dict(),
+        "tracking_streams": [item.to_dict() for item in tracking_reconciliations],
+        "event_envelope": event_summary,
+        "spatial_reference": basketball_authorities.spatial_reference().model_dump(mode="json"),
+        "surface_geometry": basketball_authorities.surface_geometry().model_dump(mode="json"),
+        "clock_mappings": [
+            item.model_dump(mode="json") for item in basketball_authorities.clock_mappings()
+        ],
+        "cadence_40ms_fraction": cadence_fraction,
+        "measurement_class": MeasurementClass.MODEL_ESTIMATED.value,
+        "positions_fabricated": False,
+        "license": license_notice(dataset_id, version),
+    }
+    reconciliations = [
+        *tracking_reconciliations,
+        StreamReconciliation(
+            stream_id=f"{game_id}-frame-clock",
+            modality="basketball_frame_clock",
+            subject_id=None,
+            trial_id=None,
+            source_records=frame_clock.frame_count,
+            canonical_rows=frame_clock_written.row_count,
+            quarantined_rows=0,
+            ignored_records=0,
+            checks={
+                "dead_time_frames": frame_clock.dead_time_frames,
+                "periods": len(frame_clock.periods),
+                "wall_clock_delta_counts_ms": dict(frame_clock.wall_clock_delta_counts_ms),
+                "positions_present_on_dead_time": False,
+            },
+        ),
+        StreamReconciliation(
+            stream_id=f"{game_id}-dynamic-events",
+            modality=Modality.EVENT.value,
+            subject_id=None,
+            trial_id=None,
+            source_records=event_summary["source_records"],
+            canonical_rows=event_summary["canonical_rows"],
+            quarantined_rows=0,
+            ignored_records=0,
+            checks={**event_summary, "source_file_key": events_key},
+        ),
+    ]
+    source_keys = (
+        f"data/matches/{game_id}/{game_id}_game_data.json",
+        tracking_key,
+        events_key,
+    )
+    receipt = ReconciliationReceipt(
+        dataset_id=dataset_id,
+        version=version,
+        session_id=game_id,
+        source_keys=source_keys,
+        streams=tuple(reconciliations),
+        domain=receipt_domain,
+        silver_artifacts=(
+            *(item.to_dict() for item in results),
+            {key: value for key, value in frame_clock_artifact.items() if key != "created_at"},
+            {key: value for key, value in event_artifact.items() if key != "created_at"},
+        ),
+        notes=(
+            "SkillCorner Basketball Open Data (MIT; SkillCorner requests attribution).",
+            "The court-centred feet source axes and origin are preserved through an explicit "
+            "feet-to-metres transform.",
+            "Empty dead-time frames remain clock-only rows; no player or ball position is imputed.",
+            "Dynamic Events use exact source frames, exact wallClock values, or a uniquely "
+            "resolvable period plus gameClock/shotClock; ambiguous and missing keys stay "
+            "unlinked, with no nearest-frame interpolation.",
+        ),
+    )
+    assert_reconciled(receipt)
+    receipt_path = write_reconciliation_receipt(
+        settings, receipt, name=f"{game_id}-basketball-{version[:12]}"
+    )
+    return IngestResult(
+        dataset_id=dataset_id,
+        version=version,
+        session_id=game_id,
+        source_keys=source_keys,
+        streams=tuple(results),
+        quarantine_artifacts=(),
+        reconciliation=receipt,
+        receipt_path=receipt_path,
+        provider_domain=domain,
+        domain=receipt_domain,
+        sidecar_artifacts=sidecars,
     )
 
 

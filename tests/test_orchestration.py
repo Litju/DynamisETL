@@ -71,7 +71,7 @@ EXPECTED_ASSET_CHECKS = {
 
 def test_registry_summary_validates_and_reports_rights() -> None:
     summary = registry_summary()
-    assert summary["source_count"] == 9
+    assert summary["source_count"] == 10
     assert sorted(summary["local_only"]) == ["sportsdataverse", "tackle-workload"]
     assert "openbiomechanics" in summary["optional"]
     assert "modality coverage: complete" in summary["summary"]
