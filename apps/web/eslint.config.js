@@ -45,9 +45,9 @@ export default tseslint.config(
     },
   },
   {
-    // TanStack Table intentionally returns a stateful instance from a hook; the
+    // TanStack Table/Virtual intentionally return stateful instances from hooks; the
     // React Compiler memoization rule does not model that library contract.
-    files: ["src/components/table/DataTable.tsx"],
+    files: ["src/components/table/DataTable.tsx", "src/components/season/SeasonNavigator.tsx"],
     rules: {
       "react-hooks/incompatible-library": "off",
     },

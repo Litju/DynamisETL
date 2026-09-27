@@ -1,4 +1,9 @@
 import "@testing-library/jest-dom/vitest";
+import { configure } from "@testing-library/react";
+
+// Route workbenches are lazy chunks; under a parallel run their first import is
+// transformed on demand, which can exceed the 1 s default wait for async queries.
+configure({ asyncUtilTimeout: 5000 });
 
 // jsdom lacks matchMedia; components read prefers-reduced-motion through it.
 if (!window.matchMedia) {

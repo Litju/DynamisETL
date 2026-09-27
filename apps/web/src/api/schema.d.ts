@@ -339,6 +339,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/season/editions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Season Editions */
+        get: operations["season_editions_api_season_editions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/season/editions/{edition_id}/families/{family}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Season Family */
+        get: operations["season_family_api_season_editions__edition_id__families__family__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/season/editions/{edition_id}/families/{family}/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Season Profile */
+        get: operations["season_profile_api_season_editions__edition_id__families__family__profile_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/season/editions/{edition_id}/families/{family}/rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Season Rows */
+        get: operations["season_rows_api_season_editions__edition_id__families__family__rows_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/season/editions/{edition_id}/links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Season Player Links */
+        get: operations["season_player_links_api_season_editions__edition_id__links_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/serving/status": {
         parameters: {
             query?: never;
@@ -1135,6 +1220,261 @@ export interface components {
             started_at: string | null;
             /** Status */
             status: string;
+        };
+        /** SeasonContestLinkView */
+        SeasonContestLinkView: {
+            /** Contest Id */
+            contest_id: string;
+            /** Dataset Id */
+            dataset_id: string;
+            /** Session Id */
+            session_id: string;
+        };
+        /**
+         * SeasonEditionView
+         * @description A competition edition that owns season-grain data, with its provenance.
+         */
+        SeasonEditionView: {
+            /** Competition Id */
+            competition_id: string;
+            /** Competition Name */
+            competition_name: string;
+            /** Dataset Id */
+            dataset_id: string;
+            /** Edition Id */
+            edition_id: string;
+            /** Edition Label */
+            edition_label: string;
+            /** Families */
+            families: components["schemas"]["SeasonFamilyRef"][];
+            /** Glossary Url */
+            glossary_url: string | null;
+            /** Inclusion Rule */
+            inclusion_rule: string;
+            license: components["schemas"]["LicenseView"];
+            /** Measurement Class */
+            measurement_class: string;
+            /** Provider */
+            provider: string;
+            /** Registry Version */
+            registry_version: string;
+            /** Sport Id */
+            sport_id: string;
+            /** Sport Name */
+            sport_name: string;
+        };
+        /**
+         * SeasonFamilyRef
+         * @description One provider aggregate family materialized for a competition edition.
+         */
+        SeasonFamilyRef: {
+            /** Artifact Id */
+            artifact_id: string;
+            /** Checksum Sha256 */
+            checksum_sha256: string;
+            /** Family */
+            family: string;
+            /** Grain Axes */
+            grain_axes: string[];
+            /** Grain Kind */
+            grain_kind: string;
+            /** Label */
+            label: string;
+            /** Match Count Column */
+            match_count_column: string;
+            /** Row Count */
+            row_count: number;
+            /** Run Id */
+            run_id: string | null;
+            /** Source File Key */
+            source_file_key: string | null;
+            /** Source Population Rows */
+            source_population_rows: number | null;
+            /** Source Revision */
+            source_revision: string | null;
+        };
+        /**
+         * SeasonFamilyView
+         * @description Family metadata: metric registry and population facets. No metric values.
+         */
+        SeasonFamilyView: {
+            edition: components["schemas"]["SeasonEditionView"];
+            family: components["schemas"]["SeasonFamilyRef"];
+            /** Metrics */
+            metrics: components["schemas"]["SeasonMetricView"][];
+            /** Population Rows */
+            population_rows: number;
+            /** Population Subjects */
+            population_subjects: number;
+            /** Position Groups */
+            position_groups: components["schemas"]["SeasonPositionView"][];
+            /** Teams */
+            teams: components["schemas"]["SeasonTeamView"][];
+        };
+        /** SeasonMetricView */
+        SeasonMetricView: {
+            /** Base */
+            base: string | null;
+            /** Basis */
+            basis: string;
+            /** Column */
+            column: string;
+            /** Definition */
+            definition: string;
+            /** Exposure */
+            exposure: boolean;
+            /** Family */
+            family: string;
+            /** Group */
+            group: string;
+            /**
+             * Higher Is
+             * @enum {string}
+             */
+            higher_is: "more" | "faster" | "neutral";
+            /** Label */
+            label: string;
+            /** Metric Id */
+            metric_id: string;
+            /** Split */
+            split: string | null;
+            /** Unit */
+            unit: string;
+        };
+        /**
+         * SeasonPlayerLinksView
+         * @description Contests linked to a season subject through the provider identity crosswalk.
+         */
+        SeasonPlayerLinksView: {
+            /** Appearances */
+            appearances: components["schemas"]["SeasonContestLinkView"][];
+            /** Identity Authority */
+            identity_authority: string;
+            /** Provider Namespace */
+            provider_namespace: string | null;
+            /** Provider Player Ids */
+            provider_player_ids: string[];
+            /** Subject Id */
+            subject_id: string;
+            /** Team Contest Ids */
+            team_contest_ids: string[];
+        };
+        /**
+         * SeasonPopulationView
+         * @description The explicit denominator every rank/percentile is relative to.
+         */
+        SeasonPopulationView: {
+            /** Label */
+            label: string;
+            /** Min Matches */
+            min_matches: number | null;
+            /** Position Group */
+            position_group: string | null;
+            /** Rows */
+            rows: number;
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "edition" | "position" | "team";
+            /** Selected Row In Population */
+            selected_row_in_population: boolean;
+            /** Team Id */
+            team_id: string | null;
+            /** Unit Of Analysis */
+            unit_of_analysis: string;
+        };
+        /** SeasonPositionView */
+        SeasonPositionView: {
+            /** Position Group */
+            position_group: string;
+            /** Rows */
+            rows: number;
+        };
+        /**
+         * SeasonProfileView
+         * @description Reproducible season profile: context, values, denominator and provenance.
+         */
+        SeasonProfileView: {
+            /** Caveats */
+            caveats: string[];
+            edition: components["schemas"]["SeasonEditionView"];
+            family: components["schemas"]["SeasonFamilyRef"];
+            /** Metrics */
+            metrics: components["schemas"]["SeasonRankedMetricView"][];
+            /** Percentile Method */
+            percentile_method: string;
+            population: components["schemas"]["SeasonPopulationView"];
+            /** Rank Method */
+            rank_method: string;
+            row: components["schemas"]["SeasonRowView"];
+        };
+        /** SeasonRankedMetricView */
+        SeasonRankedMetricView: {
+            /** Column */
+            column: string;
+            /** Metric Id */
+            metric_id: string;
+            /** Percentile */
+            percentile: number | null;
+            /** Population Maximum */
+            population_maximum: number | null;
+            /** Population Median */
+            population_median: number | null;
+            /** Population Minimum */
+            population_minimum: number | null;
+            /** Rank */
+            rank: number | null;
+            /** Valid N */
+            valid_n: number;
+            /** Value */
+            value: number | null;
+        };
+        /** SeasonRowPage */
+        SeasonRowPage: {
+            /** Limit */
+            limit: number;
+            /** Metrics */
+            metrics: string[];
+            /** Offset */
+            offset: number;
+            /** Rows */
+            rows: components["schemas"]["SeasonRowView"][];
+            /** Total */
+            total: number;
+        };
+        /**
+         * SeasonRowView
+         * @description One grain row: subject × team × edition × position group.
+         */
+        SeasonRowView: {
+            /** Matches */
+            matches: number | null;
+            /** Player Name */
+            player_name: string;
+            /** Player Short Name */
+            player_short_name: string | null;
+            /** Position Group */
+            position_group: string;
+            /** Subject Id */
+            subject_id: string;
+            /** Team Id */
+            team_id: string;
+            /** Team Name */
+            team_name: string;
+            /** Values */
+            values: {
+                [key: string]: number | null;
+            };
+        };
+        /** SeasonTeamView */
+        SeasonTeamView: {
+            /** Display Name */
+            display_name: string;
+            /** Rows */
+            rows: number;
+            /** Team Id */
+            team_id: string;
         };
         /** ServingStatus */
         ServingStatus: {
@@ -2145,6 +2485,176 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    season_editions_api_season_editions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SeasonEditionView"][];
+                };
+            };
+        };
+    };
+    season_family_api_season_editions__edition_id__families__family__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                edition_id: string;
+                family: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SeasonFamilyView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    season_profile_api_season_editions__edition_id__families__family__profile_get: {
+        parameters: {
+            query: {
+                subject_id: string;
+                team_id?: string | null;
+                position_group?: string | null;
+                population?: "edition" | "position" | "team";
+                min_matches?: number | null;
+                /** @description Comma-separated metric columns */
+                metrics?: string | null;
+                /** @description Rank against this team's rows instead of the row's own */
+                population_team_id?: string | null;
+                /** @description Rank against this position group instead of the row's own */
+                population_position_group?: string | null;
+            };
+            header?: never;
+            path: {
+                edition_id: string;
+                family: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SeasonProfileView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    season_rows_api_season_editions__edition_id__families__family__rows_get: {
+        parameters: {
+            query?: {
+                /** @description Comma-separated metric columns */
+                metrics?: string | null;
+                team_id?: string | null;
+                position_group?: string | null;
+                subject_id?: string[] | null;
+                min_matches?: number | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                edition_id: string;
+                family: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SeasonRowPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    season_player_links_api_season_editions__edition_id__links_get: {
+        parameters: {
+            query: {
+                subject_id: string;
+            };
+            header?: never;
+            path: {
+                edition_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SeasonPlayerLinksView"];
                 };
             };
             /** @description Validation Error */

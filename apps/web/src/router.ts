@@ -13,6 +13,7 @@ import { defineMethodsRoute } from "@/routes/methods";
 import { defineQualityRoute } from "@/routes/quality";
 import { defineRootRoute } from "@/routes/root";
 import { defineRunsRoute } from "@/routes/runs";
+import { defineSeasonRoute } from "@/routes/season";
 
 /**
  * Assemble a fresh route tree for one router instance.
@@ -27,6 +28,7 @@ export function buildRouteTree() {
     defineLabIndexRoute(root),
     defineLabRoute(root),
     defineCompareRoute(root),
+    defineSeasonRoute(root),
     defineMethodsRoute(root),
     defineRunsRoute(root),
     defineQualityRoute(root),

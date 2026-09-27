@@ -2191,6 +2191,784 @@
         "title": "RunView",
         "type": "object"
       },
+      "SeasonContestLinkView": {
+        "properties": {
+          "contest_id": {
+            "title": "Contest Id",
+            "type": "string"
+          },
+          "dataset_id": {
+            "title": "Dataset Id",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "dataset_id",
+          "session_id",
+          "contest_id"
+        ],
+        "title": "SeasonContestLinkView",
+        "type": "object"
+      },
+      "SeasonEditionView": {
+        "description": "A competition edition that owns season-grain data, with its provenance.",
+        "properties": {
+          "competition_id": {
+            "title": "Competition Id",
+            "type": "string"
+          },
+          "competition_name": {
+            "title": "Competition Name",
+            "type": "string"
+          },
+          "dataset_id": {
+            "title": "Dataset Id",
+            "type": "string"
+          },
+          "edition_id": {
+            "title": "Edition Id",
+            "type": "string"
+          },
+          "edition_label": {
+            "title": "Edition Label",
+            "type": "string"
+          },
+          "families": {
+            "items": {
+              "$ref": "#/components/schemas/SeasonFamilyRef"
+            },
+            "title": "Families",
+            "type": "array"
+          },
+          "glossary_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Glossary Url"
+          },
+          "inclusion_rule": {
+            "title": "Inclusion Rule",
+            "type": "string"
+          },
+          "license": {
+            "$ref": "#/components/schemas/LicenseView"
+          },
+          "measurement_class": {
+            "title": "Measurement Class",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "registry_version": {
+            "title": "Registry Version",
+            "type": "string"
+          },
+          "sport_id": {
+            "title": "Sport Id",
+            "type": "string"
+          },
+          "sport_name": {
+            "title": "Sport Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "dataset_id",
+          "provider",
+          "sport_id",
+          "sport_name",
+          "competition_id",
+          "competition_name",
+          "edition_id",
+          "edition_label",
+          "measurement_class",
+          "inclusion_rule",
+          "glossary_url",
+          "registry_version",
+          "license",
+          "families"
+        ],
+        "title": "SeasonEditionView",
+        "type": "object"
+      },
+      "SeasonFamilyRef": {
+        "description": "One provider aggregate family materialized for a competition edition.",
+        "properties": {
+          "artifact_id": {
+            "title": "Artifact Id",
+            "type": "string"
+          },
+          "checksum_sha256": {
+            "title": "Checksum Sha256",
+            "type": "string"
+          },
+          "family": {
+            "title": "Family",
+            "type": "string"
+          },
+          "grain_axes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Grain Axes",
+            "type": "array"
+          },
+          "grain_kind": {
+            "title": "Grain Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "match_count_column": {
+            "title": "Match Count Column",
+            "type": "string"
+          },
+          "row_count": {
+            "title": "Row Count",
+            "type": "integer"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "source_file_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source File Key"
+          },
+          "source_population_rows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Population Rows"
+          },
+          "source_revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Revision"
+          }
+        },
+        "required": [
+          "family",
+          "label",
+          "artifact_id",
+          "row_count",
+          "checksum_sha256",
+          "run_id",
+          "grain_kind",
+          "grain_axes",
+          "source_revision",
+          "source_file_key",
+          "source_population_rows",
+          "match_count_column"
+        ],
+        "title": "SeasonFamilyRef",
+        "type": "object"
+      },
+      "SeasonFamilyView": {
+        "description": "Family metadata: metric registry and population facets. No metric values.",
+        "properties": {
+          "edition": {
+            "$ref": "#/components/schemas/SeasonEditionView"
+          },
+          "family": {
+            "$ref": "#/components/schemas/SeasonFamilyRef"
+          },
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/SeasonMetricView"
+            },
+            "title": "Metrics",
+            "type": "array"
+          },
+          "population_rows": {
+            "title": "Population Rows",
+            "type": "integer"
+          },
+          "population_subjects": {
+            "title": "Population Subjects",
+            "type": "integer"
+          },
+          "position_groups": {
+            "items": {
+              "$ref": "#/components/schemas/SeasonPositionView"
+            },
+            "title": "Position Groups",
+            "type": "array"
+          },
+          "teams": {
+            "items": {
+              "$ref": "#/components/schemas/SeasonTeamView"
+            },
+            "title": "Teams",
+            "type": "array"
+          }
+        },
+        "required": [
+          "edition",
+          "family",
+          "metrics",
+          "population_rows",
+          "population_subjects",
+          "teams",
+          "position_groups"
+        ],
+        "title": "SeasonFamilyView",
+        "type": "object"
+      },
+      "SeasonMetricView": {
+        "properties": {
+          "base": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base"
+          },
+          "basis": {
+            "title": "Basis",
+            "type": "string"
+          },
+          "column": {
+            "title": "Column",
+            "type": "string"
+          },
+          "definition": {
+            "title": "Definition",
+            "type": "string"
+          },
+          "exposure": {
+            "title": "Exposure",
+            "type": "boolean"
+          },
+          "family": {
+            "title": "Family",
+            "type": "string"
+          },
+          "group": {
+            "title": "Group",
+            "type": "string"
+          },
+          "higher_is": {
+            "enum": [
+              "more",
+              "faster",
+              "neutral"
+            ],
+            "title": "Higher Is",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "metric_id": {
+            "title": "Metric Id",
+            "type": "string"
+          },
+          "split": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Split"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "metric_id",
+          "column",
+          "family",
+          "label",
+          "group",
+          "unit",
+          "basis",
+          "definition",
+          "split",
+          "base",
+          "exposure",
+          "higher_is"
+        ],
+        "title": "SeasonMetricView",
+        "type": "object"
+      },
+      "SeasonPlayerLinksView": {
+        "description": "Contests linked to a season subject through the provider identity crosswalk.",
+        "properties": {
+          "appearances": {
+            "items": {
+              "$ref": "#/components/schemas/SeasonContestLinkView"
+            },
+            "title": "Appearances",
+            "type": "array"
+          },
+          "identity_authority": {
+            "title": "Identity Authority",
+            "type": "string"
+          },
+          "provider_namespace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Namespace"
+          },
+          "provider_player_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Provider Player Ids",
+            "type": "array"
+          },
+          "subject_id": {
+            "title": "Subject Id",
+            "type": "string"
+          },
+          "team_contest_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Team Contest Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "subject_id",
+          "identity_authority",
+          "provider_namespace",
+          "provider_player_ids",
+          "appearances",
+          "team_contest_ids"
+        ],
+        "title": "SeasonPlayerLinksView",
+        "type": "object"
+      },
+      "SeasonPopulationView": {
+        "description": "The explicit denominator every rank/percentile is relative to.",
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "min_matches": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Matches"
+          },
+          "position_group": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position Group"
+          },
+          "rows": {
+            "title": "Rows",
+            "type": "integer"
+          },
+          "scope": {
+            "enum": [
+              "edition",
+              "position",
+              "team"
+            ],
+            "title": "Scope",
+            "type": "string"
+          },
+          "selected_row_in_population": {
+            "title": "Selected Row In Population",
+            "type": "boolean"
+          },
+          "team_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Id"
+          },
+          "unit_of_analysis": {
+            "title": "Unit Of Analysis",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope",
+          "label",
+          "team_id",
+          "position_group",
+          "min_matches",
+          "rows",
+          "unit_of_analysis",
+          "selected_row_in_population"
+        ],
+        "title": "SeasonPopulationView",
+        "type": "object"
+      },
+      "SeasonPositionView": {
+        "properties": {
+          "position_group": {
+            "title": "Position Group",
+            "type": "string"
+          },
+          "rows": {
+            "title": "Rows",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "position_group",
+          "rows"
+        ],
+        "title": "SeasonPositionView",
+        "type": "object"
+      },
+      "SeasonProfileView": {
+        "description": "Reproducible season profile: context, values, denominator and provenance.",
+        "properties": {
+          "caveats": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Caveats",
+            "type": "array"
+          },
+          "edition": {
+            "$ref": "#/components/schemas/SeasonEditionView"
+          },
+          "family": {
+            "$ref": "#/components/schemas/SeasonFamilyRef"
+          },
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/SeasonRankedMetricView"
+            },
+            "title": "Metrics",
+            "type": "array"
+          },
+          "percentile_method": {
+            "title": "Percentile Method",
+            "type": "string"
+          },
+          "population": {
+            "$ref": "#/components/schemas/SeasonPopulationView"
+          },
+          "rank_method": {
+            "title": "Rank Method",
+            "type": "string"
+          },
+          "row": {
+            "$ref": "#/components/schemas/SeasonRowView"
+          }
+        },
+        "required": [
+          "edition",
+          "family",
+          "row",
+          "population",
+          "metrics",
+          "percentile_method",
+          "rank_method",
+          "caveats"
+        ],
+        "title": "SeasonProfileView",
+        "type": "object"
+      },
+      "SeasonRankedMetricView": {
+        "properties": {
+          "column": {
+            "title": "Column",
+            "type": "string"
+          },
+          "metric_id": {
+            "title": "Metric Id",
+            "type": "string"
+          },
+          "percentile": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percentile"
+          },
+          "population_maximum": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Population Maximum"
+          },
+          "population_median": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Population Median"
+          },
+          "population_minimum": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Population Minimum"
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank"
+          },
+          "valid_n": {
+            "title": "Valid N",
+            "type": "integer"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "metric_id",
+          "column",
+          "value",
+          "rank",
+          "percentile",
+          "valid_n",
+          "population_minimum",
+          "population_median",
+          "population_maximum"
+        ],
+        "title": "SeasonRankedMetricView",
+        "type": "object"
+      },
+      "SeasonRowPage": {
+        "properties": {
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "metrics": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Metrics",
+            "type": "array"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/SeasonRowView"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "limit",
+          "offset",
+          "metrics",
+          "rows"
+        ],
+        "title": "SeasonRowPage",
+        "type": "object"
+      },
+      "SeasonRowView": {
+        "description": "One grain row: subject \u00d7 team \u00d7 edition \u00d7 position group.",
+        "properties": {
+          "matches": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matches"
+          },
+          "player_name": {
+            "title": "Player Name",
+            "type": "string"
+          },
+          "player_short_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Player Short Name"
+          },
+          "position_group": {
+            "title": "Position Group",
+            "type": "string"
+          },
+          "subject_id": {
+            "title": "Subject Id",
+            "type": "string"
+          },
+          "team_id": {
+            "title": "Team Id",
+            "type": "string"
+          },
+          "team_name": {
+            "title": "Team Name",
+            "type": "string"
+          },
+          "values": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Values",
+            "type": "object"
+          }
+        },
+        "required": [
+          "subject_id",
+          "player_name",
+          "player_short_name",
+          "team_id",
+          "team_name",
+          "position_group",
+          "matches",
+          "values"
+        ],
+        "title": "SeasonRowView",
+        "type": "object"
+      },
+      "SeasonTeamView": {
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "rows": {
+            "title": "Rows",
+            "type": "integer"
+          },
+          "team_id": {
+            "title": "Team Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "team_id",
+          "display_name",
+          "rows"
+        ],
+        "title": "SeasonTeamView",
+        "type": "object"
+      },
       "ServingStatus": {
         "properties": {
           "database": {
@@ -4846,6 +5624,477 @@
         "summary": "Runs",
         "tags": [
           "provenance"
+        ]
+      }
+    },
+    "/api/season/editions": {
+      "get": {
+        "operationId": "season_editions_api_season_editions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SeasonEditionView"
+                  },
+                  "title": "Response Season Editions Api Season Editions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Season Editions",
+        "tags": [
+          "season"
+        ]
+      }
+    },
+    "/api/season/editions/{edition_id}/families/{family}": {
+      "get": {
+        "operationId": "season_family_api_season_editions__edition_id__families__family__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "edition_id",
+            "required": true,
+            "schema": {
+              "title": "Edition Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "family",
+            "required": true,
+            "schema": {
+              "title": "Family",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonFamilyView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Season Family",
+        "tags": [
+          "season"
+        ]
+      }
+    },
+    "/api/season/editions/{edition_id}/families/{family}/profile": {
+      "get": {
+        "operationId": "season_profile_api_season_editions__edition_id__families__family__profile_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "edition_id",
+            "required": true,
+            "schema": {
+              "title": "Edition Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "family",
+            "required": true,
+            "schema": {
+              "title": "Family",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "subject_id",
+            "required": true,
+            "schema": {
+              "maxLength": 256,
+              "minLength": 1,
+              "title": "Subject Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "team_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Team Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "position_group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Position Group"
+            }
+          },
+          {
+            "in": "query",
+            "name": "population",
+            "required": false,
+            "schema": {
+              "default": "position",
+              "enum": [
+                "edition",
+                "position",
+                "team"
+              ],
+              "title": "Population",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "min_matches",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 100,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Min Matches"
+            }
+          },
+          {
+            "description": "Comma-separated metric columns",
+            "in": "query",
+            "name": "metrics",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated metric columns",
+              "title": "Metrics"
+            }
+          },
+          {
+            "description": "Rank against this team's rows instead of the row's own",
+            "in": "query",
+            "name": "population_team_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Rank against this team's rows instead of the row's own",
+              "title": "Population Team Id"
+            }
+          },
+          {
+            "description": "Rank against this position group instead of the row's own",
+            "in": "query",
+            "name": "population_position_group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Rank against this position group instead of the row's own",
+              "title": "Population Position Group"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonProfileView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Season Profile",
+        "tags": [
+          "season"
+        ]
+      }
+    },
+    "/api/season/editions/{edition_id}/families/{family}/rows": {
+      "get": {
+        "operationId": "season_rows_api_season_editions__edition_id__families__family__rows_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "edition_id",
+            "required": true,
+            "schema": {
+              "title": "Edition Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "family",
+            "required": true,
+            "schema": {
+              "title": "Family",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated metric columns",
+            "in": "query",
+            "name": "metrics",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated metric columns",
+              "title": "Metrics"
+            }
+          },
+          {
+            "in": "query",
+            "name": "team_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Team Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "position_group",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Position Group"
+            }
+          },
+          {
+            "in": "query",
+            "name": "subject_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Subject Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "min_matches",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 100,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Min Matches"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonRowPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Season Rows",
+        "tags": [
+          "season"
+        ]
+      }
+    },
+    "/api/season/editions/{edition_id}/links": {
+      "get": {
+        "operationId": "season_player_links_api_season_editions__edition_id__links_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "edition_id",
+            "required": true,
+            "schema": {
+              "title": "Edition Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "subject_id",
+            "required": true,
+            "schema": {
+              "maxLength": 256,
+              "minLength": 1,
+              "title": "Subject Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonPlayerLinksView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Season Player Links",
+        "tags": [
+          "season"
         ]
       }
     },

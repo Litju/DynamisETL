@@ -127,7 +127,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </>
           ) : null}
         </Group>
-        {!focusMode && !matchLabRoute && !showInspector ? (
+        {!focusMode && !matchLabRoute && !showInspector && !ownsEvidenceRail(pathname) ? (
         <InspectorRail tactical={tacticalRoute} onExpand={() => setInspectorOpen(true)} />
         ) : null}
       </div>
@@ -135,6 +135,11 @@ export function AppShell({ children }: { children: ReactNode }) {
       <CommandPalette />
     </div>
   );
+}
+
+/** Workbenches that render their own evidence rail never get the shell's. */
+export function ownsEvidenceRail(pathname: string): boolean {
+  return pathname === "/season" || pathname.startsWith("/season/");
 }
 
 /** Narrow, on-demand source/context rail for the flagship MatchLab route. */
