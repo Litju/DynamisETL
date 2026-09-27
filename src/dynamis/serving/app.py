@@ -66,6 +66,7 @@ from dynamis.serving.models import (
     SessionDetail,
     SessionSummary,
     SourceCapabilityView,
+    SportsCatalogMatchView,
     TacticalCapabilityView,
     TacticalEventPage,
     TacticalEventView,
@@ -94,6 +95,8 @@ class ServingBackend(Protocol):
     def dataset(self, dataset_id: str) -> DatasetDetail | None: ...
 
     def source_capabilities(self, dataset_id: str) -> list[SourceCapabilityView]: ...
+
+    def sports_catalog_matches(self) -> list[SportsCatalogMatchView]: ...
 
     def sessions(self, dataset_id: str) -> list[SessionSummary]: ...
 
@@ -211,6 +214,10 @@ class PostgresServingBackend:
     def source_capabilities(self, dataset_id: str) -> list[SourceCapabilityView]:
         with self._connect() as connection:
             return repository.list_source_capabilities(connection, dataset_id)
+
+    def sports_catalog_matches(self) -> list[SportsCatalogMatchView]:
+        with self._connect() as connection:
+            return repository.list_sports_catalog_matches(connection)
 
     def sessions(self, dataset_id: str) -> list[SessionSummary]:
         with self._connect() as connection:
@@ -708,6 +715,14 @@ def create_app(
         if service.dataset(dataset_id) is None:
             raise HTTPException(status_code=404, detail=f"dataset {dataset_id!r} is not registered")
         return service.source_capabilities(dataset_id)
+
+    @app.get(
+        "/api/catalog/sports/matches",
+        response_model=list[SportsCatalogMatchView],
+        tags=["catalog"],
+    )
+    def sports_catalog_matches(service: BackendDependency) -> list[SportsCatalogMatchView]:
+        return service.sports_catalog_matches()
 
     @app.get("/api/catalog/datasets/{dataset_id}", response_model=DatasetDetail, tags=["catalog"])
     def dataset_detail(dataset_id: str, service: BackendDependency) -> DatasetDetail:
