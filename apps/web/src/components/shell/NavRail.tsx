@@ -2,6 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Activity,
   Boxes,
+  ChartColumn,
   Database,
   FileSearch,
   GitCompareArrows,
@@ -25,6 +26,7 @@ interface NavItem {
 const ANALYSIS_ITEMS: readonly NavItem[] = [
   { to: "/catalog", label: "Catalog", hint: "Datasets, modalities and rights", icon: Database },
   { to: "/lab", label: "Laboratory", hint: "Signals, field and pose analysis", icon: Activity },
+  { to: "/season", label: "SeasonLab", hint: "Player and team season analytics", icon: ChartColumn },
   { to: "/compare", label: "Compare", hint: "Comparative metric analysis", icon: GitCompareArrows },
 ];
 

@@ -269,3 +269,78 @@
   border-radius: 2px;
   background: var(--d-accent);
 }
+
+/* ---------------------------------------------------------------------------
+ * SeasonLab. Three regions — navigator, analysis, evidence — where the analysis
+ * column is always the dominant width. Strips and charts respond to their own
+ * container, not the viewport, so a narrower analysis column sheds secondary
+ * columns (basis, rank) before the value and its position ever do.
+ * ------------------------------------------------------------------------ */
+.season-grid {
+  display: grid;
+  grid-template-columns: 15.5rem minmax(0, 1fr) 19rem;
+}
+
+@media (max-width: 1400px) {
+  .season-grid {
+    grid-template-columns: 14rem minmax(0, 1fr) 17rem;
+  }
+}
+
+.season-grid > main {
+  container-type: inline-size;
+  container-name: season-main;
+}
+
+.season-masthead {
+  background:
+    radial-gradient(120% 140% at 0% 0%, color-mix(in oklab, var(--d-accent) 9%, transparent), transparent 55%),
+    var(--d-surface-0);
+}
+
+.season-monogram {
+  color: var(--d-accent-strong);
+  background: color-mix(in oklab, var(--d-accent) 12%, var(--d-surface-1));
+  border: 1px solid color-mix(in oklab, var(--d-accent) 45%, var(--d-border-subtle));
+}
+
+.season-strip {
+  grid-template-columns: minmax(9rem, 1.3fr) 6.5rem minmax(8rem, 2fr) 4.5rem 2.75rem;
+}
+
+.season-strip-marker {
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--d-playhead) 22%, transparent);
+}
+
+.season-charts {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@container season-main (min-width: 60rem) {
+  .season-charts--with-radar {
+    grid-template-columns: minmax(0, 1.55fr) minmax(16rem, 1fr);
+  }
+}
+
+@container season-main (max-width: 46rem) {
+  .season-strip {
+    grid-template-columns: minmax(7rem, 1fr) 5.5rem minmax(6rem, 1.5fr) 2.75rem;
+  }
+  .season-strip-rank,
+  .season-strip-basis {
+    display: none;
+  }
+}
+
+.season-popover {
+  transform-origin: var(--transform-origin);
+  transition:
+    opacity var(--duration-quick) var(--ease-instrument),
+    transform var(--duration-quick) var(--ease-instrument);
+}
+
+.season-popover[data-starting-style],
+.season-popover[data-ending-style] {
+  opacity: 0;
+  transform: scale(0.98) translateY(-2px);
+}
