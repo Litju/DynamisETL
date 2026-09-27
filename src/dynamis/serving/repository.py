@@ -18,6 +18,7 @@ from sqlalchemy.engine import Connection
 
 from dynamis.contracts.sports import Capability, derive_capability_profile
 from dynamis.gold.build import MART_NAMES
+from dynamis.serving import season as season_model
 from dynamis.serving.models import (
     AlgorithmView,
     ArtifactRefView,
@@ -37,6 +38,10 @@ from dynamis.serving.models import (
     QualityIssueView,
     RightsPolicyView,
     RunView,
+    SeasonContestLinkView,
+    SeasonEditionView,
+    SeasonFamilyRef,
+    SeasonPlayerLinksView,
     SessionDetail,
     SessionParticipantView,
     SessionSummary,
@@ -1784,3 +1789,172 @@ def serving_status(connection: Connection, *, gold_schema: str, db_schema: str) 
 
 def mart_names() -> tuple[str, ...]:
     return MART_NAMES
+
+
+def list_season_editions(connection: Connection) -> list[SeasonEditionView]:
+    """Competition editions that own materialized season-grain artifacts.
+
+    Metadata only: the artifact registry, the sports semantic layer and the dataset
+    rights policy. No Parquet file is opened here.
+    """
+    rows = (
+        connection.execute(
+            sa.text(
+                """
+            SELECT artifact.artifact_id, artifact.dataset_id, artifact.run_id,
+                   artifact.row_count, artifact.checksum_sha256,
+                   artifact.data_grain_kind, artifact.data_grain_axes,
+                   artifact.artifact_metadata,
+                   edition.edition_id, edition.label AS edition_label,
+                   competition.competition_id, competition.name AS competition_name,
+                   sport.sport_id, sport.display_name AS sport_name,
+                   source.provider,
+                   license.policy_id, license.identifier, license.status AS license_status,
+                   license.attribution_required, license.noncommercial_only,
+                   license.share_alike, license.redistribution, license.local_only,
+                   license.restrictions
+            FROM processing_artifact AS artifact
+            JOIN competition_edition AS edition
+              ON edition.edition_id = artifact.artifact_metadata ->> 'competition_edition_id'
+            JOIN competition ON competition.competition_id = edition.competition_id
+            JOIN sport ON sport.sport_id = competition.sport_id
+            JOIN dataset_source AS source ON source.dataset_id = artifact.dataset_id
+            JOIN license_policy AS license ON license.policy_id = source.license_policy_id
+            WHERE artifact.artifact_type = 'season_aggregate'
+              AND artifact.data_grain_kind IN ('PLAYER_SEASON', 'TEAM_SEASON')
+            ORDER BY sport.display_name, competition.name, edition.label,
+                     artifact.artifact_metadata ->> 'aggregate_family'
+            """
+            )
+        )
+        .mappings()
+        .all()
+    )
+    editions: dict[tuple[str, str], SeasonEditionView] = {}
+    for row in rows:
+        metadata = dict(row["artifact_metadata"] or {})
+        family = str(metadata.get("aggregate_family", ""))
+        if family not in season_model.MATCH_COUNT_COLUMN:
+            continue
+        key = (str(row["dataset_id"]), str(row["edition_id"]))
+        edition = editions.get(key)
+        if edition is None:
+            edition = SeasonEditionView(
+                dataset_id=str(row["dataset_id"]),
+                provider=str(row["provider"]),
+                sport_id=str(row["sport_id"]),
+                sport_name=str(row["sport_name"]),
+                competition_id=str(row["competition_id"]),
+                competition_name=str(row["competition_name"]),
+                edition_id=str(row["edition_id"]),
+                edition_label=str(row["edition_label"]),
+                measurement_class="SOURCE_DERIVED",
+                inclusion_rule=season_model.SKILLCORNER_INCLUSION_RULE,
+                glossary_url=season_model.SKILLCORNER_GLOSSARY_URL,
+                registry_version=season_model.SEASON_METRIC_REGISTRY_VERSION,
+                license=_license_view(row),
+                families=[],
+            )
+            editions[key] = edition
+        population_rows = metadata.get("source_population_rows")
+        edition.families.append(
+            SeasonFamilyRef(
+                family=family,
+                label=season_model.FAMILY_LABELS.get(family, family),
+                artifact_id=str(row["artifact_id"]),
+                row_count=int(row["row_count"]),
+                checksum_sha256=str(row["checksum_sha256"]),
+                run_id=str(row["run_id"]) if row["run_id"] else None,
+                grain_kind=str(row["data_grain_kind"]),
+                grain_axes=[str(axis) for axis in _list(row["data_grain_axes"])],
+                source_revision=metadata.get("source_revision"),
+                source_file_key=metadata.get("source_file_key"),
+                source_population_rows=(
+                    int(population_rows) if population_rows is not None else None
+                ),
+                match_count_column=season_model.MATCH_COUNT_COLUMN[family],
+            )
+        )
+    return list(editions.values())
+
+
+def season_player_links(
+    connection: Connection,
+    *,
+    dataset_id: str,
+    subject_id: str,
+    team_ids: list[str],
+) -> SeasonPlayerLinksView:
+    """Contests a season subject can open, through explicit identity authority only.
+
+    Appearances require a ``subject`` crosswalk row whose canonical id is the season
+    subject, and a session participant carrying that provider id in the same dataset.
+    Team contests are listed separately: they say the team played, not the player.
+    """
+    crosswalk = (
+        connection.execute(
+            sa.text(
+                """
+            SELECT provider_namespace, provider_entity_id
+            FROM provider_identity_crosswalk
+            WHERE entity_kind = 'subject' AND canonical_entity_id = :subject_id
+            ORDER BY provider_namespace, provider_entity_id
+            """
+            ),
+            {"subject_id": subject_id},
+        )
+        .mappings()
+        .all()
+    )
+    provider_ids = [str(row["provider_entity_id"]) for row in crosswalk]
+    appearances: list[SeasonContestLinkView] = []
+    if provider_ids:
+        expanding = sa.bindparam("provider_ids", expanding=True)
+        for row in connection.execute(
+            sa.text(
+                """
+            SELECT DISTINCT participant.dataset_id, participant.session_id,
+                   context.contest_id
+            FROM session_participant AS participant
+            JOIN session_sport_context AS context
+              ON context.dataset_id = participant.dataset_id
+             AND context.session_id = participant.session_id
+            WHERE participant.dataset_id = :dataset_id
+              AND participant.subject_id IN :provider_ids
+            ORDER BY participant.session_id
+            """
+            ).bindparams(expanding),
+            {"dataset_id": dataset_id, "provider_ids": provider_ids},
+        ).mappings():
+            appearances.append(
+                SeasonContestLinkView(
+                    dataset_id=str(row["dataset_id"]),
+                    session_id=str(row["session_id"]),
+                    contest_id=str(row["contest_id"]),
+                )
+            )
+    team_contests: list[str] = []
+    if team_ids:
+        expanding = sa.bindparam("team_ids", expanding=True)
+        team_contests = [
+            str(row[0])
+            for row in connection.execute(
+                sa.text(
+                    """
+                SELECT DISTINCT participation.contest_id
+                FROM contest_team AS participation
+                WHERE participation.team_id IN :team_ids
+                ORDER BY participation.contest_id
+                """
+                ).bindparams(expanding),
+                {"team_ids": team_ids},
+            )
+        ]
+    return SeasonPlayerLinksView(
+        subject_id=subject_id,
+        identity_authority="provider_identity_crosswalk(entity_kind=subject)",
+        provider_namespace=str(crosswalk[0]["provider_namespace"]) if crosswalk else None,
+        provider_player_ids=provider_ids,
+        appearances=appearances,
+        team_contest_ids=team_contests,
+    )

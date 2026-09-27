@@ -581,3 +581,157 @@ class HealthStatus(BaseModel):
     version: str
 
     model_config = ConfigDict(extra="forbid")
+
+
+# ---------------------------------------------------------------------------
+# SeasonLab (PLAYER_SEASON / TEAM_SEASON)
+# ---------------------------------------------------------------------------
+
+
+class SeasonFamilyRef(BaseModel):
+    """One provider aggregate family materialized for a competition edition."""
+
+    family: str
+    label: str
+    artifact_id: str
+    row_count: int
+    checksum_sha256: str
+    run_id: str | None
+    grain_kind: str
+    grain_axes: list[str]
+    source_revision: str | None
+    source_file_key: str | None
+    source_population_rows: int | None
+    match_count_column: str
+
+
+class SeasonEditionView(BaseModel):
+    """A competition edition that owns season-grain data, with its provenance."""
+
+    dataset_id: str
+    provider: str
+    sport_id: str
+    sport_name: str
+    competition_id: str
+    competition_name: str
+    edition_id: str
+    edition_label: str
+    measurement_class: str
+    inclusion_rule: str
+    glossary_url: str | None
+    registry_version: str
+    license: LicenseView
+    families: list[SeasonFamilyRef]
+
+
+class SeasonMetricView(BaseModel):
+    metric_id: str
+    column: str
+    family: str
+    label: str
+    group: str
+    unit: str
+    basis: str
+    definition: str
+    split: str | None
+    base: str | None
+    exposure: bool
+    higher_is: Literal["more", "faster", "neutral"]
+
+
+class SeasonTeamView(BaseModel):
+    team_id: str
+    display_name: str
+    rows: int
+
+
+class SeasonPositionView(BaseModel):
+    position_group: str
+    rows: int
+
+
+class SeasonFamilyView(BaseModel):
+    """Family metadata: metric registry and population facets. No metric values."""
+
+    edition: SeasonEditionView
+    family: SeasonFamilyRef
+    metrics: list[SeasonMetricView]
+    population_rows: int
+    population_subjects: int
+    teams: list[SeasonTeamView]
+    position_groups: list[SeasonPositionView]
+
+
+class SeasonRowView(BaseModel):
+    """One grain row: subject × team × edition × position group."""
+
+    subject_id: str
+    player_name: str
+    player_short_name: str | None
+    team_id: str
+    team_name: str
+    position_group: str
+    matches: int | None
+    values: dict[str, float | None]
+
+
+class SeasonRowPage(BaseModel):
+    total: int
+    limit: int
+    offset: int
+    metrics: list[str]
+    rows: list[SeasonRowView]
+
+
+class SeasonPopulationView(BaseModel):
+    """The explicit denominator every rank/percentile is relative to."""
+
+    scope: Literal["edition", "position", "team"]
+    label: str
+    team_id: str | None
+    position_group: str | None
+    min_matches: int | None
+    rows: int
+    unit_of_analysis: str
+
+
+class SeasonRankedMetricView(BaseModel):
+    metric_id: str
+    column: str
+    value: float | None
+    rank: int | None
+    percentile: float | None
+    valid_n: int
+    population_minimum: float | None
+    population_median: float | None
+    population_maximum: float | None
+
+
+class SeasonProfileView(BaseModel):
+    """Reproducible season profile: context, values, denominator and provenance."""
+
+    edition: SeasonEditionView
+    family: SeasonFamilyRef
+    row: SeasonRowView
+    population: SeasonPopulationView
+    metrics: list[SeasonRankedMetricView]
+    percentile_method: str
+    rank_method: str
+    caveats: list[str]
+
+
+class SeasonContestLinkView(BaseModel):
+    dataset_id: str
+    session_id: str
+    contest_id: str
+
+
+class SeasonPlayerLinksView(BaseModel):
+    """Contests linked to a season subject through the provider identity crosswalk."""
+
+    subject_id: str
+    identity_authority: str
+    provider_namespace: str | None
+    provider_player_ids: list[str]
+    appearances: list[SeasonContestLinkView]
+    team_contest_ids: list[str]

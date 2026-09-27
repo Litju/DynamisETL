@@ -25,6 +25,7 @@ from dynamis.config import ConfigurationError, Settings
 from dynamis.config import settings as resolve_settings
 from dynamis.gold.publish import resolve_gold_schema
 from dynamis.serving import repository
+from dynamis.serving import season as season_model
 from dynamis.serving import tactical as tactical_authority
 from dynamis.serving.dense import (
     ArtifactPathError,
@@ -62,6 +63,16 @@ from dynamis.serving.models import (
     RightsPolicyView,
     RunPage,
     RunView,
+    SeasonEditionView,
+    SeasonFamilyRef,
+    SeasonFamilyView,
+    SeasonMetricView,
+    SeasonPlayerLinksView,
+    SeasonPositionView,
+    SeasonProfileView,
+    SeasonRowPage,
+    SeasonRowView,
+    SeasonTeamView,
     ServingStatus,
     SessionDetail,
     SessionSummary,
@@ -81,6 +92,7 @@ API_VERSION = "0.1.0"
 ACCESS_LOG = logging.getLogger("dynamis.access")
 DEFAULT_PAGE_LIMIT = 100
 MAX_PAGE_LIMIT = 1000
+MAX_SEASON_METRICS = 160
 
 ARROW_MEDIA_TYPE = "application/vnd.apache.arrow.stream"
 
@@ -177,6 +189,38 @@ class ServingBackend(Protocol):
     def tactical_methodology(self) -> TacticalMethodologyPage: ...
 
     def tactical_quality(self, dataset_id: str) -> TacticalQualityView | None: ...
+
+    def season_editions(self) -> list[SeasonEditionView]: ...
+
+    def season_family(self, edition_id: str, family: str) -> SeasonFamilyView | None: ...
+
+    def season_rows(
+        self,
+        edition_id: str,
+        family: str,
+        *,
+        metrics: list[str],
+        filters: season_model.SeasonRowFilter,
+        limit: int,
+        offset: int,
+    ) -> SeasonRowPage | None: ...
+
+    def season_profile(
+        self,
+        edition_id: str,
+        family: str,
+        *,
+        subject_id: str,
+        team_id: str | None,
+        position_group: str | None,
+        scope: season_model.PopulationScope,
+        min_matches: int | None,
+        metrics: list[str],
+    ) -> SeasonProfileView | None: ...
+
+    def season_player_links(
+        self, edition_id: str, subject_id: str
+    ) -> SeasonPlayerLinksView | None: ...
 
 
 class PostgresServingBackend:
@@ -566,6 +610,142 @@ class PostgresServingBackend:
     def tactical_quality(self, dataset_id: str) -> TacticalQualityView | None:
         return tactical_authority.tactical_quality(dataset_id)
 
+    # -- SeasonLab -----------------------------------------------------------
+
+    def season_editions(self) -> list[SeasonEditionView]:
+        with self._connect() as connection:
+            return repository.list_season_editions(connection)
+
+    def _season_scope(
+        self, edition_id: str, family: str
+    ) -> tuple[SeasonEditionView, SeasonFamilyRef, Any] | None:
+        edition = next(
+            (item for item in self.season_editions() if item.edition_id == edition_id), None
+        )
+        if edition is None:
+            return None
+        ref = next((item for item in edition.families if item.family == family), None)
+        if ref is None:
+            return None
+        artifact = self.artifact(ref.artifact_id)
+        if artifact is None:
+            return None
+        return edition, ref, resolve_artifact_path(self.settings, artifact)
+
+    def season_family(self, edition_id: str, family: str) -> SeasonFamilyView | None:
+        scope = self._season_scope(edition_id, family)
+        if scope is None:
+            return None
+        edition, ref, path = scope
+        specs = season_model.family_metrics(family, season_model.artifact_columns(path))
+        summary = season_model.population_summary(path)
+        return SeasonFamilyView(
+            edition=edition,
+            family=ref,
+            metrics=[SeasonMetricView(**item) for item in season_model.metric_views(specs)],
+            population_rows=summary.rows,
+            population_subjects=summary.subjects,
+            teams=[
+                SeasonTeamView(team_id=team_id, display_name=name, rows=count)
+                for team_id, name, count in summary.teams
+            ],
+            position_groups=[
+                SeasonPositionView(position_group=group, rows=count)
+                for group, count in summary.position_groups
+            ],
+        )
+
+    def season_rows(
+        self,
+        edition_id: str,
+        family: str,
+        *,
+        metrics: list[str],
+        filters: season_model.SeasonRowFilter,
+        limit: int,
+        offset: int,
+    ) -> SeasonRowPage | None:
+        scope = self._season_scope(edition_id, family)
+        if scope is None:
+            return None
+        _, _, path = scope
+        _, columns = season_model.resolve_metric_columns(family, path, metrics)
+        total, rows = season_model.read_rows(
+            path, family=family, metrics=columns, filters=filters, limit=limit, offset=offset
+        )
+        return SeasonRowPage(
+            total=total,
+            limit=limit,
+            offset=offset,
+            metrics=columns,
+            rows=[
+                SeasonRowView(**season_model.row_view(row, family=family, metrics=columns))
+                for row in rows
+            ],
+        )
+
+    def season_profile(
+        self,
+        edition_id: str,
+        family: str,
+        *,
+        subject_id: str,
+        team_id: str | None,
+        position_group: str | None,
+        scope: season_model.PopulationScope,
+        min_matches: int | None,
+        metrics: list[str],
+    ) -> SeasonProfileView | None:
+        resolved = self._season_scope(edition_id, family)
+        if resolved is None:
+            return None
+        edition, ref, path = resolved
+        payload = season_model.profile_payload(
+            path,
+            family=family,
+            subject_id=subject_id,
+            team_id=team_id,
+            position_group=position_group,
+            scope=scope,
+            min_matches=min_matches,
+            requested_metrics=metrics,
+            edition_label=edition.edition_label,
+            competition_name=edition.competition_name,
+        )
+        if payload is None:
+            return None
+        return SeasonProfileView(edition=edition, family=ref, **payload)
+
+    def season_player_links(self, edition_id: str, subject_id: str) -> SeasonPlayerLinksView | None:
+        edition = next(
+            (item for item in self.season_editions() if item.edition_id == edition_id), None
+        )
+        if edition is None:
+            return None
+        team_ids: set[str] = set()
+        for ref in edition.families:
+            artifact = self.artifact(ref.artifact_id)
+            if artifact is None:
+                continue
+            path = resolve_artifact_path(self.settings, artifact)
+            _, rows = season_model.read_rows(
+                path,
+                family=ref.family,
+                metrics=[],
+                filters=season_model.SeasonRowFilter(subject_ids=(subject_id,)),
+                limit=64,
+            )
+            team_ids.update(str(row["team_id"]) for row in rows)
+        if not team_ids:
+            return None
+        with self._connect() as connection:
+            return repository.season_player_links(
+                connection,
+                dataset_id=edition.dataset_id,
+                subject_id=subject_id,
+                team_ids=sorted(team_ids),
+            )
+
 
 def _backend_from_app(request: Request) -> ServingBackend:
     backend = getattr(request.app.state, "backend", None)
@@ -723,6 +903,132 @@ def create_app(
     )
     def sports_catalog_matches(service: BackendDependency) -> list[SportsCatalogMatchView]:
         return service.sports_catalog_matches()
+
+    def _metric_list(raw: str | None) -> list[str]:
+        items = [item.strip() for item in (raw or "").split(",") if item.strip()]
+        if len(items) > MAX_SEASON_METRICS:
+            raise HTTPException(
+                status_code=422, detail=f"at most {MAX_SEASON_METRICS} metrics per request"
+            )
+        return items
+
+    def _season_failure(exc: season_model.SeasonDataError) -> HTTPException:
+        return HTTPException(status_code=422, detail=str(exc))
+
+    @app.get("/api/season/editions", response_model=list[SeasonEditionView], tags=["season"])
+    def season_editions(service: BackendDependency) -> list[SeasonEditionView]:
+        return service.season_editions()
+
+    @app.get(
+        "/api/season/editions/{edition_id}/families/{family}",
+        response_model=SeasonFamilyView,
+        tags=["season"],
+    )
+    def season_family(edition_id: str, family: str, service: BackendDependency) -> SeasonFamilyView:
+        try:
+            found = service.season_family(edition_id, family)
+        except season_model.SeasonDataError as exc:
+            raise _season_failure(exc) from exc
+        if found is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"season family {family!r} is not materialized for {edition_id!r}",
+            )
+        return found
+
+    @app.get(
+        "/api/season/editions/{edition_id}/families/{family}/rows",
+        response_model=SeasonRowPage,
+        tags=["season"],
+    )
+    def season_rows(
+        edition_id: str,
+        family: str,
+        service: BackendDependency,
+        metrics: str | None = Query(default=None, description="Comma-separated metric columns"),
+        team_id: str | None = Query(default=None),
+        position_group: str | None = Query(default=None),
+        subject_id: Annotated[list[str] | None, Query()] = None,
+        min_matches: int | None = Query(default=None, ge=1, le=100),
+        limit: int = Query(default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT),
+        offset: int = Query(default=0, ge=0),
+    ) -> SeasonRowPage:
+        filters = season_model.SeasonRowFilter(
+            team_id=team_id,
+            position_group=position_group,
+            subject_ids=tuple(subject_id or ()),
+            min_matches=min_matches,
+        )
+        try:
+            found = service.season_rows(
+                edition_id,
+                family,
+                metrics=_metric_list(metrics),
+                filters=filters,
+                limit=limit,
+                offset=offset,
+            )
+        except season_model.SeasonDataError as exc:
+            raise _season_failure(exc) from exc
+        if found is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"season family {family!r} is not materialized for {edition_id!r}",
+            )
+        return found
+
+    @app.get(
+        "/api/season/editions/{edition_id}/families/{family}/profile",
+        response_model=SeasonProfileView,
+        tags=["season"],
+    )
+    def season_profile(
+        edition_id: str,
+        family: str,
+        service: BackendDependency,
+        subject_id: str = Query(min_length=1, max_length=256),
+        team_id: str | None = Query(default=None),
+        position_group: str | None = Query(default=None),
+        population: Literal["edition", "position", "team"] = Query(default="position"),
+        min_matches: int | None = Query(default=None, ge=1, le=100),
+        metrics: str | None = Query(default=None, description="Comma-separated metric columns"),
+    ) -> SeasonProfileView:
+        try:
+            found = service.season_profile(
+                edition_id,
+                family,
+                subject_id=subject_id,
+                team_id=team_id,
+                position_group=position_group,
+                scope=population,
+                min_matches=min_matches,
+                metrics=_metric_list(metrics),
+            )
+        except season_model.SeasonDataError as exc:
+            raise _season_failure(exc) from exc
+        if found is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"no {family!r} season row for {subject_id!r} in {edition_id!r}",
+            )
+        return found
+
+    @app.get(
+        "/api/season/editions/{edition_id}/links",
+        response_model=SeasonPlayerLinksView,
+        tags=["season"],
+    )
+    def season_player_links(
+        edition_id: str,
+        service: BackendDependency,
+        subject_id: str = Query(min_length=1, max_length=256),
+    ) -> SeasonPlayerLinksView:
+        found = service.season_player_links(edition_id, subject_id)
+        if found is None:
+            raise HTTPException(
+                status_code=404, detail=f"no season row for {subject_id!r} in {edition_id!r}"
+            )
+        return found
 
     @app.get("/api/catalog/datasets/{dataset_id}", response_model=DatasetDetail, tags=["catalog"])
     def dataset_detail(dataset_id: str, service: BackendDependency) -> DatasetDetail:
