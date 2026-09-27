@@ -139,8 +139,18 @@ def read_box(path: Path, *, contest_id: str) -> tuple[list[str], list[dict[str, 
         for name in names
         if not (name.startswith("src_") and name.endswith(_PRESENTATION_SUFFIXES))
     ]
-    columns = [name.removeprefix("src_") for name in keep]
-    rows = [{name.removeprefix("src_"): _clean(row[name]) for name in keep} for row in raw]
+    columns = [
+        f"source__{name.removeprefix('src_')}" if name.startswith("src_") else name for name in keep
+    ]
+    rows = [
+        {
+            (f"source__{name.removeprefix('src_')}" if name.startswith("src_") else name): _clean(
+                row[name]
+            )
+            for name in keep
+        }
+        for row in raw
+    ]
     return columns, rows
 
 

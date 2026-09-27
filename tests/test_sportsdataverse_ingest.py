@@ -278,7 +278,12 @@ def test_bounded_game_reads_scope_to_one_contest(tmp_path: Path) -> None:
     pq.write_table(result.artifacts["team_game"][0], box_path)
     columns, rows = games.read_box(box_path, contest_id=contest)
     assert "team_logo" not in columns  # presentation assets are not served
-    assert {row["team_score"] for row in rows} == {100, 98}
+    assert "source__team_id" in columns and columns.count("team_id") == 1
+    expected_provider_teams = {
+        row["team_id"]: row["src_team_id"] for row in result.artifacts["team_game"][0].to_pylist()
+    }
+    assert all(expected_provider_teams[row["team_id"]] == row["source__team_id"] for row in rows)
+    assert {row["source__team_score"] for row in rows} == {100, 98}
 
 
 class _RightsBackend:

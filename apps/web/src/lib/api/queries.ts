@@ -563,3 +563,72 @@ export const seasonLinksQuery = (editionId: string, subjectId: string) =>
       ),
     staleTime: 5 * 60_000,
   });
+
+// -- GameLab --------------------------------------------------------------------
+// Game metadata is small; one game's full play-by-play (≤ ~650 plays) is one
+// bounded request, keyed by contest so a game switch never shows another game.
+
+export const gameEditionsQuery = () =>
+  queryOptions({
+    queryKey: ["games", "editions"] as const,
+    queryFn: async () => unwrap(await api.GET("/api/games/editions")),
+    staleTime: 5 * 60_000,
+  });
+
+export const gamesQuery = (editionId: string, offset: number) =>
+  queryOptions({
+    queryKey: ["games", "list", editionId, offset] as const,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/games", {
+          params: { query: { edition_id: editionId, limit: 60, offset } },
+          signal,
+        }),
+      ),
+    staleTime: 5 * 60_000,
+  });
+
+export const gameQuery = (contestId: string) =>
+  queryOptions({
+    queryKey: ["games", "detail", contestId] as const,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/games/{contest_id}", {
+          params: { path: { contest_id: contestId } },
+          signal,
+        }),
+      ),
+    staleTime: 10 * 60_000,
+  });
+
+export const gamePlaysQuery = (contestId: string, sourceColumns: readonly string[]) =>
+  queryOptions({
+    queryKey: ["games", "plays", contestId, sourceColumns.join(",")] as const,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/games/{contest_id}/plays", {
+          params: {
+            path: { contest_id: contestId },
+            query: {
+              limit: 1000,
+              source_columns: sourceColumns.join(",") || null,
+            },
+          },
+          signal,
+        }),
+      ),
+    staleTime: 10 * 60_000,
+  });
+
+export const gameBoxQuery = (contestId: string, grain: "player" | "team") =>
+  queryOptions({
+    queryKey: ["games", "box", contestId, grain] as const,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/games/{contest_id}/box", {
+          params: { path: { contest_id: contestId }, query: { grain } },
+          signal,
+        }),
+      ),
+    staleTime: 10 * 60_000,
+  });

@@ -7,6 +7,7 @@ import {
 
 import { defineCatalogRoute } from "@/routes/catalog";
 import { defineCompareRoute } from "@/routes/compare";
+import { defineGamesRoute } from "@/routes/games";
 import { defineLabRoute } from "@/routes/lab";
 import { defineLabIndexRoute } from "@/routes/lab-index";
 import { defineMethodsRoute } from "@/routes/methods";
@@ -28,6 +29,7 @@ export function buildRouteTree() {
     defineLabIndexRoute(root),
     defineLabRoute(root),
     defineCompareRoute(root),
+    defineGamesRoute(root),
     defineSeasonRoute(root),
     defineMethodsRoute(root),
     defineRunsRoute(root),
