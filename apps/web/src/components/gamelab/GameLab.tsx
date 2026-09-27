@@ -1,8 +1,7 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight, Clock3, ShieldAlert } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef } from "react";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { useCallback, useEffect, useMemo } from "react";
 import type { KeyboardEvent } from "react";
 
 import type {
@@ -616,15 +615,81 @@ function PlayTimeline({
   onSelect: (play: GamePlayView) => void;
   onMove: (direction: -1 | 1) => void;
 }) {
-  const scrollRef = useRef<HTMLDivElement | null>(null);
-  const virtualizer = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: () => 48,
-    overscan: 10,
-    initialRect: { width: 900, height: 420 },
-  });
-  const items = virtualizer.getVirtualItems();
+  const sport = gameSport(detail.edition) ?? "nba";
+  const columns = useMemo<DataTableColumn<GamePlayView>[]>(() => [
+    {
+      id: "period-clock",
+      header: "Period / clock",
+      accessor: (play) => `${play.period_number} ${clockLabel(play) ?? ""}`,
+      cell: (play) => {
+        const period = detail.periods.find((candidate) => candidate.number === play.period_number);
+        return (
+          <div className="min-w-0 leading-tight">
+            <span className="block truncate text-[9px] text-text-muted">{periodName(period)}</span>
+            <span className="mono text-[11px] text-text-primary">{clockLabel(play) ?? "—"}</span>
+          </div>
+        );
+      },
+      size: 0.6,
+      sortable: false,
+    },
+    {
+      id: "event",
+      header: "Play",
+      accessor: (play) => presentEvent(sport, play).label,
+      cell: (play) => {
+        const presentation = presentEvent(sport, play);
+        const period = detail.periods.find((candidate) => candidate.number === play.period_number);
+        const clock = clockLabel(play) ?? "—";
+        const team = play.team_id ? detail.teams_by_id[play.team_id] : null;
+        const player = play.subject_id ? detail.subjects[play.subject_id] : null;
+        const selected = selectedEventId === play.source_event_id;
+        return (
+          <button
+            type="button"
+            aria-label={`${periodName(period)} ${clock}, ${presentation.label}${team ? `, ${team}` : ""}${player ? `, ${player}` : ""}`}
+            aria-pressed={selected}
+            onClick={(event) => {
+              event.stopPropagation();
+              onSelect(play);
+            }}
+            data-event-id={play.source_event_id}
+            data-testid="play-row"
+            className="block w-full min-w-0 text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+          >
+            <span className={`block truncate text-[11px] font-medium ${selected ? "text-text-primary" : "text-text-secondary"}`}>
+              {presentation.label}
+            </span>
+            <span className="block truncate text-[10px] text-text-muted">
+              {presentation.description ?? play.provider_event_type}
+            </span>
+          </button>
+        );
+      },
+      size: 2.2,
+      sortable: false,
+    },
+    {
+      id: "team-order",
+      header: "Team / sequence",
+      accessor: (play) => {
+        const team = play.team_id ? detail.teams_by_id[play.team_id] : "";
+        return `${team} ${play.sequence_index}`;
+      },
+      cell: (play) => {
+        const team = play.team_id ? detail.teams_by_id[play.team_id] : null;
+        return (
+          <div className="min-w-0 text-right">
+            <span className="block truncate text-[10px] text-text-secondary">{team ?? "—"}</span>
+            <span className="mono text-[9px] text-text-muted">{play.sequence_index}</span>
+          </div>
+        );
+      },
+      size: 0.7,
+      align: "right",
+      sortable: false,
+    },
+  ], [detail, onSelect, selectedEventId, sport]);
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -641,62 +706,26 @@ function PlayTimeline({
     }
   };
 
-  if (rows.length === 0) {
-    return <StatePanel state="empty" title="No plays are available for this period." />;
-  }
-
   return (
     <div
-      ref={scrollRef}
-      role="listbox"
+      role="group"
       aria-label="Game plays. Use up and down arrows to change the selected play."
-      aria-activedescendant={selectedEventId ? `play-${safeId(selectedEventId)}` : undefined}
       tabIndex={0}
       onKeyDown={onKeyDown}
-      className="min-h-0 flex-1 overflow-auto outline-none focus-visible:ring-1 focus-visible:ring-accent"
+      className="min-h-0 flex-1 outline-none focus-visible:ring-1 focus-visible:ring-accent"
       data-testid="game-timeline"
     >
-      <div className="relative" style={{ height: virtualizer.getTotalSize() }}>
-        {items.map((item) => {
-          const play = rows[item.index];
-          if (!play) return null;
-          const presentation = presentEvent(gameSport(detail.edition) ?? "nba", play);
-          const period = detail.periods.find((candidate) => candidate.number === play.period_number);
-          const player = play.subject_id ? detail.subjects[play.subject_id] : null;
-          const team = play.team_id ? detail.teams_by_id[play.team_id] : null;
-          const clock = clockLabel(play) ?? "—";
-          const id = `play-${safeId(play.source_event_id)}`;
-          const selected = selectedEventId === play.source_event_id;
-          return (
-            <button
-              key={`${play.period_number}:${play.sequence_index}:${play.source_event_id}`}
-              id={id}
-              type="button"
-              role="option"
-              aria-selected={selected}
-              aria-label={`${periodName(period)} ${clock}, ${presentation.label}${team ? `, ${team}` : ""}${player ? `, ${player}` : ""}`}
-              onClick={() => onSelect(play)}
-              data-event-id={play.source_event_id}
-              data-testid="play-row"
-              className={`absolute left-0 top-0 grid w-full grid-cols-[4.4rem_minmax(0,1fr)_minmax(5rem,0.45fr)] items-center gap-2 border-b border-border-subtle/70 px-3 text-left transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent ${selected ? "bg-surface-3 shadow-[inset_2px_0_0_0_var(--d-accent)]" : "bg-surface-1"}`}
-              style={{ height: item.size, transform: `translateY(${item.start}px)` }}
-            >
-              <span className="min-w-0">
-                <span className="block text-[9px] text-text-muted">{periodName(period)}</span>
-                <span className="mono text-[11px] text-text-primary">{clock}</span>
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-[11px] font-medium text-text-primary">{presentation.label}</span>
-                <span className="block truncate text-[10px] text-text-secondary">{presentation.description ?? play.provider_event_type}</span>
-              </span>
-              <span className="min-w-0 text-right">
-                <span className="block truncate text-[10px] text-text-secondary">{team ?? "—"}</span>
-                <span className="mono text-[9px] text-text-muted">{play.sequence_index}</span>
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      <DataTable
+        rows={rows}
+        columns={columns}
+        getRowId={(play) => play.source_event_id}
+        onRowClick={onSelect}
+        selectedRowId={selectedEventId || null}
+        emptyState={<StatePanel state="empty" title="No plays are available for this period." />}
+        virtualizeAbove={100}
+        rowHeight={48}
+        ariaLabel="Game plays"
+      />
     </div>
   );
 }
@@ -1090,8 +1119,4 @@ function sourcePlayers(source: Record<string, unknown>, prefix: "home_on_" | "aw
 function sourceText(source: Record<string, unknown>, key: string): string | null {
   const value = source[key];
   return typeof value === "string" && value.length > 0 ? value : null;
-}
-
-function safeId(value: string): string {
-  return value.replace(/[^A-Za-z0-9_-]/g, "_");
 }

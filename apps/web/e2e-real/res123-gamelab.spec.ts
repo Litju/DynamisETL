@@ -51,7 +51,7 @@ test("RES-123 GameLab real NBA and NHL acceptance", async ({ page, request }) =>
   await expect.poll(() => new URL(page.url()).searchParams.get("team")).toBe(selectedTeam.team_id);
   const firstNbaLink = page.url();
   await page.reload();
-  await expect(page.locator(`[data-event-id="${firstNbaPlay.source_event_id}"]`)).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator(`[data-event-id="${firstNbaPlay.source_event_id}"]`)).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("combobox", { name: "Selected team" })).toHaveValue(selectedTeam.team_id);
 
   await page.getByTestId("game-timeline").focus();
@@ -108,7 +108,7 @@ test("RES-123 GameLab real NBA and NHL acceptance", async ({ page, request }) =>
   assertUrlPlay(page, firstNhlPlay);
   const firstNhlLink = page.url();
   await page.reload();
-  await expect(page.locator(`[data-event-id="${firstNhlPlay.source_event_id}"]`)).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator(`[data-event-id="${firstNhlPlay.source_event_id}"]`)).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByLabel("NHL source lineup context")).toContainText("Brad Marchand");
   await expect(page).toHaveURL(firstNhlLink);
 
