@@ -2423,6 +2423,354 @@
         "title": "SkeletonDisplayConnectionView",
         "type": "object"
       },
+      "SourceCapabilityView": {
+        "properties": {
+          "availability_state": {
+            "title": "Availability State",
+            "type": "string"
+          },
+          "entry_id": {
+            "title": "Entry Id",
+            "type": "string"
+          },
+          "external_id": {
+            "title": "External Id",
+            "type": "string"
+          },
+          "local_capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Local Capabilities",
+            "type": "array"
+          },
+          "local_readiness": {
+            "title": "Local Readiness",
+            "type": "string"
+          },
+          "object_kind": {
+            "title": "Object Kind",
+            "type": "string"
+          },
+          "pending_local_capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Pending Local Capabilities",
+            "type": "array"
+          },
+          "provider_metadata": {
+            "additionalProperties": true,
+            "title": "Provider Metadata",
+            "type": "object"
+          },
+          "source_file_states": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Source File States",
+            "type": "object"
+          },
+          "source_readiness": {
+            "title": "Source Readiness",
+            "type": "string"
+          },
+          "upstream_capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Upstream Capabilities",
+            "type": "array"
+          }
+        },
+        "required": [
+          "entry_id",
+          "external_id",
+          "object_kind",
+          "availability_state",
+          "source_readiness",
+          "local_readiness",
+          "upstream_capabilities",
+          "local_capabilities",
+          "pending_local_capabilities",
+          "provider_metadata",
+          "source_file_states"
+        ],
+        "title": "SourceCapabilityView",
+        "type": "object"
+      },
+      "SportsCatalogMatchView": {
+        "description": "Metadata-only contest entry from the normalized sports and source catalogs.",
+        "properties": {
+          "actual_start_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Start At"
+          },
+          "competition_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Competition Id"
+          },
+          "competition_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Competition Name"
+          },
+          "contest_id": {
+            "title": "Contest Id",
+            "type": "string"
+          },
+          "dataset_id": {
+            "title": "Dataset Id",
+            "type": "string"
+          },
+          "edition_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edition Id"
+          },
+          "edition_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edition Label"
+          },
+          "home_away_supported": {
+            "title": "Home Away Supported",
+            "type": "boolean"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "periods": {
+            "items": {
+              "$ref": "#/components/schemas/SportsCatalogPeriodView"
+            },
+            "title": "Periods",
+            "type": "array"
+          },
+          "provider_match_id": {
+            "title": "Provider Match Id",
+            "type": "string"
+          },
+          "scheduled_start_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scheduled Start At"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "source_capability": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SourceCapabilityView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sport_code": {
+            "title": "Sport Code",
+            "type": "string"
+          },
+          "sport_id": {
+            "title": "Sport Id",
+            "type": "string"
+          },
+          "sport_name": {
+            "title": "Sport Name",
+            "type": "string"
+          },
+          "teams": {
+            "items": {
+              "$ref": "#/components/schemas/SportsCatalogTeamView"
+            },
+            "title": "Teams",
+            "type": "array"
+          },
+          "venue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue"
+          }
+        },
+        "required": [
+          "dataset_id",
+          "session_id",
+          "provider_match_id",
+          "contest_id",
+          "sport_id",
+          "sport_code",
+          "sport_name",
+          "competition_id",
+          "competition_name",
+          "edition_id",
+          "edition_label",
+          "label",
+          "scheduled_start_at",
+          "actual_start_at",
+          "venue",
+          "home_away_supported",
+          "teams",
+          "periods"
+        ],
+        "title": "SportsCatalogMatchView",
+        "type": "object"
+      },
+      "SportsCatalogPeriodView": {
+        "properties": {
+          "contest_period_id": {
+            "title": "Contest Period Id",
+            "type": "string"
+          },
+          "end_ns": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Ns"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "source_period_number": {
+            "title": "Source Period Number",
+            "type": "string"
+          },
+          "start_ns": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Ns"
+          }
+        },
+        "required": [
+          "contest_period_id",
+          "source_period_number",
+          "kind",
+          "label",
+          "start_ns",
+          "end_ns"
+        ],
+        "title": "SportsCatalogPeriodView",
+        "type": "object"
+      },
+      "SportsCatalogTeamView": {
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "side": {
+            "title": "Side",
+            "type": "string"
+          },
+          "team_id": {
+            "title": "Team Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "team_id",
+          "display_name",
+          "side",
+          "score"
+        ],
+        "title": "SportsCatalogTeamView",
+        "type": "object"
+      },
       "StreamView": {
         "properties": {
           "clock_id": {
@@ -3700,6 +4048,77 @@
           }
         },
         "summary": "Session Detail",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/catalog/source-capabilities": {
+      "get": {
+        "operationId": "source_capabilities_api_catalog_source_capabilities_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "dataset_id",
+            "required": true,
+            "schema": {
+              "title": "Dataset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SourceCapabilityView"
+                  },
+                  "title": "Response Source Capabilities Api Catalog Source Capabilities Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Source Capabilities",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/catalog/sports/matches": {
+      "get": {
+        "operationId": "sports_catalog_matches_api_catalog_sports_matches_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SportsCatalogMatchView"
+                  },
+                  "title": "Response Sports Catalog Matches Api Catalog Sports Matches Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Sports Catalog Matches",
         "tags": [
           "catalog"
         ]

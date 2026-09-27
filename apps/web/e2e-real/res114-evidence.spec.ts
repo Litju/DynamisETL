@@ -68,7 +68,7 @@ test("RES-114 §19 real SkillCorner MatchLab composition and responsive evidence
   await expect(defaultPose).toHaveAttribute("data-canonical-time-ns", await defaultField.getAttribute("data-canonical-time-ns"));
   await expect(page.getByLabel("Dashboard selected player")).toHaveValue(defaultSubjectId!);
   await page.getByRole("button", { name: "Open MatchLab explorer" }).click();
-  await expect(page.getByRole("heading", { name: "Session explorer" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Match Navigator" }).last()).toBeVisible();
   await page.getByRole("button", { name: "Close MatchLab explorer" }).last().click();
   await capture(page, "00-skillcorner-matchlab-source-selected-default-1440x900.png");
 

@@ -62,6 +62,9 @@ from dynamis.serving.models import (
     SessionParticipantView,
     SessionSummary,
     SourceCapabilityView,
+    SportsCatalogMatchView,
+    SportsCatalogPeriodView,
+    SportsCatalogTeamView,
     StreamView,
     TrialView,
 )
@@ -240,6 +243,47 @@ class FakeBackend:
                 pending_local_capabilities=["EVENTS", "PHASES"],
                 provider_metadata={"pose_availability": "UPSTREAM_AVAILABLE"},
                 source_file_states={"pose": "ACQUIRED"},
+            )
+        ]
+
+    def sports_catalog_matches(self) -> list[SportsCatalogMatchView]:
+        return [
+            SportsCatalogMatchView(
+                dataset_id="skillcorner-opendata",
+                session_id="1925299",
+                provider_match_id="1925299",
+                contest_id="skillcorner:contest:1925299",
+                sport_id="football",
+                sport_code="football",
+                sport_name="Football",
+                competition_id="skillcorner:competition:9",
+                competition_name="A-League",
+                edition_id="skillcorner:edition:870",
+                edition_label="2024/2025",
+                label="Brisbane Roar FC vs Perth Glory",
+                scheduled_start_at=None,
+                actual_start_at=None,
+                venue=None,
+                home_away_supported=True,
+                teams=[
+                    SportsCatalogTeamView(
+                        team_id="brisbane", display_name="Brisbane Roar FC", side="home", score=0
+                    ),
+                    SportsCatalogTeamView(
+                        team_id="perth", display_name="Perth Glory", side="away", score=1
+                    ),
+                ],
+                periods=[
+                    SportsCatalogPeriodView(
+                        contest_period_id="period-1",
+                        source_period_number="1",
+                        kind="half",
+                        label="first half",
+                        start_ns=None,
+                        end_ns=None,
+                    )
+                ],
+                source_capability=self.source_capabilities("skillcorner-opendata")[0],
             )
         ]
 
@@ -560,6 +604,22 @@ def test_source_capabilities_separate_upstream_and_local_readiness(client: TestC
     assert _source_readiness("REGISTERED", set()) == "UPSTREAM_UNAVAILABLE"
 
 
+def test_sports_catalog_route_returns_normalized_metadata_and_source_readiness(
+    client: TestClient,
+) -> None:
+    response = client.get("/api/catalog/sports/matches")
+    assert response.status_code == 200
+    match = response.json()[0]
+    assert (match["sport_name"], match["competition_name"], match["edition_label"]) == (
+        "Football",
+        "A-League",
+        "2024/2025",
+    )
+    assert [team["side"] for team in match["teams"]] == ["home", "away"]
+    assert "POSE" in match["source_capability"]["upstream_capabilities"]
+    assert match["source_capability"]["local_readiness"] == "PARTIAL"
+
+
 def test_pitch_dimensions_require_positive_finite_source_metres() -> None:
     assert PitchDimensionsView(length_m=105.0, width_m=68.0).width_m == 68.0
     with pytest.raises(ValueError):
@@ -672,6 +732,7 @@ def test_openapi_document_covers_the_locked_surface() -> None:
         "/api/serving/status",
         "/api/catalog/datasets",
         "/api/catalog/source-capabilities",
+        "/api/catalog/sports/matches",
         "/api/catalog/datasets/{dataset_id}",
         "/api/catalog/datasets/{dataset_id}/sessions",
         "/api/catalog/datasets/{dataset_id}/sessions/{session_id}",

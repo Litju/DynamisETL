@@ -4,6 +4,7 @@ import { ChevronDown, ChevronRight, PanelLeftClose } from "lucide-react";
 import { useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import { StatePanel } from "@/components/common/StatePanel";
+import { MatchNavigator } from "@/components/matchlab/MatchNavigator";
 import { sessionQuery } from "@/lib/api/queries";
 import { surfaceForModality } from "@/lib/capabilities";
 import type { LabSearch } from "@/lib/search";
@@ -21,6 +22,24 @@ export function Explorer({ onCollapse }: { readonly onCollapse?: () => void } = 
   const search = new URLSearchParams(location.searchStr ?? "");
   const selectedStream = search.get("stream");
   const selectedTrial = search.get("trial");
+
+  if (search.get("view") === "matchlab") {
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        <header className="flex h-8 shrink-0 items-center justify-between border-b border-border-subtle px-3">
+          <h2 className="t-section">Match Navigator</h2>
+          {onCollapse ? (
+            <button type="button" aria-label="Close MatchLab explorer" onClick={onCollapse} className="flex size-6 items-center justify-center rounded-control text-text-muted hover:bg-surface-2 hover:text-text-secondary">
+              <PanelLeftClose size={13} aria-hidden="true" />
+            </button>
+          ) : null}
+        </header>
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <MatchNavigator compact />
+        </div>
+      </div>
+    );
+  }
 
   if (!datasetId || !sessionId) {
     return (

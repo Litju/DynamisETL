@@ -81,6 +81,46 @@ class SourceCapabilityView(BaseModel):
     source_file_states: dict[str, str]
 
 
+class SportsCatalogTeamView(BaseModel):
+    team_id: str
+    display_name: str
+    side: str
+    score: int | None
+
+
+class SportsCatalogPeriodView(BaseModel):
+    contest_period_id: str
+    source_period_number: str
+    kind: str
+    label: str | None
+    start_ns: int | None
+    end_ns: int | None
+
+
+class SportsCatalogMatchView(BaseModel):
+    """Metadata-only contest entry from the normalized sports and source catalogs."""
+
+    dataset_id: str
+    session_id: str | None
+    provider_match_id: str
+    contest_id: str
+    sport_id: str
+    sport_code: str
+    sport_name: str
+    competition_id: str | None
+    competition_name: str | None
+    edition_id: str | None
+    edition_label: str | None
+    label: str | None
+    scheduled_start_at: str | None
+    actual_start_at: str | None
+    venue: str | None
+    home_away_supported: bool
+    teams: list[SportsCatalogTeamView]
+    periods: list[SportsCatalogPeriodView]
+    source_capability: SourceCapabilityView | None = None
+
+
 class SubjectView(BaseModel):
     subject_id: str
     sex: str

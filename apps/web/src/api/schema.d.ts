@@ -118,6 +118,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/catalog/source-capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Source Capabilities */
+        get: operations["source_capabilities_api_catalog_source_capabilities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalog/sports/matches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sports Catalog Matches */
+        get: operations["sports_catalog_matches_api_catalog_sports_matches_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/derived-metrics/{derived_metric_id}/provenance": {
         parameters: {
             query?: never;
@@ -1175,6 +1209,104 @@ export interface components {
             /** Start Joint Name */
             start_joint_name: string;
         };
+        /** SourceCapabilityView */
+        SourceCapabilityView: {
+            /** Availability State */
+            availability_state: string;
+            /** Entry Id */
+            entry_id: string;
+            /** External Id */
+            external_id: string;
+            /** Local Capabilities */
+            local_capabilities: string[];
+            /** Local Readiness */
+            local_readiness: string;
+            /** Object Kind */
+            object_kind: string;
+            /** Pending Local Capabilities */
+            pending_local_capabilities: string[];
+            /** Provider Metadata */
+            provider_metadata: {
+                [key: string]: unknown;
+            };
+            /** Source File States */
+            source_file_states: {
+                [key: string]: string;
+            };
+            /** Source Readiness */
+            source_readiness: string;
+            /** Upstream Capabilities */
+            upstream_capabilities: string[];
+        };
+        /**
+         * SportsCatalogMatchView
+         * @description Metadata-only contest entry from the normalized sports and source catalogs.
+         */
+        SportsCatalogMatchView: {
+            /** Actual Start At */
+            actual_start_at: string | null;
+            /** Competition Id */
+            competition_id: string | null;
+            /** Competition Name */
+            competition_name: string | null;
+            /** Contest Id */
+            contest_id: string;
+            /** Dataset Id */
+            dataset_id: string;
+            /** Edition Id */
+            edition_id: string | null;
+            /** Edition Label */
+            edition_label: string | null;
+            /** Home Away Supported */
+            home_away_supported: boolean;
+            /** Label */
+            label: string | null;
+            /** Periods */
+            periods: components["schemas"]["SportsCatalogPeriodView"][];
+            /** Provider Match Id */
+            provider_match_id: string;
+            /** Scheduled Start At */
+            scheduled_start_at: string | null;
+            /** Session Id */
+            session_id: string | null;
+            source_capability?: components["schemas"]["SourceCapabilityView"] | null;
+            /** Sport Code */
+            sport_code: string;
+            /** Sport Id */
+            sport_id: string;
+            /** Sport Name */
+            sport_name: string;
+            /** Teams */
+            teams: components["schemas"]["SportsCatalogTeamView"][];
+            /** Venue */
+            venue: string | null;
+        };
+        /** SportsCatalogPeriodView */
+        SportsCatalogPeriodView: {
+            /** Contest Period Id */
+            contest_period_id: string;
+            /** End Ns */
+            end_ns: number | null;
+            /** Kind */
+            kind: string;
+            /** Label */
+            label: string | null;
+            /** Source Period Number */
+            source_period_number: string;
+            /** Start Ns */
+            start_ns: number | null;
+        };
+        /** SportsCatalogTeamView */
+        SportsCatalogTeamView: {
+            /** Display Name */
+            display_name: string;
+            /** Score */
+            score: number | null;
+            /** Side */
+            side: string;
+            /** Team Id */
+            team_id: string;
+        };
         /** StreamView */
         StreamView: {
             /** Clock Id */
@@ -1650,6 +1782,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    source_capabilities_api_catalog_source_capabilities_get: {
+        parameters: {
+            query: {
+                dataset_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceCapabilityView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sports_catalog_matches_api_catalog_sports_matches_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SportsCatalogMatchView"][];
                 };
             };
         };

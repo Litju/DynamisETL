@@ -16,6 +16,7 @@ from typing import Any, Literal
 import sqlalchemy as sa
 from sqlalchemy.engine import Connection
 
+from dynamis.contracts.sports import Capability, derive_capability_profile
 from dynamis.gold.build import MART_NAMES
 from dynamis.serving.models import (
     AlgorithmView,
@@ -41,6 +42,9 @@ from dynamis.serving.models import (
     SessionSummary,
     SkeletonDisplayConnectionView,
     SourceCapabilityView,
+    SportsCatalogMatchView,
+    SportsCatalogPeriodView,
+    SportsCatalogTeamView,
     StreamView,
     SubjectView,
     TrialView,
@@ -92,10 +96,13 @@ def list_source_capabilities(connection: Connection, dataset_id: str) -> list[So
         return []
 
     local: dict[str, set[str]] = {str(row["entry_id"]): set() for row in entries}
+    local_evidence: dict[str, list[tuple[Capability, str]]] = {
+        str(row["entry_id"]): [] for row in entries
+    }
     modalities = connection.execute(
         sa.text(
             """
-            SELECT ctx.source_catalog_entry_id, stream.modality
+            SELECT ctx.source_catalog_entry_id, stream.modality, artifact.artifact_id
             FROM session_sport_context AS ctx
             JOIN sensor_stream AS stream
               ON stream.dataset_id = ctx.dataset_id
@@ -116,12 +123,16 @@ def list_source_capabilities(connection: Connection, dataset_id: str) -> list[So
     }
     for row in modalities:
         entry_id = str(row["source_catalog_entry_id"])
-        local.setdefault(entry_id, set()).update(modality_capabilities.get(row["modality"], set()))
+        capabilities = modality_capabilities.get(row["modality"], set())
+        local.setdefault(entry_id, set()).update(capabilities)
+        local_evidence.setdefault(entry_id, []).extend(
+            (Capability(capability), str(row["artifact_id"])) for capability in capabilities
+        )
 
     aggregate_rows = connection.execute(
         sa.text(
             """
-            SELECT artifact_metadata ->> 'source_catalog_entry_id' AS entry_id,
+            SELECT artifact_id, artifact_metadata ->> 'source_catalog_entry_id' AS entry_id,
                    artifact_metadata ->> 'aggregate_family' AS family
             FROM processing_artifact
             WHERE dataset_id = :dataset_id
@@ -131,7 +142,11 @@ def list_source_capabilities(connection: Connection, dataset_id: str) -> list[So
         {"dataset_id": dataset_id},
     ).mappings()
     for row in aggregate_rows:
-        local.setdefault(str(row["entry_id"]), set()).add("SEASON_AGGREGATE")
+        entry_id = str(row["entry_id"])
+        local.setdefault(entry_id, set()).add("SEASON_AGGREGATE")
+        local_evidence.setdefault(entry_id, []).append(
+            (Capability.SEASON_AGGREGATE, str(row["artifact_id"]))
+        )
 
     file_states = {
         str(row["registry_file_key"]): str(row["availability_state"])
@@ -151,8 +166,21 @@ def list_source_capabilities(connection: Connection, dataset_id: str) -> list[So
     result: list[SourceCapabilityView] = []
     for row in entries:
         entry_id = str(row["entry_id"])
-        upstream = set(map(str, row["upstream_capabilities"] or ()))
+        upstream_names = set(map(str, row["upstream_capabilities"] or ()))
+        upstream = {
+            Capability(name) for name in upstream_names if name in Capability._value2member_map_
+        }
         materialized = local.get(entry_id, set())
+        profile = derive_capability_profile(
+            upstream=((capability, entry_id) for capability in upstream),
+            materialized=local_evidence.get(entry_id, ()),
+        )
+        upstream_names = {item.value for item in profile.upstream_capabilities} | (
+            upstream_names - {item.value for item in upstream}
+        )
+        materialized = {item.value for item in profile.local_capabilities} | (
+            materialized - {item.value for item in Capability if item.value in materialized}
+        )
         metadata = dict(row["provider_metadata"] or {})
         inventory = metadata.get("file_families", {})
         if inventory:
@@ -173,10 +201,10 @@ def list_source_capabilities(connection: Connection, dataset_id: str) -> list[So
                 if key
                 else {}
             )
-        pending = sorted(upstream - materialized)
+        pending = sorted(upstream_names - materialized)
         readiness = (
             "READY"
-            if upstream and not pending
+            if upstream_names and not pending
             else "PARTIAL"
             if materialized
             else "NOT_MATERIALIZED"
@@ -187,9 +215,9 @@ def list_source_capabilities(connection: Connection, dataset_id: str) -> list[So
                 external_id=str(row["external_id"]),
                 object_kind=str(row["object_kind"]),
                 availability_state=str(row["availability_state"]),
-                source_readiness=_source_readiness(str(row["availability_state"]), upstream),
+                source_readiness=_source_readiness(str(row["availability_state"]), upstream_names),
                 local_readiness=readiness,
-                upstream_capabilities=sorted(upstream),
+                upstream_capabilities=sorted(upstream_names),
                 local_capabilities=sorted(materialized),
                 pending_local_capabilities=pending,
                 provider_metadata=metadata,
@@ -197,6 +225,138 @@ def list_source_capabilities(connection: Connection, dataset_id: str) -> list[So
             )
         )
     return result
+
+
+def list_sports_catalog_matches(connection: Connection) -> list[SportsCatalogMatchView]:
+    """Read contest hierarchy and source readiness without touching dense artifacts."""
+    rows = (
+        connection.execute(
+            sa.text(
+                """
+            SELECT entry.dataset AS dataset_id, entry.entry_id, entry.provider,
+                   crosswalk.provider_entity_id AS provider_match_id,
+                   contest.contest_id, contest.sport_id, sport.code AS sport_code,
+                   sport.display_name AS sport_name,
+                   competition.competition_id, competition.name AS competition_name,
+                   edition.edition_id, edition.label AS edition_label,
+                   session_sport.session_id, session.label,
+                   contest.scheduled_start_at, contest.actual_start_at, contest.venue,
+                   contest.home_away_supported
+            FROM source_catalog_entry AS entry
+            JOIN provider_identity_crosswalk AS crosswalk
+              ON crosswalk.entity_kind = 'contest'
+             AND entry.external_id = 'contest:' || crosswalk.provider_entity_id
+            JOIN contest ON contest.contest_id = crosswalk.canonical_entity_id
+            JOIN sport ON sport.sport_id = contest.sport_id
+            LEFT JOIN competition_edition AS edition
+              ON edition.edition_id = contest.competition_edition_id
+            LEFT JOIN competition ON competition.competition_id = edition.competition_id
+            LEFT JOIN session_sport_context AS session_sport
+              ON session_sport.contest_id = contest.contest_id
+             AND session_sport.dataset_id = entry.dataset
+            LEFT JOIN "session" AS session
+              ON session.dataset_id = session_sport.dataset_id
+             AND session.session_id = session_sport.session_id
+            WHERE entry.object_kind = 'contest'
+            ORDER BY sport.display_name, competition.name, edition.label,
+                     contest.scheduled_start_at NULLS LAST, entry.external_id
+            """
+            )
+        )
+        .mappings()
+        .all()
+    )
+    if not rows:
+        return []
+
+    contest_ids = [str(row["contest_id"]) for row in rows]
+    expanding = sa.bindparam("contest_ids", expanding=True)
+    teams = (
+        connection.execute(
+            sa.text(
+                """
+            SELECT participation.contest_id, participation.team_id, team.display_name,
+                   participation.side, participation.score
+            FROM contest_team AS participation
+            JOIN team ON team.team_id = participation.team_id
+            WHERE participation.contest_id IN :contest_ids
+            ORDER BY participation.side_order NULLS LAST, team.display_name
+            """
+            ).bindparams(expanding),
+            {"contest_ids": contest_ids},
+        )
+        .mappings()
+        .all()
+    )
+    periods = (
+        connection.execute(
+            sa.text(
+                """
+            SELECT contest_id, contest_period_id, source_period_number, kind, label,
+                   start_ns, end_ns
+            FROM contest_period WHERE contest_id IN :contest_ids
+            ORDER BY contest_id, start_ns NULLS LAST, source_period_number
+            """
+            ).bindparams(expanding),
+            {"contest_ids": contest_ids},
+        )
+        .mappings()
+        .all()
+    )
+    teams_by_contest: dict[str, list[SportsCatalogTeamView]] = {}
+    for row in teams:
+        teams_by_contest.setdefault(str(row["contest_id"]), []).append(
+            SportsCatalogTeamView(
+                team_id=str(row["team_id"]),
+                display_name=str(row["display_name"]),
+                side=str(row["side"]),
+                score=row["score"],
+            )
+        )
+    periods_by_contest: dict[str, list[SportsCatalogPeriodView]] = {}
+    for row in periods:
+        periods_by_contest.setdefault(str(row["contest_id"]), []).append(
+            SportsCatalogPeriodView(
+                contest_period_id=str(row["contest_period_id"]),
+                source_period_number=str(row["source_period_number"]),
+                kind=str(row["kind"]),
+                label=row["label"],
+                start_ns=row["start_ns"],
+                end_ns=row["end_ns"],
+            )
+        )
+    capabilities_by_dataset = {
+        dataset_id: {
+            item.entry_id: item for item in list_source_capabilities(connection, dataset_id)
+        }
+        for dataset_id in {str(row["dataset_id"]) for row in rows}
+    }
+    return [
+        SportsCatalogMatchView(
+            dataset_id=str(row["dataset_id"]),
+            session_id=str(row["session_id"]) if row["session_id"] is not None else None,
+            provider_match_id=str(row["provider_match_id"]),
+            contest_id=str(row["contest_id"]),
+            sport_id=str(row["sport_id"]),
+            sport_code=str(row["sport_code"]),
+            sport_name=str(row["sport_name"]),
+            competition_id=str(row["competition_id"]) if row["competition_id"] else None,
+            competition_name=str(row["competition_name"]) if row["competition_name"] else None,
+            edition_id=str(row["edition_id"]) if row["edition_id"] else None,
+            edition_label=str(row["edition_label"]) if row["edition_label"] else None,
+            label=str(row["label"]) if row["label"] else None,
+            scheduled_start_at=_iso(row["scheduled_start_at"]),
+            actual_start_at=_iso(row["actual_start_at"]),
+            venue=str(row["venue"]) if row["venue"] else None,
+            home_away_supported=bool(row["home_away_supported"]),
+            teams=teams_by_contest.get(str(row["contest_id"]), []),
+            periods=periods_by_contest.get(str(row["contest_id"]), []),
+            source_capability=capabilities_by_dataset.get(str(row["dataset_id"]), {}).get(
+                str(row["entry_id"])
+            ),
+        )
+        for row in rows
+    ]
 
 
 PROVENANCE_FIELDS: list[str] = [
