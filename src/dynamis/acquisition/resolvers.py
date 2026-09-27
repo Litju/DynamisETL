@@ -581,6 +581,94 @@ def _resolve_github_files(
     return tuple(resolved)
 
 
+class GitHubReleaseResolver:
+    """SportsDataverse-style GitHub *release asset* resolver.
+
+    Release assets are mutable (they can be re-uploaded under the same name), so
+    the committed release snapshot pins each asset's id, size and update time. The
+    live release is cross-checked against that pin before any byte is fetched; the
+    local SHA-256 computed on download then becomes the immutable Bronze identity.
+    """
+
+    name = "github_release"
+
+    def resolve(
+        self,
+        session: requests.Session,
+        *,
+        source: DatasetSource,
+        version: DatasetVersion,
+        keys: Sequence[str],
+        timeout: tuple[float, float],
+    ) -> tuple[ResolvedFile, ...]:
+        from dynamis.adapters.sportsdataverse.releases import (
+            RELEASE_TAG_API,
+            SnapshotError,
+            load_snapshot,
+        )
+
+        try:
+            snapshot = load_snapshot()
+        except SnapshotError as exc:
+            raise ResolverError(f"{source.dataset_id}: {exc}") from exc
+        if snapshot["snapshot"] != version.version:
+            raise ResolverError(
+                f"{source.dataset_id}: registry version {version.version!r} is not the pinned "
+                f"release snapshot {snapshot['snapshot']!r}"
+            )
+        pins = {item["key"]: item for item in snapshot["pinned"]}
+        releases: dict[str, Mapping[str, object]] = {}
+        resolved: list[ResolvedFile] = []
+        for key in keys:
+            pin = pins.get(key)
+            if pin is None:
+                raise ResolverError(f"{key}: not a pinned release asset of {version.version}")
+            expectation = _expectation(version, key)
+            if expectation.size_bytes != pin["size_bytes"]:
+                raise ResolverError(f"{key}: registry size disagrees with the release snapshot")
+            tag = str(pin["tag"])
+            if tag not in releases:
+                releases[tag] = _require_mapping(
+                    _get_json(session, RELEASE_TAG_API.format(tag=tag), timeout=timeout),
+                    what=f"release {tag}",
+                )
+            assets = _require_sequence(releases[tag].get("assets"), what=f"release {tag} assets")
+            live = next(
+                (
+                    item
+                    for item in assets
+                    if isinstance(item, Mapping) and item.get("name") == pin["asset_name"]
+                ),
+                None,
+            )
+            if live is None:
+                raise UpstreamDriftError(f"{key}: asset is no longer published in release {tag}")
+            for field_name in ("id", "size", "updated_at"):
+                pinned_value = pin[
+                    "asset_id"
+                    if field_name == "id"
+                    else ("size_bytes" if field_name == "size" else "updated_at")
+                ]
+                if live.get(field_name) != pinned_value:
+                    raise UpstreamDriftError(
+                        f"{key}: live release asset {field_name} {live.get(field_name)!r} != "
+                        f"pinned {pinned_value!r}; refresh the snapshot deliberately"
+                    )
+            resolved.append(
+                ResolvedFile(
+                    key=key,
+                    url=str(live["browser_download_url"]),
+                    size_bytes=int(pin["size_bytes"]),
+                    provider_metadata={
+                        "release_tag": tag,
+                        "asset_id": str(pin["asset_id"]),
+                        "asset_updated_at": str(pin["updated_at"]),
+                    },
+                )
+            )
+        return tuple(resolved)
+
+
 class GitHubResolver:
     """Resolve files at a pinned GitHub revision, following Git LFS pointers."""
 
@@ -734,6 +822,7 @@ RESOLVERS: tuple[ProviderResolver, ...] = (
     HuggingFaceResolver(),
     GitHubResolver(),
     RoutedResolver(),
+    GitHubReleaseResolver(),
 )
 
 
@@ -752,6 +841,8 @@ def resolver_for(source: DatasetSource) -> ProviderResolver:
     if routed:
         return RESOLVERS[3]
     provider = source.provider.strip().lower()
+    if "github releases" in provider:
+        return RESOLVERS[4]
     if provider.startswith("zenodo"):
         return RESOLVERS[0]
     if "hugging" in provider:

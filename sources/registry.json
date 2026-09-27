@@ -1315,6 +1315,52 @@
           }
         }
       ]
+    },
+    {
+      "dataset_id": "sportsdataverse",
+      "name": "SportsDataverse data releases — multi-sport play-by-play, box scores and schedules",
+      "provider": "SportsDataverse (GitHub releases)",
+      "upstream_urls": ["https://github.com/sportsdataverse/sportsdataverse-data", "https://www.sportsdataverse.org/"],
+      "doi": null,
+      "domain": "multi_sport",
+      "modalities": ["event"],
+      "adapter_id": "sportsdataverse_releases",
+      "v1_role": "Multi-sport release catalog; PLAY_BY_PLAY / PLAYER_GAME / TEAM_GAME authority for GameLab",
+      "initial_scope": "355 release families catalogued metadata-first; bounded acquisition of NBA 2025-26 and NHL 2025-26 (schedule, play-by-play, player and team box scores)",
+      "license": {
+        "identifier": "CC-BY-4.0",
+        "status": "declared",
+        "attribution_required": true,
+        "noncommercial_only": false,
+        "share_alike": false,
+        "redistribution": "prohibited",
+        "local_only": true,
+        "restrictions": ["SportsDataverse data repository README declares CC BY 4.0 for its release assets; repository code is MIT.", "Release assets are scraped from ESPN and NHL public APIs whose own terms are not granted by SportsDataverse: keep acquired data local-only and do not redistribute it.", "Credit SportsDataverse (hoopR / fastRhockey) when the data is used."]
+      },
+      "versions": [
+        {
+          "version": "sdv-2026-09-27",
+          "release_date": null,
+          "upstream_url": "https://github.com/sportsdataverse/sportsdataverse-data/releases",
+          "citation": "SportsDataverse (2026). sportsdataverse-data GitHub releases; hoopR (NBA) and fastRhockey (NHL) pipelines. Release metadata snapshot sdv-2026-09-27 pinned in sources/sportsdataverse-releases.json.",
+          "optional": false,
+          "retrieval": {
+            "status": "not_fetched",
+            "retrieved_at": null,
+            "files": [
+              {"key": "espn_nba_schedules/nba_schedule_2026.parquet", "size_bytes": 525802, "md5": "unknown", "sha256": "unknown", "upstream_capabilities": [], "retrieved_at": null},
+              {"key": "espn_nba_pbp/play_by_play_2026.parquet", "size_bytes": 22436946, "md5": "unknown", "sha256": "unknown", "upstream_capabilities": ["PLAY_BY_PLAY"], "retrieved_at": null},
+              {"key": "espn_nba_player_boxscores/player_box_2026.parquet", "size_bytes": 606444, "md5": "unknown", "sha256": "unknown", "upstream_capabilities": ["BOX_SCORE"], "retrieved_at": null},
+              {"key": "espn_nba_team_boxscores/team_box_2026.parquet", "size_bytes": 140628, "md5": "unknown", "sha256": "unknown", "upstream_capabilities": ["BOX_SCORE"], "retrieved_at": null},
+              {"key": "nhl_schedules/nhl_schedule_2026.parquet", "size_bytes": 52380, "md5": "unknown", "sha256": "unknown", "upstream_capabilities": [], "retrieved_at": null},
+              {"key": "nhl_pbp_lite/play_by_play_lite_2026.parquet", "size_bytes": 19062775, "md5": "unknown", "sha256": "unknown", "upstream_capabilities": ["PLAY_BY_PLAY"], "retrieved_at": null},
+              {"key": "nhl_skater_boxscores/skater_box_2026.parquet", "size_bytes": 369744, "md5": "unknown", "sha256": "unknown", "upstream_capabilities": ["BOX_SCORE"], "retrieved_at": null},
+              {"key": "nhl_goalie_boxscores/goalie_box_2026.parquet", "size_bytes": 78221, "md5": "unknown", "sha256": "unknown", "upstream_capabilities": ["BOX_SCORE"], "retrieved_at": null},
+              {"key": "nhl_team_boxscores/team_box_2026.parquet", "size_bytes": 50202, "md5": "unknown", "sha256": "unknown", "upstream_capabilities": ["BOX_SCORE"], "retrieved_at": null}
+            ]
+          }
+        }
+      ]
     }
   ]
 }

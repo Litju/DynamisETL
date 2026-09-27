@@ -43,6 +43,20 @@
       "rendered_record_discrepancy": null,
       "observed_at": "2026-09-18",
       "decision": "Keep declared CC-BY-NC-SA-4.0 and record SPL's own additional exclusion verbatim: any employee or contractor employed by, associated with, or a significant shareholder of a professional sports organization or financial analysis firm is forbidden to use SPL Open Data for any use whatsoever without a specific written commercial (paid) license. Acquisition fails closed behind the source-specific --acknowledge-spl-license-restrictions gate."
+    },
+    {
+      "dataset_id": "sportsdataverse",
+      "source_url": "https://github.com/sportsdataverse/sportsdataverse-data",
+      "doi": null,
+      "authority_type": "github_repository_license_file + pinned_readme_license_declaration + github_releases_api",
+      "license_identifier_observed": "CC-BY-4.0",
+      "source_revision": "sportsdataverse-data@f64d5c720f20272f7a533413f1804706e683eb2c; release metadata snapshot sdv-2026-09-27",
+      "companion_evidence_url": "https://github.com/sportsdataverse/sportsdataverse-data/blob/f64d5c720f20272f7a533413f1804706e683eb2c/README.md",
+      "companion_evidence_revision": "f64d5c720f20272f7a533413f1804706e683eb2c",
+      "companion_evidence": "README.md at f64d5c720f20272f7a533413f1804706e683eb2c carries a 'License: CC BY 4.0' badge linking https://creativecommons.org/licenses/by/4.0/ for the published release assets; LICENSE at the same revision is the MIT License for repository code.",
+      "rendered_record_discrepancy": "Code (MIT) and data (CC BY 4.0) licenses differ; the release assets are produced by scraping ESPN and NHL public APIs, whose terms SportsDataverse does not and cannot grant.",
+      "observed_at": "2026-09-27",
+      "decision": "Declare CC-BY-4.0 with attribution required, but keep every acquired asset local-only with redistribution prohibited because the upstream ESPN/NHL terms are not granted. Only the bounded NBA/NHL 2025-26 slice is pinned for acquisition; other families stay catalogue-only. A future family without comparable rights evidence fails closed."
     }
   ]
 }
