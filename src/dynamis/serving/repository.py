@@ -168,9 +168,7 @@ def list_source_capabilities(connection: Connection, dataset_id: str) -> list[So
         entry_id = str(row["entry_id"])
         upstream_names = set(map(str, row["upstream_capabilities"] or ()))
         upstream = {
-            Capability(name)
-            for name in upstream_names
-            if name in Capability._value2member_map_
+            Capability(name) for name in upstream_names if name in Capability._value2member_map_
         }
         materialized = local.get(entry_id, set())
         profile = derive_capability_profile(
@@ -329,8 +327,7 @@ def list_sports_catalog_matches(connection: Connection) -> list[SportsCatalogMat
         )
     capabilities_by_dataset = {
         dataset_id: {
-            item.entry_id: item
-            for item in list_source_capabilities(connection, dataset_id)
+            item.entry_id: item for item in list_source_capabilities(connection, dataset_id)
         }
         for dataset_id in {str(row["dataset_id"]) for row in rows}
     }
