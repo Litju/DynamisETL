@@ -260,6 +260,20 @@ def test_bounded_game_reads_scope_to_one_contest(tmp_path: Path) -> None:
     assert total == 1 and overtime[0]["provider_event_type"] == "Free Throw"
     assert games.period_event_counts(pbp_path, contest_id=contest) == {1: 2, 5: 1}
 
+    _, projected = games.read_plays(
+        pbp_path,
+        contest_id=contest,
+        period=1,
+        limit=5,
+        offset=0,
+        extra_columns=("clock_display_value", "scoring_play"),
+    )
+    assert projected[0]["source"] == {"clock_display_value": "12:00", "scoring_play": False}
+    with pytest.raises(games.GameDataError, match="not in this artifact"):
+        games.read_plays(
+            pbp_path, contest_id=contest, period=1, limit=5, offset=0, extra_columns=("nope",)
+        )
+
     box_path = tmp_path / "team.parquet"
     pq.write_table(result.artifacts["team_game"][0], box_path)
     columns, rows = games.read_box(box_path, contest_id=contest)
@@ -289,7 +303,7 @@ class _RightsBackend:
     def game_license(self, contest_id: str):
         return self.license
 
-    def game_plays(self, contest_id: str, *, period, limit, offset):
+    def game_plays(self, contest_id: str, *, period, limit, offset, source_columns=()):
         from dynamis.serving.models import GamePlayPage
 
         return GamePlayPage(

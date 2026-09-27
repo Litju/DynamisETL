@@ -842,6 +842,7 @@ class GamePlayView(BaseModel):
     attributes: dict[str, Any]
     attributes_schema_id: str
     attributes_schema_version: str
+    source: dict[str, Any] = Field(default_factory=dict)
 
 
 class GamePlayPage(BaseModel):

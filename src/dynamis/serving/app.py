@@ -259,7 +259,13 @@ class ServingBackend(Protocol):
     def game(self, contest_id: str) -> GameDetailView | None: ...
 
     def game_plays(
-        self, contest_id: str, *, period: int | None, limit: int, offset: int
+        self,
+        contest_id: str,
+        *,
+        period: int | None,
+        limit: int,
+        offset: int,
+        source_columns: tuple[str, ...] = (),
     ) -> GamePlayPage | None: ...
 
     def game_box(self, contest_id: str, grain: Literal["player", "team"]) -> GameBoxView | None: ...
@@ -841,7 +847,13 @@ class PostgresServingBackend:
         return edition.license if edition else None
 
     def game_plays(
-        self, contest_id: str, *, period: int | None, limit: int, offset: int
+        self,
+        contest_id: str,
+        *,
+        period: int | None,
+        limit: int,
+        offset: int,
+        source_columns: tuple[str, ...] = (),
     ) -> GamePlayPage | None:
         with self._connect() as connection:
             summary = repository.game_summary(connection, contest_id)
@@ -852,7 +864,12 @@ class PostgresServingBackend:
         if located is None:
             return None
         total, rows = game_model.read_plays(
-            located[1], contest_id=contest_id, period=period, limit=limit, offset=offset
+            located[1],
+            contest_id=contest_id,
+            period=period,
+            limit=limit,
+            offset=offset,
+            extra_columns=source_columns,
         )
         return GamePlayPage(
             contest_id=contest_id,
@@ -1266,9 +1283,18 @@ def create_app(
         period: int | None = Query(default=None, ge=1, le=20),
         limit: int = Query(default=500, ge=1, le=MAX_PAGE_LIMIT),
         offset: int = Query(default=0, ge=0),
+        source_columns: str | None = Query(
+            default=None, description="Comma-separated preserved provider columns"
+        ),
     ) -> GamePlayPage:
         _require_payload_rights(service, contest_id)
-        found = service.game_plays(contest_id, period=period, limit=limit, offset=offset)
+        extra = tuple(item.strip() for item in (source_columns or "").split(",") if item.strip())
+        try:
+            found = service.game_plays(
+                contest_id, period=period, limit=limit, offset=offset, source_columns=extra
+            )
+        except game_model.GameDataError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
         if found is None:
             raise HTTPException(
                 status_code=404, detail=f"contest {contest_id!r} has no play-by-play"
