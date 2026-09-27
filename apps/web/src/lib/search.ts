@@ -89,6 +89,41 @@ export const compareSearchSchema = z.object({
 });
 export type CompareSearch = z.infer<typeof compareSearchSchema>;
 
+export const SEASON_FAMILIES = ["physical", "obr", "passing"] as const;
+export type SeasonFamily = (typeof SEASON_FAMILIES)[number];
+export const SEASON_POPULATIONS = ["position", "edition", "team"] as const;
+export type SeasonPopulation = (typeof SEASON_POPULATIONS)[number];
+export const SEASON_VIEWS = ["profile", "table"] as const;
+
+const minMatchesText = z.preprocess((value) => {
+  const numeric = typeof value === "string" ? Number(value) : value;
+  return typeof numeric === "number" && Number.isInteger(numeric) && numeric >= 1 && numeric <= 100
+    ? String(numeric)
+    : undefined;
+}, z.string().optional());
+
+/**
+ * SeasonLab durable context: edition → team → player → metric family, plus the
+ * explicit comparison denominator. Nothing here is a playhead; season grain has
+ * no canonical time.
+ */
+export const seasonSearchSchema = z.object({
+  edition: optionalText,
+  family: z.enum(SEASON_FAMILIES).optional().catch(undefined),
+  team: optionalText,
+  player: optionalText,
+  pos: optionalText,
+  population: z.enum(SEASON_POPULATIONS).optional().catch(undefined),
+  min: minMatchesText,
+  /** Comma-separated metric columns; empty means the family's default panel. */
+  metrics: optionalText,
+  focus: optionalText,
+  compare: optionalText,
+  q: optionalText,
+  view: z.enum(SEASON_VIEWS).optional().catch(undefined),
+});
+export type SeasonSearch = z.infer<typeof seasonSearchSchema>;
+
 export const methodsSearchSchema = z.object({
   metric: optionalText,
   dataset: optionalText,

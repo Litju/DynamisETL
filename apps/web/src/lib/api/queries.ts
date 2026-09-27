@@ -456,3 +456,110 @@ export const tacticalSeriesQuery = (query: TacticalSeriesQuery) =>
     // run/artifact identity), so a served window never goes stale.
     staleTime: Number.POSITIVE_INFINITY,
   });
+
+// -- SeasonLab ------------------------------------------------------------------
+// Season metadata (editions, family registry/facets) is small and cached long;
+// value queries are always bounded by family, population and projected metrics.
+
+export interface SeasonRowsQuery {
+  readonly editionId: string;
+  readonly family: string;
+  readonly metrics: readonly string[];
+  readonly teamId?: string | undefined;
+  readonly positionGroup?: string | undefined;
+  readonly subjectIds?: readonly string[] | undefined;
+  readonly minMatches?: number | undefined;
+  readonly limit?: number | undefined;
+}
+
+export interface SeasonProfileQuery {
+  readonly editionId: string;
+  readonly family: string;
+  readonly subjectId: string;
+  readonly teamId?: string | undefined;
+  readonly positionGroup?: string | undefined;
+  readonly population: "edition" | "position" | "team";
+  readonly minMatches?: number | undefined;
+  readonly metrics: readonly string[];
+  readonly populationTeamId?: string | undefined;
+  readonly populationPositionGroup?: string | undefined;
+}
+
+export const seasonEditionsQuery = () =>
+  queryOptions({
+    queryKey: ["season", "editions"] as const,
+    queryFn: async () => unwrap(await api.GET("/api/season/editions")),
+    staleTime: 5 * 60_000,
+  });
+
+export const seasonFamilyQuery = (editionId: string, family: string) =>
+  queryOptions({
+    queryKey: ["season", "family", editionId, family] as const,
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/api/season/editions/{edition_id}/families/{family}", {
+          params: { path: { edition_id: editionId, family } },
+        }),
+      ),
+    staleTime: 5 * 60_000,
+  });
+
+export const seasonRowsQuery = (query: SeasonRowsQuery) =>
+  queryOptions({
+    queryKey: ["season", "rows", query] as const,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/season/editions/{edition_id}/families/{family}/rows", {
+          params: {
+            path: { edition_id: query.editionId, family: query.family },
+            query: {
+              metrics: query.metrics.join(",") || null,
+              team_id: query.teamId ?? null,
+              position_group: query.positionGroup ?? null,
+              subject_id: query.subjectIds ? [...query.subjectIds] : null,
+              min_matches: query.minMatches ?? null,
+              limit: query.limit ?? 1000,
+            },
+          },
+          signal,
+        }),
+      ),
+    staleTime: 5 * 60_000,
+  });
+
+export const seasonProfileQuery = (query: SeasonProfileQuery) =>
+  queryOptions({
+    queryKey: ["season", "profile", query] as const,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/season/editions/{edition_id}/families/{family}/profile", {
+          params: {
+            path: { edition_id: query.editionId, family: query.family },
+            query: {
+              subject_id: query.subjectId,
+              team_id: query.teamId ?? null,
+              position_group: query.positionGroup ?? null,
+              population: query.population,
+              min_matches: query.minMatches ?? null,
+              metrics: query.metrics.join(",") || null,
+              population_team_id: query.populationTeamId ?? null,
+              population_position_group: query.populationPositionGroup ?? null,
+            },
+          },
+          signal,
+        }),
+      ),
+    staleTime: 5 * 60_000,
+  });
+
+export const seasonLinksQuery = (editionId: string, subjectId: string) =>
+  queryOptions({
+    queryKey: ["season", "links", editionId, subjectId] as const,
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/api/season/editions/{edition_id}/links", {
+          params: { path: { edition_id: editionId }, query: { subject_id: subjectId } },
+        }),
+      ),
+    staleTime: 5 * 60_000,
+  });
