@@ -388,3 +388,27 @@ def test_openapi_exposes_season_surface(tmp_settings: Settings, physical_path: P
         "/api/season/editions/{edition_id}/links",
     ):
         assert path in paths, path
+
+
+def test_profile_can_rank_against_another_rows_denominator(physical_path: Path) -> None:
+    # Di Delta (Midfield) ranked inside the Center Forward population: the
+    # denominator is shared with a Center Forward comparison, and the payload says
+    # the row is outside it rather than silently switching populations.
+    payload = season.profile_payload(
+        physical_path,
+        family="physical",
+        subject_id="sc/4",
+        team_id=None,
+        position_group=None,
+        scope="position",
+        min_matches=None,
+        requested_metrics=["total_distance_full_all"],
+        edition_label="2024/2025",
+        competition_name="Test League",
+        population_position_group="Center Forward",
+    )
+    assert payload is not None
+    assert payload["population"]["rows"] == 3
+    assert payload["population"]["position_group"] == "Center Forward"
+    assert payload["population"]["selected_row_in_population"] is False
+    assert payload["metrics"][0]["rank"] == 1  # 11 500 m exceeds every CF row

@@ -693,6 +693,7 @@ class SeasonPopulationView(BaseModel):
     min_matches: int | None
     rows: int
     unit_of_analysis: str
+    selected_row_in_population: bool
 
 
 class SeasonRankedMetricView(BaseModel):

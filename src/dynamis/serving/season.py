@@ -944,8 +944,15 @@ def profile_payload(
     requested_metrics: Sequence[str] | None,
     edition_label: str,
     competition_name: str,
+    population_team_id: str | None = None,
+    population_position_group: str | None = None,
 ) -> dict[str, Any] | None:
-    """The selected row, every requested metric ranked inside one explicit population."""
+    """The selected row, every requested metric ranked inside one explicit population.
+
+    The population is derived from the selected row unless an explicit team or
+    position group is given, which lets two players be ranked against the same
+    denominator. A row outside its population is still ranked, and says so.
+    """
     _, columns = resolve_metric_columns(family, path, requested_metrics)
     _, candidates = read_rows(
         path,
@@ -971,12 +978,21 @@ def profile_payload(
     )
     population = population_filter(
         scope,
-        team_id=str(selected["team_id"]),
-        position_group=str(selected["position_group"]),
+        team_id=population_team_id or str(selected["team_id"]),
+        position_group=population_position_group or str(selected["position_group"]),
         min_matches=min_matches,
     )
     total, population_rows = read_rows(
         path, family=family, metrics=columns, filters=population, limit=100_000
+    )
+    selected_key = (selected["subject_id"], selected["team_id"], selected["position_group"])
+    in_population = any(
+        (row["subject_id"], row["team_id"], row["position_group"]) == selected_key
+        for row in population_rows
+    )
+    population_team_name = next(
+        (str(row["team_name"]) for row in population_rows),
+        str(selected["team_name"]),
     )
     ranked = []
     for column in columns:
@@ -1006,10 +1022,11 @@ def profile_payload(
                 scope,
                 edition_label=edition_label,
                 competition_name=competition_name,
-                team_name=str(selected["team_name"]),
-                position_group=str(selected["position_group"]),
+                team_name=population_team_name,
+                position_group=population.position_group or str(selected["position_group"]),
                 min_matches=min_matches,
             ),
+            "selected_row_in_population": in_population,
             "team_id": population.team_id,
             "position_group": population.position_group,
             "min_matches": min_matches if min_matches and min_matches > 1 else None,

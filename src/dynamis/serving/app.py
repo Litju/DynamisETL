@@ -216,6 +216,8 @@ class ServingBackend(Protocol):
         scope: season_model.PopulationScope,
         min_matches: int | None,
         metrics: list[str],
+        population_team_id: str | None = None,
+        population_position_group: str | None = None,
     ) -> SeasonProfileView | None: ...
 
     def season_player_links(
@@ -695,6 +697,8 @@ class PostgresServingBackend:
         scope: season_model.PopulationScope,
         min_matches: int | None,
         metrics: list[str],
+        population_team_id: str | None = None,
+        population_position_group: str | None = None,
     ) -> SeasonProfileView | None:
         resolved = self._season_scope(edition_id, family)
         if resolved is None:
@@ -711,6 +715,8 @@ class PostgresServingBackend:
             requested_metrics=metrics,
             edition_label=edition.edition_label,
             competition_name=edition.competition_name,
+            population_team_id=population_team_id,
+            population_position_group=population_position_group,
         )
         if payload is None:
             return None
@@ -992,6 +998,12 @@ def create_app(
         population: Literal["edition", "position", "team"] = Query(default="position"),
         min_matches: int | None = Query(default=None, ge=1, le=100),
         metrics: str | None = Query(default=None, description="Comma-separated metric columns"),
+        population_team_id: str | None = Query(
+            default=None, description="Rank against this team's rows instead of the row's own"
+        ),
+        population_position_group: str | None = Query(
+            default=None, description="Rank against this position group instead of the row's own"
+        ),
     ) -> SeasonProfileView:
         try:
             found = service.season_profile(
@@ -1003,6 +1015,8 @@ def create_app(
                 scope=population,
                 min_matches=min_matches,
                 metrics=_metric_list(metrics),
+                population_team_id=population_team_id,
+                population_position_group=population_position_group,
             )
         except season_model.SeasonDataError as exc:
             raise _season_failure(exc) from exc
