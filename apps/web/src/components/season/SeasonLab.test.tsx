@@ -14,6 +14,7 @@ import type {
 import { createAppRouter } from "@/router";
 
 vi.mock("echarts", () => ({
+  registerTheme: () => undefined,
   init: () => ({
     setOption: () => undefined,
     resize: () => undefined,

@@ -3,6 +3,7 @@ import { createRoute, type AnyRoute, useNavigate, useSearch } from "@tanstack/re
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { lazy, Suspense, useMemo, useState } from "react";
 
+import { LibraryNav } from "@/components/shell/LibraryNav";
 import { MeasurementClassBadge } from "@/components/common/Badges";
 import { CopyableId } from "@/components/common/CopyableId";
 import { MetricPicker } from "@/components/common/MetricPicker";
@@ -62,8 +63,9 @@ export function MethodsPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="shrink-0 border-b border-border-subtle bg-surface-1 px-4 py-3">
-        <h1 className="t-surface-title">
+      <LibraryNav />
+      <header className="shrink-0 border-b border-border-subtle bg-surface-1 px-5 py-4">
+        <h1 className="t-headline">
           Methodology and provenance
         </h1>
         <p className="mt-0.5 text-[12px] text-text-secondary">

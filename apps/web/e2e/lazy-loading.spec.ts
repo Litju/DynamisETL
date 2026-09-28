@@ -2,12 +2,16 @@ import { expect, test } from "@playwright/test";
 
 import { installApiMocks } from "./fixtures";
 
-test("catalog does not download renderer engines before a laboratory opens", async ({ page }) => {
+test("Research, Data and Library do not download renderer engines before a World opens", async ({ page }) => {
   const requests: string[] = [];
   page.on("request", (request) => requests.push(request.url()));
   await installApiMocks(page);
-  await page.goto("/catalog");
-  await page.waitForLoadState("networkidle");
+  for (const route of ["/", "/data", "/data/edition/skillcorner:edition:870", "/library"]) {
+    await page.goto(route);
+    await page.waitForLoadState("networkidle");
+  }
+  // Metadata only: no dense window, series or frame request from browsing.
+  expect(requests.filter((url) => /\/api\/artifacts\/[^/]+\/window|\/tactical\/series\/|\/basketball\/contests\/[^/]+\/frames|\/games\/[^/]+\/plays/.test(url))).toEqual([]);
 
   const catalogRequests = requests.join("\n");
   expect(catalogRequests).not.toMatch(/echarts|pixi\.js|three(?:\.module)?|PoseScene|LineageGraph/i);

@@ -687,6 +687,16 @@ function SceneReady({ onReady }: { readonly onReady: () => void }) {
   return null;
 }
 
+type ViewTransitionKind = "none" | "reset" | "focus";
+
+/** Focus framing: the selected player at 1.8× the canonical fit. */
+const FOCUS_ZOOM = 1.8;
+
+function prefersReducedMotion(): boolean {
+  return typeof window !== "undefined" && typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
 const FieldCamera = forwardRef<FieldCameraHandle, {
   readonly mode: FieldCameraMode;
   readonly onModeChange: (mode: FieldCameraMode) => void;
@@ -741,7 +751,7 @@ const FieldCamera = forwardRef<FieldCameraHandle, {
   );
   const perspectiveFitScale = Math.max(1, perspectiveFitDistance / perspectiveBaseDistance);
   /* eslint-disable react-hooks/immutability -- R3F cameras are mutable renderer state and this callback intentionally poses the active camera. */
-  const viewPose = useCallback((nextMode: FieldCameraMode, targetX = 0, targetZ = 0) => {
+  const viewPose = useCallback((nextMode: FieldCameraMode, targetX = 0, targetZ = 0, transition: ViewTransitionKind = "none") => {
     const isOrthographic = nextMode !== "perspective";
     const isTacticalMap = nextMode === "tactical-map";
     const camera = isOrthographic ? orthographicCamera : perspectiveCamera;
@@ -761,6 +771,19 @@ const FieldCamera = forwardRef<FieldCameraHandle, {
       ? targetZ
       : targetZ + (nextMode === "structure-lift" ? widthM * 1.35 : widthM * 1.5) * perspectiveScale;
     camera.up.set(0, 0, -1);
+    const fitZoom = isTacticalMap ? topDownZoom : structureLiftZoom;
+    // A user-initiated focus/reset inside the same projection is a damped
+    // CameraControls transition (smoothTime, refresh-rate independent); the
+    // spatial truth (orthographic projection, pitch frame) never changes.
+    if (transition !== "none" && controlsRef.current && !prefersReducedMotion()) {
+      const controls = controlsRef.current;
+      if (isOrthographic && "isOrthographicCamera" in camera) {
+        void controls.zoomTo(transition === "focus" ? Math.max(camera.zoom, fitZoom * FOCUS_ZOOM) : fitZoom, true);
+      }
+      void controls.setLookAt(cameraX, cameraY, cameraZ, targetX, 0, targetZ, true);
+      invalidate();
+      return;
+    }
     if ("isPerspectiveCamera" in camera) {
       camera.aspect = viewportAspect;
       camera.near = 0.1;
@@ -768,7 +791,7 @@ const FieldCamera = forwardRef<FieldCameraHandle, {
       camera.far = cameraDistance * 6;
     }
     if ("isOrthographicCamera" in camera && isOrthographic) {
-      camera.zoom = isTacticalMap ? topDownZoom : structureLiftZoom;
+      camera.zoom = transition === "focus" ? fitZoom * FOCUS_ZOOM : fitZoom;
       void controlsRef.current?.zoomTo(camera.zoom, false);
     }
     camera.position.set(cameraX, cameraY, cameraZ);
@@ -779,9 +802,10 @@ const FieldCamera = forwardRef<FieldCameraHandle, {
     invalidate();
   }, [cameraDistance, invalidate, orthographicCamera, perspectiveCamera, perspectiveFitScale, pitchLengthM, pitchWidthM, structureLiftZoom, topDownZoom, viewportAspect]);
   /* eslint-enable react-hooks/immutability */
-  const resetView = useCallback(() => viewPose(mode), [mode, viewPose]);
+  const resetView = useCallback(() => viewPose(mode, 0, 0, "reset"), [mode, viewPose]);
+  const presetView = useCallback(() => viewPose(mode), [mode, viewPose]);
   const setCameraMode = useCallback((nextMode: FieldCameraMode) => onModeChange(nextMode), [onModeChange]);
-  const focusAt = useCallback((xM: number, zM: number) => viewPose(mode, xM, zM), [mode, viewPose]);
+  const focusAt = useCallback((xM: number, zM: number) => viewPose(mode, xM, zM, "focus"), [mode, viewPose]);
   useImperativeHandle(ref, () => ({ resetView, setCameraMode, focusAt, getCamera: () => activeCamera }), [activeCamera, focusAt, resetView, setCameraMode]);
   const orthographicFitZoom = mode === "tactical-map"
     ? topDownZoom
@@ -790,8 +814,10 @@ const FieldCamera = forwardRef<FieldCameraHandle, {
       : null;
   const cameraPresetKey = `${mode}:${pitchLengthM ?? "unregistered"}:${pitchWidthM ?? "unregistered"}`;
   useEffect(() => {
-    resetViewRef.current = resetView;
-  }, [resetView]);
+    // Mode and pitch presets apply instantly: a projection change is a new
+    // spatial frame, not a camera move to animate.
+    resetViewRef.current = presetView;
+  }, [presetView]);
   useEffect(() => {
     currentFitZoomRef.current = orthographicFitZoom;
   }, [orthographicFitZoom]);

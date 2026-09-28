@@ -1,0 +1,56 @@
+import { Link, useNavigate } from "@tanstack/react-router";
+import { useCallback, type ComponentProps, type ReactNode } from "react";
+
+import type { LinkTarget } from "@/lib/worlds";
+
+/**
+ * Router link for a typed `LinkTarget` produced by the World/catalog model.
+ *
+ * `transition` opts a *major* context change (entity → World, World → World)
+ * into a native View Transition. Search-only and playback updates never pass
+ * it, so an analytical surface is not snapshotted while it is being used.
+ */
+export function AppLink({
+  to: target,
+  transition = false,
+  children,
+  ...rest
+}: {
+  to: LinkTarget;
+  transition?: boolean;
+  children: ReactNode;
+} & Omit<ComponentProps<"a">, "href" | "children" | "target">) {
+  return (
+    <Link
+      to={target.to as never}
+      params={(target.params ?? {}) as never}
+      search={(target.search ?? {}) as never}
+      viewTransition={transition ? { types: ["context"] } : false}
+      {...(rest as Record<string, unknown>)}
+    >
+      {children}
+    </Link>
+  );
+}
+
+/** Imperative navigation to a typed target (command palette, menus). */
+export function useGoTo() {
+  const navigate = useNavigate();
+  return useCallback(
+    (target: LinkTarget | string, options: { transition?: boolean; replace?: boolean } = {}) => {
+      const transition = options.transition ? { types: ["context"] } : false;
+      if (typeof target === "string") {
+        void navigate({ href: target, viewTransition: transition, replace: options.replace ?? false });
+        return;
+      }
+      void navigate({
+        to: target.to as never,
+        params: (target.params ?? {}) as never,
+        search: (target.search ?? {}) as never,
+        viewTransition: transition,
+        replace: options.replace ?? false,
+      });
+    },
+    [navigate],
+  );
+}

@@ -91,6 +91,53 @@ export function readPalette(root?: HTMLElement | null): ChartPalette {
   };
 }
 
+/**
+ * The Dynamis ECharts theme: library defaults never ship. Typography is the
+ * instrument's (Inter for language, JetBrains Mono for values), grids are
+ * hairlines, tooltips are L2 overlays and the colour cycle is the semantic
+ * series palette. Charts still set their own analytical encodings on top.
+ */
+export function dynamisChartTheme(palette: ChartPalette, root?: HTMLElement | null): Record<string, unknown> {
+  const element = root ?? (typeof document !== "undefined" ? document.documentElement : null);
+  const styles = element && typeof getComputedStyle === "function" ? getComputedStyle(element) : null;
+  const sans = styles?.getPropertyValue("--font-sans").trim() || "Inter Variable, system-ui, sans-serif";
+  const mono = styles?.getPropertyValue("--font-mono").trim() || "JetBrains Mono Variable, monospace";
+  const overlay = styles?.getPropertyValue("--d-surface-2").trim() || palette.surface;
+  const axis = {
+    axisLine: { lineStyle: { color: palette.border } },
+    axisTick: { show: false },
+    axisLabel: { color: palette.textMuted, fontFamily: mono, fontSize: 10 },
+    splitLine: { lineStyle: { color: palette.grid, width: 1 } },
+    nameTextStyle: { color: palette.textMuted, fontFamily: sans, fontSize: 11 },
+  };
+  return {
+    color: palette.series,
+    backgroundColor: "transparent",
+    textStyle: { fontFamily: sans, color: palette.text },
+    title: { textStyle: { fontFamily: sans, fontWeight: 600, color: palette.text } },
+    legend: { textStyle: { fontFamily: sans, color: palette.textMuted, fontSize: 11 }, icon: "roundRect", itemWidth: 10, itemHeight: 3 },
+    tooltip: {
+      backgroundColor: overlay,
+      borderColor: palette.border,
+      borderWidth: 1,
+      padding: [8, 10],
+      textStyle: { fontFamily: sans, color: palette.text, fontSize: 11.5 },
+      extraCssText: "border-radius:8px;box-shadow:var(--d-shadow-overlay);",
+      axisPointer: { lineStyle: { color: palette.playhead, width: 1 }, crossStyle: { color: palette.reference } },
+    },
+    categoryAxis: axis,
+    valueAxis: axis,
+    timeAxis: axis,
+    logAxis: axis,
+    dataZoom: {
+      borderColor: palette.border,
+      fillerColor: palette.brush,
+      handleStyle: { color: palette.playhead, borderColor: palette.playhead },
+      textStyle: { color: palette.textMuted, fontFamily: mono },
+    },
+  };
+}
+
 export function seriesColor(
   palette: ChartPalette,
   measurementClass: string | null | undefined,

@@ -5,6 +5,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { router } from "@/router";
+import { prefetchBootstrap } from "@/lib/use-catalog";
 import "@/styles/index.css";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/jetbrains-mono";
@@ -18,6 +19,10 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+// Stage A: warm lightweight navigation metadata once, so Research, Data and
+// entity-context drill-down answer from memory. Never dense data.
+prefetchBootstrap(queryClient);
 
 function Bootstrap() {
   return (

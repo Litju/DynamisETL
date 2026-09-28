@@ -84,6 +84,44 @@ export const catalogSearchSchema = z.object({
 });
 export type CatalogSearch = z.infer<typeof catalogSearchSchema>;
 
+/** Data Browser: what data exists. Provider/rights are secondary facets. */
+export const dataSearchSchema = z.object({
+  domain: z.enum(["sports", "human"]).optional().catch(undefined),
+  sport: optionalText,
+  modality: optionalText,
+  q: optionalText,
+  provider: optionalText,
+  rights: z.enum(["commercial", "noncommercial", "local_only"]).optional().catch(undefined),
+  status: z.enum(["ready", "upstream"]).optional().catch(undefined),
+});
+export type DataSearch = z.infer<typeof dataSearchSchema>;
+
+export const EDITION_TABS = ["matches", "teams", "players", "season"] as const;
+export type EditionTab = (typeof EDITION_TABS)[number];
+
+/** Competition/Season entity context. */
+export const editionSearchSchema = z.object({
+  tab: z.enum(EDITION_TABS).optional().catch(undefined),
+  q: optionalText,
+  team: optionalText,
+  status: z.enum(["ready", "upstream"]).optional().catch(undefined),
+});
+export type EditionSearch = z.infer<typeof editionSearchSchema>;
+
+/** Team and Player entity context: identity lives in the path. */
+export const entitySearchSchema = z.object({
+  edition: optionalText,
+});
+export type EntitySearch = z.infer<typeof entitySearchSchema>;
+
+/** Performance World entry: Dataset/Study → Session → Trial → Subject. */
+export const performanceSearchSchema = z.object({
+  dataset: optionalText,
+  session: optionalText,
+  q: optionalText,
+});
+export type PerformanceSearch = z.infer<typeof performanceSearchSchema>;
+
 export const compareSearchSchema = z.object({
   a: optionalText,
   b: optionalText,

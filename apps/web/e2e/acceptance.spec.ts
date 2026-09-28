@@ -9,16 +9,19 @@ test.beforeEach(async ({ page }) => {
   await installApiMocks(page);
 });
 
-test("0. root opens the catalog instead of the not-found surface", async ({ page }) => {
+test("0. root opens Research, and the legacy catalog lands on Data", async ({ page }) => {
   await page.goto("/");
-  await expect(page).toHaveURL(/\/catalog$/);
+  await expect(page.getByRole("heading", { name: "Research", level: 1 })).toBeVisible();
+  await page.goto("/catalog");
+  await expect(page).toHaveURL(/\/data$/);
 });
 
 test("1. deep link loads deterministic analytical context and survives reload", async ({ page }) => {
   await page.goto(DEEP_LINK);
-  await expect(page.getByText("skillcorner-opendata").first()).toBeVisible();
-  await expect(page.getByText("period-1").first()).toBeVisible();
-  await expect(page.getByText("SC-P1").first()).toBeVisible();
+  const spine = page.getByRole("navigation", { name: "Analysis context" });
+  await expect(spine.getByText("Brisbane Roar 0–1 Perth Glory")).toBeVisible();
+  await expect(spine.getByText("A-League 2024/2025")).toBeVisible();
+  await expect(spine.getByText(/SC-P1|Subject SC-P1/).first()).toBeVisible();
   await expect(page.getByText("00:49:47.480").first()).toBeVisible();
   await page.reload();
   await expect(page.getByText("00:49:47.480").first()).toBeVisible();

@@ -1,17 +1,18 @@
 import { useRouterState } from "@tanstack/react-router";
-import { PanelLeftClose, PanelLeftOpen, PanelRight } from "lucide-react";
+import { PanelRight } from "lucide-react";
 import { Group, Panel, Separator } from "react-resizable-panels";
-import { lazy, Suspense, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, type ReactNode } from "react";
 
 import { CommandPalette } from "@/components/command/CommandPalette";
-import { ContextBar } from "@/components/shell/ContextBar";
 import { Explorer } from "@/components/shell/Explorer";
 import { Inspector } from "@/components/shell/Inspector";
-import { NavRail } from "@/components/shell/NavRail";
+import { TopBar } from "@/components/shell/TopBar";
 import { Transport } from "@/components/shell/Transport";
 import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
 import { usePlaybackClock } from "@/hooks/usePlaybackClock";
 import { useAnalysisStore } from "@/lib/state/analysis";
+import { useShellContext } from "@/lib/state/context";
+import { useRecentContexts } from "@/lib/state/recent";
 import { inspectorVisible, useUiStore } from "@/lib/state/ui";
 import { normalizeLabSearch } from "@/lib/search";
 
@@ -51,9 +52,33 @@ export function shellLayoutFor(pathname: string): ShellLayout {
  * Panels scroll internally; the document itself never becomes one giant
  * dashboard scroll.
  */
+/**
+ * Record the published World context as a per-viewer "recent" entry. The
+ * stored href is the exact URL, so resuming reproduces the context through the
+ * router's own validation rather than any local state.
+ */
+function useRecordRecentContext(): void {
+  const context = useShellContext((state) => state.context);
+  const href = useRouterState({ select: (state) => state.location.href });
+  const record = useRecentContexts((state) => state.record);
+  useEffect(() => {
+    if (!context?.world || !context.title) return;
+    if (context.crumbs.some((crumb) => crumb.pending)) return;
+    record({
+      key: context.owner,
+      world: context.world,
+      title: context.title,
+      subtitle: context.subtitle ?? "",
+      href,
+      at: Date.now(),
+    });
+  }, [context, href, record]);
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   usePlaybackClock();
   useGlobalShortcuts();
+  useRecordRecentContext();
   const location = useRouterState({ select: (state) => state.location });
   const pathname = location.pathname;
   const focusMode = useUiStore((state) => state.focusMode);
@@ -70,15 +95,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   const showPoseTelemetry = !focusMode && layout.inspector && poseRoute;
   const tacticalRoute = !focusMode && layout.inspector && routeView === "field";
   const showTacticalAnalysis = tacticalRoute && inspectorVisible(inspectorOverride, layout.inspector);
+  // The evidence inspector earns its width only once a result or metric is
+  // selected to explain; until then the analysis keeps the space.
+  const evidenceDefault = layout.inspector && Boolean(routeSearch.result || routeSearch.metric);
   const showInspector =
-    !matchLabRoute && (showPoseTelemetry || showTacticalAnalysis || (!focusMode && inspectorVisible(inspectorOverride, layout.inspector)));
+    !matchLabRoute && (showPoseTelemetry || showTacticalAnalysis || (!focusMode && inspectorVisible(inspectorOverride, evidenceDefault)));
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-surface-0 text-text-primary">
-      <ContextBar />
+      {!focusMode ? <TopBar /> : null}
       <div className="flex min-h-0 flex-1">
-        {!focusMode ? <NavRail /> : null}
-        {matchLabRoute && !focusMode ? <MatchLabExplorerRail /> : null}
         <Group
           orientation="horizontal"
           id="dynamis-workbench"
@@ -127,7 +153,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </>
           ) : null}
         </Group>
-        {!focusMode && !matchLabRoute && !showInspector && !ownsEvidenceRail(pathname) ? (
+        {!focusMode && layout.inspector && !matchLabRoute && !showInspector && !ownsEvidenceRail(pathname) ? (
         <InspectorRail tactical={tacticalRoute} onExpand={() => setInspectorOpen(true)} />
         ) : null}
       </div>
@@ -140,32 +166,6 @@ export function AppShell({ children }: { children: ReactNode }) {
 /** Workbenches that render their own evidence rail never get the shell's. */
 export function ownsEvidenceRail(pathname: string): boolean {
   return pathname === "/season" || pathname.startsWith("/season/");
-}
-
-/** Narrow, on-demand source/context rail for the flagship MatchLab route. */
-function MatchLabExplorerRail() {
-  const [expanded, setExpanded] = useState(false);
-  return (
-    <div className="relative z-30 h-full w-8 shrink-0 border-r border-border-subtle bg-surface-0">
-      <button
-        type="button"
-        onClick={() => setExpanded((open) => !open)}
-        aria-label={expanded ? "Close MatchLab explorer" : "Open MatchLab explorer"}
-        aria-expanded={expanded}
-        className="flex h-8 w-8 items-center justify-center border-b border-border-subtle text-text-muted hover:bg-surface-2 hover:text-text-secondary"
-      >
-        {expanded ? <PanelLeftClose size={14} aria-hidden="true" /> : <PanelLeftOpen size={14} aria-hidden="true" />}
-      </button>
-      <span aria-hidden="true" className="t-section mt-3 block select-none text-center text-[9px] text-text-muted" style={{ writingMode: "vertical-rl" }}>
-        Explorer
-      </span>
-      {expanded ? (
-        <aside className="absolute inset-y-0 left-full z-30 w-64 border-r border-border-subtle bg-surface-1 shadow-panel">
-          <Explorer onCollapse={() => setExpanded(false)} />
-        </aside>
-      ) : null}
-    </div>
-  );
 }
 
 /**

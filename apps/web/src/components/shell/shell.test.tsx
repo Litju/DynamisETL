@@ -1,9 +1,10 @@
-﻿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { filterCommands, type Command } from "@/components/command/CommandPalette";
-import { contextCrumbs } from "@/components/shell/ContextBar";
 import { shellLayoutFor } from "@/components/shell/AppShell";
 import { qualityRibbonText, summarizeQuality } from "@/components/shell/Transport";
+import { useShellContext } from "@/lib/state/context";
+import { lastContextOf, relativeTime, useRecentContexts } from "@/lib/state/recent";
 
 const COMMANDS: Command[] = [
   { id: "a", title: "Go to Library", group: "Navigate", run: () => undefined },
@@ -22,35 +23,40 @@ describe("command palette filtering", () => {
 });
 
 describe("context spine", () => {
-  it("reads human-readable names first and keeps the exact id as evidence", () => {
-    const crumbs = contextCrumbs(
-      "/lab/skillcorner-opendata/1925299",
-      "?trial=period_1&subject=809166",
-      { dataset: "SkillCorner Open Data", session: "Brisbane Roar FC 0-1 Perth Glory" },
-    );
-    expect(crumbs.map((crumb) => [crumb.label, crumb.id])).toEqual([
-      ["Laboratory", undefined],
-      ["SkillCorner Open Data", "skillcorner-opendata"],
-      ["Brisbane Roar FC 0-1 Perth Glory", "1925299"],
-      ["period_1", "period_1"],
-      ["Subject 809166", "809166"],
-    ]);
+  it("publishes readable crumbs and ignores retraction by a previous owner", () => {
+    const store = useShellContext.getState();
+    store.publish({ owner: "match:a/1", world: "match", crumbs: [{ key: "match", label: "Auckland FC 2–1 Macarthur FC" }] });
+    expect(useShellContext.getState().context?.crumbs[0]?.label).toBe("Auckland FC 2–1 Macarthur FC");
+    // The next World publishes before the previous screen unmounts; the late
+    // retraction of the old owner must not blank the new context.
+    store.publish({ owner: "game:e:g", world: "game", crumbs: [{ key: "game", label: "Game", pending: true }] });
+    store.retract("match:a/1");
+    expect(useShellContext.getState().context?.owner).toBe("game:e:g");
+    expect(useShellContext.getState().context?.crumbs[0]?.pending).toBe(true);
+    store.retract("game:e:g");
+    expect(useShellContext.getState().context).toBeNull();
+  });
+});
+
+describe("recent contexts", () => {
+  it("keeps one entry per context, newest first, as exact URLs", () => {
+    const { record, clear } = useRecentContexts.getState();
+    clear();
+    record({ key: "match:a/1", world: "match", title: "A", subtitle: "", href: "/lab/a/1?t_ns=1", at: 1 });
+    record({ key: "season:e:p", world: "season", title: "P", subtitle: "", href: "/season?edition=e", at: 2 });
+    record({ key: "match:a/1", world: "match", title: "A", subtitle: "", href: "/lab/a/1?t_ns=2", at: 3 });
+    const entries = useRecentContexts.getState().entries;
+    expect(entries.map((entry) => entry.key)).toEqual(["match:a/1", "season:e:p"]);
+    expect(lastContextOf(entries, "match")?.href).toBe("/lab/a/1?t_ns=2");
+    expect(lastContextOf(entries, "game")).toBeNull();
+    clear();
   });
 
-  it("falls back to the identifier when no readable name is resolved yet", () => {
-    const crumbs = contextCrumbs("/lab/white-cmj-acc-grf/white-s000", "");
-    expect(crumbs.map((crumb) => crumb.label)).toEqual([
-      "Laboratory",
-      "white-cmj-acc-grf",
-      "white-s000",
-    ]);
-  });
-
-  it("labels non-laboratory surfaces without inventing context", () => {
-    expect(contextCrumbs("/quality", "")).toEqual([
-      { key: "surface", label: "Quality & rights", to: "/quality" },
-    ]);
-    expect(contextCrumbs("/", "")).toEqual([]);
+  it("describes elapsed time in words", () => {
+    expect(relativeTime(0, 30_000)).toBe("just now");
+    expect(relativeTime(0, 5 * 60_000)).toBe("5 min ago");
+    expect(relativeTime(0, 3 * 3_600_000)).toBe("3 h ago");
+    expect(relativeTime(0, 26 * 3_600_000)).toBe("yesterday");
   });
 });
 

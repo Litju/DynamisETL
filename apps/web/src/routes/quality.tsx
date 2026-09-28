@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createRoute, type AnyRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { Scale } from "lucide-react";
 
+import { LibraryNav } from "@/components/shell/LibraryNav";
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
 import type { DatasetSummary, QualityIssueView, RightsPage } from "@/api/types";
 import { datasetsQuery, qualityQuery, rightsQuery, servingStatusQuery } from "@/lib/api/queries";
@@ -54,10 +55,11 @@ export function QualityPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto">
-      <header className="shrink-0 border-b border-border-subtle bg-surface-1 px-4 py-3">
+      <LibraryNav />
+      <header className="shrink-0 border-b border-border-subtle bg-surface-1 px-5 py-4">
         <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
           <div className="min-w-0">
-            <h1 className="t-surface-title">
+            <h1 className="t-headline">
               Quality &amp; rights
             </h1>
             <p className="mt-0.5 max-w-2xl text-[12px] text-text-secondary">

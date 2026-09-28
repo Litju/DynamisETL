@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
+import { easing } from "maath";
 import {
   CircleGeometry,
   Color,
   DoubleSide,
   InstancedMesh,
   Matrix4,
+  Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
   Object3D,
@@ -103,6 +105,7 @@ export function TrackingLayer({
   const marker = useMemo(() => new Object3D(), []);
   const color = useMemo(() => new Color(), []);
   const lastDrawKey = useRef<TrackingDrawIdentity | null>(null);
+  const reticleTarget = useRef<ReticleTarget | null>(null);
 
   useEffect(
     () => () => {
@@ -152,6 +155,7 @@ export function TrackingLayer({
       otherColor: palette.other,
     };
 
+    reticleTarget.current = null;
     if (sourceTimeNs === null || buffers === null) {
       detected.count = 0;
       extrapolated.count = 0;
@@ -212,6 +216,7 @@ export function TrackingLayer({
             : palette.other;
       const selected = selectedId === entityId;
       const hovered = hoveredId === entityId;
+      if (selected) reticleTarget.current = { entityId, xM, yM };
       const scale = selected ? 1.55 : hovered ? 1.35 : kind === TRACKING_KIND.official ? 0.9 : 1;
       const detection = buffers.detectionState[row] ?? -1;
       const mesh =
@@ -284,6 +289,7 @@ export function TrackingLayer({
         onPointerOver={(event: { instanceId?: number }) => hoverInstance(event, unknownRows.current)}
         onPointerOut={() => matchFrame.hoverTrackingObject(null)}
       />
+      <SelectionReticle target={reticleTarget} />
       <mesh
         ref={ballRef}
         geometry={ballGeometry}
@@ -297,4 +303,65 @@ export function TrackingLayer({
       />
     </group>
   );
+}
+
+interface ReticleTarget {
+  readonly entityId: string;
+  readonly xM: number;
+  readonly yM: number;
+}
+
+function reducedMotion(): boolean {
+  return typeof window !== "undefined" && typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+/**
+ * Focus reticle for the selected player.
+ *
+ * Position is written from the exact source frame every render — the
+ * measurement is never smoothed or interpolated. Only the reticle's own
+ * scale and opacity ease in (maath, refresh-rate independent) when the
+ * selection changes, so a new selection "lands" on its player. The layer
+ * requests frames only while that affordance is still settling.
+ */
+function SelectionReticle({ target }: { readonly target: React.RefObject<ReticleTarget | null> }) {
+  const meshRef = useRef<Mesh | null>(null);
+  const geometry = useMemo(() => new RingGeometry(0.92, 1.02, 48), []);
+  const material = useMemo(
+    () => new MeshBasicMaterial({ color: "#f4f7f6", transparent: true, opacity: 0, depthWrite: false }),
+    [],
+  );
+  const lastId = useRef<string | null>(null);
+  useEffect(() => () => {
+    geometry.dispose();
+    material.dispose();
+  }, [geometry, material]);
+  /* eslint-disable react-hooks/immutability -- three.js scale/opacity are mutable renderer state animated outside React. */
+  useFrame((state, delta) => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    const current = target.current;
+    if (current) {
+      mesh.position.set(current.xM, MARKER_Y + 0.002, -current.yM);
+      if (current.entityId !== lastId.current) {
+        lastId.current = current.entityId;
+        mesh.scale.setScalar(2.1);
+        material.opacity = 0;
+      }
+    } else {
+      lastId.current = null;
+    }
+    const goalOpacity = current ? 0.85 : 0;
+    if (reducedMotion()) {
+      mesh.scale.setScalar(1);
+      material.opacity = goalOpacity;
+      return;
+    }
+    const scaling = easing.damp3(mesh.scale, [1, 1, 1], 0.14, delta);
+    const fading = easing.damp(material, "opacity", goalOpacity, 0.1, delta);
+    if (scaling || fading) state.invalidate();
+  });
+  /* eslint-enable react-hooks/immutability */
+  return <mesh ref={meshRef} geometry={geometry} material={material} rotation={[-Math.PI / 2, 0, 0]} renderOrder={2} raycast={() => null} />;
 }

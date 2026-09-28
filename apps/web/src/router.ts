@@ -5,20 +5,31 @@ import {
   type RouterHistory,
 } from "@tanstack/react-router";
 
-import { defineCatalogRoute } from "@/routes/catalog";
 import { defineBasketballRoute } from "@/routes/basketball";
 import { defineCompareRoute } from "@/routes/compare";
+import { defineCatalogRedirectRoute, defineDataRoute } from "@/routes/data";
+import { defineEditionRoute } from "@/routes/edition";
 import { defineGamesRoute } from "@/routes/games";
 import { defineLabRoute } from "@/routes/lab";
 import { defineLabIndexRoute } from "@/routes/lab-index";
+import { defineLibraryRoute } from "@/routes/library";
 import { defineMethodsRoute } from "@/routes/methods";
+import { definePerformanceRoute } from "@/routes/performance";
+import { definePlayerRoute } from "@/routes/player";
 import { defineQualityRoute } from "@/routes/quality";
+import { defineResearchRoute } from "@/routes/research";
 import { defineRootRoute } from "@/routes/root";
 import { defineRunsRoute } from "@/routes/runs";
 import { defineSeasonRoute } from "@/routes/season";
+import { defineTeamRoute } from "@/routes/team";
 
 /**
  * Assemble a fresh route tree for one router instance.
+ *
+ * Information architecture (RES-129): Research (`/`), Data (`/data`, entity
+ * context under `/data/...`), Library (`/library`, `/methods`, `/runs`,
+ * `/quality`) and the four Worlds (`/lab`, `/games`, `/season`,
+ * `/performance`, plus the basketball court at `/basketball`).
  *
  * TanStack Router route instances are owned by a single router, and tests build
  * memory routers per case, so the tree is created through factories.
@@ -26,13 +37,20 @@ import { defineSeasonRoute } from "@/routes/season";
 export function buildRouteTree() {
   const root = defineRootRoute();
   return root.addChildren([
-    defineCatalogRoute(root),
+    defineResearchRoute(root),
+    defineDataRoute(root),
+    defineCatalogRedirectRoute(root),
+    defineEditionRoute(root),
+    defineTeamRoute(root),
+    definePlayerRoute(root),
+    definePerformanceRoute(root),
     defineLabIndexRoute(root),
     defineLabRoute(root),
     defineCompareRoute(root),
     defineGamesRoute(root),
     defineBasketballRoute(root),
     defineSeasonRoute(root),
+    defineLibraryRoute(root),
     defineMethodsRoute(root),
     defineRunsRoute(root),
     defineQualityRoute(root),

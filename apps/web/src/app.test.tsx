@@ -1,6 +1,6 @@
-﻿import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -11,6 +11,7 @@ import type { DatasetDetail, DatasetSummary, MetricPage, SessionDetail } from "@
 // here. The shell test is about routing, durable state and composition; the
 // option builders have their own tests against the real contracts.
 vi.mock("echarts", () => ({
+  registerTheme: () => undefined,
   init: () => ({
     setOption: () => undefined,
     resize: () => undefined,
@@ -265,6 +266,11 @@ function renderAt(path: string) {
   return router;
 }
 
+function cleanupAndRender(path: string) {
+  cleanup();
+  return renderAt(path);
+}
+
 describe("workbench shell", () => {
   beforeEach(() => {
     installFetchStub();
@@ -273,36 +279,48 @@ describe("workbench shell", () => {
     vi.unstubAllGlobals();
   });
 
-  it("renders the semantic Data Library with provenance and ready routing", async () => {
-    renderAt("/catalog");
-    expect(await screen.findByRole("navigation", { name: "Product surfaces" })).toBeInTheDocument();
-    expect(screen.getByText(/Performance Laboratory/)).toBeInTheDocument();
-    expect(await screen.findByText("Brisbane Roar FC vs Perth Glory")).toBeInTheDocument();
-    expect(screen.getByText("Provider: SkillCorner")).toBeInTheDocument();
-    expect(screen.getByText(/Rights: CC BY 4.0/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "MatchLab" })).toBeInTheDocument();
+  it("opens on Research and routes legacy /catalog links to the Data Browser", async () => {
+    const router = renderAt("/catalog");
+    const sections = await screen.findByRole("navigation", { name: "Product sections" });
+    expect(sections).toHaveTextContent("Research");
+    expect(sections).toHaveTextContent("Data");
+    expect(sections).toHaveTextContent("Library");
+    expect(await screen.findByRole("heading", { name: "Sports", level: 1 })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/data");
+    // Provider is provenance on the competition, not a destination.
+    expect(await screen.findByText("A-League")).toBeInTheDocument();
+    expect(screen.getByText("SkillCorner")).toBeInTheDocument();
+    // The edition routes into its context screen; its ready contest counts.
+    const edition = screen.getByRole("link", { name: /2024\/2025/ });
+    expect(edition).toHaveAttribute("href", "/data/edition/edition-2025");
+    expect(edition).toHaveTextContent("1/1 contests ready");
   });
 
-  it("filters semantic records by sport and provider provenance", async () => {
-    const user = userEvent.setup();
-    renderAt("/catalog");
-    await screen.findByText("Brisbane Roar FC vs Perth Glory");
-    await user.selectOptions(screen.getByLabelText("World"), "football");
-    await user.selectOptions(screen.getByLabelText("Provider"), "SkillCorner");
-    expect(screen.getByRole("link", { name: "MatchLab" })).toBeInTheDocument();
-    expect(screen.getByText("1 of 1 records")).toBeInTheDocument();
+  it("filters the Data Browser by provider provenance through the URL", async () => {
+    renderAt("/data?domain=sports&provider=SkillCorner");
+    expect(await screen.findByText("A-League")).toBeInTheDocument();
+    cleanupAndRender("/data?domain=sports&provider=Other%20provider");
+    expect(await screen.findByText("Nothing matches these filters.")).toBeInTheDocument();
   });
 
-  it("compacts the inspector to a rail where nothing is inspectable", async () => {
+  it("routes a ready contest into Match World from the competition context", async () => {
+    renderAt("/data/edition/edition-2025");
+    expect(await screen.findByRole("heading", { name: /A-League/, level: 1 })).toBeInTheDocument();
+    const open = await screen.findByRole("link", { name: /Open Match World/ });
+    expect(open).toHaveAttribute("href", "/lab/skillcorner-opendata/1925299?view=matchlab");
+  });
+
+  it("keeps the evidence inspector out of Data and one click away in a World", async () => {
     const user = userEvent.setup();
-    renderAt("/catalog");
-    // The catalog owns its own dataset evidence, so the inspector must not
-    // reserve flagship width with an empty pane.
-    await screen.findByRole("navigation", { name: "Product surfaces" });
+    renderAt("/data");
+    await screen.findByRole("navigation", { name: "Product sections" });
     expect(screen.queryByRole("region", { name: "Inspector" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open the inspector" })).not.toBeInTheDocument();
 
-    // It stays one click away.
-    await user.click(screen.getByRole("button", { name: "Open the inspector" }));
+    cleanupAndRender("/lab/skillcorner-opendata/1925299?trial=period-1&view=overview");
+    // Nothing is selected to explain yet, so the analysis keeps the width…
+    await user.click(await screen.findByRole("button", { name: "Open the inspector" }));
+    // …and the evidence pane stays one click away.
     expect(await screen.findByRole("region", { name: "Inspector" })).toBeInTheDocument();
   });
 
@@ -310,11 +328,14 @@ describe("workbench shell", () => {
     renderAt(
       "/lab/skillcorner-opendata/1925299?trial=period-1&subject=809166&view=overview&t_ns=2987480000000",
     );
-    // Context bar: dataset, session, trial, subject.
-    expect(await screen.findByText("skillcorner-opendata")).toBeInTheDocument();
-    expect(screen.getAllByText("1925299").length).toBeGreaterThan(0);
-    expect(screen.getByText("period-1")).toBeInTheDocument();
-    expect(screen.getAllByText("809166").length).toBeGreaterThan(0);
+    // Context spine: readable sport, edition, match, period and player.
+    const spine = await screen.findByRole("navigation", { name: "Analysis context" });
+    expect(await within(spine).findByText("Brisbane Roar 0–1 Perth Glory")).toBeInTheDocument();
+    expect(within(spine).getByText("Football")).toBeInTheDocument();
+    expect(within(spine).getByText("A-League 2024/2025")).toBeInTheDocument();
+    expect(within(spine).getByText("First half")).toBeInTheDocument();
+    expect(within(spine).getByText("Subject 809166")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Match World/ })).toBeInTheDocument();
     // Committed playhead is restored from decimal nanosecond text.
     expect(screen.getAllByText("00:49:47.480").length).toBeGreaterThan(0);
     expect(screen.getAllByText("2987480000000 ns").length).toBeGreaterThan(0);
@@ -333,7 +354,7 @@ describe("workbench shell", () => {
 
   it("opens a non-overview view from the deep link without inventing results", async () => {
     renderAt("/lab/skillcorner-opendata/1925299?stream=pose-period-1&view=pose");
-    await screen.findByRole("tab", { name: "pose" });
+    await screen.findByRole("tab", { name: "Pose" });
     // The stub session declares no canonical pose artifact, so the pose viewer
     // must say so explicitly instead of rendering an empty scene.
     expect(

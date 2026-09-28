@@ -1,4 +1,5 @@
 import { CameraControls, PerspectiveCamera, View } from "@react-three/drei";
+import { easing } from "maath";
 import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
@@ -171,6 +172,8 @@ function PoseStage({ subjects, bounds, ...props }: PoseSceneProps & {
   const { cameraMode, onManualCamera } = props;
   const controlsRef = useRef<React.ElementRef<typeof CameraControls> | null>(null);
   const followTarget = useRef(new Vector3());
+  const desiredTarget = useRef(new Vector3());
+  const followSettling = useRef(false);
   const hasFollowTarget = useRef(false);
   useEffect(() => useAnalysisStore.subscribe((state, previous) => {
     if (state.playheadNs !== previous.playheadNs || state.playing !== previous.playing) invalidate();
@@ -218,12 +221,20 @@ function PoseStage({ subjects, bounds, ...props }: PoseSceneProps & {
       target.set(desired[0], desired[1], desired[2]);
       hasFollowTarget.current = true;
     }
-    const desiredVector = new Vector3(desired[0], desired[1], desired[2]);
-    if (target.distanceTo(desiredVector) > Math.max(0.1, bounds.radius * 0.2)) {
+    desiredTarget.current.set(desired[0], desired[1], desired[2]);
+    if (target.distanceTo(desiredTarget.current) > Math.max(0.1, bounds.radius * 0.2) || followSettling.current) {
       // Camera easing is JavaScript motion, outside the CSS reduced-motion
       // rule: honour the preference by moving the target in one step.
       const reduced = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-      target.lerp(desiredVector, reduced ? 1 : Math.min(1, Math.max(0, delta) * 6));
+      if (reduced) {
+        target.copy(desiredTarget.current);
+        followSettling.current = false;
+      } else {
+        // maath damping is refresh-rate independent (the previous lerp by
+        // delta*6 drifted with frame time); the camera target only — the
+        // skeleton itself is always drawn at its exact source sample.
+        followSettling.current = easing.damp3(target, desiredTarget.current, 0.2, delta);
+      }
       controlsRef.current?.setTarget(target.x, target.y, target.z, false);
       invalidate();
     }

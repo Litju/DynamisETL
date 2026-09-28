@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import { ChevronRight, Table2, UserRound } from "lucide-react";
+import { Table2, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo } from "react";
 
 import type { SeasonFamilyView, SeasonProfileView, SeasonRowView } from "@/api/types";
@@ -241,34 +241,12 @@ function SeasonWorkbench({
 
   return (
     <div className="season-lab flex h-full min-h-0 flex-col" data-family={family}>
-      <header className="shrink-0 border-b border-border-subtle bg-surface-1/70 px-4 pb-2 pt-2.5">
-        <nav aria-label="Season context" className="flex flex-wrap items-center gap-1 text-[11px] text-text-muted">
-          <span>{edition.sport_name}</span>
-          <ChevronRight size={11} aria-hidden="true" />
-          <span>{edition.competition_name}</span>
-          <ChevronRight size={11} aria-hidden="true" />
-          <span className="text-text-secondary">{edition.edition_label}</span>
-          {teamLabel ? (
-            <>
-              <ChevronRight size={11} aria-hidden="true" />
-              <span className="text-text-secondary">{shortTeamName(teamLabel)}</span>
-            </>
-          ) : null}
-          {selectedRow ? (
-            <>
-              <ChevronRight size={11} aria-hidden="true" />
-              <span className="text-text-primary">{selectedRow.player_name}</span>
-            </>
-          ) : null}
-          <span className="ml-auto flex items-center gap-1.5">
-            <span className="t-label">Provider</span>
-            <span className="text-text-secondary">{edition.provider}</span>
-          </span>
-        </nav>
-        <div className="mt-2 flex flex-wrap items-end gap-x-5 gap-y-2">
-          <div className="flex items-baseline gap-3">
-            <h1 className="t-surface-title">SeasonLab</h1>
-            <span className="t-label">Player season · {edition.edition_label}</span>
+      <header className="shrink-0 border-b border-border-subtle bg-surface-1 px-4 py-2">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          <div className="flex items-baseline gap-2.5" aria-label={`Season context: ${[edition.sport_name, edition.competition_name, edition.edition_label, teamLabel ? shortTeamName(teamLabel) : null, selectedRow?.player_name].filter(Boolean).join(" · ")}`}>
+            <span className="t-kicker">Season World</span>
+            <h1 className="text-[15px] font-semibold tracking-[-0.015em] text-text-primary">SeasonLab</h1>
+            <span className="t-label hidden min-[1500px]:inline">{edition.provider} · player season</span>
           </div>
           <FamilyTabs edition={edition} family={family} onChange={(next) => update({ family: next, metrics: undefined, focus: undefined })} />
           <div className="ml-auto flex flex-wrap items-end gap-2">

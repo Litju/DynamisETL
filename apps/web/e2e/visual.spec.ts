@@ -19,7 +19,10 @@ const COMPARE = process.env.VISUAL_REGRESSION === "1";
 const SCREENSHOT_DIR = process.env.ACCEPTANCE_SCREENSHOT_DIR;
 
 const SHOTS: Array<{ name: string; route: string }> = [
-  { name: "01-catalog.png", route: "/catalog" },
+  { name: "00-research.png", route: "/" },
+  { name: "01-data.png", route: "/data" },
+  { name: "01b-edition.png", route: "/data/edition/skillcorner:edition:870" },
+  { name: "01c-library.png", route: "/library" },
   {
     name: "02-session-overview.png",
     route: "/lab/skillcorner-opendata/1925299?view=overview&t_ns=50000000",
