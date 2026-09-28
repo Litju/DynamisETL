@@ -28,6 +28,15 @@ EDITION = "edition-test"
 RELATIVE = "silver/season/aggregate_family=physical.parquet"
 
 
+def test_basketball_efficiency_units_match_their_denominators() -> None:
+    assert season._basketball_spec("picks", "handler_ppp").unit == "points per pick"
+    assert season._basketball_spec("picks", "handler_ppp_at_middle").unit == "points per pick"
+    assert season._basketball_spec("drives", "points_per_drive").unit == "points per drive"
+    assert (
+        season._basketball_spec("drives", "points_per_shot_in_drive").unit == "points per attempt"
+    )
+
+
 def _physical_table() -> pa.Table:
     rows = [
         # subject, name, team, team name, position, matches, distance, tip, otip, psv99
@@ -108,7 +117,7 @@ def test_registry_refuses_unknown_columns_and_families() -> None:
     with pytest.raises(season.SeasonDataError, match="not covered"):
         season.family_metrics("physical", ["total_distance_full_all", "mystery_metric"])
     with pytest.raises(season.SeasonDataError, match="no registered metric resolver"):
-        season.family_metrics("shots", ["x"])
+        season.family_metrics("ice_hockey", ["x"])
     # Identity/provenance columns are never offered as metrics.
     assert season.family_metrics("physical", ["player_id", "team_name", "subject_id"]) == []
 

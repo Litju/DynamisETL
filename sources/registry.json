@@ -1361,6 +1361,421 @@
           }
         }
       ]
+    },
+    {
+        "dataset_id": "skillcorner-basketball-opendata",
+        "name": "SkillCorner Basketball Open Data — ACB tracking, dynamic events and season aggregates",
+        "provider": "SkillCorner / GitHub",
+        "upstream_urls": [
+            "https://github.com/SkillCorner/opendata-basketball"
+        ],
+        "doi": null,
+        "domain": "basketball",
+        "modalities": [
+            "tracking",
+            "event"
+        ],
+        "adapter_id": "skillcorner_basketball_opendata",
+        "v1_role": "Basketball player and ball tracking, source dynamic events and player-season aggregates",
+        "initial_scope": "10 ACB 2025-2026 games catalogued from metadata first; selected-game materialization; Shots, Drives and Picks season aggregates",
+        "license": {
+            "identifier": "MIT",
+            "status": "declared",
+            "attribution_required": true,
+            "noncommercial_only": false,
+            "share_alike": false,
+            "redistribution": "conditional",
+            "local_only": false,
+            "restrictions": [
+                "SkillCorner requests credit when the data is used."
+            ]
+        },
+        "versions": [
+            {
+                "version": "4bbed2e35e8fdd2cf083e8c8b280b3e5381a2c66",
+                "release_date": null,
+                "upstream_url": "https://github.com/SkillCorner/opendata-basketball/tree/4bbed2e35e8fdd2cf083e8c8b280b3e5381a2c66",
+                "citation": "SkillCorner (2026). SkillCorner Open Data — Basketball. https://github.com/SkillCorner/opendata-basketball (revision 4bbed2e35e8fdd2cf083e8c8b280b3e5381a2c66)",
+                "optional": false,
+                "retrieval": {
+                    "status": "not_fetched",
+                    "retrieved_at": null,
+                    "files": [
+                        {
+                            "key": "data/matches.json",
+                            "size_bytes": 4324,
+                            "md5": "unknown",
+                            "sha1": "6db83d7fa75a699270630c02efc330ce8a8d2e2b",
+                            "sha256": "unknown",
+                            "upstream_capabilities": [],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/player_id_aliases.csv",
+                            "size_bytes": 1062,
+                            "md5": "unknown",
+                            "sha1": "af2100462ea1aa7800a107207e2537a5b3642035",
+                            "sha256": "unknown",
+                            "upstream_capabilities": [],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/aggregates/acb_shotsaggregates_20252026.csv",
+                            "size_bytes": 601318,
+                            "md5": "unknown",
+                            "sha1": "ea1d3651316e745ea15662ec6f4c44c79b285302",
+                            "sha256": "unknown",
+                            "upstream_capabilities": [
+                                "SEASON_AGGREGATE"
+                            ],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/aggregates/acb_drivesaggregates_20252026.csv",
+                            "size_bytes": 162072,
+                            "md5": "unknown",
+                            "sha1": "73f2403746ede57bdf48a2e2d3881a4749514ca5",
+                            "sha256": "unknown",
+                            "upstream_capabilities": [
+                                "SEASON_AGGREGATE"
+                            ],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/aggregates/acb_picksaggregates_20252026.csv",
+                            "size_bytes": 839870,
+                            "md5": "unknown",
+                            "sha1": "856477cea3af5d78722b8a098254e7821581e38a",
+                            "sha256": "unknown",
+                            "upstream_capabilities": [
+                                "SEASON_AGGREGATE"
+                            ],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/matches/114243/114243_game_data.json",
+                            "size_bytes": 2253,
+                            "md5": "unknown",
+                            "sha1": "e969077a56d6d0b57022a6c3f8aaaa0cc002e63a",
+                            "sha256": "unknown",
+                            "upstream_capabilities": [],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/matches/114243/114243_dynamic_events.json",
+                            "size_bytes": 3526294,
+                            "md5": "unknown",
+                            "sha1": "fd4a48df294287c6e1771913297dd43f0f73cae5",
+                            "sha256": "unknown",
+                            "upstream_capabilities": [
+                                "EVENTS"
+                            ],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/matches/114243/114243_tracking_data.jsonl.gz",
+                            "size_bytes": 33707974,
+                            "md5": "unknown",
+                            "sha1": "5b28079ac58fb14bb3865f2cc11cd831a4589c34",
+                            "sha256": "a150110f57c365940ae1da32243cf924628c443ea16a85336c8cc4a674e05c0e",
+                            "upstream_capabilities": [
+                                "TRACKING",
+                                "BALL_TRACKING"
+                            ],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/matches/114234/114234_game_data.json",
+                            "size_bytes": 2130,
+                            "md5": "unknown",
+                            "sha1": "9fd1a15ec5ab31873311b45641d777b748b2431e",
+                            "sha256": "unknown",
+                            "upstream_capabilities": [],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/matches/114234/114234_dynamic_events.json",
+                            "size_bytes": 3465154,
+                            "md5": "unknown",
+                            "sha1": "4a1facbcf29293f4eba2ec07a72d8f2358d85d5c",
+                            "sha256": "unknown",
+                            "upstream_capabilities": [
+                                "EVENTS"
+                            ],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/matches/114234/114234_tracking_data.jsonl.gz",
+                            "size_bytes": 31697559,
+                            "md5": "unknown",
+                            "sha1": "009de6229d4221be98632dd1028b50331a0c5fa3",
+                            "sha256": "988b8a2ca3a8cc9c1c2a2838ab9a2d8d1add64cafd1113f0c63d2439f5164690",
+                            "upstream_capabilities": [
+                                "TRACKING",
+                                "BALL_TRACKING"
+                            ],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/matches/114169/114169_game_data.json",
+                            "size_bytes": 2098,
+                            "md5": "unknown",
+                            "sha1": "b671ed43f6c73006b8aa4b4051df7ece5f48cfe7",
+                            "sha256": "unknown",
+                            "upstream_capabilities": [],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/matches/114169/114169_dynamic_events.json",
+                            "size_bytes": 3459130,
+                            "md5": "unknown",
+                            "sha1": "19313805c4f27ffcd9d0437bfb20d10aa8392ab0",
+                            "sha256": "unknown",
+                            "upstream_capabilities": [
+                                "EVENTS"
+                            ],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/matches/114169/114169_tracking_data.jsonl.gz",
+                            "size_bytes": 45580755,
+                            "md5": "unknown",
+                            "sha1": "5a0b8a069dc98104a95d023d774bc28caa50bb5c",
+                            "sha256": "0b9f028febc7f7d46e7bd3d2bffa10c50ad85abbf0dd2a7937d5f32895e685f0",
+                            "upstream_capabilities": [
+                                "TRACKING",
+                                "BALL_TRACKING"
+                            ],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/matches/114099/114099_game_data.json",
+                            "size_bytes": 2225,
+                            "md5": "unknown",
+                            "sha1": "e274adb9b4d7b9e97aca3cbd98b86cb8024eae0e",
+                            "sha256": "unknown",
+                            "upstream_capabilities": [],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/matches/114099/114099_dynamic_events.json",
+                            "size_bytes": 3392618,
+                            "md5": "unknown",
+                            "sha1": "0283c8affb2eda0bec623f562c7bb1ebfcece29e",
+                            "sha256": "unknown",
+                            "upstream_capabilities": [
+                                "EVENTS"
+                            ],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/matches/114099/114099_tracking_data.jsonl.gz",
+                            "size_bytes": 33060109,
+                            "md5": "unknown",
+                            "sha1": "f9465d6dc6a1360ef6e540246b7f843c6b4b8cc4",
+                            "sha256": "1e4af3c2ea8f56f80a2b4adb56ffcf5abc479145c7dec55ebd7ebda652a2cc38",
+                            "upstream_capabilities": [
+                                "TRACKING",
+                                "BALL_TRACKING"
+                            ],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/matches/114086/114086_game_data.json",
+                            "size_bytes": 2168,
+                            "md5": "unknown",
+                            "sha1": "f302a354296028ff3ae3c7d65f0d1b610fd26d41",
+                            "sha256": "unknown",
+                            "upstream_capabilities": [],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/matches/114086/114086_dynamic_events.json",
+                            "size_bytes": 3345025,
+                            "md5": "unknown",
+                            "sha1": "4adddaa94608b22e0e847f03a4e6786b9b55ab86",
+                            "sha256": "unknown",
+                            "upstream_capabilities": [
+                                "EVENTS"
+                            ],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/matches/114086/114086_tracking_data.jsonl.gz",
+                            "size_bytes": 39842015,
+                            "md5": "unknown",
+                            "sha1": "c368dad45222f8ae0cb03e2b6f3ee1c17acc8eb6",
+                            "sha256": "df4043c143a6f7e3996089d4e20f19b25608a90b40f9a449d927dce89b0da846",
+                            "upstream_capabilities": [
+                                "TRACKING",
+                                "BALL_TRACKING"
+                            ],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/matches/178442/178442_game_data.json",
+                            "size_bytes": 2271,
+                            "md5": "unknown",
+                            "sha1": "9ec380ecd92e5b63a96696b9b305639e78e7de68",
+                            "sha256": "unknown",
+                            "upstream_capabilities": [],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/matches/178442/178442_dynamic_events.json",
+                            "size_bytes": 3572420,
+                            "md5": "unknown",
+                            "sha1": "5bee35229ff145f84a3c530e4cd023e7901af5dd",
+                            "sha256": "unknown",
+                            "upstream_capabilities": [
+                                "EVENTS"
+                            ],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/matches/178442/178442_tracking_data.jsonl.gz",
+                            "size_bytes": 39067647,
+                            "md5": "unknown",
+                            "sha1": "850abe875c24f168d2ddb1a2619927794741f7a8",
+                            "sha256": "03ed31f1f76eaaad39eefec90b7eb2ca6234fa3a20ee0bcf3279d12ab6f7cc09",
+                            "upstream_capabilities": [
+                                "TRACKING",
+                                "BALL_TRACKING"
+                            ],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/matches/179612/179612_game_data.json",
+                            "size_bytes": 2221,
+                            "md5": "unknown",
+                            "sha1": "259b9cd97ae0d161c42a5d79f95a132ce62d3b36",
+                            "sha256": "unknown",
+                            "upstream_capabilities": [],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/matches/179612/179612_dynamic_events.json",
+                            "size_bytes": 3414961,
+                            "md5": "unknown",
+                            "sha1": "77b54abd6c74b97350f9b068ff5ce486ed413707",
+                            "sha256": "unknown",
+                            "upstream_capabilities": [
+                                "EVENTS"
+                            ],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/matches/179612/179612_tracking_data.jsonl.gz",
+                            "size_bytes": 36191342,
+                            "md5": "unknown",
+                            "sha1": "17d6a55e49e2c420746528d05dc96a2e3bdc28a4",
+                            "sha256": "9681027e1306a2e5d6a6b80459ea2fc0816f455e5b65508c8ba9f32cc85024b8",
+                            "upstream_capabilities": [
+                                "TRACKING",
+                                "BALL_TRACKING"
+                            ],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/matches/184439/184439_game_data.json",
+                            "size_bytes": 2260,
+                            "md5": "unknown",
+                            "sha1": "99f9738e9b7fe1a543f0b316b6d8623585ed3265",
+                            "sha256": "unknown",
+                            "upstream_capabilities": [],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/matches/184439/184439_dynamic_events.json",
+                            "size_bytes": 3341994,
+                            "md5": "unknown",
+                            "sha1": "edd6d653cdc9c8e06188b1d69deaa583f23a6170",
+                            "sha256": "unknown",
+                            "upstream_capabilities": [
+                                "EVENTS"
+                            ],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/matches/184439/184439_tracking_data.jsonl.gz",
+                            "size_bytes": 33809782,
+                            "md5": "unknown",
+                            "sha1": "9a84d7445f81697cbbde1ca7b63cf5b25df3242c",
+                            "sha256": "a602b5c53d05eaebdb9e358945b8a92c42fb9fdc3e090f687b79224fa4d49bc1",
+                            "upstream_capabilities": [
+                                "TRACKING",
+                                "BALL_TRACKING"
+                            ],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/matches/188630/188630_game_data.json",
+                            "size_bytes": 2260,
+                            "md5": "unknown",
+                            "sha1": "224db3fd5dd21ab806a28b1d94a20ea10f12b73c",
+                            "sha256": "unknown",
+                            "upstream_capabilities": [],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/matches/188630/188630_dynamic_events.json",
+                            "size_bytes": 3183718,
+                            "md5": "unknown",
+                            "sha1": "1b6b1da590fe4789abefd4f4385ffabf60de7118",
+                            "sha256": "unknown",
+                            "upstream_capabilities": [
+                                "EVENTS"
+                            ],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/matches/188630/188630_tracking_data.jsonl.gz",
+                            "size_bytes": 31869680,
+                            "md5": "unknown",
+                            "sha1": "c3e3f580f46b36f40d909163dadedfd010106fa8",
+                            "sha256": "1a289ff627f8985f3f54021fc6e3ad5b97c11e7b5e85bbd1d1a0842b9d1a17c6",
+                            "upstream_capabilities": [
+                                "TRACKING",
+                                "BALL_TRACKING"
+                            ],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/matches/191313/191313_game_data.json",
+                            "size_bytes": 2294,
+                            "md5": "unknown",
+                            "sha1": "9bef665640fadd9683bb121badf9ebd0435e6b1b",
+                            "sha256": "unknown",
+                            "upstream_capabilities": [],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/matches/191313/191313_dynamic_events.json",
+                            "size_bytes": 3282745,
+                            "md5": "unknown",
+                            "sha1": "dcee1a012632e4f1a38816d829e5b8ca79e8d7a6",
+                            "sha256": "unknown",
+                            "upstream_capabilities": [
+                                "EVENTS"
+                            ],
+                            "retrieved_at": null
+                        },
+                        {
+                            "key": "data/matches/191313/191313_tracking_data.jsonl.gz",
+                            "size_bytes": 35898393,
+                            "md5": "unknown",
+                            "sha1": "9cd9df1b258fd587a270848bb2f42503ac72a116",
+                            "sha256": "a1c7cc6b5070686a8c5254a4a89627d289680c9f103bbe469b850f24a0742883",
+                            "upstream_capabilities": [
+                                "TRACKING",
+                                "BALL_TRACKING"
+                            ],
+                            "retrieved_at": null
+                        }
+                    ]
+                }
+            }
+        ]
     }
   ]
 }

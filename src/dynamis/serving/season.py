@@ -25,6 +25,16 @@ import duckdb
 
 SEASON_METRIC_REGISTRY_VERSION = "skillcorner-season-metrics/1"
 SKILLCORNER_GLOSSARY_URL = "https://skillcorner.crunch.help/en/glossaries/physical-data-glossary"
+SKILLCORNER_BASKETBALL_METRIC_REGISTRY_VERSION = "skillcorner-basketball-season-metrics/1"
+SKILLCORNER_BASKETBALL_AGGREGATES_URL = (
+    "https://github.com/SkillCorner/opendata-basketball/blob/"
+    "4bbed2e35e8fdd2cf083e8c8b280b3e5381a2c66/docs/aggregates_columns.md"
+)
+SKILLCORNER_BASKETBALL_INCLUSION_RULE = (
+    "Offense-only season aggregates cover 293 of 327 ACB 2025-2026 games across the "
+    "18-team season population. The 10 published sample games represent 17 teams. "
+    "Provider season-total rows are preserved in Bronze and excluded from player × team rows."
+)
 SKILLCORNER_INCLUSION_RULE = (
     "Upstream SkillCorner aggregates include only individual match performances above "
     "60 minutes played; the served row is the provider's season aggregate of those "
@@ -591,16 +601,67 @@ def _passing_spec(column: str) -> SeasonMetricSpec | None:
     )
 
 
+def _basketball_spec(family: str, column: str) -> SeasonMetricSpec:
+    group = FAMILY_LABELS.get(family, family.title())
+    if column == MATCH_COUNT_COLUMN[family]:
+        return SeasonMetricSpec(
+            metric_id=_metric_id(family, column),
+            column=column,
+            family=family,
+            label="Games played",
+            group="Exposure",
+            unit="games",
+            basis="season count",
+            definition="Source-reported number of games included in this player-team season row.",
+            exposure=True,
+            higher_is="neutral",
+        )
+    name = column.lower()
+    if any(token in name for token in ("percentage", "_pct", "_rate", "attempt_rate")):
+        unit = "ratio"
+    elif "distance" in name:
+        unit = "ft"
+    elif family == "picks" and ("_ppp" in name):
+        unit = "points per pick"
+    elif family == "drives" and name == "points_per_drive":
+        unit = "points per drive"
+    elif "points_per" in name or "pointsper" in name:
+        unit = "points per attempt"
+    elif "points" in name:
+        unit = "points"
+    else:
+        unit = "count"
+    return SeasonMetricSpec(
+        metric_id=_metric_id(family, column),
+        column=column,
+        family=family,
+        label=column.replace("_", " ").title(),
+        group=group,
+        unit=unit,
+        basis="provider season value",
+        definition=(
+            f"SkillCorner ACB {family} aggregate, source field `{column}`. "
+            "See the pinned aggregate column reference for its exact definition."
+        ),
+    )
+
+
 _FAMILY_RESOLVERS = {
     "physical": _physical_spec,
     "obr": _obr_spec,
     "passing": _passing_spec,
+    "shots": lambda column: _basketball_spec("shots", column),
+    "drives": lambda column: _basketball_spec("drives", column),
+    "picks": lambda column: _basketball_spec("picks", column),
 }
 
 FAMILY_LABELS: dict[str, str] = {
     "physical": "Physical",
     "obr": "Off-ball runs",
     "passing": "Passing",
+    "shots": "Shots",
+    "drives": "Drives",
+    "picks": "Picks",
 }
 
 #: Columns carried as identity/provenance, never offered as metrics.
@@ -617,6 +678,7 @@ _NON_METRIC_COLUMNS = frozenset(
         "season_id",
         "provider_season_id",
         "provider_competition_edition_id",
+        "provider_canonical_player_id",
     }
 )
 
@@ -625,6 +687,9 @@ MATCH_COUNT_COLUMN = {
     "physical": "count_match",
     "obr": "performance_included_count",
     "passing": "performance_included_count",
+    "shots": "games_played",
+    "drives": "games_played",
+    "picks": "games_played",
 }
 
 

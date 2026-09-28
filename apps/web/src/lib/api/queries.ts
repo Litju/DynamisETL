@@ -632,3 +632,58 @@ export const gameBoxQuery = (contestId: string, grain: "player" | "team") =>
       ),
     staleTime: 10 * 60_000,
   });
+
+export const basketballSpatialGameQuery = (contestId: string) =>
+  queryOptions({
+    queryKey: ["basketball", "spatial-game", contestId] as const,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/basketball/contests/{contest_id}", {
+          params: { path: { contest_id: contestId } },
+          signal,
+        }),
+      ),
+    staleTime: 10 * 60_000,
+  });
+
+export const basketballFramesQuery = (
+  contestId: string,
+  period: number,
+  fromFrame: number,
+  limit = 125,
+) =>
+  queryOptions({
+    queryKey: ["basketball", "frames", contestId, period, fromFrame, limit] as const,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/basketball/contests/{contest_id}/frames", {
+          params: {
+            path: { contest_id: contestId },
+            query: { period, from_frame: fromFrame, limit },
+          },
+          signal,
+        }),
+      ),
+    staleTime: 60_000,
+  });
+
+export const basketballEventsQuery = (
+  contestId: string,
+  period: number,
+  offset = 0,
+  limit = 500,
+) =>
+  queryOptions({
+    queryKey: ["basketball", "events", contestId, period, offset, limit] as const,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/basketball/contests/{contest_id}/events", {
+          params: {
+            path: { contest_id: contestId },
+            query: { period, offset, limit },
+          },
+          signal,
+        }),
+      ),
+    staleTime: 5 * 60_000,
+  });

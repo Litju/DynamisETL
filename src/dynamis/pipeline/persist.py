@@ -739,8 +739,7 @@ def persist_skillcorner_aggregate_artifacts(
             for key, checksum in sorted(source_checksums.items())
         ),
         notes=(
-            "Pinned SkillCorner A-League 2024/2025 player-season aggregate ingestion; "
-            f"dataset={source.dataset_id}"
+            f"Pinned SkillCorner player-season aggregate ingestion; dataset={source.dataset_id}"
         ),
     )
     _update_run(
@@ -1340,6 +1339,24 @@ def persist_ingest_run(
         }
         for artifact in result.quarantine_artifacts
     )
+    processing_artifacts.extend(
+        {
+            "artifact_id": artifact["artifact_id"],
+            "dataset_id": dataset_id,
+            "run_id": run_id,
+            "artifact_type": artifact["artifact_type"],
+            "layer": artifact.get("layer", "silver"),
+            "relative_path": artifact["relative_path"],
+            "checksum_sha256": artifact["checksum_sha256"],
+            "byte_size": artifact["byte_size"],
+            "row_count": artifact["row_count"],
+            "created_at": completed_at,
+            "artifact_metadata": dict(artifact.get("artifact_metadata") or {}),
+            "data_grain_kind": artifact.get("data_grain_kind"),
+            "data_grain_axes": artifact.get("data_grain_axes"),
+        }
+        for artifact in result.sidecar_artifacts
+    )
     written["processing_artifact"] = _replace_by_path(
         connection,
         PROCESSING_ARTIFACT_TABLE,
@@ -1473,10 +1490,10 @@ def persist_ingest(
                 code_git_sha=code_git_sha,
             )
             written.update(run_written)
-            if dataset_id == "skillcorner-opendata" and result.streams:
-                from dynamis.adapters.skillcorner.catalog import skillcorner_contest_catalog_id
-
-                entry_id = skillcorner_contest_catalog_id(result.session_id)
+            for context in domain.sports_contexts:
+                entry_id = context.session.source_catalog_entry_id
+                if not entry_id:
+                    continue
                 _advance_catalog_entry(connection, entry_id, SourceCatalogState.MATERIALIZED)
     finally:
         if owns_engine:

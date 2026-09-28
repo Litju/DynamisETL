@@ -231,6 +231,37 @@ availability stays explicit.
 smoothing, interpolation or RES-100 production metrics; no cross-provider
 fusion and no ball/shot metric canonicalization.
 
+## Basketball spatial analysis and SeasonLab (RES-124)
+
+SkillCorner's ACB 2025–2026 sample catalog registers 10 games from pinned
+metadata without downloading dense tracking. A selected game is acquired only
+when requested; its 25 Hz player/ball positions keep the center-origin court
+axes, dead-time rows retain clocks without coordinates, and Dynamic Events link
+by exact source frame/wall-clock keys or a uniquely resolvable period and game
+clock. Ambiguous and missing keys remain unlinked. SeasonLab labels the
+offense-only aggregates as 293/327 games over 18 teams; the 10 sample games
+represent 17 teams.
+
+```bash
+uv run dynamis-register-skillcorner-basketball
+uv run dynamis-fetch skillcorner-basketball-opendata \
+  --version 4bbed2e35e8fdd2cf083e8c8b280b3e5381a2c66 --match 114243
+uv run dynamis-ingest skillcorner-basketball-opendata \
+  --version 4bbed2e35e8fdd2cf083e8c8b280b3e5381a2c66 --match 114243
+
+uv run dynamis-fetch skillcorner-basketball-opendata \
+  --version 4bbed2e35e8fdd2cf083e8c8b280b3e5381a2c66 \
+  --key data/player_id_aliases.csv \
+  --key data/aggregates/acb_shotsaggregates_20252026.csv \
+  --key data/aggregates/acb_drivesaggregates_20252026.csv \
+  --key data/aggregates/acb_picksaggregates_20252026.csv
+uv run dynamis-ingest-skillcorner-basketball-aggregates
+```
+
+All acquired files and Silver Parquet remain in the external data root. Ordinary
+catalog/GameLab browsing reads the metadata-only contest records and never starts
+an acquisition.
+
 ## Performance Laboratory (RES-101)
 
 The validated data plane is exposed as a research product:

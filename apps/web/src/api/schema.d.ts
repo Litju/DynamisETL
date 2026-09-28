@@ -50,6 +50,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/basketball/contests/{contest_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Basketball Spatial Game */
+        get: operations["basketball_spatial_game_api_basketball_contests__contest_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/basketball/contests/{contest_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Basketball Events */
+        get: operations["basketball_events_api_basketball_contests__contest_id__events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/basketball/contests/{contest_id}/frames": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Basketball Frames */
+        get: operations["basketball_frames_api_basketball_contests__contest_id__frames_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/catalog/datasets": {
         parameters: {
             query?: never;
@@ -774,6 +825,189 @@ export interface components {
             stream_id: string | null;
             /** Synchronization Spec Id */
             synchronization_spec_id: string | null;
+        };
+        /** BasketballBallPointView */
+        BasketballBallPointView: {
+            /** Is Detected */
+            is_detected: boolean | null;
+            /** X */
+            x: number;
+            /** Y */
+            y: number;
+            /** Z */
+            z: number | null;
+        };
+        /** BasketballEventPage */
+        BasketballEventPage: {
+            /** Contest Id */
+            contest_id: string;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /** Period */
+            period: number | null;
+            /** Rows */
+            rows: components["schemas"]["BasketballEventView"][];
+            /** Total */
+            total: number;
+        };
+        /** BasketballEventView */
+        BasketballEventView: {
+            /** Attributes */
+            attributes: {
+                [key: string]: unknown;
+            };
+            /** Canonical Time Ns */
+            canonical_time_ns: number | null;
+            /** Contest Period Id */
+            contest_period_id: string;
+            /** Location */
+            location: {
+                [key: string]: number | null;
+            } | null;
+            /** Provider Event Type */
+            provider_event_type: string;
+            /** Sequence Index */
+            sequence_index: string;
+            /** Source Clock */
+            source_clock: {
+                [key: string]: unknown;
+            } | null;
+            /** Source Event Id */
+            source_event_id: string;
+            /** Subject Id */
+            subject_id: string | null;
+            /** Team Id */
+            team_id: string | null;
+        };
+        /** BasketballFramePage */
+        BasketballFramePage: {
+            /** Contest Id */
+            contest_id: string;
+            /** From Frame */
+            from_frame: number;
+            /** Limit */
+            limit: number;
+            /** Period */
+            period: number;
+            /** Rows */
+            rows: components["schemas"]["BasketballFrameView"][];
+            /** Total Frames */
+            total_frames: number;
+        };
+        /** BasketballFrameView */
+        BasketballFrameView: {
+            ball: components["schemas"]["BasketballBallPointView"] | null;
+            /** Ball Present */
+            ball_present: boolean;
+            /** Canonical Time Ns */
+            canonical_time_ns: number;
+            /** Frame Idx */
+            frame_idx: number;
+            /** Game Clock S */
+            game_clock_s: number | null;
+            /** Game Clock Stopped */
+            game_clock_stopped: boolean;
+            /** Is Dead Time */
+            is_dead_time: boolean;
+            /** Period Number */
+            period_number: number;
+            /** Player Count */
+            player_count: number;
+            /** Players */
+            players: components["schemas"]["BasketballPlayerPointView"][];
+            /** Shot Clock S */
+            shot_clock_s: number | null;
+            /** Wall Clock Ms */
+            wall_clock_ms: number;
+        };
+        /** BasketballPeriodRangeView */
+        BasketballPeriodRangeView: {
+            /** Dead Time Frames */
+            dead_time_frames: number;
+            /** First Active Frame */
+            first_active_frame: number;
+            /** First Frame */
+            first_frame: number;
+            /** Frame Count */
+            frame_count: number;
+            /** Label */
+            label: string;
+            /** Last Frame */
+            last_frame: number;
+            /** Number */
+            number: number;
+        };
+        /** BasketballPlayerPointView */
+        BasketballPlayerPointView: {
+            /** Display Name */
+            display_name: string;
+            /** Is Detected */
+            is_detected: boolean | null;
+            /** Jersey */
+            jersey: string | null;
+            /** Provider Player Id */
+            provider_player_id: string;
+            /** Subject Id */
+            subject_id: string;
+            /** Team Id */
+            team_id: string | null;
+            /** X */
+            x: number;
+            /** Y */
+            y: number;
+            /** Z */
+            z: number | null;
+        };
+        /** BasketballRosterPlayerView */
+        BasketballRosterPlayerView: {
+            /** Display Name */
+            display_name: string;
+            /** Jersey */
+            jersey: string | null;
+            /** Provider Player Id */
+            provider_player_id: string;
+            /** Subject Id */
+            subject_id: string;
+            /** Team Id */
+            team_id: string | null;
+            /** Team Name */
+            team_name: string | null;
+        };
+        /** BasketballSpatialGameView */
+        BasketballSpatialGameView: {
+            /** Axis Orientation */
+            axis_orientation: {
+                [key: string]: string;
+            };
+            /** Court Dimensions */
+            court_dimensions: {
+                [key: string]: number;
+            };
+            /** Dataset Id */
+            dataset_id: string;
+            /** Events Materialized */
+            events_materialized: boolean;
+            /** Frame Rate Hz */
+            frame_rate_hz: number;
+            game: components["schemas"]["GameDetailView"];
+            /** Origin */
+            origin: {
+                [key: string]: number;
+            };
+            /** Periods */
+            periods: components["schemas"]["BasketballPeriodRangeView"][];
+            /** Players */
+            players: components["schemas"]["BasketballRosterPlayerView"][];
+            /** Source Revision */
+            source_revision: string;
+            /** Spatial Reference Id */
+            spatial_reference_id: string;
+            /** Tracking Materialized */
+            tracking_materialized: boolean;
+            /** Units */
+            units: string;
         };
         /** DatasetDetail */
         DatasetDetail: {
@@ -2316,6 +2550,107 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DenseWindow"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    basketball_spatial_game_api_basketball_contests__contest_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BasketballSpatialGameView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    basketball_events_api_basketball_contests__contest_id__events_get: {
+        parameters: {
+            query?: {
+                period?: number | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                contest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BasketballEventPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    basketball_frames_api_basketball_contests__contest_id__frames_get: {
+        parameters: {
+            query: {
+                period: number;
+                from_frame?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                contest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BasketballFramePage"];
                 };
             };
             /** @description Validation Error */

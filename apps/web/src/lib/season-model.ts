@@ -55,9 +55,45 @@ export const DEFAULT_SEASON_METRICS: Record<SeasonFamily, readonly string[]> = {
     "pass_count_shotwithin10s_p30tip",
     "pass_avgdistance",
   ],
+  shots: [
+    "attempts",
+    "mades",
+    "total_points",
+    "fg_percentage",
+    "three_pt_percentage",
+    "avg_attempts_distance",
+    "rim_attempts",
+    "rim_mades",
+  ],
+  drives: [
+    "total_drives",
+    "successful_drives",
+    "made_baskets",
+    "assists",
+    "potential_assists",
+    "fouls",
+    "points_per_drive",
+  ],
+  picks: [
+    "handler_total_picks",
+    "handler_points",
+    "handler_assists",
+    "handler_fouls",
+    "screener_total_picks",
+    "screener_points",
+    "screener_assists",
+    "screener_fouls",
+  ],
 };
 
-export const FAMILY_ORDER: readonly SeasonFamily[] = ["physical", "obr", "passing"];
+export const FAMILY_ORDER: readonly SeasonFamily[] = [
+  "physical",
+  "obr",
+  "passing",
+  "shots",
+  "drives",
+  "picks",
+];
 
 export const POPULATION_LABELS: Record<SeasonPopulation, string> = {
   position: "Same position group",

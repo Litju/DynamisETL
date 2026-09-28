@@ -89,7 +89,7 @@ export const compareSearchSchema = z.object({
 });
 export type CompareSearch = z.infer<typeof compareSearchSchema>;
 
-export const SEASON_FAMILIES = ["physical", "obr", "passing"] as const;
+export const SEASON_FAMILIES = ["physical", "obr", "passing", "shots", "drives", "picks"] as const;
 export type SeasonFamily = (typeof SEASON_FAMILIES)[number];
 export const SEASON_POPULATIONS = ["position", "edition", "team"] as const;
 export type SeasonPopulation = (typeof SEASON_POPULATIONS)[number];
@@ -123,6 +123,26 @@ export const seasonSearchSchema = z.object({
   view: z.enum(SEASON_VIEWS).optional().catch(undefined),
 });
 export type SeasonSearch = z.infer<typeof seasonSearchSchema>;
+
+export const basketballSpatialSearchSchema = z.object({
+  contest: optionalText,
+  period: z.preprocess((value) => {
+    const numeric = typeof value === "string" ? Number(value) : value;
+    return typeof numeric === "number" && Number.isInteger(numeric) && numeric >= 1 && numeric <= 20
+      ? String(numeric)
+      : undefined;
+  }, z.string().optional()),
+  frame: z.preprocess((value) => {
+    const numeric = typeof value === "string" ? Number(value) : value;
+    return typeof numeric === "number" && Number.isSafeInteger(numeric) && numeric >= 0
+      ? String(numeric)
+      : undefined;
+  }, z.string().optional()),
+  event: optionalText,
+  player: optionalText,
+  entity: optionalText,
+});
+export type BasketballSpatialSearch = z.infer<typeof basketballSpatialSearchSchema>;
 
 export const GAME_BOX_VIEWS = ["player", "team"] as const;
 

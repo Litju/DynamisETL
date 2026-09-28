@@ -22,6 +22,7 @@ from dynamis.serving import season as season_model
 from dynamis.serving.models import (
     AlgorithmView,
     ArtifactRefView,
+    BasketballRosterPlayerView,
     DatasetDetail,
     DatasetSummary,
     DatasetVersionView,
@@ -1826,7 +1827,9 @@ def list_season_editions(connection: Connection) -> list[SeasonEditionView]:
             JOIN license_policy AS license ON license.policy_id = source.license_policy_id
             WHERE artifact.artifact_type = 'season_aggregate'
               AND artifact.data_grain_kind IN ('PLAYER_SEASON', 'TEAM_SEASON')
-            ORDER BY sport.display_name, competition.name, edition.label,
+            ORDER BY CASE WHEN artifact.dataset_id = 'skillcorner-basketball-opendata'
+                          THEN 1 ELSE 0 END,
+                     sport.display_name, competition.name, edition.label,
                      artifact.artifact_metadata ->> 'aggregate_family'
             """
             )
@@ -1843,6 +1846,7 @@ def list_season_editions(connection: Connection) -> list[SeasonEditionView]:
         key = (str(row["dataset_id"]), str(row["edition_id"]))
         edition = editions.get(key)
         if edition is None:
+            basketball = str(row["dataset_id"]) == "skillcorner-basketball-opendata"
             edition = SeasonEditionView(
                 dataset_id=str(row["dataset_id"]),
                 provider=str(row["provider"]),
@@ -1853,9 +1857,21 @@ def list_season_editions(connection: Connection) -> list[SeasonEditionView]:
                 edition_id=str(row["edition_id"]),
                 edition_label=str(row["edition_label"]),
                 measurement_class="SOURCE_DERIVED",
-                inclusion_rule=season_model.SKILLCORNER_INCLUSION_RULE,
-                glossary_url=season_model.SKILLCORNER_GLOSSARY_URL,
-                registry_version=season_model.SEASON_METRIC_REGISTRY_VERSION,
+                inclusion_rule=(
+                    season_model.SKILLCORNER_BASKETBALL_INCLUSION_RULE
+                    if basketball
+                    else season_model.SKILLCORNER_INCLUSION_RULE
+                ),
+                glossary_url=(
+                    season_model.SKILLCORNER_BASKETBALL_AGGREGATES_URL
+                    if basketball
+                    else season_model.SKILLCORNER_GLOSSARY_URL
+                ),
+                registry_version=(
+                    season_model.SKILLCORNER_BASKETBALL_METRIC_REGISTRY_VERSION
+                    if basketball
+                    else season_model.SEASON_METRIC_REGISTRY_VERSION
+                ),
                 license=_license_view(row),
                 families=[],
             )
@@ -1989,7 +2005,12 @@ def list_game_editions(connection: Connection) -> list[GameEditionView]:
                      WHERE contest.competition_edition_id = edition.edition_id) AS contests,
                    (SELECT count(*) FROM contest
                      WHERE contest.competition_edition_id = edition.edition_id
-                       AND contest.actual_start_at IS NOT NULL) AS completed
+                       AND (contest.actual_start_at IS NOT NULL OR EXISTS (
+                           SELECT 1 FROM provider_identity_crosswalk AS game_identity
+                           WHERE game_identity.entity_kind = 'contest'
+                             AND game_identity.canonical_entity_id = contest.contest_id
+                             AND game_identity.metadata_json->>'completed' = 'true'
+                       ))) AS completed
             FROM processing_artifact AS artifact
             JOIN competition_edition AS edition
               ON edition.edition_id = artifact.artifact_metadata ->> 'competition_edition_id'
@@ -2051,6 +2072,79 @@ def list_game_editions(connection: Connection) -> list[GameEditionView]:
                 snapshot=metadata.get("snapshot"),
                 freshness=dict(metadata.get("release_freshness") or {}),
             )
+        )
+    # SkillCorner Basketball's contest catalog is available before any dense
+    # tracking or event payload is acquired. Return its edition from relational
+    # metadata so GameLab can browse all 10 games without opening Parquet.
+    catalog_rows = (
+        connection.execute(
+            sa.text(
+                """
+            SELECT catalog.registry_dataset_id AS dataset_id, source.provider,
+                   catalog.sport_id, catalog.competition_id,
+                   catalog.competition_edition_id AS edition_id,
+                   edition.label AS edition_label, edition.starts_on, edition.ends_on,
+                   competition.name AS competition_name,
+                   sport.display_name AS sport_name,
+                   license.policy_id, license.identifier, license.status AS license_status,
+                   license.attribution_required, license.noncommercial_only,
+                   license.share_alike, license.redistribution, license.local_only,
+                   license.restrictions,
+                   (SELECT count(*) FROM contest
+                     WHERE contest.competition_edition_id = edition.edition_id) AS contests,
+                   (SELECT count(*) FROM contest
+                     LEFT JOIN provider_identity_crosswalk AS game_identity
+                       ON game_identity.entity_kind = 'contest'
+                      AND game_identity.canonical_entity_id = contest.contest_id
+                     WHERE contest.competition_edition_id = edition.edition_id
+                       AND (contest.actual_start_at IS NOT NULL
+                            OR game_identity.metadata_json->>'completed' = 'true')) AS completed
+            FROM source_catalog_entry AS catalog
+            JOIN dataset_source AS source
+              ON source.dataset_id = catalog.registry_dataset_id
+            JOIN competition_edition AS edition
+              ON edition.edition_id = catalog.competition_edition_id
+            JOIN competition ON competition.competition_id = edition.competition_id
+            JOIN sport ON sport.sport_id = catalog.sport_id
+            JOIN license_policy AS license ON license.policy_id = source.license_policy_id
+            WHERE catalog.registry_dataset_id = 'skillcorner-basketball-opendata'
+              AND catalog.object_kind = 'contest'
+              AND catalog.competition_edition_id IS NOT NULL
+            GROUP BY catalog.registry_dataset_id, source.provider, catalog.sport_id,
+                     catalog.competition_id, catalog.competition_edition_id,
+                     edition.edition_id, edition.label, edition.starts_on, edition.ends_on,
+                     competition.name, sport.display_name, license.policy_id,
+                     license.identifier, license.status, license.attribution_required,
+                     license.noncommercial_only, license.share_alike,
+                     license.redistribution, license.local_only, license.restrictions
+            ORDER BY competition.name, edition.label
+            """
+            )
+        )
+        .mappings()
+        .all()
+    )
+    for row in catalog_rows:
+        edition_key = str(row["edition_id"])
+        if edition_key in editions:
+            continue
+        editions[edition_key] = GameEditionView(
+            dataset_id=str(row["dataset_id"]),
+            provider=str(row["provider"]),
+            sport_id=str(row["sport_id"]),
+            sport_name=str(row["sport_name"]),
+            league_id="acb",
+            competition_id=str(row["competition_id"]),
+            competition_name=str(row["competition_name"]),
+            edition_id=edition_key,
+            edition_label=str(row["edition_label"]),
+            starts_on=_iso(row["starts_on"]),
+            ends_on=_iso(row["ends_on"]),
+            contest_count=int(row["contests"]),
+            completed_count=int(row["completed"]),
+            measurement_class="SOURCE_DERIVED",
+            license=_license_view(row),
+            families=[],
         )
     return list(editions.values())
 
@@ -2187,6 +2281,159 @@ def game_periods(connection: Connection, contest_id: str) -> list[dict[str, Any]
             {"contest_id": contest_id},
         ).mappings()
     ]
+
+
+def basketball_spatial_artifacts(connection: Connection, contest_id: str) -> dict[str, Any] | None:
+    """Resolve one basketball contest to its metadata and bounded local artifact refs."""
+    summary = game_summary(connection, contest_id)
+    if summary is None or summary.sport_id != "basketball" or not summary.provider_game_id:
+        return None
+    source = (
+        connection.execute(
+            sa.text(
+                """
+            SELECT registry_dataset_id, registry_version
+            FROM source_catalog_entry
+            WHERE registry_dataset_id = 'skillcorner-basketball-opendata'
+              AND object_kind = 'contest' AND external_id = :external_id
+            ORDER BY registry_dataset_id
+            LIMIT 1
+            """
+            ),
+            {"external_id": f"contest:{summary.provider_game_id}"},
+        )
+        .mappings()
+        .first()
+    )
+    if source is None:
+        return None
+    dataset_id = str(source["registry_dataset_id"])
+    tracking_rows = (
+        connection.execute(
+            sa.text(
+                """
+            SELECT a.artifact_id, a.dataset_id, a.stream_id, a.layer, a.relative_path,
+                   a.format, a.compression, a.checksum_sha256, a.row_count, a.byte_size,
+                   a.coordinate_frame_id, a.synchronization_spec_id,
+                   stream.modality, stream.measurement_class, stream.si_units
+            FROM sample_artifact AS a
+            JOIN sensor_stream AS stream
+              ON stream.dataset_id = a.dataset_id AND stream.stream_id = a.stream_id
+            WHERE a.dataset_id = :dataset_id AND a.session_id = :session_id
+              AND stream.modality = 'tracking'
+            ORDER BY stream.trial_id, stream.stream_id
+            """
+            ),
+            {"dataset_id": dataset_id, "session_id": summary.provider_game_id},
+        )
+        .mappings()
+        .all()
+    )
+    processing_rows = (
+        connection.execute(
+            sa.text(
+                """
+            SELECT p.artifact_id, p.dataset_id, p.layer, p.relative_path,
+                   p.checksum_sha256, p.row_count, p.byte_size, p.artifact_type,
+                   p.artifact_metadata, p.artifact_metadata->>'stream_id' AS stream_id,
+                   p.artifact_metadata->>'measurement_class' AS measurement_class,
+                   p.artifact_metadata->>'coordinate_frame_id' AS coordinate_frame_id,
+                   p.artifact_metadata->>'algorithm_version' AS algorithm_version,
+                   p.artifact_metadata->>'parameters_hash' AS parameters_hash,
+                   r.algorithm_id, r.run_id
+            FROM processing_artifact AS p
+            JOIN processing_run AS r ON r.run_id = p.run_id
+            WHERE p.dataset_id = :dataset_id
+              AND p.artifact_metadata->>'contest_id' = :contest_id
+              AND p.artifact_type IN ('basketball_frame_clock', 'play_by_play')
+              AND r.status = 'completed'
+            ORDER BY r.completed_at DESC NULLS LAST, p.artifact_id
+            """
+            ),
+            {"dataset_id": dataset_id, "contest_id": contest_id},
+        )
+        .mappings()
+        .all()
+    )
+    sidecars: dict[str, ArtifactRefView] = {}
+    for row in processing_rows:
+        metadata = dict(row["artifact_metadata"] or {})
+        family = str(metadata.get("family", ""))
+        if family in {"frame_clock", "basketball_events"} and family not in sidecars:
+            sidecars[family] = _artifact_view(row, kind="processing")
+    return {
+        "dataset_id": dataset_id,
+        "provider_game_id": summary.provider_game_id,
+        "registry_version": str(source["registry_version"]),
+        "tracking": [_artifact_view(row, kind="sample") for row in tracking_rows],
+        "frame_clock": sidecars.get("frame_clock"),
+        "events": sidecars.get("basketball_events"),
+    }
+
+
+def basketball_roster(
+    connection: Connection,
+    *,
+    dataset_id: str,
+    session_id: str,
+    contest_id: str,
+    edition_id: str,
+) -> list[BasketballRosterPlayerView]:
+    rows = (
+        connection.execute(
+            sa.text(
+                """
+            SELECT participant.subject_id AS provider_player_id,
+                   identity.canonical_entity_id AS subject_id,
+                   identity.metadata_json->>'display_name' AS display_name,
+                   identity.metadata_json->>'jersey' AS jersey,
+                   membership.team_id,
+                   team.display_name AS team_name
+            FROM session_participant AS participant
+            JOIN provider_identity_crosswalk AS identity
+              ON identity.provider_namespace = 'skillcorner_basketball_opendata'
+             AND identity.entity_kind = 'subject'
+             AND identity.provider_entity_id = participant.subject_id
+            LEFT JOIN team_roster_membership AS membership
+              ON membership.dataset_id = participant.dataset_id
+             AND membership.subject_id = participant.subject_id
+             AND membership.competition_edition_id = :edition_id
+            LEFT JOIN team ON team.team_id = membership.team_id
+            LEFT JOIN contest_team AS side
+              ON side.contest_id = :contest_id AND side.team_id = membership.team_id
+            WHERE participant.dataset_id = :dataset_id
+              AND participant.session_id = :session_id
+            ORDER BY side.side_order NULLS LAST, display_name, provider_player_id
+            """
+            ),
+            {
+                "dataset_id": dataset_id,
+                "session_id": session_id,
+                "contest_id": contest_id,
+                "edition_id": edition_id,
+            },
+        )
+        .mappings()
+        .all()
+    )
+    seen: set[str] = set()
+    result: list[BasketballRosterPlayerView] = []
+    for row in rows:
+        provider_id = str(row["provider_player_id"])
+        if provider_id in seen:
+            continue
+        seen.add(provider_id)
+        result.append(
+            BasketballRosterPlayerView(
+                subject_id=str(row["subject_id"]),
+                provider_player_id=provider_id,
+                display_name=str(row["display_name"] or provider_id),
+                jersey=str(row["jersey"]) if row["jersey"] is not None else None,
+                team_id=str(row["team_id"]) if row["team_id"] is not None else None,
+                team_name=str(row["team_name"]) if row["team_name"] is not None else None,
+            )
+        )
+    return result
 
 
 def subject_display_names(connection: Connection, subject_ids: list[str]) -> dict[str, str]:
