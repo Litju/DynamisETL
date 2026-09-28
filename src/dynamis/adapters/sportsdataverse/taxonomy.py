@@ -16,6 +16,16 @@ from dynamis.contracts.sports import DataGrainKind
 
 TAXONOMY_VERSION = "sportsdataverse-taxonomy/1"
 
+# Explicit release-family capabilities shared by acquisition and metadata cataloging.
+FAMILY_CAPABILITIES: dict[str, tuple[str, ...]] = {
+    "play_by_play": ("PLAY_BY_PLAY",),
+    "player_game": ("BOX_SCORE",),
+    "team_game": ("BOX_SCORE",),
+    "player_season": ("SEASON_AGGREGATE",),
+    "team_season": ("SEASON_AGGREGATE",),
+    "shots": ("EVENTS",),
+}
+
 
 @dataclass(frozen=True, slots=True)
 class League:

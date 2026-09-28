@@ -69,16 +69,84 @@ class DatasetDetail(DatasetSummary):
 
 class SourceCapabilityView(BaseModel):
     entry_id: str
+    provider: str = ""
+    sport_id: str | None = None
+    sport_name: str | None = None
+    competition_id: str | None = None
+    competition_name: str | None = None
+    edition_id: str | None = None
+    edition_label: str | None = None
     external_id: str
     object_kind: str
     availability_state: str
     source_readiness: str
     local_readiness: str
     upstream_capabilities: list[str]
+    registered_capabilities: list[str] = Field(default_factory=list)
+    materialized_capabilities: list[str] = Field(default_factory=list)
+    materialized_grains: list[str] = Field(default_factory=list)
     local_capabilities: list[str]
     pending_local_capabilities: list[str]
+    preparation_eligible: bool = False
+    preparation_action: str | None = None
     provider_metadata: dict[str, Any]
     source_file_states: dict[str, str]
+
+
+class ProductRouteView(BaseModel):
+    product: Literal["MatchLab", "GameLab", "SeasonLab", "PerformanceLab"]
+    ready: bool
+    missing_capabilities: list[list[str]] = Field(default_factory=list)
+    missing_grains: list[list[str]] = Field(default_factory=list)
+
+
+class CatalogStageView(BaseModel):
+    upstream: Literal["available", "unavailable"]
+    registered: Literal["registered", "not_registered"]
+    materialized: Literal["materialized", "not_materialized"]
+    ready: Literal["ready", "not_ready"]
+
+
+class CatalogResourceView(BaseModel):
+    """One navigable canonical contest, competition edition or lab session."""
+
+    resource_kind: Literal[
+        "contest", "competition_edition", "performance_dataset", "performance_session"
+    ]
+    resource_id: str
+    label: str
+    dataset_ids: list[str] = Field(default_factory=list)
+    providers: list[str] = Field(default_factory=list)
+    source_entry_ids: list[str] = Field(default_factory=list)
+    external_ids: list[str] = Field(default_factory=list)
+    sport_id: str | None = None
+    sport_name: str | None = None
+    competition_id: str | None = None
+    competition_name: str | None = None
+    edition_id: str | None = None
+    edition_label: str | None = None
+    contest_id: str | None = None
+    teams: list[SportsCatalogTeamView] = Field(default_factory=list)
+    session_id: str | None = None
+    rights_identifiers: list[str] = Field(default_factory=list)
+    noncommercial_only: bool = False
+    local_only: bool = False
+    availability_state: str | None = None
+    stages: CatalogStageView
+    upstream_capabilities: list[str] = Field(default_factory=list)
+    registered_capabilities: list[str] = Field(default_factory=list)
+    materialized_capabilities: list[str] = Field(default_factory=list)
+    materialized_grains: list[str] = Field(default_factory=list)
+    routes: list[ProductRouteView] = Field(default_factory=list)
+    basketball_spatial_ready: bool = False
+    preparation_eligible: bool = False
+    preparation_actions: list[str] = Field(default_factory=list)
+
+
+class CatalogReadModelView(BaseModel):
+    """Metadata-only semantic catalog consumed by the Data Library."""
+
+    resources: list[CatalogResourceView] = Field(default_factory=list)
 
 
 class SportsCatalogTeamView(BaseModel):
@@ -168,6 +236,8 @@ class StreamView(BaseModel):
     pitch_dimensions_m: PitchDimensionsView | None = None
     sample_artifact_ids: list[str]
     sample_row_count: int
+    data_grain_kind: str | None = None
+    data_grain_axes: list[str] = Field(default_factory=list)
 
 
 class SessionSummary(BaseModel):

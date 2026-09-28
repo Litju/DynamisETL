@@ -22,7 +22,12 @@ from dynamis.adapters.sportsdataverse.releases import (
     load_snapshot,
     pinned_assets,
 )
-from dynamis.adapters.sportsdataverse.taxonomy import LEAGUES as TAXONOMY_LEAGUES
+from dynamis.adapters.sportsdataverse.taxonomy import (
+    FAMILY_CAPABILITIES,
+)
+from dynamis.adapters.sportsdataverse.taxonomy import (
+    LEAGUES as TAXONOMY_LEAGUES,
+)
 from dynamis.config import ConfigurationError, Settings
 from dynamis.config import settings as resolve_settings
 from dynamis.contracts import AlgorithmKind, AlgorithmSpec
@@ -61,14 +66,6 @@ SPORT_NAMES = {
     "ice_hockey": "Ice hockey",
     "american_football": "American football",
     "baseball": "Baseball",
-}
-FAMILY_CAPABILITIES = {
-    "play_by_play": ["PLAY_BY_PLAY"],
-    "player_game": ["BOX_SCORE"],
-    "team_game": ["BOX_SCORE"],
-    "player_season": ["SEASON_AGGREGATE"],
-    "team_season": ["SEASON_AGGREGATE"],
-    "shots": ["EVENTS"],
 }
 
 

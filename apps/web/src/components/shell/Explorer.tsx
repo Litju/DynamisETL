@@ -46,7 +46,7 @@ export function Explorer({ onCollapse }: { readonly onCollapse?: () => void } = 
       <StatePanel
         state="empty"
         title="No session open."
-        detail="Choose a dataset and session in the Catalog to open the laboratory explorer."
+        detail="Choose a human-performance session in the Library to open the laboratory explorer."
       />
     );
   }

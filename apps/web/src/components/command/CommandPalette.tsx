@@ -45,7 +45,7 @@ export function CommandPalette() {
     () => [
       {
         id: "go-catalog",
-        title: "Go to Catalog",
+        title: "Go to Library",
         group: "Navigate",
         run: () => void navigate({ to: "/catalog" }),
       },

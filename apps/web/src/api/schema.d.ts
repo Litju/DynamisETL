@@ -169,6 +169,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/catalog/read-model": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Catalog Read Model */
+        get: operations["catalog_read_model_api_catalog_read_model_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/catalog/source-capabilities": {
         parameters: {
             query?: never;
@@ -1009,6 +1026,115 @@ export interface components {
             /** Units */
             units: string;
         };
+        /**
+         * CatalogReadModelView
+         * @description Metadata-only semantic catalog consumed by the Data Library.
+         */
+        CatalogReadModelView: {
+            /** Resources */
+            resources?: components["schemas"]["CatalogResourceView"][];
+        };
+        /**
+         * CatalogResourceView
+         * @description One navigable canonical contest, competition edition or lab session.
+         */
+        CatalogResourceView: {
+            /** Availability State */
+            availability_state?: string | null;
+            /**
+             * Basketball Spatial Ready
+             * @default false
+             */
+            basketball_spatial_ready: boolean;
+            /** Competition Id */
+            competition_id?: string | null;
+            /** Competition Name */
+            competition_name?: string | null;
+            /** Contest Id */
+            contest_id?: string | null;
+            /** Dataset Ids */
+            dataset_ids?: string[];
+            /** Edition Id */
+            edition_id?: string | null;
+            /** Edition Label */
+            edition_label?: string | null;
+            /** External Ids */
+            external_ids?: string[];
+            /** Label */
+            label: string;
+            /**
+             * Local Only
+             * @default false
+             */
+            local_only: boolean;
+            /** Materialized Capabilities */
+            materialized_capabilities?: string[];
+            /** Materialized Grains */
+            materialized_grains?: string[];
+            /**
+             * Noncommercial Only
+             * @default false
+             */
+            noncommercial_only: boolean;
+            /** Preparation Actions */
+            preparation_actions?: string[];
+            /**
+             * Preparation Eligible
+             * @default false
+             */
+            preparation_eligible: boolean;
+            /** Providers */
+            providers?: string[];
+            /** Registered Capabilities */
+            registered_capabilities?: string[];
+            /** Resource Id */
+            resource_id: string;
+            /**
+             * Resource Kind
+             * @enum {string}
+             */
+            resource_kind: "contest" | "competition_edition" | "performance_dataset" | "performance_session";
+            /** Rights Identifiers */
+            rights_identifiers?: string[];
+            /** Routes */
+            routes?: components["schemas"]["ProductRouteView"][];
+            /** Session Id */
+            session_id?: string | null;
+            /** Source Entry Ids */
+            source_entry_ids?: string[];
+            /** Sport Id */
+            sport_id?: string | null;
+            /** Sport Name */
+            sport_name?: string | null;
+            stages: components["schemas"]["CatalogStageView"];
+            /** Teams */
+            teams?: components["schemas"]["SportsCatalogTeamView"][];
+            /** Upstream Capabilities */
+            upstream_capabilities?: string[];
+        };
+        /** CatalogStageView */
+        CatalogStageView: {
+            /**
+             * Materialized
+             * @enum {string}
+             */
+            materialized: "materialized" | "not_materialized";
+            /**
+             * Ready
+             * @enum {string}
+             */
+            ready: "ready" | "not_ready";
+            /**
+             * Registered
+             * @enum {string}
+             */
+            registered: "registered" | "not_registered";
+            /**
+             * Upstream
+             * @enum {string}
+             */
+            upstream: "available" | "unavailable";
+        };
         /** DatasetDetail */
         DatasetDetail: {
             /** Adapter Id */
@@ -1614,6 +1740,20 @@ export interface components {
             /** Trial Id */
             trial_id: string;
         };
+        /** ProductRouteView */
+        ProductRouteView: {
+            /** Missing Capabilities */
+            missing_capabilities?: string[][];
+            /** Missing Grains */
+            missing_grains?: string[][];
+            /**
+             * Product
+             * @enum {string}
+             */
+            product: "MatchLab" | "GameLab" | "SeasonLab" | "PerformanceLab";
+            /** Ready */
+            ready: boolean;
+        };
         /** ProvenanceEdge */
         ProvenanceEdge: {
             /** Id */
@@ -2104,6 +2244,14 @@ export interface components {
         SourceCapabilityView: {
             /** Availability State */
             availability_state: string;
+            /** Competition Id */
+            competition_id?: string | null;
+            /** Competition Name */
+            competition_name?: string | null;
+            /** Edition Id */
+            edition_id?: string | null;
+            /** Edition Label */
+            edition_label?: string | null;
             /** Entry Id */
             entry_id: string;
             /** External Id */
@@ -2112,20 +2260,42 @@ export interface components {
             local_capabilities: string[];
             /** Local Readiness */
             local_readiness: string;
+            /** Materialized Capabilities */
+            materialized_capabilities?: string[];
+            /** Materialized Grains */
+            materialized_grains?: string[];
             /** Object Kind */
             object_kind: string;
             /** Pending Local Capabilities */
             pending_local_capabilities: string[];
+            /** Preparation Action */
+            preparation_action?: string | null;
+            /**
+             * Preparation Eligible
+             * @default false
+             */
+            preparation_eligible: boolean;
+            /**
+             * Provider
+             * @default
+             */
+            provider: string;
             /** Provider Metadata */
             provider_metadata: {
                 [key: string]: unknown;
             };
+            /** Registered Capabilities */
+            registered_capabilities?: string[];
             /** Source File States */
             source_file_states: {
                 [key: string]: string;
             };
             /** Source Readiness */
             source_readiness: string;
+            /** Sport Id */
+            sport_id?: string | null;
+            /** Sport Name */
+            sport_name?: string | null;
             /** Upstream Capabilities */
             upstream_capabilities: string[];
         };
@@ -2204,6 +2374,10 @@ export interface components {
             clock_id: string;
             /** Coordinate Frame Id */
             coordinate_frame_id: string | null;
+            /** Data Grain Axes */
+            data_grain_axes?: string[];
+            /** Data Grain Kind */
+            data_grain_kind?: string | null;
             /** Device Id */
             device_id: string | null;
             /** Measurement Class */
@@ -2774,6 +2948,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    catalog_read_model_api_catalog_read_model_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogReadModelView"];
                 };
             };
         };

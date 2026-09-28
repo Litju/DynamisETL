@@ -85,6 +85,7 @@ function compact(params: Record<string, string | number | undefined>): Record<st
 export const queryKeys = {
   status: ["serving", "status"] as const,
   datasets: ["catalog", "datasets"] as const,
+  catalogReadModel: ["catalog", "read-model"] as const,
   sportsMatches: ["catalog", "sports", "matches"] as const,
   dataset: (datasetId: string) => ["catalog", "datasets", datasetId] as const,
   sessions: (datasetId: string) => ["catalog", "datasets", datasetId, "sessions"] as const,
@@ -130,6 +131,13 @@ export const datasetsQuery = () =>
   queryOptions({
     queryKey: queryKeys.datasets,
     queryFn: async () => unwrap(await api.GET("/api/catalog/datasets")),
+    staleTime: 30_000,
+  });
+
+export const catalogReadModelQuery = () =>
+  queryOptions({
+    queryKey: queryKeys.catalogReadModel,
+    queryFn: async () => unwrap(await api.GET("/api/catalog/read-model")),
     staleTime: 30_000,
   });
 

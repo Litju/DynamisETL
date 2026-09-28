@@ -13,5 +13,5 @@ test("Report Light keeps the shell readable at a large workstation viewport", as
     viewportWidth: window.innerWidth,
   }));
   expect(dimensions.documentWidth).toBeLessThanOrEqual(dimensions.viewportWidth + 1);
-  await expect(page.getByRole("heading", { name: "Multimodal human performance data" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Data Library" })).toBeVisible();
 });

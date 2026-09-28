@@ -1139,6 +1139,301 @@
         "title": "BasketballSpatialGameView",
         "type": "object"
       },
+      "CatalogReadModelView": {
+        "description": "Metadata-only semantic catalog consumed by the Data Library.",
+        "properties": {
+          "resources": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogResourceView"
+            },
+            "title": "Resources",
+            "type": "array"
+          }
+        },
+        "title": "CatalogReadModelView",
+        "type": "object"
+      },
+      "CatalogResourceView": {
+        "description": "One navigable canonical contest, competition edition or lab session.",
+        "properties": {
+          "availability_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Availability State"
+          },
+          "basketball_spatial_ready": {
+            "default": false,
+            "title": "Basketball Spatial Ready",
+            "type": "boolean"
+          },
+          "competition_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Competition Id"
+          },
+          "competition_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Competition Name"
+          },
+          "contest_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contest Id"
+          },
+          "dataset_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Dataset Ids",
+            "type": "array"
+          },
+          "edition_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edition Id"
+          },
+          "edition_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edition Label"
+          },
+          "external_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "External Ids",
+            "type": "array"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "local_only": {
+            "default": false,
+            "title": "Local Only",
+            "type": "boolean"
+          },
+          "materialized_capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Materialized Capabilities",
+            "type": "array"
+          },
+          "materialized_grains": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Materialized Grains",
+            "type": "array"
+          },
+          "noncommercial_only": {
+            "default": false,
+            "title": "Noncommercial Only",
+            "type": "boolean"
+          },
+          "preparation_actions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Preparation Actions",
+            "type": "array"
+          },
+          "preparation_eligible": {
+            "default": false,
+            "title": "Preparation Eligible",
+            "type": "boolean"
+          },
+          "providers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Providers",
+            "type": "array"
+          },
+          "registered_capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Registered Capabilities",
+            "type": "array"
+          },
+          "resource_id": {
+            "title": "Resource Id",
+            "type": "string"
+          },
+          "resource_kind": {
+            "enum": [
+              "contest",
+              "competition_edition",
+              "performance_dataset",
+              "performance_session"
+            ],
+            "title": "Resource Kind",
+            "type": "string"
+          },
+          "rights_identifiers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Rights Identifiers",
+            "type": "array"
+          },
+          "routes": {
+            "items": {
+              "$ref": "#/components/schemas/ProductRouteView"
+            },
+            "title": "Routes",
+            "type": "array"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "source_entry_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Source Entry Ids",
+            "type": "array"
+          },
+          "sport_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sport Id"
+          },
+          "sport_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sport Name"
+          },
+          "stages": {
+            "$ref": "#/components/schemas/CatalogStageView"
+          },
+          "teams": {
+            "items": {
+              "$ref": "#/components/schemas/SportsCatalogTeamView"
+            },
+            "title": "Teams",
+            "type": "array"
+          },
+          "upstream_capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Upstream Capabilities",
+            "type": "array"
+          }
+        },
+        "required": [
+          "resource_kind",
+          "resource_id",
+          "label",
+          "stages"
+        ],
+        "title": "CatalogResourceView",
+        "type": "object"
+      },
+      "CatalogStageView": {
+        "properties": {
+          "materialized": {
+            "enum": [
+              "materialized",
+              "not_materialized"
+            ],
+            "title": "Materialized",
+            "type": "string"
+          },
+          "ready": {
+            "enum": [
+              "ready",
+              "not_ready"
+            ],
+            "title": "Ready",
+            "type": "string"
+          },
+          "registered": {
+            "enum": [
+              "registered",
+              "not_registered"
+            ],
+            "title": "Registered",
+            "type": "string"
+          },
+          "upstream": {
+            "enum": [
+              "available",
+              "unavailable"
+            ],
+            "title": "Upstream",
+            "type": "string"
+          }
+        },
+        "required": [
+          "upstream",
+          "registered",
+          "materialized",
+          "ready"
+        ],
+        "title": "CatalogStageView",
+        "type": "object"
+      },
       "DatasetDetail": {
         "properties": {
           "adapter_id": {
@@ -3007,6 +3302,50 @@
         "title": "PoseRangeReportView",
         "type": "object"
       },
+      "ProductRouteView": {
+        "properties": {
+          "missing_capabilities": {
+            "items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Missing Capabilities",
+            "type": "array"
+          },
+          "missing_grains": {
+            "items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Missing Grains",
+            "type": "array"
+          },
+          "product": {
+            "enum": [
+              "MatchLab",
+              "GameLab",
+              "SeasonLab",
+              "PerformanceLab"
+            ],
+            "title": "Product",
+            "type": "string"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "product",
+          "ready"
+        ],
+        "title": "ProductRouteView",
+        "type": "object"
+      },
       "ProvenanceEdge": {
         "properties": {
           "id": {
@@ -4540,6 +4879,50 @@
             "title": "Availability State",
             "type": "string"
           },
+          "competition_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Competition Id"
+          },
+          "competition_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Competition Name"
+          },
+          "edition_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edition Id"
+          },
+          "edition_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edition Label"
+          },
           "entry_id": {
             "title": "Entry Id",
             "type": "string"
@@ -4559,6 +4942,20 @@
             "title": "Local Readiness",
             "type": "string"
           },
+          "materialized_capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Materialized Capabilities",
+            "type": "array"
+          },
+          "materialized_grains": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Materialized Grains",
+            "type": "array"
+          },
           "object_kind": {
             "title": "Object Kind",
             "type": "string"
@@ -4570,10 +4967,38 @@
             "title": "Pending Local Capabilities",
             "type": "array"
           },
+          "preparation_action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preparation Action"
+          },
+          "preparation_eligible": {
+            "default": false,
+            "title": "Preparation Eligible",
+            "type": "boolean"
+          },
+          "provider": {
+            "default": "",
+            "title": "Provider",
+            "type": "string"
+          },
           "provider_metadata": {
             "additionalProperties": true,
             "title": "Provider Metadata",
             "type": "object"
+          },
+          "registered_capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Registered Capabilities",
+            "type": "array"
           },
           "source_file_states": {
             "additionalProperties": {
@@ -4585,6 +5010,28 @@
           "source_readiness": {
             "title": "Source Readiness",
             "type": "string"
+          },
+          "sport_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sport Id"
+          },
+          "sport_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sport Name"
           },
           "upstream_capabilities": {
             "items": {
@@ -4898,6 +5345,24 @@
               }
             ],
             "title": "Coordinate Frame Id"
+          },
+          "data_grain_axes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Data Grain Axes",
+            "type": "array"
+          },
+          "data_grain_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Grain Kind"
           },
           "device_id": {
             "anyOf": [
@@ -6360,6 +6825,27 @@
           }
         },
         "summary": "Session Detail",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/catalog/read-model": {
+      "get": {
+        "operationId": "catalog_read_model_api_catalog_read_model_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogReadModelView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Catalog Read Model",
         "tags": [
           "catalog"
         ]
