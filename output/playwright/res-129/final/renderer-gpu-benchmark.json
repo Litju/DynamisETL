@@ -1,0 +1,774 @@
+{
+  "issue": "RES-113",
+  "capturedAt": "2026-09-28T23:35:41.266Z",
+  "baseUrl": "http://127.0.0.1:4173",
+  "browser": "Playwright Chromium headless with WebGPU enabled",
+  "deviceScaleFactor": 1,
+  "sampleDurationMs": 5000,
+  "method": {
+    "data": "Real local SkillCorner source artifacts through the running API; no mocks.",
+    "scenes": "Field includes territory and influence overlays; Pose and split use the all-subjects scope, with each run recording the source subjects available in its bounded window.",
+    "resolution": "The requested viewport sizes are recorded separately from the responsive canvas backing size.",
+    "memory": "Records JS heap, renderer resource counts, and WebGPU-reported allocated bytes. WebGL2 does not expose comparable allocated bytes, so cross-backend GPU memory comparison is unavailable.",
+    "drawCalls": "Samples Three renderer statistics after each render pass and records their per-animation-frame aggregate; missing pass instrumentation is null rather than zero.",
+    "repeatCount": 1,
+    "concurrentSplit": "Field and Pose are mounted simultaneously as two Drei View panels in one Canvas; the shared canonical playhead drives both."
+  },
+  "webgpuCompatibility": "passed all real Field/Pose scenes without renderer or console errors",
+  "recommendedBackend": "WebGL2",
+  "decision": "WebGPU rendered all tested scenes without renderer or console errors, but performance varied by workload and viewport: it was faster for 1440px Field in this sample and markedly slower in both split-view runs. Keep WebGL2 as the production backend until split-view performance is resolved; compare each run's FPS, frame intervals and resource figures.",
+  "runs": [
+    {
+      "backend": "webgl2",
+      "viewport": {
+        "width": 1600,
+        "height": 1000
+      },
+      "scenario": "field",
+      "errors": [],
+      "status": "ok",
+      "measurement": {
+        "canvasPixels": {
+          "width": 926,
+          "height": 908
+        },
+        "canvasCssPixels": {
+          "width": 927,
+          "height": 908
+        },
+        "isWebGPURenderer": false,
+        "isWebGLRenderer": true,
+        "adapter": {
+          "vendor": "amd",
+          "architecture": "gcn-5"
+        },
+        "graphicsRenderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "elapsedMs": 5073,
+        "frames": 153,
+        "fps": 30,
+        "frameIntervalMs": {
+          "p50": 33.3,
+          "p95": 50.1,
+          "p99": 83.4,
+          "worst": 133.3
+        },
+        "draw": {
+          "renderStatsSamples": 314,
+          "renderPassesPerFrame": 2.05,
+          "meanDrawCallsPerFrame": 191,
+          "drawCallsPerRenderPassP50": 83,
+          "drawCallsPerRenderPassP95": 105,
+          "meanTrianglesPerFrame": 5668,
+          "trianglesPerRenderPassP50": 2870
+        },
+        "rendererResources": {
+          "geometries": 20,
+          "textures": 1,
+          "allocatedBytes": null
+        },
+        "jsHeapBytes": 148000000
+      },
+      "selectionLatency": {
+        "samplesMs": [
+          28.1,
+          118.7,
+          88.6,
+          82.6,
+          96.7,
+          124.5,
+          138,
+          147.7
+        ],
+        "p50Ms": 96.7,
+        "p95Ms": 147.7
+      },
+      "poseSubjectCount": null,
+      "sourceFrameIdentity": "tracking-period-1-457d138baddf:0"
+    },
+    {
+      "backend": "webgl2",
+      "viewport": {
+        "width": 1600,
+        "height": 1000
+      },
+      "scenario": "pose",
+      "errors": [],
+      "status": "ok",
+      "measurement": {
+        "canvasPixels": {
+          "width": 926,
+          "height": 908
+        },
+        "canvasCssPixels": {
+          "width": 927,
+          "height": 908
+        },
+        "isWebGPURenderer": false,
+        "isWebGLRenderer": true,
+        "adapter": {
+          "vendor": "amd",
+          "architecture": "gcn-5"
+        },
+        "graphicsRenderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "elapsedMs": 5017,
+        "frames": 260,
+        "fps": 52,
+        "frameIntervalMs": {
+          "p50": 16.7,
+          "p95": 33.4,
+          "p99": 66.6,
+          "worst": 66.7
+        },
+        "draw": {
+          "renderStatsSamples": 263,
+          "renderPassesPerFrame": 1.01,
+          "meanDrawCallsPerFrame": 10,
+          "drawCallsPerRenderPassP50": 13,
+          "drawCallsPerRenderPassP95": 13,
+          "meanTrianglesPerFrame": 292295,
+          "trianglesPerRenderPassP50": 288820
+        },
+        "rendererResources": {
+          "geometries": 13,
+          "textures": 0,
+          "allocatedBytes": null
+        },
+        "jsHeapBytes": 148000000
+      },
+      "selectionLatency": null,
+      "poseSubjectCount": 20,
+      "sourceFrameIdentity": null
+    },
+    {
+      "backend": "webgl2",
+      "viewport": {
+        "width": 1600,
+        "height": 1000
+      },
+      "scenario": "split",
+      "errors": [],
+      "status": "ok",
+      "measurement": {
+        "canvasPixels": {
+          "width": 1600,
+          "height": 908
+        },
+        "canvasCssPixels": {
+          "width": 1600,
+          "height": 908
+        },
+        "isWebGPURenderer": false,
+        "isWebGLRenderer": true,
+        "adapter": {
+          "vendor": "amd",
+          "architecture": "gcn-5"
+        },
+        "graphicsRenderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "elapsedMs": 5094,
+        "frames": 87,
+        "fps": 17,
+        "frameIntervalMs": {
+          "p50": 50.1,
+          "p95": 100,
+          "p99": 116.7,
+          "worst": 116.7
+        },
+        "draw": {
+          "renderStatsSamples": 267,
+          "renderPassesPerFrame": 3.07,
+          "meanDrawCallsPerFrame": 176,
+          "drawCallsPerRenderPassP50": 55,
+          "drawCallsPerRenderPassP95": 105,
+          "meanTrianglesPerFrame": 21069,
+          "trianglesPerRenderPassP50": 3004
+        },
+        "rendererResources": {
+          "geometries": 20,
+          "textures": 1,
+          "allocatedBytes": null
+        },
+        "jsHeapBytes": 148000000
+      },
+      "selectionLatency": {
+        "samplesMs": [
+          14,
+          195.1,
+          188,
+          128.3,
+          109.8,
+          136.4,
+          152.4,
+          194.1
+        ],
+        "p50Ms": 136.4,
+        "p95Ms": 195.1
+      },
+      "poseSubjectCount": 1,
+      "sourceFrameIdentity": "tracking-period-1-457d138baddf:5000000000"
+    },
+    {
+      "backend": "webgl2",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scenario": "field",
+      "errors": [],
+      "status": "ok",
+      "measurement": {
+        "canvasPixels": {
+          "width": 834,
+          "height": 808
+        },
+        "canvasCssPixels": {
+          "width": 834,
+          "height": 808
+        },
+        "isWebGPURenderer": false,
+        "isWebGLRenderer": true,
+        "adapter": {
+          "vendor": "amd",
+          "architecture": "gcn-5"
+        },
+        "graphicsRenderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "elapsedMs": 5059,
+        "frames": 173,
+        "fps": 34,
+        "frameIntervalMs": {
+          "p50": 33.3,
+          "p95": 50,
+          "p99": 83.4,
+          "worst": 100
+        },
+        "draw": {
+          "renderStatsSamples": 350,
+          "renderPassesPerFrame": 2.02,
+          "meanDrawCallsPerFrame": 189,
+          "drawCallsPerRenderPassP50": 83,
+          "drawCallsPerRenderPassP95": 105,
+          "meanTrianglesPerFrame": 5600,
+          "trianglesPerRenderPassP50": 2870
+        },
+        "rendererResources": {
+          "geometries": 64,
+          "textures": 1,
+          "allocatedBytes": null
+        },
+        "jsHeapBytes": 139000000
+      },
+      "selectionLatency": {
+        "samplesMs": [
+          20.9,
+          137.7,
+          133.3,
+          74.1,
+          82.8,
+          70.9,
+          61.5,
+          69.3
+        ],
+        "p50Ms": 70.9,
+        "p95Ms": 137.7
+      },
+      "poseSubjectCount": null,
+      "sourceFrameIdentity": "tracking-period-1-457d138baddf:0"
+    },
+    {
+      "backend": "webgl2",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scenario": "pose",
+      "errors": [],
+      "status": "ok",
+      "measurement": {
+        "canvasPixels": {
+          "width": 834,
+          "height": 808
+        },
+        "canvasCssPixels": {
+          "width": 834,
+          "height": 808
+        },
+        "isWebGPURenderer": false,
+        "isWebGLRenderer": true,
+        "adapter": {
+          "vendor": "amd",
+          "architecture": "gcn-5"
+        },
+        "graphicsRenderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "elapsedMs": 5013,
+        "frames": 264,
+        "fps": 53,
+        "frameIntervalMs": {
+          "p50": 16.7,
+          "p95": 33.4,
+          "p99": 66.7,
+          "worst": 66.8
+        },
+        "draw": {
+          "renderStatsSamples": 269,
+          "renderPassesPerFrame": 1.02,
+          "meanDrawCallsPerFrame": 10,
+          "drawCallsPerRenderPassP50": 13,
+          "drawCallsPerRenderPassP95": 13,
+          "meanTrianglesPerFrame": 294603,
+          "trianglesPerRenderPassP50": 288820
+        },
+        "rendererResources": {
+          "geometries": 13,
+          "textures": 0,
+          "allocatedBytes": null
+        },
+        "jsHeapBytes": 139000000
+      },
+      "selectionLatency": null,
+      "poseSubjectCount": 20,
+      "sourceFrameIdentity": null
+    },
+    {
+      "backend": "webgl2",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scenario": "split",
+      "errors": [],
+      "status": "ok",
+      "measurement": {
+        "canvasPixels": {
+          "width": 1440,
+          "height": 808
+        },
+        "canvasCssPixels": {
+          "width": 1440,
+          "height": 808
+        },
+        "isWebGPURenderer": false,
+        "isWebGLRenderer": true,
+        "adapter": {
+          "vendor": "amd",
+          "architecture": "gcn-5"
+        },
+        "graphicsRenderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "elapsedMs": 5081,
+        "frames": 100,
+        "fps": 20,
+        "frameIntervalMs": {
+          "p50": 50,
+          "p95": 100,
+          "p99": 116.7,
+          "worst": 166.7
+        },
+        "draw": {
+          "renderStatsSamples": 309,
+          "renderPassesPerFrame": 3.09,
+          "meanDrawCallsPerFrame": 182,
+          "drawCallsPerRenderPassP50": 60,
+          "drawCallsPerRenderPassP95": 105,
+          "meanTrianglesPerFrame": 21244,
+          "trianglesPerRenderPassP50": 3034
+        },
+        "rendererResources": {
+          "geometries": 20,
+          "textures": 1,
+          "allocatedBytes": null
+        },
+        "jsHeapBytes": 139000000
+      },
+      "selectionLatency": {
+        "samplesMs": [
+          11.1,
+          142.6,
+          203,
+          190.6,
+          186,
+          135.6,
+          122.2,
+          136.3
+        ],
+        "p50Ms": 136.3,
+        "p95Ms": 203
+      },
+      "poseSubjectCount": 1,
+      "sourceFrameIdentity": "tracking-period-1-457d138baddf:5000000000"
+    },
+    {
+      "backend": "webgpu",
+      "viewport": {
+        "width": 1600,
+        "height": 1000
+      },
+      "scenario": "field",
+      "errors": [],
+      "status": "ok",
+      "measurement": {
+        "canvasPixels": {
+          "width": 926,
+          "height": 908
+        },
+        "canvasCssPixels": {
+          "width": 927,
+          "height": 908
+        },
+        "isWebGPURenderer": true,
+        "isWebGLRenderer": false,
+        "adapter": {
+          "vendor": "amd",
+          "architecture": "gcn-5"
+        },
+        "graphicsRenderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "elapsedMs": 5052,
+        "frames": 127,
+        "fps": 25,
+        "frameIntervalMs": {
+          "p50": 33.4,
+          "p95": 83.3,
+          "p99": 116.6,
+          "worst": 116.7
+        },
+        "draw": {
+          "renderStatsSamples": 260,
+          "renderPassesPerFrame": 2.05,
+          "meanDrawCallsPerFrame": 193,
+          "drawCallsPerRenderPassP50": 84,
+          "drawCallsPerRenderPassP95": 106,
+          "meanTrianglesPerFrame": 5664,
+          "trianglesPerRenderPassP50": 2871
+        },
+        "rendererResources": {
+          "geometries": 80,
+          "textures": 3,
+          "allocatedBytes": 10234998
+        },
+        "jsHeapBytes": 157000000
+      },
+      "selectionLatency": {
+        "samplesMs": [
+          39.8,
+          115.3,
+          85.9,
+          73.3,
+          65,
+          78.8,
+          58,
+          73.7
+        ],
+        "p50Ms": 73.3,
+        "p95Ms": 115.3
+      },
+      "poseSubjectCount": null,
+      "sourceFrameIdentity": "tracking-period-1-457d138baddf:0"
+    },
+    {
+      "backend": "webgpu",
+      "viewport": {
+        "width": 1600,
+        "height": 1000
+      },
+      "scenario": "pose",
+      "errors": [],
+      "status": "ok",
+      "measurement": {
+        "canvasPixels": {
+          "width": 926,
+          "height": 908
+        },
+        "canvasCssPixels": {
+          "width": 927,
+          "height": 908
+        },
+        "isWebGPURenderer": true,
+        "isWebGLRenderer": false,
+        "adapter": {
+          "vendor": "amd",
+          "architecture": "gcn-5"
+        },
+        "graphicsRenderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "elapsedMs": 5019,
+        "frames": 250,
+        "fps": 50,
+        "frameIntervalMs": {
+          "p50": 16.7,
+          "p95": 33.4,
+          "p99": 83.4,
+          "worst": 100.1
+        },
+        "draw": {
+          "renderStatsSamples": 251,
+          "renderPassesPerFrame": 1,
+          "meanDrawCallsPerFrame": 11,
+          "drawCallsPerRenderPassP50": 14,
+          "drawCallsPerRenderPassP95": 14,
+          "meanTrianglesPerFrame": 290189,
+          "trianglesPerRenderPassP50": 288821
+        },
+        "rendererResources": {
+          "geometries": 14,
+          "textures": 2,
+          "allocatedBytes": 702661
+        },
+        "jsHeapBytes": 157000000
+      },
+      "selectionLatency": null,
+      "poseSubjectCount": 20,
+      "sourceFrameIdentity": null
+    },
+    {
+      "backend": "webgpu",
+      "viewport": {
+        "width": 1600,
+        "height": 1000
+      },
+      "scenario": "split",
+      "errors": [],
+      "status": "ok",
+      "measurement": {
+        "canvasPixels": {
+          "width": 1600,
+          "height": 908
+        },
+        "canvasCssPixels": {
+          "width": 1600,
+          "height": 908
+        },
+        "isWebGPURenderer": true,
+        "isWebGLRenderer": false,
+        "adapter": {
+          "vendor": "amd",
+          "architecture": "gcn-5"
+        },
+        "graphicsRenderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "elapsedMs": 5267,
+        "frames": 25,
+        "fps": 5,
+        "frameIntervalMs": {
+          "p50": 216.6,
+          "p95": 333.3,
+          "p99": 483.4,
+          "worst": 483.4
+        },
+        "draw": {
+          "renderStatsSamples": 81,
+          "renderPassesPerFrame": 3.24,
+          "meanDrawCallsPerFrame": 188,
+          "drawCallsPerRenderPassP50": 56,
+          "drawCallsPerRenderPassP95": 106,
+          "meanTrianglesPerFrame": 22236,
+          "trianglesPerRenderPassP50": 3003
+        },
+        "rendererResources": {
+          "geometries": 10,
+          "textures": 3,
+          "allocatedBytes": 17590957
+        },
+        "jsHeapBytes": 157000000
+      },
+      "selectionLatency": {
+        "samplesMs": [
+          11.7,
+          110.7,
+          129.7,
+          154.2,
+          198.5,
+          184.3,
+          119,
+          120.4
+        ],
+        "p50Ms": 120.4,
+        "p95Ms": 198.5
+      },
+      "poseSubjectCount": 1,
+      "sourceFrameIdentity": "tracking-period-1-457d138baddf:5000000000"
+    },
+    {
+      "backend": "webgpu",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scenario": "field",
+      "errors": [],
+      "status": "ok",
+      "measurement": {
+        "canvasPixels": {
+          "width": 834,
+          "height": 808
+        },
+        "canvasCssPixels": {
+          "width": 834,
+          "height": 808
+        },
+        "isWebGPURenderer": true,
+        "isWebGLRenderer": false,
+        "adapter": {
+          "vendor": "amd",
+          "architecture": "gcn-5"
+        },
+        "graphicsRenderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "elapsedMs": 5033,
+        "frames": 239,
+        "fps": 47,
+        "frameIntervalMs": {
+          "p50": 16.7,
+          "p95": 33.4,
+          "p99": 66.6,
+          "worst": 66.8
+        },
+        "draw": {
+          "renderStatsSamples": 482,
+          "renderPassesPerFrame": 2.02,
+          "meanDrawCallsPerFrame": 191,
+          "drawCallsPerRenderPassP50": 84,
+          "drawCallsPerRenderPassP95": 106,
+          "meanTrianglesPerFrame": 5582,
+          "trianglesPerRenderPassP50": 2871
+        },
+        "rendererResources": {
+          "geometries": 80,
+          "textures": 3,
+          "allocatedBytes": 684609
+        },
+        "jsHeapBytes": 177000000
+      },
+      "selectionLatency": {
+        "samplesMs": [
+          30.7,
+          99.7,
+          74.8,
+          109.1,
+          112.5,
+          90.9,
+          62.6,
+          62.3
+        ],
+        "p50Ms": 74.8,
+        "p95Ms": 112.5
+      },
+      "poseSubjectCount": null,
+      "sourceFrameIdentity": "tracking-period-1-457d138baddf:0"
+    },
+    {
+      "backend": "webgpu",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scenario": "pose",
+      "errors": [],
+      "status": "ok",
+      "measurement": {
+        "canvasPixels": {
+          "width": 834,
+          "height": 808
+        },
+        "canvasCssPixels": {
+          "width": 834,
+          "height": 808
+        },
+        "isWebGPURenderer": true,
+        "isWebGLRenderer": false,
+        "adapter": {
+          "vendor": "amd",
+          "architecture": "gcn-5"
+        },
+        "graphicsRenderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "elapsedMs": 5009,
+        "frames": 249,
+        "fps": 50,
+        "frameIntervalMs": {
+          "p50": 16.7,
+          "p95": 50,
+          "p99": 83.4,
+          "worst": 100.1
+        },
+        "draw": {
+          "renderStatsSamples": 250,
+          "renderPassesPerFrame": 1,
+          "meanDrawCallsPerFrame": 11,
+          "drawCallsPerRenderPassP50": 14,
+          "drawCallsPerRenderPassP95": 14,
+          "meanTrianglesPerFrame": 290134,
+          "trianglesPerRenderPassP50": 288821
+        },
+        "rendererResources": {
+          "geometries": 14,
+          "textures": 2,
+          "allocatedBytes": 702661
+        },
+        "jsHeapBytes": 177000000
+      },
+      "selectionLatency": null,
+      "poseSubjectCount": 20,
+      "sourceFrameIdentity": null
+    },
+    {
+      "backend": "webgpu",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scenario": "split",
+      "errors": [],
+      "status": "ok",
+      "measurement": {
+        "canvasPixels": {
+          "width": 1440,
+          "height": 808
+        },
+        "canvasCssPixels": {
+          "width": 1440,
+          "height": 808
+        },
+        "isWebGPURenderer": true,
+        "isWebGLRenderer": false,
+        "adapter": {
+          "vendor": "amd",
+          "architecture": "gcn-5"
+        },
+        "graphicsRenderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "elapsedMs": 5480,
+        "frames": 24,
+        "fps": 4,
+        "frameIntervalMs": {
+          "p50": 216.7,
+          "p95": 400,
+          "p99": 416.6,
+          "worst": 416.6
+        },
+        "draw": {
+          "renderStatsSamples": 78,
+          "renderPassesPerFrame": 3.25,
+          "meanDrawCallsPerFrame": 196,
+          "drawCallsPerRenderPassP50": 61,
+          "drawCallsPerRenderPassP95": 106,
+          "meanTrianglesPerFrame": 22359,
+          "trianglesPerRenderPassP50": 3003
+        },
+        "rendererResources": {
+          "geometries": 10,
+          "textures": 3,
+          "allocatedBytes": 717057
+        },
+        "jsHeapBytes": 177000000
+      },
+      "selectionLatency": {
+        "samplesMs": [
+          11.1,
+          171.4,
+          201.8,
+          157.2,
+          157.6,
+          92.8,
+          83.7,
+          114.1
+        ],
+        "p50Ms": 114.1,
+        "p95Ms": 201.8
+      },
+      "poseSubjectCount": 1,
+      "sourceFrameIdentity": "tracking-period-1-457d138baddf:5000000000"
+    }
+  ]
+}

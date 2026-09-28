@@ -12,7 +12,7 @@ import { ErrorPanel, StatePanel } from "@/components/common/StatePanel";
 import { VirtualList } from "@/components/common/VirtualList";
 import { WorldGlyph } from "@/components/common/WorldGlyph";
 import { sessionQuery, sessionsQuery } from "@/lib/api/queries";
-import { readinessOf, type StudyNode } from "@/lib/catalog-model";
+import { readinessOf, type Readiness, type StudyNode } from "@/lib/catalog-model";
 import type { PerformanceSearch } from "@/lib/search";
 import { usePublishContext, type Crumb } from "@/lib/state/context";
 import { METADATA_STALE_MS, useCatalog } from "@/lib/use-catalog";
@@ -91,6 +91,12 @@ function StudyContext({ study, search }: { study: StudyNode; search: Performance
     () => new Set(study.sessions.filter((item) => readinessOf(item).server === "ready").flatMap((item) => (item.session_id ? [item.session_id] : []))),
     [study.sessions],
   );
+  const catalogSessionIds = useMemo(
+    () => new Set(study.sessions.flatMap((item) => (item.session_id ? [item.session_id] : []))),
+    [study.sessions],
+  );
+  const selectedResource = study.sessions.find((item) => item.session_id === selected) ?? null;
+  const selectedReadiness = selectedResource ? readinessOf(selectedResource) : null;
   const needle = search.q?.toLocaleLowerCase().trim() ?? "";
   const rows = (sessions.data ?? []).filter((session) => !needle || `${session.session_id} ${session.label ?? ""}`.toLocaleLowerCase().includes(needle));
   const update = (patch: Partial<PerformanceSearch>, replace = false) =>
@@ -109,6 +115,10 @@ function StudyContext({ study, search }: { study: StudyNode; search: Performance
               <span className="text-[12px] text-text-muted">
                 <span className="mono text-text-secondary">{study.sessionCount}</span> sessions · <span className="mono text-text-secondary">{study.subjectCount}</span> subjects · <span className="mono text-text-secondary">{study.trialCount}</span> trials
               </span>
+              <span className="flex items-center gap-1.5 text-[11.5px] text-text-secondary">
+                <ReadinessGlyph kind={study.ready ? "ready" : "upstream"} />
+                {study.ready ? `${study.readySessions} of ${study.sessionCount} sessions ready` : "Upstream available · not materialized"}
+              </span>
             </>
           }
           actions={<AppLink to={{ to: "/compare" }} className="d-btn">Compare sessions</AppLink>}
@@ -122,11 +132,24 @@ function StudyContext({ study, search }: { study: StudyNode; search: Performance
               <input value={search.q ?? ""} onChange={(event) => update({ q: event.target.value || undefined }, true)} placeholder="Filter sessions" aria-label="Filter sessions" className="d-input w-full pl-8" />
             </label>
           </div>
-          <SessionList rows={rows} selected={selected} readyIds={readyIds} pending={sessions.isPending} onSelect={(sessionId) => update({ session: sessionId })} />
+          <SessionList
+            rows={rows}
+            selected={selected}
+            readyIds={readyIds}
+            catalogSessionIds={catalogSessionIds}
+            studyReady={study.ready}
+            pending={sessions.isPending}
+            onSelect={(sessionId) => update({ session: sessionId })}
+          />
         </aside>
         <section className="min-h-0 overflow-y-auto" aria-label="Session context">
           {selected ? (
-            <SessionPanel datasetId={study.datasetId} sessionId={selected} ready={readyIds.size === 0 || readyIds.has(selected)} />
+            <SessionPanel
+              datasetId={study.datasetId}
+              sessionId={selected}
+              readiness={selectedReadiness}
+              studyReady={study.ready}
+            />
           ) : (
             <StatePanel state="empty" title="Choose a session to see its trials." detail="Session and trial metadata load here; signal windows load only when a trial opens in the Performance World." />
           )}
@@ -140,12 +163,16 @@ function SessionList({
   rows,
   selected,
   readyIds,
+  catalogSessionIds,
+  studyReady,
   pending,
   onSelect,
 }: {
   rows: readonly SessionSummary[];
   selected: string | null;
   readyIds: ReadonlySet<string>;
+  catalogSessionIds: ReadonlySet<string>;
+  studyReady: boolean;
   pending: boolean;
   onSelect: (sessionId: string) => void;
 }) {
@@ -159,7 +186,8 @@ function SessionList({
       getKey={(session) => session.session_id}
       renderRow={(session, _index, style) => {
         const active = session.session_id === selected;
-        const ready = readyIds.size === 0 || readyIds.has(session.session_id);
+        const ready = readyIds.has(session.session_id) ||
+          (studyReady && !catalogSessionIds.has(session.session_id) && session.stream_count > 0);
         return (
           <button
             type="button"
@@ -186,16 +214,17 @@ function SessionList({
   );
 }
 
-function SessionPanel({ datasetId, sessionId, ready }: { datasetId: string; sessionId: string; ready: boolean }) {
+function SessionPanel({ datasetId, sessionId, readiness, studyReady }: { datasetId: string; sessionId: string; readiness: Readiness | null; studyReady: boolean }) {
   const detail = useQuery(sessionQuery(datasetId, sessionId));
   if (detail.isPending) {
     return <div className="space-y-3 p-8" aria-busy="true"><div className="d-skeleton h-6 w-72" /><div className="d-skeleton h-40" /></div>;
   }
   if (detail.isError) return <ErrorPanel error={detail.error} onRetry={() => void detail.refetch()} />;
-  return <SessionTrials detail={detail.data} ready={ready} />;
+  const ready = readiness?.server === "ready" || (!readiness && studyReady && detail.data.streams.length > 0);
+  return <SessionTrials detail={detail.data} readiness={readiness} ready={ready} />;
 }
 
-function SessionTrials({ detail, ready }: { detail: SessionDetail; ready: boolean }) {
+function SessionTrials({ detail, readiness, ready }: { detail: SessionDetail; readiness: Readiness | null; ready: boolean }) {
   const byCondition = new Map<string, TrialView[]>();
   for (const trial of detail.trials) {
     const condition = trialFacts(trial).condition ?? "Trials";
@@ -227,7 +256,23 @@ function SessionTrials({ detail, ready }: { detail: SessionDetail; ready: boolea
         ) : null}
       </div>
       {!ready ? (
-        <StatePanel className="mt-6 d-card min-h-28" state="not_materialized" title="This session is registered but its signals are not materialized." detail="Trials are listed from metadata; the signal workbench opens once canonical streams exist." />
+        <StatePanel
+          className="mt-6 d-card min-h-28"
+          state={readiness?.server === "none" && readiness.upstream ? "upstream" : "not_materialized"}
+          title={readiness?.server === "none" && readiness.upstream
+            ? "This session is available upstream, not materialized locally."
+            : readiness?.server === "registered"
+              ? "This session is registered but its streams are not materialized."
+              : readiness?.server === "materialized"
+                ? "This session is materialized but not ready for analysis."
+                : "This session has no verified local signals."}
+          detail={
+            <>
+              Trial metadata remains discoverable; signal analysis opens only when local streams are ready.
+              {readiness?.preparation ? <> The next preparation step is <span className="mono text-text-secondary">{readiness.preparation}</span>.</> : null}
+            </>
+          }
+        />
       ) : null}
       {[...byCondition.entries()].map(([condition, trials]) => (
         <section key={condition} className="mt-7" aria-label={`Condition ${condition}`}>
@@ -236,26 +281,36 @@ function SessionTrials({ detail, ready }: { detail: SessionDetail; ready: boolea
             {trials.map((trial) => {
               const streams = detail.streams.filter((stream) => stream.trial_id === trial.trial_id);
               const facts = trialFacts(trial);
+              const row = (
+                <>
+                  <span className="mono text-text-primary">T{facts.index ?? "—"}</span>
+                  <span className="mono truncate text-[11px] text-text-muted" title={trial.label ?? trial.trial_id}>{trial.trial_id}</span>
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    {streams.map((stream) => (
+                      <span key={stream.stream_id} className="flex items-center gap-1 text-[11px] text-text-muted">
+                        <ModalityBadge modality={stream.modality} />
+                        {stream.nominal_sampling_rate_hz ? <span className="mono">{stream.nominal_sampling_rate_hz} Hz</span> : null}
+                      </span>
+                    ))}
+                  </span>
+                  {ready ? <ArrowRight size={12} aria-hidden="true" className="text-text-faint group-hover:text-accent" /> : <span className="text-[10px] text-text-faint">Not ready</span>}
+                </>
+              );
               return (
                 <li key={trial.trial_id}>
-                  <AppLink
-                    to={performanceWorldTarget(detail.dataset_id, detail.session.session_id, { trial: trial.trial_id, ...(streams[0] ? { stream: streams[0].stream_id } : {}) })}
-                    transition
-                    className="d-row group grid grid-cols-[4.5rem_minmax(0,1fr)_minmax(0,1fr)_1rem] items-center gap-4 px-5 py-2.5 text-[12.5px]"
-                    aria-disabled={!ready}
-                  >
-                    <span className="mono text-text-primary">T{facts.index ?? "—"}</span>
-                    <span className="mono truncate text-[11px] text-text-muted" title={trial.label ?? trial.trial_id}>{trial.trial_id}</span>
-                    <span className="flex flex-wrap items-center gap-1.5">
-                      {streams.map((stream) => (
-                        <span key={stream.stream_id} className="flex items-center gap-1 text-[11px] text-text-muted">
-                          <ModalityBadge modality={stream.modality} />
-                          {stream.nominal_sampling_rate_hz ? <span className="mono">{stream.nominal_sampling_rate_hz} Hz</span> : null}
-                        </span>
-                      ))}
-                    </span>
-                    <ArrowRight size={12} aria-hidden="true" className="text-text-faint group-hover:text-accent" />
-                  </AppLink>
+                  {ready ? (
+                    <AppLink
+                      to={performanceWorldTarget(detail.dataset_id, detail.session.session_id, { trial: trial.trial_id, ...(streams[0] ? { stream: streams[0].stream_id } : {}) })}
+                      transition
+                      className="d-row group grid grid-cols-[4.5rem_minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-4 px-5 py-2.5 text-[12.5px]"
+                    >
+                      {row}
+                    </AppLink>
+                  ) : (
+                    <div aria-disabled="true" className="d-row grid cursor-not-allowed grid-cols-[4.5rem_minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-4 px-5 py-2.5 text-[12.5px]">
+                      {row}
+                    </div>
+                  )}
                 </li>
               );
             })}

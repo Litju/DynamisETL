@@ -190,7 +190,7 @@ function NoMatch() {
 
 function BrowserSkeleton() {
   return (
-    <div className="space-y-3" aria-busy="true" aria-label="Loading catalog metadata">
+    <div role="status" className="space-y-3" aria-busy="true" aria-label="Loading catalog metadata">
       {[0, 1, 2, 3].map((index) => <div key={index} className="d-skeleton h-16 rounded-[10px]" />)}
     </div>
   );

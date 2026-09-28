@@ -19,6 +19,23 @@ const match = readyMatches.find((item) => item.dataset_ids?.includes("skillcorne
 assert.ok(match?.session_id, "live read model must contain the ready SkillCorner Brisbane match");
 assert.ok(match.routes?.some((route) => route.product === "MatchLab" && route.ready), "match must route to the existing Match World");
 
+const gameEditions = await (await fetch(`${apiBase}/api/games/editions`)).json();
+const acbEdition = gameEditions.find((item) => item.dataset_id === "skillcorner-basketball-opendata");
+const nbaEdition = gameEditions.find((item) => item.league_id === "nba");
+assert.ok(acbEdition && nbaEdition, "live Game World must contain the ACB and NBA editions");
+const acbGames = await (await fetch(`${apiBase}/api/games?edition_id=${encodeURIComponent(acbEdition.edition_id)}&limit=1000&offset=0`)).json();
+const acbGame = acbGames.rows.find((item) => item.provider_game_id === "114243");
+assert.ok(acbGame?.contest_id, "live ACB data must contain the accepted basketball spatial game");
+const basketballContest = resources.find((item) => item.resource_kind === "contest" && item.external_ids?.includes("114243"));
+assert.ok(basketballContest?.contest_id, "live catalog must contain the ACB tracking contest");
+const nbaPage0 = await (await fetch(`${apiBase}/api/games?edition_id=${encodeURIComponent(nbaEdition.edition_id)}&limit=1000&offset=0`)).json();
+let nbaGame = nbaPage0.rows.find((item) => item.provider_game_id === "401809243");
+for (let offset = 1000; !nbaGame && offset < nbaPage0.total; offset += 1000) {
+  const nextPage = await (await fetch(`${apiBase}/api/games?edition_id=${encodeURIComponent(nbaEdition.edition_id)}&limit=1000&offset=${offset}`)).json();
+  nbaGame = nextPage.rows.find((item) => item.provider_game_id === "401809243");
+}
+assert.ok(nbaGame?.contest_id, "live NBA data must contain the accepted local-only rights example");
+
 const outputRoot = path.resolve(appDir, "../../output/playwright/res-129/final");
 await mkdir(outputRoot, { recursive: true });
 const browser = await chromium.launch({ headless: true });
@@ -33,6 +50,7 @@ page.setDefaultTimeout(30000);
 const requests = [];
 const responses = [];
 const consoleErrors = [];
+let unavailableCatalogReadModel = false;
 page.on("request", (request) => {
   const url = new URL(request.url());
   requests.push({ url: url.href, path: url.pathname + url.search, type: request.resourceType(), method: request.method() });
@@ -49,10 +67,20 @@ page.on("response", (response) => {
 });
 page.on("pageerror", (error) => consoleErrors.push(error.message));
 page.on("console", (message) => {
-  if (message.type() === "error") consoleErrors.push(message.text());
+  if (message.type() === "error" && !/server responded with a status of (?:404|451|503)\b/u.test(message.text())) {
+    consoleErrors.push(message.text());
+  }
 });
 await page.route("**/api/**", async (route) => {
   const url = new URL(route.request().url());
+  if (unavailableCatalogReadModel && url.pathname === "/api/catalog/read-model") {
+    await route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ detail: "The catalog service is temporarily unavailable." }),
+    });
+    return;
+  }
   await route.fulfill({
     response: await route.fetch({ url: `${apiBase}${url.pathname}${url.search}` }),
   });
@@ -63,6 +91,8 @@ await mkdir(viewportDir, { recursive: true });
 const steps = [];
 let responseMark = 0;
 async function capture(name) {
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+  assert.equal(overflow, false, `${name} has horizontal overflow at ${viewport.label}`);
   const file = path.join(viewportDir, `${name}.png`);
   await page.screenshot({ path: file, animations: "disabled" });
   const js = [];
@@ -119,6 +149,7 @@ await page.getByTestId("matchlab-composition").waitFor({ state: "visible" });
 await page.getByText(/29\/29 landmarks/).waitFor({ state: "visible", timeout: 120000 });
 await page.waitForTimeout(5000);
 const preWorldRequests = requests.slice(0, beforeWorldRequests);
+const initialWorldRequests = requests.slice(beforeWorldRequests);
 const densePaths = preWorldRequests.filter((request) =>
   /^\/api\/artifacts\/[^/]+\/window$/.test(new URL(request.url).pathname) ||
   /^\/api\/tactical\/series\//.test(new URL(request.url).pathname) ||
@@ -138,6 +169,87 @@ await page.getByRole("heading", { name: "Continue", exact: true }).waitFor({ sta
 await page.getByText(/Brisbane Roar FC 0–1 Perth Glory Football Club/).first().waitFor({ state: "visible" });
 await capture("09-research-home-recent");
 
+await page.goto(`${webBase}/games?edition=${encodeURIComponent(acbEdition.edition_id)}&game=${encodeURIComponent(acbGame.contest_id)}&offset=0`);
+await page.getByRole("heading", { name: "Basketball game", exact: true }).waitFor({ state: "visible" });
+await page.getByTestId("gamelab").waitFor({ state: "visible" });
+await page.getByRole("table", { name: "ACB contests" }).getByRole("row").filter({ hasText: "BAXI Manresa" }).waitFor({ state: "visible" });
+await capture("18-game-world");
+
+await page.goto(`${webBase}/basketball?contest=${encodeURIComponent(basketballContest.contest_id)}`);
+await page.getByTestId("basketball-court").waitFor({ state: "visible" });
+await page.getByRole("slider", { name: "Frame timeline" }).waitFor({ state: "visible" });
+await page.locator('[data-testid="basketball-court"][data-frame-idx]').waitFor({ state: "visible" });
+await capture("19-basketball-spatial");
+
+await page.goto(`${webBase}/performance?dataset=white-cmj-acc-grf&session=white-s000`);
+await page.getByRole("heading", { name: "White CMJ accelerometer + vGRF", exact: true }).waitFor({ state: "visible" });
+await page.getByRole("heading", { name: "white-s000", exact: true }).waitFor({ state: "visible" });
+await page.getByRole("listbox", { name: "Sessions" }).getByRole("option", { name: /white-s000/ }).waitFor({ state: "visible" });
+await page.getByRole("link", { name: "Open first trial" }).waitFor({ state: "visible" });
+await capture("20-performance-world");
+
+await page.goto(`${webBase}/library`);
+await page.getByRole("heading", { name: "Library", exact: true }).waitFor({ state: "visible" });
+await page.getByRole("link", { name: "Browse pose definitions", exact: true }).waitFor({ state: "visible" });
+await capture("21-library-evidence");
+
+await page.goto(`${webBase}/data/edition/${encodeURIComponent(edition.edition_id)}?status=upstream`);
+const prepareButton = page.getByRole("button", { name: /^Prepare .* locally$/u }).first();
+await prepareButton.waitFor({ state: "visible" });
+await prepareButton.click();
+await page.getByRole("dialog").waitFor({ state: "visible" });
+await page.getByText("Deterministic preparation", { exact: true }).waitFor({ state: "visible" });
+await page.getByText("Declared · not acquired", { exact: true }).first().waitFor({ state: "visible" });
+await capture("22-prepare");
+if (viewport.height <= 768) {
+  const scrolled = await page.getByRole("dialog").evaluate((dialog) => {
+    let node = dialog.parentElement;
+    while (node && node !== document.body) {
+      const overflowY = getComputedStyle(node).overflowY;
+      if ((overflowY === "auto" || overflowY === "scroll") && node.scrollHeight > node.clientHeight + 8) {
+        node.scrollTop = node.scrollHeight;
+        return true;
+      }
+      node = node.parentElement;
+    }
+    return false;
+  });
+  assert.equal(scrolled, true, "Prepare dialog should remain reachable by scrolling at compact workstation height");
+  await capture("22-prepare-scroll");
+}
+await page.getByRole("button", { name: "Close" }).click();
+
+const rightsGamePath = `/api/games/${nbaGame.contest_id}`;
+const rejectRightsRestrictedPayload = (route) => route.fulfill({
+  status: 451,
+  contentType: "application/json",
+  body: JSON.stringify({ detail: "This local-only source is blocked in public exposure.", state: "rights_restricted" }),
+});
+await page.route((url) => new URL(url).pathname === `${rightsGamePath}/plays`, rejectRightsRestrictedPayload);
+await page.route((url) => new URL(url).pathname === `${rightsGamePath}/box`, rejectRightsRestrictedPayload);
+await page.goto(`${webBase}/games?edition=${encodeURIComponent(nbaEdition.edition_id)}&game=${encodeURIComponent(nbaGame.contest_id)}`);
+await page.getByLabel("Local-only source rights").waitFor({ state: "visible" });
+await page.locator('[data-state="rights"]').first().waitFor({ state: "visible" });
+await capture("23-rights-restricted");
+
+await page.goto(`${webBase}/lab/${encodeURIComponent(match.dataset_ids[0])}/${encodeURIComponent(match.session_id)}?view=field&stream=tracking-period-1&t_ns=120000000000`);
+await page.getByTestId("pitch-canvas").waitFor({ state: "visible" });
+await page.getByRole("region", { name: "Tactical Analysis" }).waitFor({ state: "visible" });
+await page.getByRole("tab", { name: "Events", exact: true }).click();
+await page.getByText("Unsupported by this source", { exact: false }).waitFor({ state: "visible" });
+await capture("24-unsupported-capability");
+
+await page.goto(`${webBase}/performance?dataset=white-cmj-acc-grf&session=cmj-1`);
+await page.getByRole("heading", { name: "White CMJ accelerometer + vGRF", exact: true }).waitFor({ state: "visible" });
+await page.locator('[data-state="error"]').waitFor({ state: "visible" });
+await capture("25-api-error");
+
+await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => undefined);
+unavailableCatalogReadModel = true;
+await page.goto(`${webBase}/data?domain=sports`);
+await page.locator('[data-state="api_unavailable"]').waitFor({ state: "visible" });
+await capture("26-api-unavailable");
+
 const uniqueScripts = [];
 for (const response of new Map(responses.filter((item) => item.type === "script").map((item) => [item.url, item])).values()) {
   const file = new URL(response.url).pathname.split("/").pop();
@@ -146,6 +258,12 @@ for (const response of new Map(responses.filter((item) => item.type === "script"
 }
 const apiRequests = requests.filter((request) => new URL(request.url).pathname.startsWith("/api/"));
 const denseApiRequests = apiRequests.filter((request) =>
+  /^\/api\/artifacts\/[^/]+\/window$/.test(new URL(request.url).pathname) ||
+  /^\/api\/tactical\/series\//.test(new URL(request.url).pathname) ||
+  /^\/api\/basketball\/[^/]+\/frames/.test(new URL(request.url).pathname),
+);
+const initialWorldApiRequests = initialWorldRequests.filter((request) => new URL(request.url).pathname.startsWith("/api/"));
+const initialWorldDenseRequests = initialWorldRequests.filter((request) =>
   /^\/api\/artifacts\/[^/]+\/window$/.test(new URL(request.url).pathname) ||
   /^\/api\/tactical\/series\//.test(new URL(request.url).pathname) ||
   /^\/api\/basketball\/[^/]+\/frames/.test(new URL(request.url).pathname),
@@ -167,10 +285,14 @@ const report = {
   javascriptAssets: uniqueScripts,
   apiRequestCounts: {
     beforeWorld: preWorldRequests.filter((request) => new URL(request.url).pathname.startsWith("/api/")).length,
-    afterWorldTotal: apiRequests.length,
-    denseAfterWorld: denseApiRequests.length,
+    firstMatchWorld: initialWorldApiRequests.length,
+    denseBeforeWorld: densePaths.length,
+    denseFirstMatchWorld: initialWorldDenseRequests.length,
+    allCapturedScreens: apiRequests.length,
+    denseAcrossCapturedScreens: denseApiRequests.length,
   },
   apiRequests: apiRequests.map((request) => ({ path: request.path, type: request.type })),
+  expectedHttpStates: responses.filter((item) => [404, 451, 503].includes(item.status)).map(({ url, status }) => ({ path: new URL(url).pathname, status })),
   consoleErrors,
 };
 const manifest = JSON.parse(await readFile(path.resolve(appDir, "dist/.vite/manifest.json"), "utf8"));
@@ -194,16 +316,27 @@ console.log(JSON.stringify({
   returnUrl: report.returnUrl,
   noDenseRequestsBeforeWorld: report.noDenseRequestsBeforeWorld,
   beforeWorldApiRequests: report.apiRequestCounts.beforeWorld,
-  totalApiRequests: report.apiRequestCounts.afterWorldTotal,
-  denseApiRequestsAfterWorld: report.apiRequestCounts.denseAfterWorld,
+  firstMatchWorldApiRequests: report.apiRequestCounts.firstMatchWorld,
+  denseBeforeWorld: report.apiRequestCounts.denseBeforeWorld,
+  denseInFirstMatchWorld: report.apiRequestCounts.denseFirstMatchWorld,
+  totalApiRequestsAcrossScreens: report.apiRequestCounts.allCapturedScreens,
+  denseRequestsAcrossScreens: report.apiRequestCounts.denseAcrossCapturedScreens,
   staticRouteAudit: Object.fromEntries(Object.entries(report.staticRouteAudit).map(([route, value]) => [route, { staticChunks: value.files.length, heavy: value.heavy }])),
   beforeWorldScripts: { count: beforeWorldScripts.length, heavy: preWorldHeavyScripts },
   matchWorldChunks: report.matchWorldChunkFiles.map((file) => {
     const asset = uniqueScripts.find((item) => item.file === file);
     return { file, bytes: asset?.bytes, gzipBytes: asset?.gzipBytes };
   }),
-  steps: report.steps.map(({ name, js }) => ({ name, js: js.map(({ file, bytes, gzipBytes }) => ({ file, bytes, gzipBytes })) })),
+  steps: report.steps.map(({ name, js }) => ({
+    name,
+    addedAssets: js.length,
+    rawBytes: js.reduce((total, asset) => total + asset.bytes, 0),
+    gzipBytes: js.reduce((total, asset) => total + asset.gzipBytes, 0),
+  })),
+  expectedHttpStates: report.expectedHttpStates,
   consoleErrors: report.consoleErrors,
 }, null, 2));
+await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => undefined);
+await page.unrouteAll({ behavior: "wait" });
 await context.close();
 await browser.close();

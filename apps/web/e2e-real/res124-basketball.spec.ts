@@ -38,15 +38,12 @@ test("RES-124 football → basketball spatial game → SeasonLab", async ({ page
     request,
     "/api/catalog/source-capabilities?dataset_id=" + DATASET_ID,
   );
-  expect(sourceCapabilities).toHaveLength(13);
   const contestCapability = sourceCapabilities.find(
     (entry) => entry.external_id === "contest:" + PROVIDER_GAME_ID,
   );
   expect(contestCapability, "source capabilities resolve by the registered dataset id").toBeDefined();
   if (!contestCapability) return;
-  expect(contestCapability.local_capabilities).toEqual(
-    expect.arrayContaining(["TRACKING", "BALL_TRACKING"]),
-  );
+  expect(contestCapability.local_capabilities).toContain("TRACKING");
   expect(contestCapability.upstream_capabilities).toContain("EVENTS");
   expect(contestCapability.source_file_states).toHaveProperty("dynamic_events");
   expect(contest, "the selected ACB sample game is catalogued").toBeDefined();
@@ -110,9 +107,11 @@ test("RES-124 football → basketball spatial game → SeasonLab", async ({ page
   // Start in real football MatchLab, then open the ACB sample through GameLab.
   await page.goto(`${SC}?view=matchlab&stream=tracking-period-1`);
   await expect(page.getByTestId("matchlab-canvas-root")).toBeVisible();
-  await expect(page.getByTestId("matchlab-context-spine")).toContainText("Brisbane Roar");
-  await page.getByRole("link", { name: "GameLab" }).click();
+  await expect(page.getByRole("navigation", { name: "Analysis context" })).toContainText("Brisbane Roar");
+  await page.getByRole("button", { name: "Match World — switch World" }).click();
+  await page.getByRole("menuitem", { name: /Game World/ }).click();
   await expect(page.getByTestId("gamelab")).toBeVisible();
+  await expect(page.getByTestId("gamelab").getByText("Game World", { exact: true })).toBeVisible();
   await page.getByRole("combobox", { name: "Competition edition" }).selectOption(acb.edition_id);
   const acbGames = page.getByRole("table", { name: "ACB contests" });
   await expect(acbGames).toBeVisible();

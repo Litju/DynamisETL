@@ -141,3 +141,39 @@ test("RES-129 reports unavailable Pose for a ready A-League match without Pose",
   await expect(page.getByTestId("pose-canvas")).toHaveCount(0);
   await expectCleanConsole(console);
 });
+
+test("RES-129 opens a Performance trial only when the selected session has ready streams", async ({ page }) => {
+  const console = probe(page);
+  const denseReads: string[] = [];
+  page.on("request", (request) => {
+    if (/\/window$/u.test(new URL(request.url()).pathname)) denseReads.push(request.url());
+  });
+
+  await page.goto("/performance?dataset=white-cmj-acc-grf&session=white-s000");
+  await expect(page.getByRole("heading", { name: "White CMJ accelerometer + vGRF", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "white-s000", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open first trial" })).toBeVisible();
+  expect(denseReads).toEqual([]);
+  await capture(page, "1440x900", "20-performance-world.png");
+  await expectCleanConsole(console);
+});
+
+test("RES-129 keeps upstream-only trials discoverable but non-openable", async ({ page }) => {
+  const console = probe(page);
+  const denseReads: string[] = [];
+  page.on("request", (request) => {
+    if (/\/window$/u.test(new URL(request.url()).pathname)) denseReads.push(request.url());
+  });
+
+  await page.goto("/performance?dataset=gymaware-landmine-vision&session=session-ga-p001");
+  await expect(page.getByRole("heading", { name: "GymAware landmine press + vision agreement", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "session-ga-p001", exact: true })).toBeVisible();
+  await expect(page.locator('[data-state="upstream"]')).toContainText("This session is available upstream, not materialized locally.");
+  await expect(page.getByText("ga-t001-r01", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open first trial" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /ga-t001-r01/ })).toHaveCount(0);
+  await expect(page.locator('a[href*="/lab/gymaware-landmine-vision/session-ga-p001"]')).toHaveCount(0);
+  expect(denseReads).toEqual([]);
+  await capture(page, "1440x900", "17-gymaware-upstream-only-session.png");
+  await expectCleanConsole(console);
+});

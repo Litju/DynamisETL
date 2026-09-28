@@ -179,7 +179,7 @@ export function GameLab() {
     <div className="flex h-full min-h-0 flex-col" data-testid="gamelab" data-sport={sport ?? ""}>
       <header className="flex h-12 shrink-0 items-center gap-4 border-b border-border-subtle bg-surface-1 px-4">
         <div className="flex items-baseline gap-2.5">
-          <span className="t-kicker">{skillCornerBasketball ? "Match World" : "Game World"}</span>
+          <span className="t-kicker">Game World</span>
           <h1 className="text-[15px] font-semibold tracking-[-0.015em] text-text-primary">
             {skillCornerBasketball ? "Basketball game" : "GameLab"}
           </h1>
