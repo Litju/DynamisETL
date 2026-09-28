@@ -8,12 +8,14 @@ import hashlib
 import io
 import json
 import sys
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import requests
 from pydantic import HttpUrl, TypeAdapter
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from dynamis.adapters.skillcorner_basketball import authorities
@@ -62,6 +64,26 @@ def load_corpus_manifest(path: Path | None = None) -> dict[str, Any]:
         raise ValueError("the SkillCorner basketball sample manifest must contain 10 games")
     if len({str(item["match"]["id"]) for item in corpus["matches"]}) != 10:
         raise ValueError("SkillCorner basketball match ids must be unique")
+    coverage = corpus.get("coverage", {})
+    sample_teams = {
+        str(item[team][key]["id"])
+        for item in corpus["matches"]
+        for team, key in (("match", "home_team"), ("match", "away_team"))
+    }
+    manifest_teams = {str(team["provider_team_id"]) for team in corpus.get("teams", [])}
+    expected_coverage = {
+        "sample_game_count": len(corpus["matches"]),
+        "sample_game_team_count": len(sample_teams),
+        "season_aggregate_game_count": 293,
+        "season_aggregate_team_count": 18,
+        "season_schedule_game_count": 327,
+    }
+    if (
+        manifest_teams != sample_teams
+        or any(coverage.get(key) != value for key, value in expected_coverage.items())
+        or coverage.get("aggregate_scope") != "offense_only"
+    ):
+        raise ValueError("SkillCorner basketball coverage facts do not match the pinned corpus")
     keys = [str(item["key"]) for item in corpus.get("files", [])]
     if len(keys) != len(set(keys)):
         raise ValueError("SkillCorner basketball upstream file keys must be unique")
@@ -284,7 +306,7 @@ def build_game_domain(corpus: dict[str, Any], item: dict[str, Any]) -> ProviderD
             dataset_id=DATASET_ID,
             session_id=game_id,
             contest_id=contest.contest_id,
-            source_catalog_entry_id=None,
+            source_catalog_entry_id=contest_catalog_id(game_id),
         ),
         crosswalks=tuple(crosswalks),
     )
@@ -306,6 +328,35 @@ def build_game_domain(corpus: dict[str, Any], item: dict[str, Any]) -> ProviderD
     )
 
 
+def _preserve_materialized_contest_metadata(
+    domain: ProviderDomain,
+    existing_metadata: dict[str, Any] | None,
+) -> ProviderDomain:
+    if not existing_metadata:
+        return domain
+    contexts = []
+    for context in domain.sports_contexts:
+        crosswalks = []
+        for crosswalk in context.crosswalks:
+            if crosswalk.entity_kind is not SportsEntityKind.CONTEST:
+                crosswalks.append(crosswalk)
+                continue
+            metadata = dict(crosswalk.metadata)
+            for key in ("play_by_play_available", "tracking_available"):
+                if existing_metadata.get(key) is True:
+                    metadata[key] = True
+            previous_period_count = existing_metadata.get("period_count")
+            if (
+                isinstance(previous_period_count, int)
+                and not isinstance(previous_period_count, bool)
+                and previous_period_count > int(metadata.get("period_count", 0))
+            ):
+                metadata["period_count"] = previous_period_count
+            crosswalks.append(crosswalk.model_copy(update={"metadata": metadata}))
+        contexts.append(context.model_copy(update={"crosswalks": tuple(crosswalks)}))
+    return replace(domain, sports_contexts=tuple(contexts))
+
+
 def build_catalog_entries(source, corpus: dict[str, Any]) -> list[dict[str, Any]]:
     upstream = corpus["upstream"]
     revision = upstream["revision"]
@@ -322,6 +373,19 @@ def build_catalog_entries(source, corpus: dict[str, Any]) -> list[dict[str, Any]
         )
         for item in corpus["teams"]
     }
+    coverage = corpus["coverage"]
+
+    def file_family_asset(key: str) -> dict[str, Any]:
+        asset = file_by_key[key]
+        return {
+            "key": key,
+            "size_bytes": int(asset["size_bytes"]),
+            "sha1": asset.get("sha1"),
+            "sha256": asset.get("sha256"),
+            "upstream_provider": "github",
+            "upstream_revision": revision,
+        }
+
     rights = source.license.model_dump(mode="json")
     entries: list[SourceCatalogEntry] = []
     for item in corpus["matches"]:
@@ -340,9 +404,9 @@ def build_catalog_entries(source, corpus: dict[str, Any]) -> list[dict[str, Any]
             "roster_size": len(item["detail"]["homeTeam"]["players"])
             + len(item["detail"]["awayTeam"]["players"]),
             "file_families": {
-                "game_data": key,
-                "dynamic_events": event_key,
-                "tracking": tracking_key,
+                "game_data": file_family_asset(key),
+                "dynamic_events": file_family_asset(event_key),
+                "tracking": file_family_asset(tracking_key),
             },
             "dense_materialized": False,
         }
@@ -350,7 +414,7 @@ def build_catalog_entries(source, corpus: dict[str, Any]) -> list[dict[str, Any]
             SourceCatalogEntry(
                 entry_id=contest_catalog_id(game_id),
                 provider=source.provider,
-                dataset=source.name,
+                dataset=source.dataset_id,
                 external_id=f"contest:{game_id}",
                 object_kind=SourceObjectKind.CONTEST,
                 registry_dataset_id=DATASET_ID,
@@ -380,7 +444,7 @@ def build_catalog_entries(source, corpus: dict[str, Any]) -> list[dict[str, Any]
                 availability_state=SourceCatalogState.REGISTERED,
             )
         )
-    all_teams = tuple(sorted(set(teams_by_provider_id.values())))
+    sample_team_count = len(set(teams_by_provider_id.values()))
     for aggregate in corpus["aggregates"]:
         asset = aggregate["asset"]
         family = str(aggregate["family"])
@@ -389,7 +453,7 @@ def build_catalog_entries(source, corpus: dict[str, Any]) -> list[dict[str, Any]
             SourceCatalogEntry(
                 entry_id=aggregate_catalog_id(season_edition_id, family),
                 provider=source.provider,
-                dataset=source.name,
+                dataset=source.dataset_id,
                 external_id=f"aggregate:{season_edition_id}:{family}",
                 object_kind=SourceObjectKind.AGGREGATE,
                 registry_dataset_id=DATASET_ID,
@@ -398,7 +462,7 @@ def build_catalog_entries(source, corpus: dict[str, Any]) -> list[dict[str, Any]
                 sport_id="basketball",
                 competition_id=competition_id,
                 competition_edition_id=season_edition_id,
-                teams=all_teams,
+                teams=(),
                 upstream_url=_HTTP_URL.validate_python(
                     f"https://raw.githubusercontent.com/{upstream['repository']}/{revision}/{key}"
                 ),
@@ -411,6 +475,11 @@ def build_catalog_entries(source, corpus: dict[str, Any]) -> list[dict[str, Any]
                     "source_file_key": key,
                     "provider_id_columns": ["player_id", "team_id", "season_id"],
                     "season": str(upstream["season"]["label"]),
+                    "population_scope": coverage["aggregate_scope"],
+                    "sample_game_team_count": sample_team_count,
+                    "season_aggregate_game_count": coverage["season_aggregate_game_count"],
+                    "season_aggregate_team_count": coverage["season_aggregate_team_count"],
+                    "season_schedule_game_count": coverage["season_schedule_game_count"],
                 },
                 upstream_capabilities=(Capability.SEASON_AGGREGATE.value,),
                 discovered_at=datetime.now(UTC),
@@ -551,6 +620,7 @@ def register_corpus(*, verify_upstream: bool = True) -> dict[str, Any]:
 def persist_catalog(connection, source, corpus: dict[str, Any]) -> dict[str, int]:
     from dynamis.pipeline.persist import (
         CLOCK_MAPPING_TABLE,
+        PROVIDER_CROSSWALK_TABLE,
         SESSION_SPORT_CONTEXT_TABLE,
         SOURCE_CATALOG_TABLE,
         SPATIAL_REFERENCE_TABLE,
@@ -561,7 +631,18 @@ def persist_catalog(connection, source, corpus: dict[str, Any]) -> dict[str, int
 
     written: dict[str, int] = {}
     for item in corpus["matches"]:
-        rows = persist_domain(connection, build_game_domain(corpus, item))
+        game_id = str(item["match"]["id"])
+        existing_metadata = connection.execute(
+            select(PROVIDER_CROSSWALK_TABLE.c.metadata_json).where(
+                PROVIDER_CROSSWALK_TABLE.c.provider_namespace == authorities.NAMESPACE,
+                PROVIDER_CROSSWALK_TABLE.c.entity_kind == SportsEntityKind.CONTEST.value,
+                PROVIDER_CROSSWALK_TABLE.c.provider_entity_id == game_id,
+            )
+        ).scalar_one_or_none()
+        domain = _preserve_materialized_contest_metadata(
+            build_game_domain(corpus, item), existing_metadata
+        )
+        rows = persist_domain(connection, domain)
         for key, count in rows.items():
             written[key] = written.get(key, 0) + count
     entries = build_catalog_entries(source, corpus)

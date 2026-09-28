@@ -9,6 +9,7 @@ import type {
   BasketballSpatialGameView,
   GameEditionView,
   GamePage,
+  SourceCapabilityView,
   SeasonEditionView,
   SeasonFamilyView,
 } from "@/api/types";
@@ -33,8 +34,24 @@ test("RES-124 football → basketball spatial game → SeasonLab", async ({ page
   expect(gamePage.rows).toHaveLength(10);
   const sampleTeamIds = new Set(gamePage.rows.flatMap((game) => game.teams.map((team) => team.team_id)));
   expect(sampleTeamIds.size, "the 10 published sample games represent 17 teams").toBe(17);
+  const sourceCapabilities = await getJson<SourceCapabilityView[]>(
+    request,
+    "/api/catalog/source-capabilities?dataset_id=" + DATASET_ID,
+  );
+  expect(sourceCapabilities).toHaveLength(13);
+  const contestCapability = sourceCapabilities.find(
+    (entry) => entry.external_id === "contest:" + PROVIDER_GAME_ID,
+  );
+  expect(contestCapability, "source capabilities resolve by the registered dataset id").toBeDefined();
+  if (!contestCapability) return;
+  expect(contestCapability.local_capabilities).toEqual(
+    expect.arrayContaining(["TRACKING", "BALL_TRACKING"]),
+  );
+  expect(contestCapability.upstream_capabilities).toContain("EVENTS");
+  expect(contestCapability.source_file_states).toHaveProperty("dynamic_events");
   expect(contest, "the selected ACB sample game is catalogued").toBeDefined();
   if (!contest) return;
+  expect(contest.play_by_play_available).toBe(true);
 
   const seasonEditions = await getJson<SeasonEditionView[]>(request, "/api/season/editions");
   const seasonEdition = seasonEditions.find((edition) => edition.dataset_id === DATASET_ID);

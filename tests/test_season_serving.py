@@ -28,6 +28,15 @@ EDITION = "edition-test"
 RELATIVE = "silver/season/aggregate_family=physical.parquet"
 
 
+def test_basketball_efficiency_units_match_their_denominators() -> None:
+    assert season._basketball_spec("picks", "handler_ppp").unit == "points per pick"
+    assert season._basketball_spec("picks", "handler_ppp_at_middle").unit == "points per pick"
+    assert season._basketball_spec("drives", "points_per_drive").unit == "points per drive"
+    assert (
+        season._basketball_spec("drives", "points_per_shot_in_drive").unit == "points per attempt"
+    )
+
+
 def _physical_table() -> pa.Table:
     rows = [
         # subject, name, team, team name, position, matches, distance, tip, otip, psv99

@@ -1,5 +1,13 @@
 {
   "schema_version": 1,
+  "coverage": {
+    "aggregate_scope": "offense_only",
+    "sample_game_count": 10,
+    "sample_game_team_count": 17,
+    "season_aggregate_game_count": 293,
+    "season_aggregate_team_count": 18,
+    "season_schedule_game_count": 327
+  },
   "aggregates": [
     {
       "asset": {

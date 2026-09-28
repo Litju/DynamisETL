@@ -5,10 +5,18 @@ import json
 import math
 from pathlib import Path
 
+import pytest
+
 from dynamis.adapters.skillcorner_basketball import authorities
-from dynamis.adapters.skillcorner_basketball.aggregates import _canonicalize
+from dynamis.adapters.skillcorner_basketball.aggregates import (
+    _canonicalize,
+    _persist_player_identities,
+)
 from dynamis.adapters.skillcorner_basketball.catalog import (
+    _preserve_materialized_contest_metadata,
+    build_catalog_entries,
     build_game_domain,
+    contest_catalog_id,
     load_corpus_manifest,
 )
 from dynamis.adapters.skillcorner_basketball.events import build_event_table
@@ -16,6 +24,8 @@ from dynamis.adapters.skillcorner_basketball.tracking import (
     BasketballTrackingCanonicalizer,
     write_frame_clock,
 )
+from dynamis.contracts.sports import SportsEntityKind, canonical_sports_id
+from dynamis.registry import source_by_id, validate_registry
 
 
 def _fixture_frames(path: Path) -> None:
@@ -40,7 +50,7 @@ def _fixture_frames(path: Path) -> None:
             "shotClock": 23.96,
             "homePlayers": [],
             "awayPlayers": [],
-            "ball": {},
+            "ball": {"isDetected": 0},
         },
         {
             "frameIdx": 12,
@@ -63,6 +73,8 @@ def test_acb_sample_catalog_is_metadata_first() -> None:
     corpus = load_corpus_manifest()
     assert len(corpus["matches"]) == 10
     assert len(corpus["files"]) == 35
+    assert corpus["coverage"]["sample_game_team_count"] == 17
+    assert corpus["coverage"]["season_aggregate_team_count"] == 18
     assert (
         sum(
             file["size_bytes"]
@@ -75,7 +87,90 @@ def test_acb_sample_catalog_is_metadata_first() -> None:
     assert domain.streams == ()
     assert domain.sports_contexts[0].contest.sport_id == "basketball"
     assert domain.sports_contexts[0].contest_teams[0].score is not None
+    assert domain.sports_contexts[0].session.source_catalog_entry_id == contest_catalog_id(
+        str(corpus["matches"][0]["match"]["id"])
+    )
     assert len(domain.participants) >= 20
+    entries = build_catalog_entries(
+        source_by_id(validate_registry(), authorities.DATASET_ID), corpus
+    )
+    contest_entry = next(entry for entry in entries if entry["object_kind"] == "contest")
+    aggregate_entry = next(entry for entry in entries if entry["object_kind"] == "aggregate")
+    assert contest_entry["dataset"] == authorities.DATASET_ID
+    assert contest_entry["provider_metadata"]["file_families"]["tracking"]["key"].endswith(
+        "_tracking_data.jsonl.gz"
+    )
+    assert aggregate_entry["dataset"] == authorities.DATASET_ID
+    assert aggregate_entry["teams"] == []
+    assert aggregate_entry["provider_metadata"]["sample_game_team_count"] == 17
+    assert aggregate_entry["provider_metadata"]["season_aggregate_team_count"] == 18
+
+
+def test_metadata_reregistration_preserves_materialized_contest_flags() -> None:
+    corpus = load_corpus_manifest()
+    domain = build_game_domain(corpus, corpus["matches"][0])
+    updated = _preserve_materialized_contest_metadata(
+        domain,
+        {"play_by_play_available": True, "tracking_available": True, "period_count": 4},
+    )
+    contest_metadata = next(
+        item.metadata
+        for item in updated.sports_contexts[0].crosswalks
+        if item.entity_kind is SportsEntityKind.CONTEST
+    )
+    assert contest_metadata["play_by_play_available"] is True
+    assert contest_metadata["tracking_available"] is True
+    assert contest_metadata["period_count"] == 4
+
+
+def test_aggregate_subject_rows_use_canonical_sports_ids(monkeypatch: pytest.MonkeyPatch) -> None:
+    from dynamis.adapters.skillcorner_basketball import aggregates
+
+    persisted: dict[str, list[dict[str, object]]] = {}
+
+    def capture(_connection, table, rows):
+        persisted[table.name] = rows
+        return len(rows)
+
+    monkeypatch.setattr(aggregates, "_upsert_refresh", capture)
+    _persist_player_identities(
+        object(),
+        [
+            {
+                "provider_mappings": [
+                    {"provider_id": "alias", "canonical_id": "canonical", "display_name": "Name"}
+                ],
+                "provider_team_mappings": [],
+            }
+        ],
+        {"matches": []},
+    )
+
+    expected = canonical_sports_id(authorities.NAMESPACE, SportsEntityKind.SUBJECT, "canonical")
+    assert [row["subject_id"] for row in persisted["subject"]] == [expected]
+
+
+def test_cli_basketball_ingestion_requires_one_complete_game_set() -> None:
+    from dynamis.acquisition.plan import PlanError
+    from dynamis.pipeline.cli import _skillcorner_basketball_file_set
+
+    keys = (
+        "data/matches/114243/114243_game_data.json",
+        "data/matches/114243/114243_tracking_data.jsonl.gz",
+        "data/matches/114243/114243_dynamic_events.json",
+    )
+    paths = {key: Path(key) for key in keys}
+    assert _skillcorner_basketball_file_set(paths) == tuple(paths[key] for key in keys)
+
+    mixed = {
+        **paths,
+        "data/matches/114234/114234_tracking_data.jsonl.gz": Path("other-tracking.jsonl.gz"),
+    }
+    with pytest.raises(PlanError, match="exactly one game"):
+        _skillcorner_basketball_file_set(mixed)
+
+    with pytest.raises(PlanError, match="full file set"):
+        _skillcorner_basketball_file_set({keys[0]: paths[keys[0]]})
 
 
 def test_25_hz_tracking_keeps_clock_only_dead_time_without_positions(tmp_path: Path) -> None:

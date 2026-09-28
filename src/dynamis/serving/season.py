@@ -621,6 +621,10 @@ def _basketball_spec(family: str, column: str) -> SeasonMetricSpec:
         unit = "ratio"
     elif "distance" in name:
         unit = "ft"
+    elif family == "picks" and ("_ppp" in name):
+        unit = "points per pick"
+    elif family == "drives" and name == "points_per_drive":
+        unit = "points per drive"
     elif "points_per" in name or "pointsper" in name:
         unit = "points per attempt"
     elif "points" in name:

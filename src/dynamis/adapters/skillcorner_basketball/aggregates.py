@@ -424,8 +424,13 @@ def _persist_player_identities(
             raw_id = mapping["provider_id"]
             canonical_id = mapping["canonical_id"]
             name = mapping["display_name"]
-            subjects.add(raw_id)
-            subjects.add(canonical_id)
+            subjects.add(
+                canonical_sports_id(
+                    authorities.NAMESPACE,
+                    SportsEntityKind.SUBJECT,
+                    canonical_id,
+                )
+            )
             prior = by_provider_id.get(raw_id)
             if prior and prior[0] != canonical_id:
                 raise ValueError(f"provider player {raw_id} maps to conflicting canonical ids")

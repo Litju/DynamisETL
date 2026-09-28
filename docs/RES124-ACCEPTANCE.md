@@ -14,6 +14,8 @@ coverage, and provider total-row convention.
 
 The metadata catalog contains 10 sample games representing 17 distinct teams.
 The three season aggregate files each cover 18 teams and 293 of 327 ACB games.
+The aggregate catalog records that separate 18-team population without reusing
+the 17-team sample-game list.
 SeasonLab's Metric evidence panel visibly states that the aggregates are
 offense-only and distinguishes the 17 sample-game teams from the 18-team season
 population.
@@ -95,9 +97,11 @@ the unsupported field list is recorded in the reconciliation.
 
 `apps/web/e2e-real/res124-basketball.spec.ts` passed against the real local API
 and Chromium. It seeks a shot, timeout, pick, and drive to their exact frames and
-canonical times, checks the team populations and visible SeasonLab caveat, and
-walks Football MatchLab → Basketball spatial game → SeasonLab → Football
-MatchLab. Screenshots are included with the local acceptance receipt:
+canonical times, checks the 13-entry source-capability response and the
+materialized contest's `play_by_play_available` flag, checks both team
+populations and the visible SeasonLab caveat, and walks Football MatchLab →
+Basketball spatial game → SeasonLab → Football MatchLab. Screenshots are
+included with the local acceptance receipt:
 `basketball-spatial.png` and `seasonlab-coverage.png`.
 
 | Check | Result |
@@ -105,7 +109,7 @@ MatchLab. Screenshots are included with the local acceptance receipt:
 | Ruff check and format | Passed |
 | Pyright | 0 errors, 0 warnings |
 | OpenAPI generation and TypeScript drift check | Passed |
-| Python regressions (including PostgreSQL) | 709 passed |
+| Python regressions (including PostgreSQL) | 713 passed |
 | Web typecheck and lint | Passed |
 | Web production build | Passed |
 | Vitest | 207 passed across 37 files |

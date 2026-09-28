@@ -319,30 +319,7 @@ def _ingest(args: argparse.Namespace) -> tuple[IngestResult, str]:
         )
         return result, session_id
     if args.dataset_id == SKILLCORNER_BASKETBALL_DATASET_ID:
-        game_data = next(
-            (path for key, path in paths.items() if key.endswith("_game_data.json")), None
-        )
-        tracking = next(
-            (path for key, path in paths.items() if key.endswith("_tracking_data.jsonl.gz")), None
-        )
-        events = next(
-            (path for key, path in paths.items() if key.endswith("_dynamic_events.json")), None
-        )
-        missing = [
-            name
-            for name, value in (
-                ("game metadata", game_data),
-                ("tracking", tracking),
-                ("Dynamic Events", events),
-            )
-            if value is None
-        ]
-        if missing:
-            raise PlanError(
-                "SkillCorner basketball ingestion requires one game's full file set; "
-                f"missing: {missing}"
-            )
-        assert game_data is not None and tracking is not None and events is not None
+        game_data, tracking, events = _skillcorner_basketball_file_set(paths)
         result = ingest_skillcorner_basketball_game(
             config,
             game_data_path=game_data,
@@ -437,6 +414,32 @@ def _ingest(args: argparse.Namespace) -> tuple[IngestResult, str]:
         batch_size=args.batch_size,
     )
     return result, session_id
+
+
+def _skillcorner_basketball_file_set(paths: dict[str, Path]) -> tuple[Path, Path, Path]:
+    game_ids = {
+        match.group("match")
+        for key in paths
+        if (match := SKILLCORNER_MATCH_TOKEN.search(key)) is not None
+    }
+    if len(game_ids) != 1:
+        raise PlanError(
+            "SkillCorner basketball ingestion requires keys from exactly one game; "
+            f"selected: {sorted(game_ids)}"
+        )
+    game_id = next(iter(game_ids))
+    required = (
+        f"data/matches/{game_id}/{game_id}_game_data.json",
+        f"data/matches/{game_id}/{game_id}_tracking_data.jsonl.gz",
+        f"data/matches/{game_id}/{game_id}_dynamic_events.json",
+    )
+    missing = [key for key in required if key not in paths]
+    if missing:
+        raise PlanError(
+            "SkillCorner basketball ingestion requires one game's full file set; "
+            f"missing: {missing}"
+        )
+    return paths[required[0]], paths[required[1]], paths[required[2]]
 
 
 def _persist(args: argparse.Namespace, result: IngestResult, session_id: str) -> dict[str, Any]:

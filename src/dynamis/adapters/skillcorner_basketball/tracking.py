@@ -69,6 +69,11 @@ def _coordinates(payload: dict[str, Any], *, object_id: str) -> tuple[float, flo
     return x, y, z
 
 
+def _has_xy_coordinates(payload: dict[str, Any]) -> bool:
+    coordinates = payload.get("xyz")
+    return isinstance(coordinates, list) and len(coordinates) >= 2
+
+
 @dataclass(slots=True)
 class PeriodFrameSummary:
     period: int
@@ -184,9 +189,7 @@ def write_frame_clock(
                     ball = {}
                 if not isinstance(ball, dict):
                     raise ValueError(f"line {line_no}: ball must be an object")
-                ball_present = (
-                    bool(ball) and isinstance(ball.get("xyz"), list) and len(ball["xyz"]) >= 2
-                )
+                ball_present = _has_xy_coordinates(ball)
                 if ball_present:
                     _coordinates(ball, object_id="ball")
                 game_clock = frame.get("gameClock")
@@ -439,7 +442,7 @@ class BasketballTrackingCanonicalizer:
                     ball = {}
                 if not isinstance(ball, dict):
                     raise ValueError(f"line {line_no}: ball must be an object")
-                if ball:
+                if _has_xy_coordinates(ball):
                     rows.append(
                         self._row(
                             sample_index=sample_index,
