@@ -67,6 +67,50 @@ const DATASET_DETAIL: DatasetDetail = {
   ],
 };
 
+const CATALOG = {
+  resources: [
+    {
+      resource_kind: "contest",
+      resource_id: "contest-1925299",
+      label: "Brisbane Roar FC vs Perth Glory",
+      dataset_ids: ["skillcorner-opendata"],
+      providers: ["SkillCorner"],
+      source_entry_ids: ["catalog-1925299"],
+      external_ids: ["1925299"],
+      sport_id: "football",
+      sport_name: "Football",
+      competition_id: "competition-9",
+      competition_name: "A-League",
+      edition_id: "edition-2025",
+      edition_label: "2024/2025",
+      contest_id: "contest-1925299",
+      teams: [
+        { team_id: "brisbane", display_name: "Brisbane Roar FC", side: "home", score: 0 },
+        { team_id: "perth", display_name: "Perth Glory", side: "away", score: 1 },
+      ],
+      session_id: "1925299",
+      rights_identifiers: ["CC BY 4.0"],
+      noncommercial_only: false,
+      local_only: false,
+      availability_state: "MATERIALIZED",
+      stages: { upstream: "available", registered: "registered", materialized: "materialized", ready: "ready" },
+      upstream_capabilities: ["TRACKING"],
+      registered_capabilities: ["TRACKING"],
+      materialized_capabilities: ["TRACKING"],
+      materialized_grains: ["FRAME_SERIES"],
+      routes: [
+        { product: "MatchLab", ready: true, missing_capabilities: [], missing_grains: [] },
+        { product: "GameLab", ready: false, missing_capabilities: [["PLAY_BY_PLAY", "EVENTS"]], missing_grains: [["PLAY_BY_PLAY", "EVENT_SERIES"]] },
+        { product: "SeasonLab", ready: false, missing_capabilities: [["SEASON_AGGREGATE"]], missing_grains: [["PLAYER_SEASON", "TEAM_SEASON"]] },
+        { product: "PerformanceLab", ready: false, missing_capabilities: [["FORCE", "IMU", "LPT", "GNSS"]], missing_grains: [["TRIAL_SERIES", "SENSOR_SERIES"]] },
+      ],
+      basketball_spatial_ready: false,
+      preparation_eligible: false,
+      preparation_actions: [],
+    },
+  ],
+};
+
 const SESSION: SessionDetail = {
   dataset_id: "skillcorner-opendata",
   session: {
@@ -182,6 +226,9 @@ function installFetchStub(): void {
       if (path === "/api/catalog/datasets/skillcorner-opendata/sessions/1925299") {
         return jsonResponse(SESSION);
       }
+      if (path === "/api/catalog/read-model") {
+        return jsonResponse(CATALOG);
+      }
       if (path === "/api/metrics") {
         return jsonResponse(METRICS);
       }
@@ -226,21 +273,24 @@ describe("workbench shell", () => {
     vi.unstubAllGlobals();
   });
 
-  it("renders the fixed instrument shell on the catalog route", async () => {
+  it("renders the semantic Data Library with provenance and ready routing", async () => {
     renderAt("/catalog");
     expect(await screen.findByRole("navigation", { name: "Product surfaces" })).toBeInTheDocument();
     expect(screen.getByText(/Performance Laboratory/)).toBeInTheDocument();
-    expect(await screen.findByText("SkillCorner Open Data")).toBeInTheDocument();
-    expect(screen.getByText("CC BY 4.0")).toBeInTheDocument();
+    expect(await screen.findByText("Brisbane Roar FC vs Perth Glory")).toBeInTheDocument();
+    expect(screen.getByText("Provider: SkillCorner")).toBeInTheDocument();
+    expect(screen.getByText(/Rights: CC BY 4.0/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "MatchLab" })).toBeInTheDocument();
   });
 
-  it("does not advertise an un-ingested event laboratory", async () => {
-    renderAt("/catalog?dataset=skillcorner-opendata");
-
-    expect(await screen.findByRole("link", { name: "Field" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Pose" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Events" })).not.toBeInTheDocument();
-    expect(screen.queryByTitle("Events laboratory available for this dataset")).not.toBeInTheDocument();
+  it("filters semantic records by sport and provider provenance", async () => {
+    const user = userEvent.setup();
+    renderAt("/catalog");
+    await screen.findByText("Brisbane Roar FC vs Perth Glory");
+    await user.selectOptions(screen.getByLabelText("World"), "football");
+    await user.selectOptions(screen.getByLabelText("Provider"), "SkillCorner");
+    expect(screen.getByRole("link", { name: "MatchLab" })).toBeInTheDocument();
+    expect(screen.getByText("1 of 1 records")).toBeInTheDocument();
   });
 
   it("compacts the inspector to a rail where nothing is inspectable", async () => {

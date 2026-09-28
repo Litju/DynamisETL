@@ -8,6 +8,7 @@ with an explicit ``source`` marker. No endpoint recomputes science.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
@@ -16,7 +17,11 @@ from typing import Any, Literal
 import sqlalchemy as sa
 from sqlalchemy.engine import Connection
 
-from dynamis.contracts.sports import Capability, derive_capability_profile
+from dynamis.contracts.sports import (
+    Capability,
+    DataGrainKind,
+    derive_capability_profile,
+)
 from dynamis.gold.build import MART_NAMES
 from dynamis.serving import season as season_model
 from dynamis.serving.models import (
@@ -84,17 +89,37 @@ def _source_readiness(availability_state: str, upstream_capabilities: set[str]) 
     return "UPSTREAM_AVAILABLE" if upstream_capabilities else "UPSTREAM_UNAVAILABLE"
 
 
+def _preparation_action(availability_state: str) -> str | None:
+    return {
+        "UPSTREAM_AVAILABLE": "register",
+        "REGISTERED": "acquire",
+        "ACQUISITION_FAILED": "acquire",
+        "ACQUIRED": "materialize",
+        "MATERIALIZATION_FAILED": "materialize",
+        "MATERIALIZED": "validate",
+        "VALIDATION_FAILED": "validate",
+    }.get(availability_state)
+
+
 def list_source_capabilities(connection: Connection, dataset_id: str) -> list[SourceCapabilityView]:
     """Separate provider-available capability from locally materialized data."""
     entries = (
         connection.execute(
             sa.text(
                 """
-            SELECT entry_id, external_id, object_kind, availability_state,
-                   upstream_capabilities, provider_metadata
-            FROM source_catalog_entry
-            WHERE dataset = :dataset_id AND object_kind IN ('contest', 'aggregate')
-            ORDER BY object_kind, external_id
+            SELECT entry.entry_id, entry.provider, entry.sport_id, sport.display_name AS sport_name,
+                   entry.competition_id, competition.name AS competition_name,
+                   entry.competition_edition_id AS edition_id, edition.label AS edition_label,
+                   entry.external_id, entry.object_kind, entry.availability_state,
+                   entry.upstream_capabilities, entry.provider_metadata
+            FROM source_catalog_entry AS entry
+            LEFT JOIN sport ON sport.sport_id = entry.sport_id
+            LEFT JOIN competition ON competition.competition_id = entry.competition_id
+            LEFT JOIN competition_edition AS edition
+              ON edition.edition_id = entry.competition_edition_id
+            WHERE entry.dataset = :dataset_id
+              AND entry.object_kind IN ('contest', 'aggregate', 'release_asset')
+            ORDER BY entry.object_kind, entry.external_id
             """
             ),
             {"dataset_id": dataset_id},
@@ -105,19 +130,26 @@ def list_source_capabilities(connection: Connection, dataset_id: str) -> list[So
     if not entries:
         return []
 
-    local: dict[str, set[str]] = {str(row["entry_id"]): set() for row in entries}
-    local_evidence: dict[str, list[tuple[Capability, str]]] = {
+    materialized: dict[str, set[str]] = {str(row["entry_id"]): set() for row in entries}
+    registered: dict[str, set[str]] = {str(row["entry_id"]): set() for row in entries}
+    materialized_evidence: dict[str, list[tuple[Capability, str]]] = {
         str(row["entry_id"]): [] for row in entries
     }
+    registered_evidence: dict[str, list[tuple[Capability, str]]] = {
+        str(row["entry_id"]): [] for row in entries
+    }
+    materialized_grains: dict[str, set[str]] = {str(row["entry_id"]): set() for row in entries}
     modalities = connection.execute(
         sa.text(
             """
-            SELECT ctx.source_catalog_entry_id, stream.modality, artifact.artifact_id
+            SELECT ctx.source_catalog_entry_id, stream.stream_id, stream.modality,
+                   stream.data_grain_kind,
+                   artifact.artifact_id, artifact.data_grain_kind AS artifact_grain_kind
             FROM session_sport_context AS ctx
             JOIN sensor_stream AS stream
               ON stream.dataset_id = ctx.dataset_id
              AND stream.session_id = ctx.session_id
-            JOIN sample_artifact AS artifact
+            LEFT JOIN sample_artifact AS artifact
               ON artifact.dataset_id = stream.dataset_id
              AND artifact.stream_id = stream.stream_id
             WHERE ctx.dataset_id = :dataset_id
@@ -127,22 +159,35 @@ def list_source_capabilities(connection: Connection, dataset_id: str) -> list[So
         {"dataset_id": dataset_id},
     ).mappings()
     modality_capabilities = {
-        "tracking": {"TRACKING", "BALL_TRACKING"},
+        "tracking": {"TRACKING"},
         "pose": {"POSE"},
         "event": {"EVENTS"},
+        "force": {"FORCE"},
+        "imu": {"IMU"},
+        "lpt": {"LPT"},
+        "gnss": {"GNSS"},
     }
     for row in modalities:
         entry_id = str(row["source_catalog_entry_id"])
         capabilities = modality_capabilities.get(row["modality"], set())
-        local.setdefault(entry_id, set()).update(capabilities)
-        local_evidence.setdefault(entry_id, []).extend(
-            (Capability(capability), str(row["artifact_id"])) for capability in capabilities
+        registered.setdefault(entry_id, set()).update(capabilities)
+        registered_evidence.setdefault(entry_id, []).extend(
+            (Capability(capability), str(row["stream_id"])) for capability in capabilities
         )
+        if row["artifact_id"] is not None:
+            materialized.setdefault(entry_id, set()).update(capabilities)
+            materialized_evidence.setdefault(entry_id, []).extend(
+                (Capability(capability), str(row["artifact_id"])) for capability in capabilities
+            )
+            grain = row["artifact_grain_kind"] or row["data_grain_kind"]
+            if grain in DataGrainKind._value2member_map_:
+                materialized_grains.setdefault(entry_id, set()).add(str(grain))
 
     aggregate_rows = connection.execute(
         sa.text(
             """
-            SELECT artifact_id, artifact_metadata ->> 'source_catalog_entry_id' AS entry_id,
+            SELECT artifact_id, data_grain_kind,
+                   artifact_metadata ->> 'source_catalog_entry_id' AS entry_id,
                    artifact_metadata ->> 'aggregate_family' AS family
             FROM processing_artifact
             WHERE dataset_id = :dataset_id
@@ -153,10 +198,12 @@ def list_source_capabilities(connection: Connection, dataset_id: str) -> list[So
     ).mappings()
     for row in aggregate_rows:
         entry_id = str(row["entry_id"])
-        local.setdefault(entry_id, set()).add("SEASON_AGGREGATE")
-        local_evidence.setdefault(entry_id, []).append(
+        materialized.setdefault(entry_id, set()).add("SEASON_AGGREGATE")
+        materialized_evidence.setdefault(entry_id, []).append(
             (Capability.SEASON_AGGREGATE, str(row["artifact_id"]))
         )
+        if row["data_grain_kind"] in DataGrainKind._value2member_map_:
+            materialized_grains.setdefault(entry_id, set()).add(str(row["data_grain_kind"]))
 
     file_states = {
         str(row["registry_file_key"]): str(row["availability_state"])
@@ -180,16 +227,21 @@ def list_source_capabilities(connection: Connection, dataset_id: str) -> list[So
         upstream = {
             Capability(name) for name in upstream_names if name in Capability._value2member_map_
         }
-        materialized = local.get(entry_id, set())
         profile = derive_capability_profile(
             upstream=((capability, entry_id) for capability in upstream),
-            materialized=local_evidence.get(entry_id, ()),
+            registered=registered_evidence.get(entry_id, ()),
+            materialized=materialized_evidence.get(entry_id, ()),
         )
         upstream_names = {item.value for item in profile.upstream_capabilities} | (
             upstream_names - {item.value for item in upstream}
         )
-        materialized = {item.value for item in profile.local_capabilities} | (
-            materialized - {item.value for item in Capability if item.value in materialized}
+        registered_names = {item.value for item in profile.registered_capabilities} | (
+            registered.get(entry_id, set())
+            - {item.value for item in Capability if item.value in registered.get(entry_id, set())}
+        )
+        materialized_names = {item.value for item in profile.local_capabilities} | (
+            materialized.get(entry_id, set())
+            - {item.value for item in Capability if item.value in materialized.get(entry_id, set())}
         )
         metadata = dict(row["provider_metadata"] or {})
         inventory = metadata.get("file_families", {})
@@ -211,25 +263,42 @@ def list_source_capabilities(connection: Connection, dataset_id: str) -> list[So
                 if key
                 else {}
             )
-        pending = sorted(upstream_names - materialized)
+        pending = sorted(upstream_names - materialized_names)
         readiness = (
             "READY"
             if upstream_names and not pending
             else "PARTIAL"
-            if materialized
+            if materialized_names
             else "NOT_MATERIALIZED"
         )
+        state = str(row["availability_state"])
+        preparation_action = _preparation_action(state)
+        grains = sorted(materialized_grains.get(entry_id, set()))
         result.append(
             SourceCapabilityView(
                 entry_id=entry_id,
+                provider=str(row["provider"]),
+                sport_id=str(row["sport_id"]) if row["sport_id"] else None,
+                sport_name=str(row["sport_name"]) if row["sport_name"] else None,
+                competition_id=(str(row["competition_id"]) if row["competition_id"] else None),
+                competition_name=(
+                    str(row["competition_name"]) if row["competition_name"] else None
+                ),
+                edition_id=str(row["edition_id"]) if row["edition_id"] else None,
+                edition_label=str(row["edition_label"]) if row["edition_label"] else None,
                 external_id=str(row["external_id"]),
                 object_kind=str(row["object_kind"]),
-                availability_state=str(row["availability_state"]),
-                source_readiness=_source_readiness(str(row["availability_state"]), upstream_names),
+                availability_state=state,
+                source_readiness=_source_readiness(state, upstream_names),
                 local_readiness=readiness,
                 upstream_capabilities=sorted(upstream_names),
-                local_capabilities=sorted(materialized),
+                registered_capabilities=sorted(registered_names),
+                materialized_capabilities=sorted(materialized_names),
+                materialized_grains=grains,
+                local_capabilities=sorted(materialized_names),
                 pending_local_capabilities=pending,
+                preparation_eligible=preparation_action is not None,
+                preparation_action=preparation_action,
                 provider_metadata=metadata,
                 source_file_states=source_file_states,
             )
@@ -237,7 +306,10 @@ def list_source_capabilities(connection: Connection, dataset_id: str) -> list[So
     return result
 
 
-def list_sports_catalog_matches(connection: Connection) -> list[SportsCatalogMatchView]:
+def list_sports_catalog_matches(
+    connection: Connection,
+    source_capabilities: Mapping[str, Sequence[SourceCapabilityView]] | None = None,
+) -> list[SportsCatalogMatchView]:
     """Read contest hierarchy and source readiness without touching dense artifacts."""
     rows = (
         connection.execute(
@@ -335,12 +407,19 @@ def list_sports_catalog_matches(connection: Connection) -> list[SportsCatalogMat
                 end_ns=row["end_ns"],
             )
         )
-    capabilities_by_dataset = {
-        dataset_id: {
-            item.entry_id: item for item in list_source_capabilities(connection, dataset_id)
+    capabilities_by_dataset = (
+        {
+            dataset_id: {item.entry_id: item for item in items}
+            for dataset_id, items in source_capabilities.items()
         }
-        for dataset_id in {str(row["dataset_id"]) for row in rows}
-    }
+        if source_capabilities is not None
+        else {
+            dataset_id: {
+                item.entry_id: item for item in list_source_capabilities(connection, dataset_id)
+            }
+            for dataset_id in {str(row["dataset_id"]) for row in rows}
+        }
+    )
     return [
         SportsCatalogMatchView(
             dataset_id=str(row["dataset_id"]),
@@ -763,6 +842,7 @@ def session_detail(
             st.trial_id, st.device_id, st.nominal_sampling_rate_hz, st.si_units,
             st.source_unit, st.coordinate_frame_id, st.synchronization_spec_id,
             st.clock_id, st.skeleton_id, st.stream_metadata,
+            st.data_grain_kind, st.data_grain_axes,
             COALESCE((SELECT sum(a.row_count) FROM sample_artifact a
                 WHERE a.dataset_id = st.dataset_id AND a.stream_id = st.stream_id), 0)
                 AS sample_row_count,
@@ -848,6 +928,8 @@ def session_detail(
                 pitch_dimensions_m=(row.get("stream_metadata") or {}).get("pitch_dimensions_m"),
                 sample_artifact_ids=[str(item) for item in _list(row["artifact_ids"])],
                 sample_row_count=int(row["sample_row_count"]),
+                data_grain_kind=(str(row["data_grain_kind"]) if row["data_grain_kind"] else None),
+                data_grain_axes=[str(item) for item in _list(row["data_grain_axes"])],
             )
             for row in streams
         ],

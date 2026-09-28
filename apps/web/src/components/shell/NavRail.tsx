@@ -25,7 +25,7 @@ interface NavItem {
  * separator is the only grouping cue the rail can afford at 48 px.
  */
 const ANALYSIS_ITEMS: readonly NavItem[] = [
-  { to: "/catalog", label: "Catalog", hint: "Datasets, modalities and rights", icon: Database },
+  { to: "/catalog", label: "Library", hint: "Sports and human-performance data", icon: Database },
   { to: "/lab", label: "Laboratory", hint: "Signals, field and pose analysis", icon: Activity },
   { to: "/games", label: "GameLab", hint: "Basketball and hockey game analysis", icon: Trophy },
   { to: "/season", label: "SeasonLab", hint: "Player and team season analytics", icon: ChartColumn },

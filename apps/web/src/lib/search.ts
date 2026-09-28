@@ -76,8 +76,11 @@ export type LabSearch = z.infer<typeof labSearchSchema>;
 export const catalogSearchSchema = z.object({
   q: optionalText,
   modality: z.enum(MODALITIES).optional().catch(undefined),
-  rights: z.enum(["all", "commercial", "noncommercial"]).optional().catch("all"),
+  rights: z.enum(["all", "commercial", "noncommercial", "local_only"]).optional().catch("all"),
   dataset: optionalText,
+  sport: optionalText,
+  provider: optionalText,
+  kind: z.enum(["contest", "competition_edition", "performance_dataset", "performance_session"]).optional().catch(undefined),
 });
 export type CatalogSearch = z.infer<typeof catalogSearchSchema>;
 

@@ -22,10 +22,12 @@ from sqlalchemy import Engine
 from sqlalchemy.exc import SQLAlchemyError
 
 from dynamis.adapters.skillcorner_basketball import authorities as basketball_authorities
+from dynamis.adapters.sportsdataverse.releases import SnapshotError, load_snapshot
 from dynamis.config import ConfigurationError, Settings
 from dynamis.config import settings as resolve_settings
 from dynamis.gold.publish import resolve_gold_schema
 from dynamis.serving import basketball as basketball_reader
+from dynamis.serving import catalog as catalog_model
 from dynamis.serving import games as game_model
 from dynamis.serving import repository
 from dynamis.serving import season as season_model
@@ -53,6 +55,7 @@ from dynamis.serving.models import (
     BasketballEventPage,
     BasketballFramePage,
     BasketballSpatialGameView,
+    CatalogReadModelView,
     DatasetDetail,
     DatasetSummary,
     DenseWindow,
@@ -140,6 +143,8 @@ class ServingBackend(Protocol):
     def source_capabilities(self, dataset_id: str) -> list[SourceCapabilityView]: ...
 
     def sports_catalog_matches(self) -> list[SportsCatalogMatchView]: ...
+
+    def catalog_read_model(self) -> CatalogReadModelView: ...
 
     def sessions(self, dataset_id: str) -> list[SessionSummary]: ...
 
@@ -327,6 +332,44 @@ class PostgresServingBackend:
     def sports_catalog_matches(self) -> list[SportsCatalogMatchView]:
         with self._connect() as connection:
             return repository.list_sports_catalog_matches(connection)
+
+    def catalog_read_model(self) -> CatalogReadModelView:
+        """Assemble the semantic library from relational metadata only."""
+        with self._connect() as connection:
+            datasets = repository.list_datasets(connection, gold_schema=self.gold_schema)
+            source_capabilities = {
+                dataset.dataset_id: repository.list_source_capabilities(
+                    connection, dataset.dataset_id
+                )
+                for dataset in datasets
+            }
+            matches = repository.list_sports_catalog_matches(connection, source_capabilities)
+            game_editions = repository.list_game_editions(connection)
+            season_editions = repository.list_season_editions(connection)
+            performance_sessions = []
+            for dataset in datasets:
+                if dataset.domain != "laboratory":
+                    continue
+                for session in repository.list_sessions(connection, dataset.dataset_id):
+                    detail = repository.session_detail(
+                        connection, dataset.dataset_id, session.session_id
+                    )
+                    if detail is not None:
+                        performance_sessions.append((dataset, detail))
+        try:
+            snapshot = load_snapshot()
+        except SnapshotError as exc:
+            ACCESS_LOG.warning("SportsDataverse release metadata unavailable: %s", exc)
+            snapshot = None
+        return catalog_model.build_catalog_read_model(
+            datasets=datasets,
+            matches=matches,
+            game_editions=game_editions,
+            season_editions=season_editions,
+            source_capabilities=source_capabilities,
+            performance_sessions=performance_sessions,
+            sportsdataverse_snapshot=snapshot,
+        )
 
     def sessions(self, dataset_id: str) -> list[SessionSummary]:
         with self._connect() as connection:
@@ -1211,6 +1254,14 @@ def create_app(
     )
     def sports_catalog_matches(service: BackendDependency) -> list[SportsCatalogMatchView]:
         return service.sports_catalog_matches()
+
+    @app.get(
+        "/api/catalog/read-model",
+        response_model=CatalogReadModelView,
+        tags=["catalog"],
+    )
+    def catalog_read_model(service: BackendDependency) -> CatalogReadModelView:
+        return service.catalog_read_model()
 
     def _metric_list(raw: str | None) -> list[str]:
         items = [item.strip() for item in (raw or "").split(",") if item.strip()]

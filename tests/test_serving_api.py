@@ -37,6 +37,7 @@ from dynamis.serving.models import (
     AlgorithmView,
     ArtifactDetail,
     ArtifactRefView,
+    CatalogReadModelView,
     DatasetDetail,
     DatasetSummary,
     DenseWindowMeta,
@@ -286,6 +287,9 @@ class FakeBackend:
                 source_capability=self.source_capabilities("skillcorner-opendata")[0],
             )
         ]
+
+    def catalog_read_model(self) -> CatalogReadModelView:
+        return CatalogReadModelView(resources=[])
 
     def sessions(self, dataset_id: str) -> list[SessionSummary]:
         return [
@@ -618,6 +622,12 @@ def test_sports_catalog_route_returns_normalized_metadata_and_source_readiness(
     assert [team["side"] for team in match["teams"]] == ["home", "away"]
     assert "POSE" in match["source_capability"]["upstream_capabilities"]
     assert match["source_capability"]["local_readiness"] == "PARTIAL"
+
+
+def test_unified_catalog_read_model_route_is_metadata_only(client: TestClient) -> None:
+    response = client.get("/api/catalog/read-model")
+    assert response.status_code == 200
+    assert response.json() == {"resources": []}
 
 
 def test_pitch_dimensions_require_positive_finite_source_metres() -> None:

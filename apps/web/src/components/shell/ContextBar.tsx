@@ -19,7 +19,7 @@ export interface ContextCrumb {
 }
 
 const SURFACE_LABELS: Record<string, string> = {
-  catalog: "Catalog",
+  catalog: "Library",
   lab: "Laboratory",
   compare: "Compare",
   methods: "Methodology",

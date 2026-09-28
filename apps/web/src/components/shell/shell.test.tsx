@@ -6,14 +6,14 @@ import { shellLayoutFor } from "@/components/shell/AppShell";
 import { qualityRibbonText, summarizeQuality } from "@/components/shell/Transport";
 
 const COMMANDS: Command[] = [
-  { id: "a", title: "Go to Catalog", group: "Navigate", run: () => undefined },
+  { id: "a", title: "Go to Library", group: "Navigate", run: () => undefined },
   { id: "b", title: "Play/pause playback", group: "Transport", run: () => undefined },
   { id: "c", title: "Switch to Report Light", group: "View", run: () => undefined },
 ];
 
 describe("command palette filtering", () => {
   it("matches by title or group, case-insensitively", () => {
-    expect(filterCommands(COMMANDS, "catalog").map((c) => c.id)).toEqual(["a"]);
+    expect(filterCommands(COMMANDS, "library").map((c) => c.id)).toEqual(["a"]);
     expect(filterCommands(COMMANDS, "transport").map((c) => c.id)).toEqual(["b"]);
     expect(filterCommands(COMMANDS, "light").map((c) => c.id)).toEqual(["c"]);
     expect(filterCommands(COMMANDS, "  ").map((c) => c.id)).toEqual(["a", "b", "c"]);
