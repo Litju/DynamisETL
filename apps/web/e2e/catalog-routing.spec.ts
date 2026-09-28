@@ -81,6 +81,19 @@ test("semantic capabilities route into the pertinent World", async ({ page }) =>
   expect(new URL(page.url()).searchParams.get("trial")).toBe("cmj-1-arms-t00");
 });
 
+test("Match World Back returns to the catalog, including from a direct deep link", async ({ page }) => {
+  await page.goto("/lab/skillcorner-opendata/1925299?view=matchlab");
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(page).toHaveURL(/\/data$/u);
+  await expect(page.getByRole("heading", { name: "Sports", level: 1 })).toBeVisible();
+
+  await page.goto("/data/edition/skillcorner:edition:870?tab=matches&status=ready");
+  await page.getByRole("link", { name: /Open Match World/ }).click();
+  await expect(page).toHaveURL(/\/lab\/skillcorner-opendata\/1925299/u);
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(page).toHaveURL(/\/data\/edition\/skillcorner:edition:870\?tab=matches&status=ready/u);
+});
+
 test("the command palette searches metadata and switches Worlds", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Research", level: 1 })).toBeVisible();

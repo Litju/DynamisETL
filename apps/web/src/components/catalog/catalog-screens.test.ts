@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import type { SessionDetail, SourceCapabilityView } from "@/api/types";
 import { fileFamilies, formatBytes } from "@/components/catalog/PrepareDialog";
 import { shortDatasetName } from "@/lib/catalog-model";
+import { verifiedParticipant } from "@/lib/participants";
 import { trialFacts } from "@/pages/performance";
-import { verifiedParticipant } from "@/pages/player";
 
 describe("preparation plan", () => {
   const entry = {

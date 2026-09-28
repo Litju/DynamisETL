@@ -2,32 +2,21 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import { useParams, useSearch } from "@tanstack/react-router";
 import { ArrowRight, ShieldCheck } from "lucide-react";
 
-import type { SeasonEditionView, SessionDetail } from "@/api/types";
+import type { SeasonEditionView } from "@/api/types";
 import { AppLink } from "@/components/common/AppLink";
 import { CopyableId } from "@/components/common/CopyableId";
 import { Page, PageHeader, SectionHeader } from "@/components/common/Page";
-import { ReadinessGlyph } from "@/components/common/Readiness";
+import { ReadinessGlyph, ServerReadiness } from "@/components/common/Readiness";
 import { ErrorPanel, StatePanel } from "@/components/common/StatePanel";
 import { WorldGlyph } from "@/components/common/WorldGlyph";
 import { seasonEditionsQuery, seasonFamilyQuery, seasonLinksQuery, seasonRowsQuery, sessionQuery } from "@/lib/api/queries";
-import { contestTitle } from "@/lib/catalog-model";
+import { contestTitle, readinessOf, resourceWorlds } from "@/lib/catalog-model";
 import { DEFAULT_SEASON_METRICS, formatSeasonValue, shortTeamName, unitSuffix } from "@/lib/season-model";
 import type { SeasonFamily } from "@/lib/search";
 import { usePublishContext, type Crumb } from "@/lib/state/context";
 import { useCatalog } from "@/lib/use-catalog";
 import { editionTarget, matchWorldTarget, seasonWorldTarget, teamTarget } from "@/lib/worlds";
-
-/**
- * The match-session participant that is the *same canonical person*, proven by
- * the provider identity crosswalk (never by display name): the season link
- * lists provider player ids in the provider namespace, and the session must
- * register a participant with exactly that id.
- */
-export function verifiedParticipant(session: SessionDetail | undefined, providerIds: readonly string[]): string | null {
-  if (!session) return null;
-  const ids = new Set(providerIds);
-  return session.participants.find((participant) => ids.has(participant.subject_id))?.subject_id ?? null;
-}
+import { verifiedParticipant } from "@/lib/participants";
 
 export function PlayerPage() {
   const { subjectId } = useParams({ from: "/data/player/$subjectId" });
@@ -35,10 +24,9 @@ export function PlayerPage() {
   const catalog = useCatalog();
   const editions = useQuery(seasonEditionsQuery());
   const datasetId = subjectId.split("/")[0] ?? "";
-  const season: SeasonEditionView | null =
-    editions.data?.find((item) => item.edition_id === search.edition) ??
-    editions.data?.find((item) => item.dataset_id === datasetId) ??
-    null;
+  const season: SeasonEditionView | null = search.edition
+    ? editions.data?.find((item) => item.edition_id === search.edition) ?? null
+    : editions.data?.find((item) => item.dataset_id === datasetId) ?? null;
   const editionId = season?.edition_id ?? search.edition ?? null;
   const families = (season?.families ?? []).map((family) => family.family as SeasonFamily);
 
@@ -82,8 +70,14 @@ export function PlayerPage() {
 
   const rowsPending = rows.some((query) => query.isPending) || editions.isPending;
   if (editions.isError) return <ErrorPanel error={editions.error} onRetry={() => void editions.refetch()} />;
+  if (catalog.isError) return <ErrorPanel error={catalog.error} onRetry={catalog.refetch} />;
+  const rowsError = rows.find((query) => query.isError);
+  if (rowsError?.error) return <ErrorPanel error={rowsError.error} onRetry={() => void rowsError.refetch()} />;
+  if (search.edition && !season && !editions.isPending) {
+    return <StatePanel state="not_found" title="This edition has no season context for this player." detail="The selected edition is not served for this canonical subject." />;
+  }
   if (!rowsPending && !firstRow) {
-    return <StatePanel state="not_found" title="No season record names this player." detail="Player context is built from canonical season identities; there is no row for this subject in the selected edition." />;
+    return <StatePanel state="not_materialized" title="No season row is materialized for this player." detail="The canonical subject id stays distinct from provider names; a season profile appears only when a served season row names this id." />;
   }
 
   const byContest = new Map(catalog.resources.filter((item) => item.resource_kind === "contest").map((item) => [item.contest_id, item]));
@@ -128,20 +122,15 @@ export function PlayerPage() {
             const row = query?.data?.rows[0];
             const metrics = DEFAULT_SEASON_METRICS[family]?.slice(0, 4) ?? [];
             const label = season?.families.find((item) => item.family === family)?.label ?? family;
-            return (
-              <AppLink
-                key={family}
-                to={seasonWorldTarget(editionId ?? "", { player: subjectId, family, ...(teams[0] ? { team: teams[0][0] } : {}) })}
-                transition
-                className="d-card d-card-interactive group flex flex-col p-5"
-              >
+            const card = (
+              <>
                 <div className="flex items-center justify-between">
                   <span className="text-[13.5px] font-semibold text-text-primary">{label}</span>
-                  <span className="text-[11px] text-text-muted group-hover:text-accent">Distribution <ArrowRight size={11} aria-hidden="true" className="inline" /></span>
+                  {row ? <span className="text-[11px] text-text-muted group-hover:text-accent">Distribution <ArrowRight size={11} aria-hidden="true" className="inline" /></span> : null}
                 </div>
-                {!row ? (
+                {query?.isPending ? (
                   <div className="mt-4 space-y-2">{[0, 1, 2].map((key) => <div key={key} className="d-skeleton h-5" />)}</div>
-                ) : (
+                ) : row ? (
                   <dl className="mt-4 space-y-2.5">
                     {metrics.map((column) => {
                       const metric = registry?.metrics.find((candidate) => candidate.column === column);
@@ -157,11 +146,30 @@ export function PlayerPage() {
                       );
                     })}
                   </dl>
+                ) : (
+                  <StatePanel
+                    className="mt-3 min-h-24 flex-1 p-3"
+                    state="not_materialized"
+                    title={`${label} data is unavailable for this player.`}
+                    detail="No season row for this canonical subject exists in this family."
+                  />
                 )}
                 <p className="mt-4 border-t border-border-subtle pt-2.5 text-[10.5px] text-text-faint">
-                  Values only. Percentiles appear in Season World with their named denominator.
+                  {row ? "Values only. Percentiles appear in Season World with their named denominator." : "No values are inferred from the other season families."}
                 </p>
+              </>
+            );
+            return row ? (
+              <AppLink
+                key={family}
+                to={seasonWorldTarget(editionId ?? "", { player: subjectId, family, ...(teams[0] ? { team: teams[0][0] } : {}) })}
+                transition
+                className="d-card d-card-interactive group flex flex-col p-5"
+              >
+                {card}
               </AppLink>
+            ) : (
+              <div key={family} className="d-card flex flex-col p-5">{card}</div>
             );
           })}
         </div>
@@ -170,33 +178,50 @@ export function PlayerPage() {
       <div className="mt-10 grid grid-cols-12 gap-x-10 gap-y-10">
         <section className="col-span-12 min-[1250px]:col-span-7" aria-labelledby="player-contests">
           <SectionHeader index="02" id="player-contests" title="Materialized contests" detail="Participation proven by the identity crosswalk" />
-          {links.isPending ? (
+          {links.isError ? (
+            <ErrorPanel error={links.error} onRetry={() => void links.refetch()} />
+          ) : links.isPending ? (
             <div className="d-card h-24 p-4"><div className="d-skeleton h-full" /></div>
           ) : appearances.length ? (
             <ul className="d-card divide-y divide-border-subtle overflow-hidden">
               {appearances.map((item, index) => {
-                const session = sessions[index]?.data;
+                const sessionQuery = sessions[index];
+                const session = sessionQuery?.data;
                 const participant = verifiedParticipant(session, links.data?.provider_player_ids ?? []);
                 const contest = byContest.get(item.contest_id);
-                const pose = (contest?.materialized_capabilities ?? []).includes("POSE");
+                const matchWorld = contest ? resourceWorlds(contest).find((world) => world.world === "match") : null;
+                const readiness = contest ? readinessOf(contest) : null;
+                const tracking = contest
+                  ? (contest.materialized_capabilities ?? []).includes("TRACKING")
+                  : session
+                    ? session.streams.some((stream) => stream.modality === "tracking")
+                    : null;
+                const pose = contest
+                  ? (contest.materialized_capabilities ?? []).includes("POSE")
+                  : session
+                    ? session.streams.some((stream) => stream.modality === "pose")
+                    : null;
                 return (
                   <li key={`${item.dataset_id}/${item.session_id}`} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-5 py-3">
                     <span className="min-w-0">
                       <span className="block truncate text-[13px] text-text-primary">{contest ? contestTitle(contest) : session?.session.label ?? item.session_id}</span>
                       <span className="mt-0.5 flex items-center gap-3 text-[11px] text-text-muted">
-                        <span className="flex items-center gap-1.5"><ReadinessGlyph kind="ready" />Tracking</span>
-                        <span className="flex items-center gap-1.5"><ReadinessGlyph kind={pose ? "ready" : "unavailable"} />{pose ? "Pose available" : "No Pose"}</span>
-                        <span>{participant ? `participant ${participant}` : sessions[index]?.isPending ? "verifying identity…" : "participant not verified"}</span>
+                        <span className="flex items-center gap-1.5"><ReadinessGlyph kind={tracking === null ? "upstream" : tracking ? "ready" : "unavailable"} />{tracking === null ? "Tracking status resolving" : tracking ? "Tracking available" : "Tracking unavailable"}</span>
+                        <span className="flex items-center gap-1.5"><ReadinessGlyph kind={pose === null ? "upstream" : pose ? "ready" : "unavailable"} />{pose === null ? "Pose status resolving" : pose ? "Pose available" : "Pose unavailable"}</span>
+                        <span>{participant ? `participant ${participant} verified` : sessionQuery?.isPending ? "verifying player identity…" : "player identity unavailable"}</span>
+                        {matchWorld?.ready ? <span className="flex items-center gap-1.5"><ReadinessGlyph kind="ready" />Match World ready</span> : readiness ? <ServerReadiness stage={readiness.server} upstream={readiness.upstream} compact /> : <span>{catalog.isPending ? "Resolving Match World readiness" : "Match World readiness unavailable"}</span>}
                       </span>
                     </span>
-                    <AppLink
-                      to={matchWorldTarget(item.dataset_id, item.session_id, participant ? { subject: participant } : {})}
-                      transition
-                      className="d-btn border-selected-border text-text-primary"
-                    >
-                      <WorldGlyph world="match" size="sm" className="text-accent" />
-                      {participant ? "Open with player selected" : "Open match"}
-                    </AppLink>
+                    {matchWorld?.ready && participant ? (
+                      <AppLink
+                        to={matchWorldTarget(item.dataset_id, item.session_id, { subject: participant })}
+                        transition
+                        className="d-btn border-selected-border text-text-primary"
+                      >
+                        <WorldGlyph world="match" size="sm" className="text-accent" />
+                        Open with player selected
+                      </AppLink>
+                    ) : null}
                   </li>
                 );
               })}

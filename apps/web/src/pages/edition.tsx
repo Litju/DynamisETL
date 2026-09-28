@@ -9,7 +9,7 @@ import { AppLink } from "@/components/common/AppLink";
 import { FilterSelect } from "@/components/common/FilterSelect";
 import { Page, PageHeader, SectionHeader } from "@/components/common/Page";
 import { ReadinessGlyph, ReadinessLadder, ServerReadiness } from "@/components/common/Readiness";
-import { ErrorPanel, StatePanel } from "@/components/common/StatePanel";
+import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
 import { VirtualList } from "@/components/common/VirtualList";
 import { WorldGlyph } from "@/components/common/WorldGlyph";
 import { ContestListHeader, ContestRow, GameRow } from "@/components/catalog/ContestRows";
@@ -78,7 +78,6 @@ export function EditionPage() {
   const gameEditions = useQuery(gameEditionsQuery());
   const season = seasonEditions.data?.find((item) => item.edition_id === editionId) ?? null;
   const gameEdition = gameEditions.data?.find((item) => item.edition_id === editionId) ?? null;
-  const seasonReady = Boolean(edition?.worlds.some((link) => link.world === "season" && link.ready) && season);
   const gameReady = Boolean(edition?.worlds.some((link) => link.world === "game" && link.ready) && gameEdition);
   const contestSource: "catalog" | "games" | "none" = edition?.contests.length ? "catalog" : gameReady ? "games" : "none";
   const tab: EditionTab = search.tab ?? "matches";
@@ -164,8 +163,8 @@ export function EditionPage() {
         <Tabs.List aria-label="Edition context" className="relative flex gap-1 border-b border-border-subtle">
           <EditionTabButton value="matches" label="Matches" count={contestSource === "catalog" ? edition.contests.length : gameEdition?.contest_count ?? null} />
           <EditionTabButton value="teams" label="Teams" count={contestSource === "catalog" ? teams.length : null} />
-          <EditionTabButton value="players" label="Players" count={null} disabled={!seasonReady} />
-          <EditionTabButton value="season" label="Season data" count={season?.families.length ?? null} disabled={!seasonReady} />
+          <EditionTabButton value="players" label="Players" count={null} />
+          <EditionTabButton value="season" label="Season data" count={season?.families.length ?? null} />
           <Tabs.Indicator className="absolute bottom-[-1px] left-[var(--active-tab-left)] h-[2px] w-[var(--active-tab-width)] rounded-full bg-accent transition-[left,width] duration-panel ease-instrument" />
         </Tabs.List>
 
@@ -174,6 +173,10 @@ export function EditionPage() {
             <CatalogMatches edition={edition} search={search} update={update} gameEditionId={gameReady ? editionId : null} />
           ) : contestSource === "games" ? (
             <GameMatches editionId={editionId} />
+          ) : gameEditions.isPending ? (
+            <LoadingPanel label="Resolving edition contest availability" />
+          ) : gameEditions.isError ? (
+            <ErrorPanel error={gameEditions.error} onRetry={() => void gameEditions.refetch()} />
           ) : edition.ready ? (
             <StatePanel
               className="d-card min-h-32"
@@ -191,31 +194,41 @@ export function EditionPage() {
               <TeamGrid teams={teams.map((team) => ({ id: team.teamId, name: team.name, detail: `${team.readyContests}/${team.contests.length} contests ready` }))} editionId={editionId} />
             ) : contestSource === "games" ? (
               <GameTeams editionId={editionId} />
+            ) : gameEditions.isPending ? (
+              <LoadingPanel label="Resolving edition team membership" />
+            ) : gameEditions.isError ? (
+              <ErrorPanel error={gameEditions.error} onRetry={() => void gameEditions.refetch()} />
             ) : (
               <UpstreamEditionState edition={edition} />
             )
           ) : null}
         </Tabs.Panel>
         <Tabs.Panel value="players" className="pt-5 outline-none">
-          {tab === "players" && seasonReady ? <PlayerTable season={season!} editionId={editionId} search={search} update={update} /> : null}
-          {tab === "players" && !seasonReady ? (
-            <StatePanel state="not_materialized" title="No player-season grain is materialized for this edition." detail="Players appear here only from an authoritative season aggregate; play-by-play box scores stay inside the Game World." />
+          {tab === "players" && seasonEditions.isPending ? <LoadingPanel label="Resolving player-season readiness" /> : null}
+          {tab === "players" && seasonEditions.isError ? <ErrorPanel error={seasonEditions.error} onRetry={() => void seasonEditions.refetch()} /> : null}
+          {tab === "players" && season ? <PlayerTable season={season} editionId={editionId} search={search} update={update} /> : null}
+          {tab === "players" && !seasonEditions.isPending && !seasonEditions.isError && !season ? (
+            <StatePanel state={edition.resource && readinessOf(edition.resource).upstream ? "upstream" : "not_materialized"} title="No player-season grain is materialized for this edition." detail="Players appear here only from an authoritative season aggregate; play-by-play box scores stay inside the Game World." />
           ) : null}
         </Tabs.Panel>
         <Tabs.Panel value="season" className="pt-5 outline-none">
-          {season ? <SeasonFamilies season={season} /> : null}
+          {tab === "season" && seasonEditions.isPending ? <LoadingPanel label="Resolving season data readiness" /> : null}
+          {tab === "season" && seasonEditions.isError ? <ErrorPanel error={seasonEditions.error} onRetry={() => void seasonEditions.refetch()} /> : null}
+          {tab === "season" && season ? <SeasonFamilies season={season} /> : null}
+          {tab === "season" && !seasonEditions.isPending && !seasonEditions.isError && !season ? (
+            <StatePanel state={edition.resource && readinessOf(edition.resource).upstream ? "upstream" : "not_materialized"} title="Season data is not materialized for this edition." detail="This edition has no served PLAYER_SEASON or TEAM_SEASON families. Upstream availability does not make a Season World locally ready." />
+          ) : null}
         </Tabs.Panel>
       </Tabs.Root>
     </Page>
   );
 }
 
-function EditionTabButton({ value, label, count, disabled = false }: { value: EditionTab; label: string; count: number | null; disabled?: boolean }) {
+function EditionTabButton({ value, label, count }: { value: EditionTab; label: string; count: number | null }) {
   return (
     <Tabs.Tab
       value={value}
-      disabled={disabled}
-      className="flex h-9 items-center gap-2 px-3 text-[12.5px] font-medium text-text-muted outline-none transition-colors duration-quick hover:text-text-secondary data-[active]:text-text-primary data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40"
+      className="flex h-9 items-center gap-2 px-3 text-[12.5px] font-medium text-text-muted outline-none transition-colors duration-quick hover:text-text-secondary data-[active]:text-text-primary"
     >
       {label}
       {count !== null ? <span className="mono text-[10.5px] text-text-faint">{count}</span> : null}
@@ -348,6 +361,8 @@ function GameTeams({ editionId }: { editionId: string }) {
     }
     return [...map.entries()].map(([id, entry]) => ({ id, name: entry.name, detail: `${entry.games} games` })).sort((a, b) => a.name.localeCompare(b.name));
   }, [pages]);
+  if (games.isError) return <ErrorPanel error={games.error} onRetry={() => void games.refetch()} />;
+  if (games.isPending) return <LoadingPanel label="Loading authoritative game team membership" />;
   return (
     <>
       <p className="mb-3 text-[11px] text-text-muted">
@@ -359,7 +374,7 @@ function GameTeams({ editionId }: { editionId: string }) {
 }
 
 function TeamGrid({ teams, editionId }: { teams: readonly { id: string; name: string; detail: string }[]; editionId: string }) {
-  if (!teams.length) return <div className="space-y-2">{[0, 1, 2].map((index) => <div key={index} className="d-skeleton h-12 rounded-[10px]" />)}</div>;
+  if (!teams.length) return <StatePanel state="empty" title="No registered teams name this edition." detail="Team membership is shown only when a served contest or game summary identifies its canonical team id." />;
   return (
     <ul className="grid grid-cols-2 gap-2 min-[1100px]:grid-cols-3 min-[1500px]:grid-cols-4">
       {teams.map((team) => (
@@ -412,6 +427,7 @@ function PlayerTable({
     return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]));
   }, [rows.data]);
   if (rows.isError) return <ErrorPanel error={rows.error} onRetry={() => void rows.refetch()} />;
+  if (!rows.isPending && players.length === 0) return <StatePanel state="filtered" title="No players match this edition and filter." detail="Player identity comes from the selected edition's season rows." />;
   return (
     <>
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -464,6 +480,7 @@ function PlayerTable({
 }
 
 function SeasonFamilies({ season }: { season: SeasonEditionView }) {
+  if (!season.families.length) return <StatePanel state="not_materialized" title="No season data families are materialized." detail="This edition has no PLAYER_SEASON or TEAM_SEASON artifact family to open." />;
   return (
     <>
       <SectionHeader title="Metric families" detail={`${season.provider} · ${season.measurement_class.replaceAll("_", " ").toLowerCase()} · ${season.inclusion_rule}`} />

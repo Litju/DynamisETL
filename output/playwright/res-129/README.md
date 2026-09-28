@@ -37,3 +37,19 @@ Back returned to the exact ready-filter catalog URL: /data/edition/edition-ebf87
 Supplemental renderer-settling capture (direct Match World URL, outside the flow): [1366×768 Pose sample](final/1366x768/07-match-world-debug.png).
 
 Each viewport also has a report.json. To regenerate one viewport from the worktree root, set RES129_VIEWPORT to a JSON object such as {"label":"1366x768","width":1366,"height":768}, then run node output/playwright/res-129/capture.mjs. Repeat with the other two viewport objects while the local API and production preview are running.
+
+## Competition, team and player context
+
+The real-data continuation adds the A-League edition tabs, Perth Glory team context, canonical player context and Season World linkage. These entity screenshots were captured from the local Vite workbench against the read-only local serving API; they use no mocks.
+
+| Context | 1600×1000 | 1440×900 | 1366×768 |
+| --- | --- | --- | --- |
+| A-League teams | [10](final/1600x1000/10-a-league-teams.png) | [10](final/1440x900/10-a-league-teams.png) | [10](final/1366x768/10-a-league-teams.png) |
+| A-League players | [11](final/1600x1000/11-a-league-players.png) | [11](final/1440x900/11-a-league-players.png) | [11](final/1366x768/11-a-league-players.png) |
+| Season data families | [12](final/1600x1000/12-a-league-season-data.png) | [12](final/1440x900/12-a-league-season-data.png) | [12](final/1366x768/12-a-league-season-data.png) |
+| Perth Glory team | [13](final/1600x1000/13-team-perth-glory.png) | [13](final/1440x900/13-team-perth-glory.png) | [13](final/1366x768/13-team-perth-glory.png) |
+| Adam Bugarija, linked Match World | [14](final/1600x1000/14-player-adam-bugarija.png) | [14](final/1440x900/14-player-adam-bugarija.png) | [14](final/1366x768/14-player-adam-bugarija.png) |
+| Adam Taggart, no match crosswalk | [15](final/1600x1000/15-player-adam-taggart-unlinked.png) | [15](final/1440x900/15-player-adam-taggart-unlinked.png) | [15](final/1366x768/15-player-adam-taggart-unlinked.png) |
+| Season World player linkage | [16](final/1600x1000/16-season-bugarija-match-linkage.png) | [16](final/1440x900/16-season-bugarija-match-linkage.png) | [16](final/1366x768/16-season-bugarija-match-linkage.png) |
+
+`apps/web/e2e-real/res129-entity-context.spec.ts` verifies canonical player selection in both World directions, exact URL restoration through Back/Forward, deep-link reload, no stale player values, and zero dense reads while browsing the entity and Season surfaces. The ready Brisbane–Perth match has Pose; ready Auckland–Macarthur explicitly reports Pose unavailable. Adam Taggart has no provider identity crosswalk, so his page reports no materialized player match instead of joining by name. Adam Bugarija has physical season data; the missing off-ball-run and passing rows are stated explicitly.

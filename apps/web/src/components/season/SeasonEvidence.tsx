@@ -1,13 +1,18 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowUpRight, Download, ExternalLink } from "lucide-react";
 import { useMemo, type ReactNode } from "react";
 
 import type { SeasonFamilyView, SeasonMetricView, SeasonProfileView, SportsCatalogMatchView } from "@/api/types";
+import { AppLink } from "@/components/common/AppLink";
 import { MeasurementClassBadge } from "@/components/common/Badges";
 import { CopyableId } from "@/components/common/CopyableId";
-import { seasonLinksQuery, sportsCatalogMatchesQuery } from "@/lib/api/queries";
+import { seasonLinksQuery, sessionQuery, sportsCatalogMatchesQuery } from "@/lib/api/queries";
+import { readinessOf, resourceWorlds } from "@/lib/catalog-model";
 import { buildSeasonReport } from "@/lib/season-model";
+import { verifiedParticipant } from "@/lib/participants";
+import { useCatalog } from "@/lib/use-catalog";
+import { matchWorldTarget } from "@/lib/worlds";
 
 function matchLabel(match: SportsCatalogMatchView | undefined, fallback: string): string {
   if (!match) return fallback;
@@ -171,11 +176,19 @@ export function SeasonEvidence({
 function MatchLinks({ editionId, subjectId }: { editionId: string; subjectId: string }) {
   const links = useQuery(seasonLinksQuery(editionId, subjectId));
   const matches = useQuery(sportsCatalogMatchesQuery());
+  const catalog = useCatalog();
   const byContest = useMemo(
     () => new Map((matches.data ?? []).map((match) => [match.contest_id, match])),
     [matches.data],
   );
   const appearances = links.data?.appearances ?? [];
+  const sessions = useQueries({
+    queries: appearances.map((item) => sessionQuery(item.dataset_id, item.session_id)),
+  });
+  const contests = useMemo(
+    () => new Map(catalog.resources.filter((item) => item.resource_kind === "contest").map((item) => [item.contest_id, item])),
+    [catalog.resources],
+  );
   const appearanceContests = new Set(appearances.map((item) => item.contest_id));
   const teamOnly = (links.data?.team_contest_ids ?? []).filter((id) => !appearanceContests.has(id));
 
@@ -189,26 +202,51 @@ function MatchLinks({ editionId, subjectId }: { editionId: string; subjectId: st
         <>
           {appearances.length > 0 ? (
             <ul className="flex flex-col gap-1">
-              {appearances.map((item) => {
+              {appearances.map((item, index) => {
                 const match = byContest.get(item.contest_id);
+                const session = sessions[index];
+                const contest = contests.get(item.contest_id);
+                const participant = verifiedParticipant(session?.data, links.data?.provider_player_ids ?? []);
+                const matchWorld = contest ? resourceWorlds(contest).find((world) => world.world === "match") : null;
+                const readiness = contest ? readinessOf(contest) : null;
+                const capabilities = contest?.materialized_capabilities ?? [];
+                const tracking = contest
+                  ? capabilities.includes("TRACKING")
+                  : session?.data
+                    ? session.data.streams.some((stream) => stream.modality === "tracking")
+                    : null;
+                const pose = contest
+                  ? capabilities.includes("POSE")
+                  : session?.data
+                    ? session.data.streams.some((stream) => stream.modality === "pose")
+                    : null;
                 return (
                   <li key={`${item.dataset_id}/${item.session_id}`}>
-                    <Link
-                      to="/lab/$datasetId/$sessionId"
-                      params={{ datasetId: item.dataset_id, sessionId: item.session_id }}
-                      search={{ view: "matchlab" }}
-                      className="group flex items-center gap-2 rounded-control border border-border-subtle px-2 py-1.5 transition-colors duration-quick hover:border-accent"
-                    >
+                    <div className="flex items-center gap-2 rounded-control border border-border-subtle px-2 py-1.5">
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-[12px] text-text-primary">
                           {matchLabel(match, `Match ${item.session_id}`)}
                         </span>
-                        <span className="block text-[10px] text-text-muted">
-                          {matchDate(match) ?? "date unavailable"} · appeared · ready in MatchLab
+                        <span className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[10px] text-text-muted">
+                          <span>{matchDate(match) ?? "date unavailable"}</span>
+                          <span>{tracking === null ? "Tracking status resolving" : tracking ? "Tracking available" : "Tracking unavailable"}</span>
+                          <span>{pose === null ? "Pose status resolving" : pose ? "Pose available" : "Pose unavailable"}</span>
+                          <span>{participant ? "Player identity verified" : session?.isPending ? "Verifying player identity" : "Player identity unavailable"}</span>
+                          {matchWorld?.ready ? <span>Match World ready</span> : readiness ? <span>Server {readiness.server} · Match World unavailable</span> : <span>{catalog.isPending ? "Resolving readiness" : "Readiness unavailable"}</span>}
                         </span>
                       </span>
-                      <ArrowUpRight size={13} aria-hidden="true" className="text-text-muted group-hover:text-accent" />
-                    </Link>
+                      {matchWorld?.ready && participant ? (
+                        <AppLink
+                          to={matchWorldTarget(item.dataset_id, item.session_id, { subject: participant })}
+                          transition
+                          aria-label="Open Match World with player selected"
+                          className="group flex shrink-0 items-center gap-1 rounded-control px-1.5 py-1 text-[10px] text-accent hover:bg-hover"
+                        >
+                          Open with player
+                          <ArrowUpRight size={12} aria-hidden="true" />
+                        </AppLink>
+                      ) : null}
+                    </div>
                   </li>
                 );
               })}

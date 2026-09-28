@@ -1,10 +1,10 @@
 import { Menu } from "@base-ui/react/menu";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { ArrowLeft, ChevronDown, ChevronRight, Moon, Search, Sun } from "lucide-react";
 import { LayoutGroup, motion } from "motion/react";
 
-import { AppLink, useGoTo } from "@/components/common/AppLink";
+import { AppLink, takeCatalogReturnHref, useGoTo } from "@/components/common/AppLink";
 import { BrowserReadiness, ReadinessGlyph, SERVER_TEXT, ServerReadiness, serverGlyph } from "@/components/common/Readiness";
 import { WorldGlyph } from "@/components/common/WorldGlyph";
 import { datasetsQuery, servingStatusQuery } from "@/lib/api/queries";
@@ -26,6 +26,7 @@ const SECTIONS: readonly { id: Exclude<Section, "world" | "other">; label: strin
  */
 export function TopBar() {
   const location = useRouterState({ select: (state) => state.location });
+  const navigate = useNavigate();
   const datasets = useQuery(datasetsQuery());
   const datasetId = location.pathname.startsWith("/lab/") ? location.pathname.split("/")[2] : undefined;
   const domain = datasetId ? datasets.data?.find((dataset) => dataset.dataset_id === datasetId)?.domain ?? null : null;
@@ -43,7 +44,13 @@ export function TopBar() {
         <button
           type="button"
           aria-label="Back"
-          onClick={() => window.history.back()}
+          onClick={() => {
+            void navigate({
+              href: takeCatalogReturnHref() ?? "/data",
+              replace: true,
+              viewTransition: { types: ["context"] },
+            });
+          }}
           className="flex h-7 shrink-0 items-center gap-1 rounded-control px-1.5 text-[11px] text-text-muted transition-colors duration-quick hover:bg-surface-2 hover:text-text-primary"
         >
           <ArrowLeft size={13} aria-hidden="true" />

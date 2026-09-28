@@ -6,7 +6,7 @@ import { useMemo } from "react";
 import type { SeasonRowView } from "@/api/types";
 import { AppLink } from "@/components/common/AppLink";
 import { Page, PageHeader, SectionHeader } from "@/components/common/Page";
-import { ErrorPanel, StatePanel } from "@/components/common/StatePanel";
+import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
 import { WorldGlyph } from "@/components/common/WorldGlyph";
 import { ContestListHeader, ContestRow, GameRow } from "@/components/catalog/ContestRows";
 import { api, unwrap } from "@/lib/api/client";
@@ -35,18 +35,25 @@ export function TeamPage() {
   const edition = editionId ? findEdition(catalog.tree, editionId) : null;
   const season = seasonEditions.data?.find((item) => item.edition_id === editionId) ?? null;
   const gameEdition = gameEditions.data?.find((item) => item.edition_id === editionId) ?? null;
+  const editionContests = useMemo(
+    () => contests.filter((contest) => !editionId || contest.edition_id === editionId),
+    [contests, editionId],
+  );
   const roster = useEditionPlayers(season, Boolean(season), teamId);
   const games = useQuery({
     queryKey: ["games", "team", editionId, teamId] as const,
-    enabled: Boolean(gameEdition && contests.length === 0),
+    enabled: Boolean(gameEdition && editionContests.length === 0),
     staleTime: METADATA_STALE_MS,
     queryFn: async ({ signal }) => unwrap(await api.GET("/api/games", { params: { query: { edition_id: editionId!, team_id: teamId, limit: 120 } }, signal })),
   });
 
-  const name = contests.flatMap((contest) => contest.teams ?? []).find((team) => team.team_id === teamId)?.display_name
-    ?? roster.data?.rows[0]?.team_name
+  const name = editionContests.flatMap((contest) => contest.teams ?? []).find((team) => team.team_id === teamId)?.display_name
+    ?? roster.data?.rows.find((row) => row.team_id === teamId)?.team_name
     ?? games.data?.rows.flatMap((game) => game.teams).find((team) => team.team_id === teamId)?.display_name
     ?? null;
+  const hasSeasonMembership = roster.data?.rows.some((row) => row.team_id === teamId) ?? false;
+  const hasGameMembership = games.data?.rows.some((game) => game.teams.some((team) => team.team_id === teamId)) ?? false;
+  const hasEditionMembership = editionContests.length > 0 || hasSeasonMembership || hasGameMembership;
 
   const crumbs: Crumb[] = [
     ...(edition ? [
@@ -58,13 +65,17 @@ export function TeamPage() {
   usePublishContext({ owner: `team:${teamId}:${editionId ?? ""}`, world: null, crumbs });
 
   if (catalog.isError) return <ErrorPanel error={catalog.error} onRetry={catalog.refetch} />;
-  const resolving = catalog.isPending || (name === null && (roster.isPending || games.isPending));
+  if (seasonEditions.isError) return <ErrorPanel error={seasonEditions.error} onRetry={() => void seasonEditions.refetch()} />;
+  if (roster.isError) return <ErrorPanel error={roster.error} onRetry={() => void roster.refetch()} />;
+  const gamesEnabled = Boolean(gameEdition && editionContests.length === 0);
+  const resolving = catalog.isPending || seasonEditions.isPending || (name === null && ((Boolean(season) && roster.isPending) || (gamesEnabled && games.isPending) || gameEditions.isPending));
   if (!resolving && name === null) {
-    return <StatePanel state="not_found" title="No authoritative record names this team." detail="Team pages exist only for canonical team ids referenced by registered contests, season rows or game summaries." />;
+    return <StatePanel state="not_found" title="No authoritative record names this team in the selected edition." detail="Team membership is resolved by the canonical team id in contest, season, or game-summary rows; names never create membership." />;
   }
 
   const players = dedupePlayers(roster.data?.rows ?? []);
-  const readyContests = contests.filter((contest) => readinessOf(contest).server === "ready").length;
+  const readyContests = editionContests.filter((contest) => readinessOf(contest).server === "ready").length;
+  const seasonWorldReady = edition?.worlds.some((world) => world.world === "season" && world.ready) ?? false;
 
   return (
     <Page label={name ?? "Team"}>
@@ -73,13 +84,13 @@ export function TeamPage() {
         title={name ?? <span className="d-skeleton inline-block h-9 w-72 align-middle" />}
         meta={
           <span className="text-[12px] text-text-muted">
-            {contests.length ? `${readyContests} of ${contests.length} registered contests ready` : games.data ? `${games.data.total} play-by-play games` : ""}
+            {editionContests.length ? `${readyContests} of ${editionContests.length} registered contests ready` : games.data ? `${games.data.total} play-by-play games` : hasSeasonMembership ? "Season membership verified" : ""}
             {players.length ? ` · ${players.length} players in season aggregates` : ""}
           </span>
         }
         actions={
           <>
-            {season && editionId ? (
+            {season && editionId && seasonWorldReady ? (
               <AppLink to={seasonWorldTarget(editionId, { team: teamId })} transition className="d-btn">
                 <WorldGlyph world="season" size="sm" className="text-accent" /> Season World
               </AppLink>
@@ -109,32 +120,55 @@ export function TeamPage() {
       <div className="mt-10 grid grid-cols-12 gap-x-10 gap-y-10">
         <section className="col-span-12 min-[1250px]:col-span-7" aria-labelledby="team-contests">
           <SectionHeader index="01" id="team-contests" title="Contests" detail="Registered contests naming this team" />
-          {contests.length ? (
+          {editionContests.length ? (
             <div className="d-card contest-list overflow-hidden">
               <ContestListHeader />
               <ul className="divide-y divide-border-subtle">
-                {contests
-                  .filter((contest) => !editionId || contest.edition_id === editionId)
+                {editionContests
                   .sort((a, b) => Number(readinessOf(b).server === "ready") - Number(readinessOf(a).server === "ready"))
                   .map((contest) => (
                     <ContestRow key={contest.resource_id} contest={contest} matches={catalog.matchesByContest} gameEditionId={gameEdition ? editionId : null} />
                   ))}
               </ul>
             </div>
-          ) : games.data ? (
+          ) : games.data?.rows.length ? (
             <div className="d-card max-h-[32rem] overflow-y-auto">
               {games.data.rows.map((game) => <GameRow key={game.contest_id} game={game} editionId={editionId!} style={{ height: 40 }} />)}
             </div>
+          ) : games.data ? (
+            <StatePanel className="d-card min-h-40" state="not_materialized" title="No game summaries name this team in this edition." detail="Season roster membership does not establish participation in a game." />
+          ) : gameEditions.isPending || (gamesEnabled && games.isPending) ? (
+            <LoadingPanel label="Resolving available team contests" />
+          ) : gameEditions.isError ? (
+            <ErrorPanel error={gameEditions.error} onRetry={() => void gameEditions.refetch()} />
+          ) : games.isError ? (
+            <ErrorPanel error={games.error} onRetry={() => void games.refetch()} />
+          ) : hasEditionMembership ? (
+            <StatePanel className="d-card min-h-40" state="not_materialized" title="No registered contests for this team in this edition." detail="A season roster does not imply player participation in any individual match." />
           ) : (
-            <div className="d-card h-40 p-4"><div className="d-skeleton h-full" /></div>
+            <StatePanel className="d-card min-h-40" state="not_materialized" title="Contest availability is resolving." detail="Only contests linked to this canonical team id appear here." />
           )}
         </section>
         <section className="col-span-12 min-[1250px]:col-span-5" aria-labelledby="team-roster">
-          <SectionHeader index="02" id="team-roster" title="Roster" detail={season ? `From ${primarySeasonFamily(season)?.label ?? "season"} aggregates` : "No season aggregate"} />
-          {season ? (
-            roster.isPending ? (
+          <SectionHeader index="02" id="team-roster" title="Roster & season data" detail={season ? `${season.provider} · ${primarySeasonFamily(season)?.label ?? "season"} aggregate` : seasonEditions.isPending ? "Resolving season data" : "No season aggregate"} />
+          {seasonEditions.isPending ? (
+            <LoadingPanel label="Resolving authoritative team season data" />
+          ) : season ? (
+            <>
+            <ul className="mb-3 grid grid-cols-1 gap-1.5">
+              {season.families.map((family) => (
+                <li key={family.family}>
+                  <AppLink to={seasonWorldTarget(season.edition_id, { team: teamId, family: family.family })} transition className="d-card d-card-interactive flex items-center justify-between gap-3 px-3 py-2 text-[11.5px]">
+                    <span className="truncate text-text-primary">{family.label}</span>
+                    <span className="mono shrink-0 text-text-muted">{family.row_count} rows · Season World</span>
+                  </AppLink>
+                </li>
+              ))}
+            </ul>
+            {roster.isPending ? (
               <div className="d-card space-y-2 p-4">{[0, 1, 2, 3].map((index) => <div key={index} className="d-skeleton h-6" />)}</div>
             ) : (
+              players.length ? (
               <ul className="d-card max-h-[32rem] divide-y divide-border-subtle overflow-y-auto">
                 {players.map((player) => (
                   <li key={player.subject_id}>
@@ -147,7 +181,11 @@ export function TeamPage() {
                   </li>
                 ))}
               </ul>
-            )
+              ) : (
+                <StatePanel className="d-card min-h-32" state="not_materialized" title="No player-season rows name this team." detail="The selected edition has season data, but its authoritative roster contains no player rows for this team id." />
+              )
+            )}
+            </>
           ) : (
             <StatePanel className="d-card min-h-40" state="not_materialized" title="No player-season aggregate for this edition." detail="A roster is shown only from an authoritative season aggregate; it is never inferred from names." />
           )}
