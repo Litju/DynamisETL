@@ -314,7 +314,7 @@ export function LabPage() {
               className="flex h-full min-h-0"
               resizeTargetMinimumSize={{ coarse: 28, fine: 6 }}
             >
-              <Panel id="matchlab-field" defaultSize="48%" minSize="38%" className="min-w-0 overflow-hidden bg-transparent">
+              <Panel id="matchlab-field" defaultSize="42%" minSize="38%" className="min-w-0 overflow-hidden bg-transparent">
                 <section aria-label="Field Tactical Map" data-testid="matchlab-field-panel" className="h-full min-h-0 overflow-hidden bg-transparent">
                   {selectedStream?.modality === "tracking" ? (
                     <PitchReplay />
@@ -328,7 +328,7 @@ export function LabPage() {
                 <MatchLabPoseViewport />
               </Panel>
               <Separator aria-label="Resize Pose and Analysis panels" className="w-px shrink-0 bg-border-subtle transition-colors data-[separator]:hover:bg-accent" />
-              <Panel id="matchlab-analysis" defaultSize="22%" minSize="18%" className="min-w-0 overflow-hidden bg-surface-1">
+              <Panel id="matchlab-analysis" defaultSize="28%" minSize="18%" className="min-w-0 overflow-hidden bg-surface-1">
                 <MatchLabDashboard session={session.data} />
               </Panel>
             </Group>

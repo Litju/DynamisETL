@@ -1,7 +1,7 @@
 import { Menu } from "@base-ui/react/menu";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { ChevronDown, ChevronRight, Moon, Search, Sun } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, Moon, Search, Sun } from "lucide-react";
 import { LayoutGroup, motion } from "motion/react";
 
 import { AppLink, useGoTo } from "@/components/common/AppLink";
@@ -39,6 +39,17 @@ export function TopBar() {
       <SectionNav section={where.section} />
       <span aria-hidden="true" className="mx-1 h-4 w-px bg-border-subtle" />
       <WorldSwitcher active={world} />
+      {world === "match" && location.pathname.startsWith("/lab/") ? (
+        <button
+          type="button"
+          aria-label="Back"
+          onClick={() => window.history.back()}
+          className="flex h-7 shrink-0 items-center gap-1 rounded-control px-1.5 text-[11px] text-text-muted transition-colors duration-quick hover:bg-surface-2 hover:text-text-primary"
+        >
+          <ArrowLeft size={13} aria-hidden="true" />
+          Back
+        </button>
+      ) : null}
       <ContextSpine crumbs={world || where.section !== "research" ? context?.crumbs ?? [] : []} />
       <div className="ml-auto flex shrink-0 items-center gap-1.5">
         {world && context?.readiness ? <SpineReadiness readiness={context.readiness} /> : null}

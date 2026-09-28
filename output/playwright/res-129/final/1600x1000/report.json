@@ -1,0 +1,1086 @@
+{
+  "viewport": {
+    "label": "1600x1000",
+    "width": 1600,
+    "height": 1000
+  },
+  "liveCorpus": {
+    "editionId": "edition-ebf871f2a9cd29912d68880e",
+    "matches": 20,
+    "ready": 4,
+    "upstreamOnly": 16,
+    "selected": {
+      "label": "Brisbane Roar FC 0-1 Perth Glory Football Club",
+      "datasetId": "skillcorner-opendata",
+      "sessionId": "1925299"
+    }
+  },
+  "returnUrl": "http://127.0.0.1:4174/data/edition/edition-ebf871f2a9cd29912d68880e?status=ready",
+  "noDenseRequestsBeforeWorld": true,
+  "staticRouteChunksBeforeWorld": {
+    "files": [
+      "rolldown-runtime-hePW80VL.js",
+      "useQueries-D6Nqgavj.js",
+      "jsx-runtime-BNakU3Ej.js",
+      "with-selector-CoMyWBAX.js",
+      "queries-PKVa1NnG.js",
+      "useMatch-Co0JqeGs.js",
+      "useNavigate-Bcb0coU3.js",
+      "useSelector-D-Lsppt_.js",
+      "link-DKXrALlv.js",
+      "useRouterState-mgptyWAK.js",
+      "react-dom-hf6EcyAr.js",
+      "check-CIYJu1_N.js",
+      "createLucideIcon-Cn6LRB4K.js",
+      "AppLink-DpxaHWWS.js",
+      "cn-SJsoOVwg.js",
+      "copy-CIOtfkTt.js",
+      "react-Cu0DF75D.js",
+      "react-NblnYFBB.js",
+      "preload-helper-BZ1Pz5am.js",
+      "measurement-Bf7WNei0.js",
+      "analysis-CbRYp57B.js",
+      "chart-palette-BqLvWunf.js",
+      "schemas-DSl38XHO.js",
+      "getPseudoElementBounds-V-0At92A.js",
+      "useScrollLock-BjWB32U1.js",
+      "composite-Dct7uLoh.js",
+      "useCompositeListItem-BtrZQELC.js",
+      "useOpenInteractionType-4urdmGBX.js",
+      "analysis-context-B3zcFjR4.js",
+      "index-Cn1mez1N.js",
+      "arrow-up-right-DYmjkj0a.js",
+      "research-DR9MzPrB.js",
+      "AutocompleteItem-CW_ZoU0l.js",
+      "ComboboxPopup-DztQ12XI.js",
+      "useLabelableId-Dy_scwfF.js",
+      "ComboboxEmpty-MlNjIjle.js",
+      "Page-_gPhDCwK.js",
+      "PaletteBody-BxYRLmqK.js",
+      "data-De9-5ZJq.js",
+      "FilterSelect-dGb6DidT.js",
+      "VirtualList-BnRUJB7v.js",
+      "edition-B7kU-AIO.js"
+    ],
+    "heavy": []
+  },
+  "matchWorldChunkFiles": [
+    "vanilla--C5Lp_AM.js",
+    "MatchLabCanvasRoot-CbbApmOe.js",
+    "View-YjPNc8A4.js",
+    "pitch-model--qJzQGGg.js",
+    "useThrottledPlayhead-h0uFdNYi.js",
+    "MatchWorldStrip-Btg_-SfT.js",
+    "match-frame-windows-CPQQAS5n.js",
+    "tactical-v3-CnZrQlm3.js",
+    "arrow-window-BMNtibqe.js",
+    "frame-buffers-DvJ99041.js",
+    "PitchReplay-DLb9ojBF.js",
+    "PoseScene-CTXB5Gdq.js",
+    "use-pose-playback-BDZGLz3V.js",
+    "MatchLabWorkspace-DeqxTaX5.js",
+    "PoseAnalysisPane-CqF0R3uy.js",
+    "PoseViewer-CrXIBKMH.js",
+    "TacticalAnalysisPane-rZCzpy1S.js",
+    "arrow.worker-CxJCLa5m.js"
+  ],
+  "steps": [
+    {
+      "name": "01-research-home",
+      "url": "http://127.0.0.1:4174/",
+      "file": "E:\\Data\\Projects\\DynamisETL\\.claude\\worktrees\\res-129-v4-ux\\output\\playwright\\res-129\\final\\1600x1000\\01-research-home.png",
+      "js": [
+        {
+          "file": "rolldown-runtime-hePW80VL.js",
+          "bytes": 716,
+          "gzipBytes": 428,
+          "status": 200
+        },
+        {
+          "file": "useQueries-D6Nqgavj.js",
+          "bytes": 3558,
+          "gzipBytes": 1543,
+          "status": 200
+        },
+        {
+          "file": "jsx-runtime-BNakU3Ej.js",
+          "bytes": 8292,
+          "gzipBytes": 3153,
+          "status": 200
+        },
+        {
+          "file": "with-selector-CoMyWBAX.js",
+          "bytes": 1728,
+          "gzipBytes": 790,
+          "status": 200
+        },
+        {
+          "file": "queries-PKVa1NnG.js",
+          "bytes": 38319,
+          "gzipBytes": 11911,
+          "status": 200
+        },
+        {
+          "file": "useMatch-Co0JqeGs.js",
+          "bytes": 679,
+          "gzipBytes": 435,
+          "status": 200
+        },
+        {
+          "file": "useNavigate-Bcb0coU3.js",
+          "bytes": 318,
+          "gzipBytes": 251,
+          "status": 200
+        },
+        {
+          "file": "useSelector-D-Lsppt_.js",
+          "bytes": 3632,
+          "gzipBytes": 1719,
+          "status": 200
+        },
+        {
+          "file": "link-DKXrALlv.js",
+          "bytes": 6183,
+          "gzipBytes": 3017,
+          "status": 200
+        },
+        {
+          "file": "useRouterState-mgptyWAK.js",
+          "bytes": 251,
+          "gzipBytes": 213,
+          "status": 200
+        },
+        {
+          "file": "react-dom-hf6EcyAr.js",
+          "bytes": 3955,
+          "gzipBytes": 1454,
+          "status": 200
+        },
+        {
+          "file": "check-CIYJu1_N.js",
+          "bytes": 207,
+          "gzipBytes": 200,
+          "status": 200
+        },
+        {
+          "file": "createLucideIcon-Cn6LRB4K.js",
+          "bytes": 3198,
+          "gzipBytes": 1556,
+          "status": 200
+        },
+        {
+          "file": "AppLink-DpxaHWWS.js",
+          "bytes": 3636,
+          "gzipBytes": 1506,
+          "status": 200
+        },
+        {
+          "file": "cn-SJsoOVwg.js",
+          "bytes": 106,
+          "gzipBytes": 123,
+          "status": 200
+        },
+        {
+          "file": "copy-CIOtfkTt.js",
+          "bytes": 318,
+          "gzipBytes": 272,
+          "status": 200
+        },
+        {
+          "file": "react-Cu0DF75D.js",
+          "bytes": 123245,
+          "gzipBytes": 39647,
+          "status": 200
+        },
+        {
+          "file": "react-NblnYFBB.js",
+          "bytes": 745,
+          "gzipBytes": 465,
+          "status": 200
+        },
+        {
+          "file": "preload-helper-BZ1Pz5am.js",
+          "bytes": 1218,
+          "gzipBytes": 688,
+          "status": 200
+        },
+        {
+          "file": "measurement-Bf7WNei0.js",
+          "bytes": 2182,
+          "gzipBytes": 965,
+          "status": 200
+        },
+        {
+          "file": "analysis-CbRYp57B.js",
+          "bytes": 3037,
+          "gzipBytes": 885,
+          "status": 200
+        },
+        {
+          "file": "chart-palette-BqLvWunf.js",
+          "bytes": 3166,
+          "gzipBytes": 1254,
+          "status": 200
+        },
+        {
+          "file": "schemas-DSl38XHO.js",
+          "bytes": 83265,
+          "gzipBytes": 23565,
+          "status": 200
+        },
+        {
+          "file": "getPseudoElementBounds-V-0At92A.js",
+          "bytes": 2579,
+          "gzipBytes": 1262,
+          "status": 200
+        },
+        {
+          "file": "useScrollLock-BjWB32U1.js",
+          "bytes": 18095,
+          "gzipBytes": 6771,
+          "status": 200
+        },
+        {
+          "file": "composite-Dct7uLoh.js",
+          "bytes": 2146,
+          "gzipBytes": 800,
+          "status": 200
+        },
+        {
+          "file": "useCompositeListItem-BtrZQELC.js",
+          "bytes": 9391,
+          "gzipBytes": 3899,
+          "status": 200
+        },
+        {
+          "file": "useOpenInteractionType-4urdmGBX.js",
+          "bytes": 41223,
+          "gzipBytes": 14812,
+          "status": 200
+        },
+        {
+          "file": "analysis-context-B3zcFjR4.js",
+          "bytes": 255,
+          "gzipBytes": 212,
+          "status": 200
+        },
+        {
+          "file": "index-Cn1mez1N.js",
+          "bytes": 668478,
+          "gzipBytes": 204442,
+          "status": 200
+        },
+        {
+          "file": "arrow-up-right-DYmjkj0a.js",
+          "bytes": 259,
+          "gzipBytes": 223,
+          "status": 200
+        },
+        {
+          "file": "research-DR9MzPrB.js",
+          "bytes": 16663,
+          "gzipBytes": 4729,
+          "status": 200
+        },
+        {
+          "file": "AutocompleteItem-CW_ZoU0l.js",
+          "bytes": 2055,
+          "gzipBytes": 1164,
+          "status": 200
+        },
+        {
+          "file": "ComboboxPopup-DztQ12XI.js",
+          "bytes": 3410,
+          "gzipBytes": 1563,
+          "status": 200
+        },
+        {
+          "file": "useLabelableId-Dy_scwfF.js",
+          "bytes": 5247,
+          "gzipBytes": 2199,
+          "status": 200
+        },
+        {
+          "file": "ComboboxEmpty-MlNjIjle.js",
+          "bytes": 28312,
+          "gzipBytes": 10272,
+          "status": 200
+        },
+        {
+          "file": "Page-_gPhDCwK.js",
+          "bytes": 1775,
+          "gzipBytes": 761,
+          "status": 200
+        },
+        {
+          "file": "PaletteBody-BxYRLmqK.js",
+          "bytes": 7287,
+          "gzipBytes": 3037,
+          "status": 200
+        }
+      ]
+    },
+    {
+      "name": "02-data-browser",
+      "url": "http://127.0.0.1:4174/data",
+      "file": "E:\\Data\\Projects\\DynamisETL\\.claude\\worktrees\\res-129-v4-ux\\output\\playwright\\res-129\\final\\1600x1000\\02-data-browser.png",
+      "js": [
+        {
+          "file": "data-De9-5ZJq.js",
+          "bytes": 13780,
+          "gzipBytes": 4150,
+          "status": 200
+        },
+        {
+          "file": "FilterSelect-dGb6DidT.js",
+          "bytes": 24722,
+          "gzipBytes": 9065,
+          "status": 200
+        }
+      ]
+    },
+    {
+      "name": "03-sports",
+      "url": "http://127.0.0.1:4174/data?domain=sports",
+      "file": "E:\\Data\\Projects\\DynamisETL\\.claude\\worktrees\\res-129-v4-ux\\output\\playwright\\res-129\\final\\1600x1000\\03-sports.png",
+      "js": []
+    },
+    {
+      "name": "04-football",
+      "url": "http://127.0.0.1:4174/data?domain=sports&sport=football",
+      "file": "E:\\Data\\Projects\\DynamisETL\\.claude\\worktrees\\res-129-v4-ux\\output\\playwright\\res-129\\final\\1600x1000\\04-football.png",
+      "js": []
+    },
+    {
+      "name": "05-a-league-2024-25",
+      "url": "http://127.0.0.1:4174/data/edition/edition-ebf871f2a9cd29912d68880e",
+      "file": "E:\\Data\\Projects\\DynamisETL\\.claude\\worktrees\\res-129-v4-ux\\output\\playwright\\res-129\\final\\1600x1000\\05-a-league-2024-25.png",
+      "js": [
+        {
+          "file": "VirtualList-BnRUJB7v.js",
+          "bytes": 1029,
+          "gzipBytes": 634,
+          "status": 200
+        },
+        {
+          "file": "edition-B7kU-AIO.js",
+          "bytes": 25881,
+          "gzipBytes": 8379,
+          "status": 200
+        }
+      ]
+    },
+    {
+      "name": "06-ready-skillcorner-match",
+      "url": "http://127.0.0.1:4174/data/edition/edition-ebf871f2a9cd29912d68880e?status=ready",
+      "file": "E:\\Data\\Projects\\DynamisETL\\.claude\\worktrees\\res-129-v4-ux\\output\\playwright\\res-129\\final\\1600x1000\\06-ready-skillcorner-match.png",
+      "js": []
+    },
+    {
+      "name": "07-match-world",
+      "url": "http://127.0.0.1:4174/lab/skillcorner-opendata/1925299?view=matchlab&stream=tracking-period-1&trial=period_1&subject=11897&t_ns=440000000",
+      "file": "E:\\Data\\Projects\\DynamisETL\\.claude\\worktrees\\res-129-v4-ux\\output\\playwright\\res-129\\final\\1600x1000\\07-match-world.png",
+      "js": [
+        {
+          "file": "vanilla--C5Lp_AM.js",
+          "bytes": 387,
+          "gzipBytes": 292,
+          "status": 200
+        },
+        {
+          "file": "MatchLabCanvasRoot-CbbApmOe.js",
+          "bytes": 5912,
+          "gzipBytes": 2425,
+          "status": 200
+        },
+        {
+          "file": "View-YjPNc8A4.js",
+          "bytes": 895184,
+          "gzipBytes": 235152,
+          "status": 200
+        },
+        {
+          "file": "pitch-model--qJzQGGg.js",
+          "bytes": 466,
+          "gzipBytes": 343,
+          "status": 200
+        },
+        {
+          "file": "useThrottledPlayhead-h0uFdNYi.js",
+          "bytes": 956,
+          "gzipBytes": 500,
+          "status": 200
+        },
+        {
+          "file": "MatchWorldStrip-Btg_-SfT.js",
+          "bytes": 5743,
+          "gzipBytes": 2366,
+          "status": 200
+        },
+        {
+          "file": "match-frame-windows-CPQQAS5n.js",
+          "bytes": 6679,
+          "gzipBytes": 2596,
+          "status": 200
+        },
+        {
+          "file": "tactical-v3-CnZrQlm3.js",
+          "bytes": 2896,
+          "gzipBytes": 1400,
+          "status": 200
+        },
+        {
+          "file": "arrow-window-BMNtibqe.js",
+          "bytes": 12749,
+          "gzipBytes": 4462,
+          "status": 200
+        },
+        {
+          "file": "frame-buffers-DvJ99041.js",
+          "bytes": 3177,
+          "gzipBytes": 1312,
+          "status": 200
+        },
+        {
+          "file": "PitchReplay-DLb9ojBF.js",
+          "bytes": 75039,
+          "gzipBytes": 24130,
+          "status": 200
+        },
+        {
+          "file": "PoseScene-CTXB5Gdq.js",
+          "bytes": 69892,
+          "gzipBytes": 19581,
+          "status": 200
+        },
+        {
+          "file": "use-pose-playback-BDZGLz3V.js",
+          "bytes": 3497,
+          "gzipBytes": 1495,
+          "status": 200
+        },
+        {
+          "file": "MatchLabWorkspace-DeqxTaX5.js",
+          "bytes": 7246,
+          "gzipBytes": 2396,
+          "status": 200
+        },
+        {
+          "file": "PoseAnalysisPane-CqF0R3uy.js",
+          "bytes": 24377,
+          "gzipBytes": 6852,
+          "status": 200
+        },
+        {
+          "file": "PoseViewer-CrXIBKMH.js",
+          "bytes": 26237,
+          "gzipBytes": 8265,
+          "status": 200
+        },
+        {
+          "file": "TacticalAnalysisPane-rZCzpy1S.js",
+          "bytes": 35310,
+          "gzipBytes": 10646,
+          "status": 200
+        },
+        {
+          "file": "arrow.worker-CxJCLa5m.js",
+          "bytes": 192453,
+          "gzipBytes": 44223,
+          "status": 200
+        }
+      ]
+    },
+    {
+      "name": "08-back-exact-catalog-context",
+      "url": "http://127.0.0.1:4174/data/edition/edition-ebf871f2a9cd29912d68880e?status=ready",
+      "file": "E:\\Data\\Projects\\DynamisETL\\.claude\\worktrees\\res-129-v4-ux\\output\\playwright\\res-129\\final\\1600x1000\\08-back-exact-catalog-context.png",
+      "js": []
+    },
+    {
+      "name": "09-research-home-recent",
+      "url": "http://127.0.0.1:4174/",
+      "file": "E:\\Data\\Projects\\DynamisETL\\.claude\\worktrees\\res-129-v4-ux\\output\\playwright\\res-129\\final\\1600x1000\\09-research-home-recent.png",
+      "js": []
+    }
+  ],
+  "javascriptAssets": [
+    {
+      "file": "rolldown-runtime-hePW80VL.js",
+      "bytes": 716,
+      "gzipBytes": 428,
+      "status": 200
+    },
+    {
+      "file": "useQueries-D6Nqgavj.js",
+      "bytes": 3558,
+      "gzipBytes": 1543,
+      "status": 200
+    },
+    {
+      "file": "jsx-runtime-BNakU3Ej.js",
+      "bytes": 8292,
+      "gzipBytes": 3153,
+      "status": 200
+    },
+    {
+      "file": "with-selector-CoMyWBAX.js",
+      "bytes": 1728,
+      "gzipBytes": 790,
+      "status": 200
+    },
+    {
+      "file": "queries-PKVa1NnG.js",
+      "bytes": 38319,
+      "gzipBytes": 11911,
+      "status": 200
+    },
+    {
+      "file": "useMatch-Co0JqeGs.js",
+      "bytes": 679,
+      "gzipBytes": 435,
+      "status": 200
+    },
+    {
+      "file": "useNavigate-Bcb0coU3.js",
+      "bytes": 318,
+      "gzipBytes": 251,
+      "status": 200
+    },
+    {
+      "file": "useSelector-D-Lsppt_.js",
+      "bytes": 3632,
+      "gzipBytes": 1719,
+      "status": 200
+    },
+    {
+      "file": "link-DKXrALlv.js",
+      "bytes": 6183,
+      "gzipBytes": 3017,
+      "status": 200
+    },
+    {
+      "file": "useRouterState-mgptyWAK.js",
+      "bytes": 251,
+      "gzipBytes": 213,
+      "status": 200
+    },
+    {
+      "file": "react-dom-hf6EcyAr.js",
+      "bytes": 3955,
+      "gzipBytes": 1454,
+      "status": 200
+    },
+    {
+      "file": "check-CIYJu1_N.js",
+      "bytes": 207,
+      "gzipBytes": 200,
+      "status": 200
+    },
+    {
+      "file": "createLucideIcon-Cn6LRB4K.js",
+      "bytes": 3198,
+      "gzipBytes": 1556,
+      "status": 200
+    },
+    {
+      "file": "AppLink-DpxaHWWS.js",
+      "bytes": 3636,
+      "gzipBytes": 1506,
+      "status": 200
+    },
+    {
+      "file": "cn-SJsoOVwg.js",
+      "bytes": 106,
+      "gzipBytes": 123,
+      "status": 200
+    },
+    {
+      "file": "copy-CIOtfkTt.js",
+      "bytes": 318,
+      "gzipBytes": 272,
+      "status": 200
+    },
+    {
+      "file": "react-Cu0DF75D.js",
+      "bytes": 123245,
+      "gzipBytes": 39647,
+      "status": 200
+    },
+    {
+      "file": "react-NblnYFBB.js",
+      "bytes": 745,
+      "gzipBytes": 465,
+      "status": 200
+    },
+    {
+      "file": "preload-helper-BZ1Pz5am.js",
+      "bytes": 1218,
+      "gzipBytes": 688,
+      "status": 200
+    },
+    {
+      "file": "measurement-Bf7WNei0.js",
+      "bytes": 2182,
+      "gzipBytes": 965,
+      "status": 200
+    },
+    {
+      "file": "analysis-CbRYp57B.js",
+      "bytes": 3037,
+      "gzipBytes": 885,
+      "status": 200
+    },
+    {
+      "file": "chart-palette-BqLvWunf.js",
+      "bytes": 3166,
+      "gzipBytes": 1254,
+      "status": 200
+    },
+    {
+      "file": "schemas-DSl38XHO.js",
+      "bytes": 83265,
+      "gzipBytes": 23565,
+      "status": 200
+    },
+    {
+      "file": "getPseudoElementBounds-V-0At92A.js",
+      "bytes": 2579,
+      "gzipBytes": 1262,
+      "status": 200
+    },
+    {
+      "file": "useScrollLock-BjWB32U1.js",
+      "bytes": 18095,
+      "gzipBytes": 6771,
+      "status": 200
+    },
+    {
+      "file": "composite-Dct7uLoh.js",
+      "bytes": 2146,
+      "gzipBytes": 800,
+      "status": 200
+    },
+    {
+      "file": "useCompositeListItem-BtrZQELC.js",
+      "bytes": 9391,
+      "gzipBytes": 3899,
+      "status": 200
+    },
+    {
+      "file": "useOpenInteractionType-4urdmGBX.js",
+      "bytes": 41223,
+      "gzipBytes": 14812,
+      "status": 200
+    },
+    {
+      "file": "analysis-context-B3zcFjR4.js",
+      "bytes": 255,
+      "gzipBytes": 212,
+      "status": 200
+    },
+    {
+      "file": "index-Cn1mez1N.js",
+      "bytes": 668478,
+      "gzipBytes": 204442,
+      "status": 200
+    },
+    {
+      "file": "arrow-up-right-DYmjkj0a.js",
+      "bytes": 259,
+      "gzipBytes": 223,
+      "status": 200
+    },
+    {
+      "file": "research-DR9MzPrB.js",
+      "bytes": 16663,
+      "gzipBytes": 4729,
+      "status": 200
+    },
+    {
+      "file": "AutocompleteItem-CW_ZoU0l.js",
+      "bytes": 2055,
+      "gzipBytes": 1164,
+      "status": 200
+    },
+    {
+      "file": "ComboboxPopup-DztQ12XI.js",
+      "bytes": 3410,
+      "gzipBytes": 1563,
+      "status": 200
+    },
+    {
+      "file": "useLabelableId-Dy_scwfF.js",
+      "bytes": 5247,
+      "gzipBytes": 2199,
+      "status": 200
+    },
+    {
+      "file": "ComboboxEmpty-MlNjIjle.js",
+      "bytes": 28312,
+      "gzipBytes": 10272,
+      "status": 200
+    },
+    {
+      "file": "Page-_gPhDCwK.js",
+      "bytes": 1775,
+      "gzipBytes": 761,
+      "status": 200
+    },
+    {
+      "file": "PaletteBody-BxYRLmqK.js",
+      "bytes": 7287,
+      "gzipBytes": 3037,
+      "status": 200
+    },
+    {
+      "file": "data-De9-5ZJq.js",
+      "bytes": 13780,
+      "gzipBytes": 4150,
+      "status": 200
+    },
+    {
+      "file": "FilterSelect-dGb6DidT.js",
+      "bytes": 24722,
+      "gzipBytes": 9065,
+      "status": 200
+    },
+    {
+      "file": "VirtualList-BnRUJB7v.js",
+      "bytes": 1029,
+      "gzipBytes": 634,
+      "status": 200
+    },
+    {
+      "file": "edition-B7kU-AIO.js",
+      "bytes": 25881,
+      "gzipBytes": 8379,
+      "status": 200
+    },
+    {
+      "file": "vanilla--C5Lp_AM.js",
+      "bytes": 387,
+      "gzipBytes": 292,
+      "status": 200
+    },
+    {
+      "file": "MatchLabCanvasRoot-CbbApmOe.js",
+      "bytes": 5912,
+      "gzipBytes": 2425,
+      "status": 200
+    },
+    {
+      "file": "View-YjPNc8A4.js",
+      "bytes": 895184,
+      "gzipBytes": 235152,
+      "status": 200
+    },
+    {
+      "file": "pitch-model--qJzQGGg.js",
+      "bytes": 466,
+      "gzipBytes": 343,
+      "status": 200
+    },
+    {
+      "file": "useThrottledPlayhead-h0uFdNYi.js",
+      "bytes": 956,
+      "gzipBytes": 500,
+      "status": 200
+    },
+    {
+      "file": "MatchWorldStrip-Btg_-SfT.js",
+      "bytes": 5743,
+      "gzipBytes": 2366,
+      "status": 200
+    },
+    {
+      "file": "match-frame-windows-CPQQAS5n.js",
+      "bytes": 6679,
+      "gzipBytes": 2596,
+      "status": 200
+    },
+    {
+      "file": "tactical-v3-CnZrQlm3.js",
+      "bytes": 2896,
+      "gzipBytes": 1400,
+      "status": 200
+    },
+    {
+      "file": "arrow-window-BMNtibqe.js",
+      "bytes": 12749,
+      "gzipBytes": 4462,
+      "status": 200
+    },
+    {
+      "file": "frame-buffers-DvJ99041.js",
+      "bytes": 3177,
+      "gzipBytes": 1312,
+      "status": 200
+    },
+    {
+      "file": "PitchReplay-DLb9ojBF.js",
+      "bytes": 75039,
+      "gzipBytes": 24130,
+      "status": 200
+    },
+    {
+      "file": "PoseScene-CTXB5Gdq.js",
+      "bytes": 69892,
+      "gzipBytes": 19581,
+      "status": 200
+    },
+    {
+      "file": "use-pose-playback-BDZGLz3V.js",
+      "bytes": 3497,
+      "gzipBytes": 1495,
+      "status": 200
+    },
+    {
+      "file": "MatchLabWorkspace-DeqxTaX5.js",
+      "bytes": 7246,
+      "gzipBytes": 2396,
+      "status": 200
+    },
+    {
+      "file": "PoseAnalysisPane-CqF0R3uy.js",
+      "bytes": 24377,
+      "gzipBytes": 6852,
+      "status": 200
+    },
+    {
+      "file": "PoseViewer-CrXIBKMH.js",
+      "bytes": 26237,
+      "gzipBytes": 8265,
+      "status": 200
+    },
+    {
+      "file": "TacticalAnalysisPane-rZCzpy1S.js",
+      "bytes": 35310,
+      "gzipBytes": 10646,
+      "status": 200
+    },
+    {
+      "file": "arrow.worker-CxJCLa5m.js",
+      "bytes": 192453,
+      "gzipBytes": 44223,
+      "status": 200
+    }
+  ],
+  "apiRequestCounts": {
+    "beforeWorld": 6,
+    "afterWorldTotal": 22,
+    "denseAfterWorld": 6
+  },
+  "apiRequests": [
+    {
+      "path": "/api/catalog/read-model",
+      "type": "fetch"
+    },
+    {
+      "path": "/api/catalog/datasets",
+      "type": "fetch"
+    },
+    {
+      "path": "/api/catalog/sports/matches",
+      "type": "fetch"
+    },
+    {
+      "path": "/api/serving/status",
+      "type": "fetch"
+    },
+    {
+      "path": "/api/season/editions",
+      "type": "fetch"
+    },
+    {
+      "path": "/api/games/editions",
+      "type": "fetch"
+    },
+    {
+      "path": "/api/catalog/datasets/skillcorner-opendata/sessions/1925299",
+      "type": "fetch"
+    },
+    {
+      "path": "/api/quality?dataset_id=skillcorner-opendata&session_id=1925299&limit=200",
+      "type": "fetch"
+    },
+    {
+      "path": "/api/artifacts/tracking-period-1-457d138baddf",
+      "type": "fetch"
+    },
+    {
+      "path": "/api/artifacts/pose-period-1-0bbe2b182716",
+      "type": "fetch"
+    },
+    {
+      "path": "/api/artifacts/tracking-period-1-457d138baddf/window?from_ns=0&to_ns=27480959055&columns=t_rel_ns%2Cobject_id%2Cobject_type%2Cgroup_id%2Cx_m%2Cy_m%2Cis_detected&max_points=20000&format=arrow",
+      "type": "fetch"
+    },
+    {
+      "path": "/api/artifacts/tracking-period-1-457d138baddf/window?from_ns=27480959056&to_ns=54961918111&columns=t_rel_ns%2Cobject_id%2Cobject_type%2Cgroup_id%2Cx_m%2Cy_m%2Cis_detected&max_points=20000&format=arrow",
+      "type": "fetch"
+    },
+    {
+      "path": "/api/metrics?subject_id=11897&stream_id=pose-period-1&limit=50",
+      "type": "fetch"
+    },
+    {
+      "path": "/api/tactical/capabilities/skillcorner-opendata",
+      "type": "fetch"
+    },
+    {
+      "path": "/api/tactical/artifacts?dataset_id=skillcorner-opendata&session_id=1925299&stream_id=tracking-period-1",
+      "type": "fetch"
+    },
+    {
+      "path": "/api/metrics/methodology/pose.angular_rom.left_hip",
+      "type": "fetch"
+    },
+    {
+      "path": "/api/artifacts/pose-period-1-0bbe2b182716/window?from_ns=440000000&to_ns=16648173508&columns=t_rel_ns%2Csubject_id%2Cjoint_name%2Cis_available%2Cx_m%2Cy_m%2Cz_m%2Cerror_m&max_points=20000&entity_id=11897&format=arrow",
+      "type": "fetch"
+    },
+    {
+      "path": "/api/artifacts/pose-period-1-0bbe2b182716/window?from_ns=16648173509&to_ns=32856347017&columns=t_rel_ns%2Csubject_id%2Cjoint_name%2Cis_available%2Cx_m%2Cy_m%2Cz_m%2Cerror_m&max_points=20000&entity_id=11897&format=arrow",
+      "type": "fetch"
+    },
+    {
+      "path": "/api/season/editions/edition-ebf871f2a9cd29912d68880e/links?subject_id=skillcorner-opendata%2F11897",
+      "type": "fetch"
+    },
+    {
+      "path": "/api/tactical/series/proc-run-ac565903d5205352-functional_unit_geometry?from_ns=-2000000000&to_ns=29999999999&max_points=100000",
+      "type": "fetch"
+    },
+    {
+      "path": "/api/tactical/series/proc-run-ac565903d5205352-source_possession_context?from_ns=-2000000000&to_ns=29999999999&max_points=100000",
+      "type": "fetch"
+    },
+    {
+      "path": "/api/season/editions/edition-ebf871f2a9cd29912d68880e/families/physical/rows?subject_id=skillcorner-opendata%2F11897&limit=2",
+      "type": "fetch"
+    }
+  ],
+  "consoleErrors": [],
+  "staticRouteAudit": {
+    "src/pages/research.tsx": {
+      "files": [
+        "assets/research-DR9MzPrB.js",
+        "assets/rolldown-runtime-hePW80VL.js",
+        "assets/jsx-runtime-BNakU3Ej.js",
+        "assets/queries-PKVa1NnG.js",
+        "assets/AppLink-DpxaHWWS.js",
+        "assets/link-DKXrALlv.js",
+        "assets/useSelector-D-Lsppt_.js",
+        "assets/with-selector-CoMyWBAX.js",
+        "assets/useNavigate-Bcb0coU3.js",
+        "assets/createLucideIcon-Cn6LRB4K.js",
+        "assets/arrow-up-right-DYmjkj0a.js",
+        "assets/cn-SJsoOVwg.js",
+        "assets/index-Cn1mez1N.js",
+        "assets/useQueries-D6Nqgavj.js",
+        "assets/useMatch-Co0JqeGs.js",
+        "assets/useRouterState-mgptyWAK.js",
+        "assets/react-Cu0DF75D.js",
+        "assets/react-dom-hf6EcyAr.js",
+        "assets/check-CIYJu1_N.js",
+        "assets/copy-CIOtfkTt.js",
+        "assets/schemas-DSl38XHO.js",
+        "assets/react-NblnYFBB.js",
+        "assets/preload-helper-BZ1Pz5am.js",
+        "assets/measurement-Bf7WNei0.js",
+        "assets/chart-palette-BqLvWunf.js",
+        "assets/analysis-CbRYp57B.js",
+        "assets/useOpenInteractionType-4urdmGBX.js",
+        "assets/useScrollLock-BjWB32U1.js",
+        "assets/useCompositeListItem-BtrZQELC.js",
+        "assets/getPseudoElementBounds-V-0At92A.js",
+        "assets/composite-Dct7uLoh.js",
+        "assets/analysis-context-B3zcFjR4.js",
+        "assets/ComboboxEmpty-MlNjIjle.js",
+        "assets/useLabelableId-Dy_scwfF.js",
+        "assets/AutocompleteItem-CW_ZoU0l.js",
+        "assets/ComboboxPopup-DztQ12XI.js",
+        "assets/Page-_gPhDCwK.js"
+      ],
+      "heavy": []
+    },
+    "src/pages/data.tsx": {
+      "files": [
+        "assets/data-De9-5ZJq.js",
+        "assets/rolldown-runtime-hePW80VL.js",
+        "assets/jsx-runtime-BNakU3Ej.js",
+        "assets/useNavigate-Bcb0coU3.js",
+        "assets/useSelector-D-Lsppt_.js",
+        "assets/with-selector-CoMyWBAX.js",
+        "assets/AppLink-DpxaHWWS.js",
+        "assets/link-DKXrALlv.js",
+        "assets/createLucideIcon-Cn6LRB4K.js",
+        "assets/FilterSelect-dGb6DidT.js",
+        "assets/check-CIYJu1_N.js",
+        "assets/cn-SJsoOVwg.js",
+        "assets/useOpenInteractionType-4urdmGBX.js",
+        "assets/react-dom-hf6EcyAr.js",
+        "assets/useScrollLock-BjWB32U1.js",
+        "assets/useLabelableId-Dy_scwfF.js",
+        "assets/useCompositeListItem-BtrZQELC.js",
+        "assets/getPseudoElementBounds-V-0At92A.js",
+        "assets/composite-Dct7uLoh.js",
+        "assets/index-Cn1mez1N.js",
+        "assets/queries-PKVa1NnG.js",
+        "assets/useQueries-D6Nqgavj.js",
+        "assets/useMatch-Co0JqeGs.js",
+        "assets/useRouterState-mgptyWAK.js",
+        "assets/react-Cu0DF75D.js",
+        "assets/copy-CIOtfkTt.js",
+        "assets/schemas-DSl38XHO.js",
+        "assets/react-NblnYFBB.js",
+        "assets/preload-helper-BZ1Pz5am.js",
+        "assets/measurement-Bf7WNei0.js",
+        "assets/chart-palette-BqLvWunf.js",
+        "assets/analysis-CbRYp57B.js",
+        "assets/analysis-context-B3zcFjR4.js",
+        "assets/Page-_gPhDCwK.js"
+      ],
+      "heavy": []
+    },
+    "src/pages/library.tsx": {
+      "files": [
+        "assets/library-BBOZWmuj.js",
+        "assets/rolldown-runtime-hePW80VL.js",
+        "assets/jsx-runtime-BNakU3Ej.js",
+        "assets/queries-PKVa1NnG.js",
+        "assets/AppLink-DpxaHWWS.js",
+        "assets/link-DKXrALlv.js",
+        "assets/useSelector-D-Lsppt_.js",
+        "assets/with-selector-CoMyWBAX.js",
+        "assets/useNavigate-Bcb0coU3.js",
+        "assets/createLucideIcon-Cn6LRB4K.js",
+        "assets/external-link-Cb6yPo3H.js",
+        "assets/index-Cn1mez1N.js",
+        "assets/useQueries-D6Nqgavj.js",
+        "assets/useMatch-Co0JqeGs.js",
+        "assets/useRouterState-mgptyWAK.js",
+        "assets/react-Cu0DF75D.js",
+        "assets/react-dom-hf6EcyAr.js",
+        "assets/check-CIYJu1_N.js",
+        "assets/copy-CIOtfkTt.js",
+        "assets/cn-SJsoOVwg.js",
+        "assets/schemas-DSl38XHO.js",
+        "assets/react-NblnYFBB.js",
+        "assets/preload-helper-BZ1Pz5am.js",
+        "assets/measurement-Bf7WNei0.js",
+        "assets/chart-palette-BqLvWunf.js",
+        "assets/analysis-CbRYp57B.js",
+        "assets/useOpenInteractionType-4urdmGBX.js",
+        "assets/useScrollLock-BjWB32U1.js",
+        "assets/useCompositeListItem-BtrZQELC.js",
+        "assets/getPseudoElementBounds-V-0At92A.js",
+        "assets/composite-Dct7uLoh.js",
+        "assets/analysis-context-B3zcFjR4.js",
+        "assets/Page-_gPhDCwK.js"
+      ],
+      "heavy": []
+    }
+  }
+}
