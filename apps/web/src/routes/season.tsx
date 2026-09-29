@@ -1,8 +1,9 @@
-import { createRoute, type AnyRoute } from "@tanstack/react-router";
+import { createRoute, type AnyRoute, useSearch } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
 
 import { LoadingPanel } from "@/components/common/StatePanel";
 import { parseSearch, seasonSearchSchema } from "@/lib/search";
+import { usePublishSeasonContext } from "@/lib/use-world-context";
 
 const SeasonLab = lazy(() =>
   import("@/components/season/SeasonLab").then((module) => ({ default: module.SeasonLab })),
@@ -19,8 +20,9 @@ export function defineSeasonRoute(parent: AnyRoute) {
 }
 
 function SeasonPage() {
+  usePublishSeasonContext(useSearch({ from: "/season" }));
   return (
-    <Suspense fallback={<LoadingPanel label="Opening SeasonLab" />}>
+    <Suspense fallback={<LoadingPanel label="Opening Season World" />}>
       <SeasonLab />
     </Suspense>
   );

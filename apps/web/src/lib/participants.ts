@@ -22,3 +22,10 @@ export function participantLabels(session: SessionDetail | undefined): ReadonlyM
   }
   return labels;
 }
+
+/** Resolve a provider identity to its registered participant id, never its display name. */
+export function verifiedParticipant(session: SessionDetail | undefined, providerIds: readonly string[]): string | null {
+  if (!session) return null;
+  const ids = new Set(providerIds);
+  return session.participants.find((participant) => ids.has(participant.subject_id))?.subject_id ?? null;
+}

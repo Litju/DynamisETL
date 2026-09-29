@@ -3,12 +3,18 @@ import { expect, test } from "@playwright/test";
 import { installApiMocks } from "./fixtures";
 
 const VIEWPORTS = [
+  { name: "compact-workstation", width: 1366, height: 768 },
   { name: "laptop-workstation", width: 1440, height: 900 },
   { name: "large-workstation", width: 1600, height: 1000 },
 ] as const;
 
 const ROUTES = [
-  "/catalog",
+  "/",
+  "/data",
+  "/data/edition/skillcorner:edition:870",
+  "/performance?dataset=white-cmj-acc-grf&session=cmj-1",
+  "/lab",
+  "/library",
   "/lab/skillcorner-opendata/1925299?stream=tracking-1&view=overview&t_ns=50000000",
   "/lab/skillcorner-opendata/1925299?stream=tracking-1&view=signals&t_ns=50000000",
   "/lab/skillcorner-opendata/1925299?stream=tracking-1&view=field",

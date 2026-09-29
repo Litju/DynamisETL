@@ -72,10 +72,17 @@ export function UPlotSignal({
       const width = Math.max(320, target.clientWidth || 640);
       const height = Math.max(180, target.clientHeight || 320);
       const xSpan = Math.max(1, plotData.xMax - plotData.xMin);
+      const sans = palette.getPropertyValue("--font-sans").trim() || "Inter Variable, system-ui, sans-serif";
+      const mono = palette.getPropertyValue("--font-mono").trim() || "JetBrains Mono Variable, monospace";
+      const axisFont = `10.5px ${mono}`;
+      const labelFont = `500 11px ${sans}`;
       const axes: uPlot.Axis[] = [
         {
           scale: "x",
           label: timeReference ? `Time (s relative to ${timeReference})` : "Time (s)",
+          font: axisFont,
+          labelFont,
+          ticks: { show: false },
           stroke: palette.getPropertyValue("--d-chart-axis").trim() || "#8b95a5",
           grid: { stroke: palette.getPropertyValue("--d-chart-grid").trim() || "#28323f", dash: [4, 4] },
           values: (_u, values) => values.map((value) => `${((value - plotData.xMin!) / 1000).toFixed(xSpan > 10000 ? 1 : 3)} s`),
@@ -83,6 +90,9 @@ export function UPlotSignal({
         ...panes.map((pane, index) => ({
           scale: `y${index}`,
           label: pane.unit === "1" ? pane.label : `${pane.label} [${pane.unit}]`,
+          font: axisFont,
+          labelFont,
+          ticks: { show: false },
           stroke: palette.getPropertyValue("--d-chart-axis").trim() || "#8b95a5",
           grid: { stroke: palette.getPropertyValue("--d-chart-grid").trim() || "#28323f" },
           values: (_u: uPlot, values: number[]) => values.map((value) => value.toFixed(2)),

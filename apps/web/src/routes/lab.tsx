@@ -7,6 +7,7 @@ import {
   useSearch,
 } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef } from "react";
+import { LayoutGroup, motion } from "motion/react";
 import { Group, Panel, Separator } from "react-resizable-panels";
 
 import { lazy, Suspense } from "react";
@@ -16,7 +17,7 @@ const MatchLabCanvasRoot = lazy(() => import("@/components/matchlab/MatchLabCanv
 const SignalLaboratory = lazy(() => import("@/components/lab/SignalLaboratory").then((module) => ({ default: module.SignalLaboratory })));
 const PitchReplay = lazy(() => import("@/components/pitch/PitchReplay").then((module) => ({ default: module.PitchReplay })));
 const PoseViewer = lazy(() => import("@/components/pose/PoseViewer"));
-const MatchLabContextSpine = lazy(() => import("@/components/matchlab/MatchLabWorkspace").then((module) => ({ default: module.MatchLabContextSpine })));
+const MatchWorldStrip = lazy(() => import("@/components/matchlab/MatchWorldStrip").then((module) => ({ default: module.MatchWorldStrip })));
 const MatchLabDashboard = lazy(() => import("@/components/matchlab/MatchLabWorkspace").then((module) => ({ default: module.MatchLabDashboard })));
 const MatchLabPoseViewport = lazy(() => import("@/components/matchlab/MatchLabWorkspace").then((module) => ({ default: module.MatchLabPoseViewport })));
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
@@ -27,6 +28,7 @@ import { cn } from "@/lib/cn";
 import { labSearchSchema, parseSearch, WORKBENCH_VIEWS } from "@/lib/search";
 import type { LabSearch, WorkbenchView } from "@/lib/search";
 import { useAnalysisStore } from "@/lib/state/analysis";
+import { usePublishLabContext } from "@/lib/use-world-context";
 import { formatNsDecimal, tryParseNs } from "@/lib/time";
 
 
@@ -46,6 +48,7 @@ export function LabPage() {
   const hydrate = useAnalysisStore((state) => state.hydrate);
   const setNominalRate = useAnalysisStore((state) => state.setNominalRate);
   const session = useQuery(sessionQuery(datasetId, sessionId));
+  usePublishLabContext({ datasetId, sessionId, search, session: session.data });
 
   const durableTimeNs = tryParseNs(search.t_ns);
   const durableSubject = search.subject ?? null;
@@ -125,7 +128,10 @@ export function LabPage() {
   const poseStreamForMatch = detail?.streams.find(
     (stream) => stream.modality === "pose" && stream.trial_id === (selectedStream?.trial_id ?? search.trial),
   );
-  const poseSubjectArtifactId = durableView === "matchlab" && search.subject === undefined && selectedStream?.modality === "tracking"
+  // Match World entry: the selected player's first Pose observation anchors
+  // the opening frame, so a link into a Pose match never lands on a Pose gap.
+  const poseSubjectArtifactId = durableView === "matchlab" && selectedStream?.modality === "tracking" &&
+    (search.subject === undefined || search.t_ns === undefined)
     ? poseStreamForMatch?.sample_artifact_ids[0] ?? null
     : null;
   const poseSubjectArtifact = useQuery({
@@ -209,14 +215,23 @@ export function LabPage() {
       return;
     }
     if (!timeArtifact.data || awaitingPoseSubject) return;
+    const matchEntry = durableView === "matchlab" && search.t_ns === undefined && poseSubjectArtifactId !== null;
+    if (matchEntry && poseSubjectArtifact.isPending) return;
+    let anchorNs = durableTimeNs;
+    if (matchEntry && poseSubjectArtifact.data && detail) {
+      const subject = search.subject ?? defaultMatchPlayerId(detail, poseSubjectArtifact.data, timeArtifact.data);
+      anchorNs = canonicalTimeDefault(poseSubjectArtifact.data, { currentNs: null, view: "pose", subjectId: subject }) ?? durableTimeNs;
+    }
+    // `canonicalTimeDefault` returns null when the anchor already lies inside
+    // the tracking span; on entry that anchor is exactly the frame to commit.
     const target = canonicalTimeDefault(timeArtifact.data, {
-      currentNs: durableTimeNs,
+      currentNs: anchorNs,
       view: durableView,
       subjectId: durableSubject,
-    });
+    }) ?? (matchEntry && anchorNs !== durableTimeNs ? anchorNs : null);
     if (target === null) return;
     updateSearch({ t_ns: formatNsDecimal(target) });
-  }, [awaitingPoseSubject, datasetId, durableSubject, durableTimeNs, durableView, search.stream, search.subject, search.t_ns, search.trial, selectedStream, sessionId, timeArtifact.data, updateSearch]);
+  }, [awaitingPoseSubject, datasetId, detail, durableSubject, durableTimeNs, durableView, poseSubjectArtifact.data, poseSubjectArtifact.isPending, poseSubjectArtifactId, search.stream, search.subject, search.t_ns, search.trial, selectedStream, sessionId, timeArtifact.data, updateSearch]);
 
   if (session.isPending) return <LoadingPanel label="Loading laboratory session" />;
   if (session.isError) {
@@ -242,12 +257,12 @@ export function LabPage() {
     ),
   ];
   const viewLabels: Record<WorkbenchView, string> = {
-    overview: "overview",
-    signals: "signals",
-    field: "field",
-    pose: "pose",
+    overview: "Overview",
+    signals: "Signals",
+    field: "Field",
+    pose: "Pose",
     matchlab: "MatchLab",
-    provenance: "provenance",
+    provenance: "Provenance",
   };
   return (
     <Suspense fallback={<LoadingPanel label="Opening laboratory" />}>
@@ -258,52 +273,18 @@ export function LabPage() {
         }
       >
         <div className="relative z-10 flex h-full min-h-0 flex-col">
-        <div
-          role="tablist"
-          aria-label="Laboratory views"
-          className="flex h-9 shrink-0 items-center gap-0.5 border-b border-border-subtle bg-surface-1 px-2"
-        >
-          {availableViews.map((candidate) => (
-            <button
-              key={candidate}
-              type="button"
-              role="tab"
-              aria-selected={view === candidate}
-              onClick={() => updateSearch({ view: candidate })}
-              className={cn(
-                "t-context relative rounded-control px-2.5 py-1 capitalize transition-colors duration-quick",
-                view === candidate
-                  ? "bg-surface-3 font-medium text-text-primary"
-                  : "text-text-muted hover:bg-surface-2 hover:text-text-secondary",
-              )}
-            >
-              {viewLabels[candidate]}
-              {view === candidate ? (
-                <span
-                  aria-hidden="true"
-                  className="t-tab-indicator absolute inset-x-2 -bottom-[5px] h-0.5 rounded-full bg-accent"
-                />
-              ) : null}
-            </button>
-          ))}
-          <span className="ml-auto flex items-center gap-2 text-[11px] text-text-muted">
-            {search.trial ? (
-              <span title={`Selected trial ${search.trial}`}>
-                Trial <span className="mono text-text-secondary">{search.trial}</span>
-              </span>
-            ) : null}
-            {search.subject ? (
-              <span title={`Selected subject ${search.subject}`}>
-                Subject <span className="mono text-text-secondary">{search.subject}</span>
-              </span>
-            ) : null}
-          </span>
-        </div>
         {view === "matchlab" ? (
           <Suspense fallback={<div className="h-10 shrink-0 border-b border-border-subtle bg-surface-1" />}>
-            <MatchLabContextSpine session={session.data} />
+            <MatchWorldStrip
+              session={session.data}
+              tabs={<ViewTabs views={availableViews} labels={viewLabels} active={view} onSelect={(candidate) => updateSearch({ view: candidate })} />}
+            />
           </Suspense>
-        ) : null}
+        ) : (
+          <div className="flex h-10 shrink-0 items-center border-b border-border-subtle bg-surface-1 px-2">
+            <ViewTabs views={availableViews} labels={viewLabels} active={view} onSelect={(candidate) => updateSearch({ view: candidate })} />
+          </div>
+        )}
         <div className="min-h-0 flex-1">
           {view === "overview" ? (
             <LabOverview
@@ -333,7 +314,7 @@ export function LabPage() {
               className="flex h-full min-h-0"
               resizeTargetMinimumSize={{ coarse: 28, fine: 6 }}
             >
-              <Panel id="matchlab-field" defaultSize="48%" minSize="38%" className="min-w-0 overflow-hidden bg-transparent">
+              <Panel id="matchlab-field" defaultSize="42%" minSize="38%" className="min-w-0 overflow-hidden bg-transparent">
                 <section aria-label="Field Tactical Map" data-testid="matchlab-field-panel" className="h-full min-h-0 overflow-hidden bg-transparent">
                   {selectedStream?.modality === "tracking" ? (
                     <PitchReplay />
@@ -347,7 +328,7 @@ export function LabPage() {
                 <MatchLabPoseViewport />
               </Panel>
               <Separator aria-label="Resize Pose and Analysis panels" className="w-px shrink-0 bg-border-subtle transition-colors data-[separator]:hover:bg-accent" />
-              <Panel id="matchlab-analysis" defaultSize="22%" minSize="18%" className="min-w-0 overflow-hidden bg-surface-1">
+              <Panel id="matchlab-analysis" defaultSize="28%" minSize="18%" className="min-w-0 overflow-hidden bg-surface-1">
                 <MatchLabDashboard session={session.data} />
               </Panel>
             </Group>
@@ -366,5 +347,48 @@ export function LabPage() {
         </div>
       </MatchLabCanvasRoot>
     </Suspense>
+  );
+}
+
+/** World view switcher: a quiet segmented control with a shared-layout marker. */
+function ViewTabs({
+  views,
+  labels,
+  active,
+  onSelect,
+}: {
+  views: readonly WorkbenchView[];
+  labels: Record<WorkbenchView, string>;
+  active: WorkbenchView;
+  onSelect: (view: WorkbenchView) => void;
+}) {
+  return (
+    <LayoutGroup id="lab-view-tabs">
+      <div role="tablist" aria-label="Laboratory views" className="flex shrink-0 items-center gap-0.5 rounded-[7px] border border-border-subtle bg-surface-0 p-0.5">
+        {views.map((candidate) => (
+          <button
+            key={candidate}
+            type="button"
+            role="tab"
+            aria-selected={active === candidate}
+            onClick={() => onSelect(candidate)}
+            className={cn(
+              "relative rounded-[5px] px-2.5 py-1 text-[11.5px] transition-colors duration-quick",
+              active === candidate ? "font-medium text-text-primary" : "text-text-muted hover:text-text-secondary",
+            )}
+          >
+            {active === candidate ? (
+              <motion.span
+                layoutId="lab-view-marker"
+                transition={{ duration: 0.2, ease: [0.3, 0, 0, 1] }}
+                aria-hidden="true"
+                className="absolute inset-0 rounded-[5px] border border-border-subtle bg-surface-3"
+              />
+            ) : null}
+            <span className="relative">{labels[candidate]}</span>
+          </button>
+        ))}
+      </div>
+    </LayoutGroup>
   );
 }

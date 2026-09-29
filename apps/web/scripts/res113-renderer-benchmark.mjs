@@ -200,7 +200,8 @@ for (const backend of ["webgl2", "webgpu"]) {
             await page.waitForFunction(() => Number(document.querySelector("[data-testid='pitch-canvas']")?.dataset.overlayTerritoryCells) > 0);
             await page.waitForFunction(() => Number(document.querySelector("[data-testid='pitch-canvas']")?.dataset.overlayInfluenceCells) > 0);
           }
-          if (scenario.id !== "field") {
+          // Split owns one linked Pose subject; the all-subject control exists on the standalone Pose view.
+          if (scenario.id === "pose") {
             const allSubjects = page.getByTestId("pose-all-subjects-toggle");
             if (await allSubjects.getAttribute("aria-pressed") !== "true") await allSubjects.click();
             await page.waitForFunction(() => {
@@ -223,14 +224,16 @@ for (const backend of ["webgl2", "webgpu"]) {
           result.measurement = await measure(page);
           await page.getByRole("button", { name: "Pause playback" }).first().click();
           result.selectionLatency = scenario.id !== "pose" ? await fieldSelectionLatency(page) : null;
-          result.poseSubjectCount = scenario.id !== "field"
+          result.poseSubjectCount = scenario.id === "pose"
             ? await page.locator("[data-testid='pose-canvas']").evaluate(() => Number(
                 [...document.querySelectorAll("p")]
                   .map((node) => node.textContent ?? "")
                   .find((value) => value.includes("subjects share one source-coordinate world"))
                   ?.match(/^\s*(\d+)/)?.[1] ?? 0,
               ))
-            : null;
+            : scenario.id === "split"
+              ? await page.getByTestId("pose-canvas").getAttribute("data-selected-player-id").then((value) => value ? 1 : 0)
+              : null;
           result.status = errors.length === 0 ? "ok" : "console-error";
           result.sourceFrameIdentity = renderer.source;
         } catch (error) {
@@ -267,7 +270,7 @@ const report = {
     run.status === "ok" && run.measurement?.isWebGPURenderer === true,
   ) ? "passed all real Field/Pose scenes without renderer or console errors" : "failed one or more real scenes",
   recommendedBackend: "WebGL2",
-  decision: "WebGPU rendered all tested scenes without renderer or console errors, but did not provide a performance benefit in this captured sample. WebGL2 was faster in Field, Pose and split mode, with the largest gap in split mode; compare each run's FPS, frame intervals and resource figures. Keep WebGL2 as the production backend.",
+  decision: "WebGPU rendered all tested scenes without renderer or console errors, but performance varied by workload and viewport: it was faster for 1440px Field in this sample and markedly slower in both split-view runs. Keep WebGL2 as the production backend until split-view performance is resolved; compare each run's FPS, frame intervals and resource figures.",
   runs,
 };
 await mkdir(path.dirname(output), { recursive: true });

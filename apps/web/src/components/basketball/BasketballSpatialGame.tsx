@@ -365,20 +365,17 @@ function BasketballSpatialGameContent() {
 function GameHeader({ game }: { game: BasketballSpatialGameView }) {
   const summary = game.game.summary;
   return (
-    <header className="shrink-0 border-b border-border-subtle bg-surface-1 px-4 py-2">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div className="min-w-0">
-          <p className="t-section">
-            {summary.teams
-              .map((team) => `${team.display_name} ${team.score ?? "—"}`)
-              .join(" · ")} · {game.game.edition.edition_label}
-          </p>
-          <h1 className="t-surface-title mt-0.5">Basketball spatial game</h1>
-        </div>
-        <span className="mono ml-auto text-[10px] text-text-muted">
-          SkillCorner · {summary.provider_game_id ?? summary.contest_id}
-        </span>
+    <header className="flex h-12 shrink-0 items-center gap-4 border-b border-border-subtle bg-surface-1 px-4">
+      <div className="flex min-w-0 items-baseline gap-2.5">
+        <span className="t-kicker">Match World · court</span>
+        <h1 className="text-[15px] font-semibold tracking-[-0.015em] text-text-primary">Basketball spatial game</h1>
       </div>
+      <p className="mono hidden truncate text-[12px] text-text-secondary min-[1400px]:block" aria-label="Score">
+        {summary.teams.map((team) => `${team.display_name} ${team.score ?? "—"}`).join(" · ")}
+      </p>
+      <span className="mono ml-auto shrink-0 text-[10.5px] text-text-muted">
+        {game.game.edition.competition_name} {game.game.edition.edition_label} · SkillCorner · {summary.provider_game_id ?? summary.contest_id}
+      </span>
     </header>
   );
 }

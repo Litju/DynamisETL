@@ -1,115 +1,180 @@
-﻿/* DynamisData design tokens — "Dynamis Instrument".
+/* DynamisData design tokens — "Dynamis Instrument" (V4).
  *
- * Tailwind v4 theme variables are the canonical frontend design-token source.
- * Semantic variables are defined per theme (`:root` = Instrument Dark,
- * `[data-theme="light"]` = Report Light) and mapped into Tailwind through
- * `@theme inline`, so no component ever hard-codes a surface or semantic color.
+ * Direction: scientific instrument × editorial product × spatial interface.
+ * Quiet at rest, precise under interaction.
+ *
+ * OKLCH is the colour authority. Every derived hover/selection/overlay state is
+ * produced with `color-mix()` from a semantic token instead of a hand-picked
+ * duplicate. Semantic variables are defined per theme (`:root` = Instrument
+ * Dark, `[data-theme="light"]` = Report Light) and mapped into Tailwind through
+ * `@theme inline`, so no component hard-codes a surface or semantic colour.
+ *
+ * Depth is four conceptual planes, expressed by tone + 1 px borders first and
+ * shadow last:
+ *   L0 world / canvas        → --d-surface-0
+ *   L1 analytical surface    → --d-surface-1
+ *   L2 contextual overlay    → --d-surface-2 (+ glass only over spatial scenes)
+ *   L3 active focus / modal  → --d-surface-3
  */
 
 :root {
   color-scheme: dark;
 
-  /* Surface hierarchy: graphite, never pure-black inversion. */
-  --d-surface-0: oklch(0.17 0.012 255);
-  --d-surface-1: oklch(0.2 0.012 255);
-  --d-surface-2: oklch(0.235 0.013 255);
-  --d-surface-3: oklch(0.285 0.015 255);
-  --d-border-subtle: oklch(0.3 0.012 255);
-  --d-border-strong: oklch(0.42 0.015 255);
-  --d-border-divider: oklch(0.34 0.012 255);
+  /* Planes: cool graphite, never pure black. */
+  --d-surface-0: oklch(0.158 0.009 262);
+  --d-surface-1: oklch(0.186 0.01 262);
+  --d-surface-2: oklch(0.218 0.011 262);
+  --d-surface-3: oklch(0.262 0.013 262);
+  --d-surface-4: oklch(0.31 0.014 262);
+  --d-border-subtle: oklch(0.275 0.011 262);
+  --d-border-strong: oklch(0.4 0.014 262);
+  --d-border-divider: oklch(0.32 0.011 262);
 
-  --d-text-primary: oklch(0.93 0.005 255);
-  --d-text-secondary: oklch(0.82 0.01 255);
-  --d-text-muted: oklch(0.72 0.012 255);
-  --d-text-inverse: oklch(0.16 0.01 255);
+  --d-text-primary: oklch(0.955 0.004 262);
+  --d-text-secondary: oklch(0.815 0.009 262);
+  --d-text-muted: oklch(0.7 0.011 262);
+  --d-text-faint: oklch(0.625 0.011 262);
+  --d-text-inverse: oklch(0.16 0.01 262);
 
-  /* Focus/selection: cyan/blue instrument accent. */
-  --d-accent: oklch(0.74 0.13 215);
-  --d-accent-strong: oklch(0.82 0.13 215);
-  --d-accent-muted: oklch(0.4 0.06 215);
+  /* One instrument accent: a cool, slightly desaturated cyan-blue. */
+  --d-accent: oklch(0.77 0.115 222);
+  --d-accent-strong: oklch(0.85 0.11 222);
+  --d-accent-muted: oklch(0.38 0.055 222);
+  --d-focus: oklch(0.8 0.12 222);
 
-  /* Measurement classes: shape + text + color, never color alone. */
-  --d-measurement-raw: oklch(0.78 0.12 205);
-  --d-measurement-source-derived: oklch(0.8 0.14 80);
-  --d-measurement-pipeline-derived: oklch(0.74 0.15 290);
-  --d-measurement-model-estimated: oklch(0.74 0.16 350);
+  /* Semantic status. Always paired with text and a glyph. */
+  --d-success: oklch(0.78 0.13 155);
+  --d-warning: oklch(0.82 0.13 82);
+  --d-danger: oklch(0.69 0.17 25);
+  --d-info: oklch(0.76 0.09 245);
 
-  /* Quality states. */
-  --d-quality-valid: oklch(0.78 0.15 150);
-  --d-quality-warning: oklch(0.81 0.14 80);
-  --d-quality-error: oklch(0.68 0.19 25);
-  --d-quality-unavailable: oklch(0.55 0.01 255);
+  /* Readiness ladder — three separate concepts, never conflated:
+   *   upstream   → exists at the provider;
+   *   server     → registered / materialized / ready on the Dynamis data plane;
+   *   browser    → loaded in this session's cache. */
+  --d-ready-upstream: oklch(0.66 0.012 262);
+  --d-ready-registered: oklch(0.74 0.06 240);
+  --d-ready-materialized: oklch(0.77 0.09 205);
+  --d-ready-ready: oklch(0.79 0.13 155);
+  --d-ready-loaded: oklch(0.8 0.115 222);
+  --d-ready-blocked: oklch(0.69 0.17 25);
+
+  /* Scientific classes: shape + text + colour, never colour alone. */
+  --d-measurement-raw: oklch(0.78 0.11 205);
+  --d-measurement-source-derived: oklch(0.8 0.13 80);
+  --d-measurement-pipeline-derived: oklch(0.75 0.14 292);
+  --d-measurement-model-estimated: oklch(0.75 0.15 350);
+  --d-deterministic: var(--d-measurement-pipeline-derived);
+  --d-model-estimated: var(--d-measurement-model-estimated);
+  --d-unavailable: oklch(0.52 0.01 262);
+
+  /* Legacy quality aliases (component contracts depend on these names). */
+  --d-quality-valid: var(--d-success);
+  --d-quality-warning: var(--d-warning);
+  --d-quality-error: var(--d-danger);
+  --d-quality-unavailable: var(--d-unavailable);
 
   /* Chart primitives. */
-  --d-chart-grid: oklch(0.31 0.01 255);
-  --d-chart-axis: oklch(0.62 0.012 255);
-  --d-chart-reference: oklch(0.5 0.012 255);
-  --d-playhead: oklch(0.82 0.13 200);
-  --d-brush: oklch(0.74 0.13 215 / 0.16);
+  --d-chart-grid: oklch(0.29 0.009 262);
+  --d-chart-axis: oklch(0.62 0.011 262);
+  --d-chart-reference: oklch(0.48 0.011 262);
+  --d-playhead: oklch(0.84 0.12 205);
+  --d-brush: oklch(0.77 0.115 222 / 0.15);
 
   /* Modality accents (one hue per modality family). */
-  --d-modality-force: oklch(0.75 0.15 45);
-  --d-modality-imu: oklch(0.75 0.13 175);
-  --d-modality-gnss: oklch(0.76 0.12 140);
-  --d-modality-lpt: oklch(0.75 0.14 300);
-  --d-modality-tracking: oklch(0.76 0.12 245);
-  --d-modality-event: oklch(0.78 0.14 95);
-  --d-modality-pose: oklch(0.74 0.16 350);
+  --d-modality-force: oklch(0.76 0.14 45);
+  --d-modality-imu: oklch(0.76 0.12 175);
+  --d-modality-gnss: oklch(0.77 0.11 140);
+  --d-modality-lpt: oklch(0.76 0.13 300);
+  --d-modality-tracking: oklch(0.77 0.11 245);
+  --d-modality-event: oklch(0.79 0.13 95);
+  --d-modality-pose: oklch(0.75 0.15 350);
 
-  /* Team identity on the pitch: two hues reserved for opposing groups so they
-   * never borrow a measurement-class or modality meaning. */
+  /* Team identity on spatial views: two hues reserved for opposing groups so
+   * they never borrow a measurement-class or modality meaning. */
   --d-team-a: oklch(0.8 0.1 235);
-  --d-team-b: oklch(0.82 0.14 62);
-  --d-team-halo: oklch(0.14 0.01 255);
+  --d-team-b: oklch(0.82 0.13 62);
+  --d-team-halo: oklch(0.14 0.01 262);
 
-  --d-shadow-overlay: 0 12px 32px oklch(0.08 0.01 255 / 0.55);
+  /* Derived states. */
+  --d-hover: color-mix(in oklab, var(--d-text-primary) 5%, transparent);
+  --d-press: color-mix(in oklab, var(--d-text-primary) 8%, transparent);
+  --d-selected: color-mix(in oklab, var(--d-accent) 13%, var(--d-surface-1));
+  --d-selected-border: color-mix(in oklab, var(--d-accent) 55%, var(--d-border-subtle));
+  --d-glass: color-mix(in oklab, var(--d-surface-2) 80%, transparent);
+  --d-scrim: oklch(0.09 0.01 262 / 0.55);
+
+  --d-shadow-overlay: 0 1px 0 oklch(1 0 0 / 0.04) inset, 0 18px 48px -12px oklch(0.05 0.01 262 / 0.7);
+  --d-shadow-lift: 0 1px 0 oklch(1 0 0 / 0.035) inset, 0 8px 24px -14px oklch(0.05 0.01 262 / 0.8);
 }
 
 [data-theme="light"] {
   color-scheme: light;
 
-  --d-surface-0: oklch(0.975 0.003 255);
-  --d-surface-1: oklch(0.995 0.001 255);
-  --d-surface-2: oklch(0.955 0.004 255);
-  --d-surface-3: oklch(0.92 0.006 255);
-  --d-border-subtle: oklch(0.87 0.006 255);
-  --d-border-strong: oklch(0.72 0.01 255);
-  --d-border-divider: oklch(0.82 0.006 255);
+  --d-surface-0: oklch(0.972 0.003 262);
+  --d-surface-1: oklch(0.993 0.001 262);
+  --d-surface-2: oklch(0.955 0.004 262);
+  --d-surface-3: oklch(0.925 0.006 262);
+  --d-surface-4: oklch(0.89 0.008 262);
+  --d-border-subtle: oklch(0.885 0.006 262);
+  --d-border-strong: oklch(0.73 0.01 262);
+  --d-border-divider: oklch(0.83 0.006 262);
 
-  --d-text-primary: oklch(0.24 0.012 255);
-  --d-text-secondary: oklch(0.4 0.012 255);
-  --d-text-muted: oklch(0.46 0.012 255);
-  --d-text-inverse: oklch(0.98 0.003 255);
+  --d-text-primary: oklch(0.22 0.012 262);
+  --d-text-secondary: oklch(0.38 0.012 262);
+  --d-text-muted: oklch(0.47 0.012 262);
+  --d-text-faint: oklch(0.55 0.011 262);
+  --d-text-inverse: oklch(0.98 0.003 262);
 
-  --d-accent: oklch(0.55 0.14 215);
-  --d-accent-strong: oklch(0.45 0.14 215);
-  --d-accent-muted: oklch(0.85 0.05 215);
+  --d-accent: oklch(0.52 0.13 228);
+  --d-accent-strong: oklch(0.43 0.13 228);
+  --d-accent-muted: oklch(0.87 0.045 228);
+  --d-focus: oklch(0.52 0.14 228);
 
-  --d-measurement-raw: oklch(0.55 0.13 205);
-  --d-measurement-source-derived: oklch(0.6 0.13 70);
-  --d-measurement-pipeline-derived: oklch(0.52 0.16 290);
-  --d-measurement-model-estimated: oklch(0.55 0.17 350);
+  --d-success: oklch(0.52 0.13 155);
+  --d-warning: oklch(0.6 0.13 70);
+  --d-danger: oklch(0.54 0.18 25);
+  --d-info: oklch(0.5 0.1 245);
 
-  --d-quality-valid: oklch(0.55 0.14 150);
-  --d-quality-warning: oklch(0.62 0.13 75);
-  --d-quality-error: oklch(0.55 0.18 25);
-  --d-quality-unavailable: oklch(0.6 0.01 255);
+  --d-ready-upstream: oklch(0.55 0.01 262);
+  --d-ready-registered: oklch(0.5 0.07 240);
+  --d-ready-materialized: oklch(0.5 0.09 205);
+  --d-ready-ready: oklch(0.5 0.13 155);
+  --d-ready-loaded: oklch(0.5 0.13 228);
+  --d-ready-blocked: oklch(0.54 0.18 25);
 
-  --d-chart-grid: oklch(0.9 0.005 255);
-  --d-chart-axis: oklch(0.5 0.012 255);
-  --d-chart-reference: oklch(0.7 0.01 255);
-  --d-playhead: oklch(0.5 0.14 215);
-  --d-brush: oklch(0.55 0.14 215 / 0.14);
+  --d-measurement-raw: oklch(0.52 0.12 205);
+  --d-measurement-source-derived: oklch(0.56 0.13 70);
+  --d-measurement-pipeline-derived: oklch(0.5 0.15 292);
+  --d-measurement-model-estimated: oklch(0.53 0.16 350);
+  --d-unavailable: oklch(0.6 0.01 262);
+
+  --d-chart-grid: oklch(0.9 0.005 262);
+  --d-chart-axis: oklch(0.5 0.012 262);
+  --d-chart-reference: oklch(0.7 0.01 262);
+  --d-playhead: oklch(0.5 0.13 228);
+  --d-brush: oklch(0.52 0.13 228 / 0.13);
 
   --d-team-a: oklch(0.52 0.13 245);
   --d-team-b: oklch(0.6 0.15 55);
-  --d-team-halo: oklch(0.99 0.002 255);
-  --d-shadow-overlay: 0 12px 28px oklch(0.4 0.01 255 / 0.18);
+  --d-team-halo: oklch(0.99 0.002 262);
+
+  --d-hover: color-mix(in oklab, var(--d-text-primary) 4%, transparent);
+  --d-press: color-mix(in oklab, var(--d-text-primary) 7%, transparent);
+  --d-selected: color-mix(in oklab, var(--d-accent) 9%, var(--d-surface-1));
+  --d-glass: color-mix(in oklab, var(--d-surface-1) 82%, transparent);
+  --d-scrim: oklch(0.3 0.01 262 / 0.28);
+
+  --d-shadow-overlay: 0 18px 44px -16px oklch(0.35 0.02 262 / 0.28), 0 0 0 1px oklch(0.2 0.01 262 / 0.04);
+  --d-shadow-lift: 0 8px 22px -14px oklch(0.35 0.02 262 / 0.3);
 }
 
-/* Type and control tokens shared by every surface. Keep the instrument dense,
- * but make the hierarchy and touch targets deliberate instead of accidental. */
+/* Type, spacing, control and motion tokens shared by every surface. The
+ * instrument stays dense inside analytical panels; hierarchy boundaries get
+ * editorial whitespace and a real display scale. */
 :root {
+  --d-type-display: 2.25rem;
+  --d-type-headline: 1.5rem;
   --d-type-product: 1.25rem;
   --d-type-surface: 1rem;
   --d-type-analysis: 0.8125rem;
@@ -122,6 +187,16 @@
   --d-control-compact: 1.5rem;
   --d-control-default: 1.75rem;
   --d-control-prominent: 2rem;
+
+  /* Motion grammar: micro (hover/press/tab), panel (drawers, inspectors),
+   * context (shared/route continuity). Short, interruptible, no springs. */
+  --d-motion-instant: 60ms;
+  --d-motion-micro: 120ms;
+  --d-motion-panel: 220ms;
+  --d-motion-context: 320ms;
+  --d-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --d-ease-emphasized: cubic-bezier(0.3, 0, 0, 1);
+  --d-ease-exit: cubic-bezier(0.4, 0, 1, 1);
 }
 
 @theme inline {
@@ -129,6 +204,7 @@
   --color-surface-1: var(--d-surface-1);
   --color-surface-2: var(--d-surface-2);
   --color-surface-3: var(--d-surface-3);
+  --color-surface-4: var(--d-surface-4);
   --color-border-subtle: var(--d-border-subtle);
   --color-border-strong: var(--d-border-strong);
   --color-border-divider: var(--d-border-divider);
@@ -136,16 +212,33 @@
   --color-text-primary: var(--d-text-primary);
   --color-text-secondary: var(--d-text-secondary);
   --color-text-muted: var(--d-text-muted);
+  --color-text-faint: var(--d-text-faint);
   --color-text-inverse: var(--d-text-inverse);
 
   --color-accent: var(--d-accent);
   --color-accent-strong: var(--d-accent-strong);
   --color-accent-muted: var(--d-accent-muted);
+  --color-focus: var(--d-focus);
+
+  --color-success: var(--d-success);
+  --color-warning: var(--d-warning);
+  --color-danger: var(--d-danger);
+  --color-info: var(--d-info);
+
+  --color-ready-upstream: var(--d-ready-upstream);
+  --color-ready-registered: var(--d-ready-registered);
+  --color-ready-materialized: var(--d-ready-materialized);
+  --color-ready-ready: var(--d-ready-ready);
+  --color-ready-loaded: var(--d-ready-loaded);
+  --color-ready-blocked: var(--d-ready-blocked);
 
   --color-measurement-raw: var(--d-measurement-raw);
   --color-measurement-source-derived: var(--d-measurement-source-derived);
   --color-measurement-pipeline-derived: var(--d-measurement-pipeline-derived);
   --color-measurement-model-estimated: var(--d-measurement-model-estimated);
+  --color-deterministic: var(--d-deterministic);
+  --color-model-estimated: var(--d-model-estimated);
+  --color-unavailable: var(--d-unavailable);
 
   --color-quality-valid: var(--d-quality-valid);
   --color-quality-warning: var(--d-quality-warning);
@@ -166,20 +259,32 @@
   --color-modality-event: var(--d-modality-event);
   --color-modality-pose: var(--d-modality-pose);
 
-  /* Typography: Inter Variable for UI, JetBrains Mono Variable for identifiers. */
+  --color-hover: var(--d-hover);
+  --color-press: var(--d-press);
+  --color-selected: var(--d-selected);
+  --color-selected-border: var(--d-selected-border);
+  --color-glass: var(--d-glass);
+  --color-scrim: var(--d-scrim);
+
+  /* Typography: Inter Variable for interface, JetBrains Mono for exact values,
+   * timestamps, ids and hashes. No decorative families. */
   --font-sans: "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, "Cascadia Mono", monospace;
 
-  /* Spatial system: 4 px micro-grid, 8 px macro rhythm, 6 px radii, 1 px borders. */
+  /* Spatial system: 4 px micro-grid, 8 px macro rhythm, 1 px borders. */
   --spacing-px: 1px;
   --spacing-micro: 0.25rem;
   --spacing-rhythm: 0.5rem;
   --spacing-rail: 3rem;
   --spacing-explorer: 15rem;
   --spacing-inspector: 22.5rem;
-  --radius-panel: 6px;
-  --radius-control: 4px;
+  --radius-panel: 8px;
+  --radius-card: 10px;
+  --radius-control: 6px;
+  --radius-chip: 4px;
 
+  --text-display: var(--d-type-display);
+  --text-headline: var(--d-type-headline);
   --text-product-title: var(--d-type-product);
   --text-surface-title: var(--d-type-surface);
   --text-analysis-title: var(--d-type-analysis);
@@ -191,10 +296,13 @@
   --text-evidence: var(--d-type-evidence);
 
   /* Animation: functional, never decorative. */
-  --duration-instant: 60ms;
-  --duration-quick: 120ms;
-  --duration-panel: 200ms;
-  --ease-instrument: cubic-bezier(0.2, 0, 0, 1);
+  --duration-instant: var(--d-motion-instant);
+  --duration-quick: var(--d-motion-micro);
+  --duration-panel: var(--d-motion-panel);
+  --duration-context: var(--d-motion-context);
+  --ease-instrument: var(--d-ease-standard);
+  --ease-emphasized: var(--d-ease-emphasized);
 
   --shadow-overlay: var(--d-shadow-overlay);
+  --shadow-lift: var(--d-shadow-lift);
 }

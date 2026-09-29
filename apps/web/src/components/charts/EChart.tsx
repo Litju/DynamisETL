@@ -1,6 +1,7 @@
 import type { ECElementEvent, ECharts, EChartsOption } from "echarts";
 import { useEffect, useRef, useState } from "react";
 
+import { dynamisChartTheme, readPalette } from "@/lib/chart-palette";
 import { cn } from "@/lib/cn";
 
 export interface ChartPointSelection {
@@ -54,7 +55,11 @@ export function EChart({
     void import("echarts").then((echarts) => {
       const element = containerRef.current;
       if (disposed || element === null) return;
-      chart = echarts.init(element, undefined, { renderer: "canvas" });
+      // Theme is rebuilt per chart from the live tokens so Instrument Dark and
+      // Report Light charts both read as part of the instrument.
+      const themeName = `dynamis-${document.documentElement.dataset.theme ?? "dark"}`;
+      echarts.registerTheme(themeName, dynamisChartTheme(readPalette()));
+      chart = echarts.init(element, themeName, { renderer: "canvas" });
       chartRef.current = chart;
       chart.on("click", (params: ECElementEvent) => {
         const data = params.data as [number, number] | undefined;

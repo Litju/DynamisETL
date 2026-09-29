@@ -1,6 +1,6 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import { ChevronLeft, ChevronRight, Clock3, ShieldAlert } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock3 } from "lucide-react";
 import { useCallback, useEffect, useMemo } from "react";
 import type { KeyboardEvent } from "react";
 
@@ -11,6 +11,8 @@ import type {
   GamePlayView,
   GameSummaryView,
 } from "@/api/types";
+import { MeasurementClassBadge } from "@/components/common/Badges";
+import { RightsChip } from "@/components/common/RightsChip";
 import { DataTable, type DataTableColumn } from "@/components/table/DataTable";
 import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/common/StatePanel";
 import { KeyValueRow, Panel } from "@/components/common/Panel";
@@ -175,63 +177,46 @@ export function GameLab() {
 
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="gamelab" data-sport={sport ?? ""}>
-      <header className="shrink-0 border-b border-border-subtle bg-surface-1 px-4 py-2">
-        <div className="flex flex-wrap items-end gap-x-5 gap-y-2">
-          <div className="flex items-baseline gap-3">
-            <h1 className="t-surface-title">
-              {skillCornerBasketball ? "Basketball game" : "GameLab"}
-            </h1>
-            <span className="t-label">
-              {skillCornerBasketball
-                ? "TRACKING · BALL_TRACKING · EVENTS"
-                : "PLAY_BY_PLAY · PLAYER_GAME · TEAM_GAME"}
-            </span>
-          </div>
-          <label className="flex flex-col gap-1 text-[10px] text-text-muted">
-            Competition edition
-            <select
-              aria-label="Competition edition"
-              value={edition.edition_id}
-              onChange={(event) =>
-                update({
-                  edition: event.currentTarget.value,
-                  game: undefined,
-                  team: undefined,
-                  period: undefined,
-                  clock: undefined,
-                  event: undefined,
-                  player: undefined,
-                  q: undefined,
-                  offset: "0",
-                  box: undefined,
-                })
-              }
-              className="rounded-control border border-border-strong bg-surface-0 px-2 py-1 text-[12px] text-text-primary"
-            >
-              {editions.map((item) => (
-                <option key={item.edition_id} value={item.edition_id}>
-                  {item.competition_name} · {item.edition_label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <span className="ml-auto text-[11px] text-text-muted">
-            {contextEdition?.provider ?? edition.provider} · {contextEdition?.measurement_class ?? edition.measurement_class}
-          </span>
+      <header className="flex h-12 shrink-0 items-center gap-4 border-b border-border-subtle bg-surface-1 px-4">
+        <div className="flex items-baseline gap-2.5">
+          <span className="t-kicker">Game World</span>
+          <h1 className="text-[15px] font-semibold tracking-[-0.015em] text-text-primary">
+            {skillCornerBasketball ? "Basketball game" : "GameLab"}
+          </h1>
         </div>
-        {contextEdition?.license.local_only ? (
-          <div
-            role="note"
-            aria-label="Local-only source rights"
-            className="mt-2 flex items-start gap-2 rounded-control border border-warning/40 bg-warning/5 px-2.5 py-1.5 text-[11px] text-text-secondary"
-          >
-            <ShieldAlert size={14} className="mt-0.5 shrink-0 text-warning" aria-hidden="true" />
-            <span>
-              <strong className="mr-1 text-warning">Local-only source.</strong>
-              {contextEdition.license.notice} Redistribution: {contextEdition.license.redistribution}.
-            </span>
-          </div>
-        ) : null}
+        <select
+          aria-label="Competition edition"
+          value={edition.edition_id}
+          onChange={(event) =>
+            update({
+              edition: event.currentTarget.value,
+              game: undefined,
+              team: undefined,
+              period: undefined,
+              clock: undefined,
+              event: undefined,
+              player: undefined,
+              q: undefined,
+              offset: "0",
+              box: undefined,
+            })
+          }
+          className="d-input h-7 text-[12px]"
+        >
+          {editions.map((item) => (
+            <option key={item.edition_id} value={item.edition_id}>
+              {item.competition_name} · {item.edition_label}
+            </option>
+          ))}
+        </select>
+        <span className="t-kicker hidden text-text-faint min-[1500px]:inline">
+          {skillCornerBasketball ? "TRACKING · BALL_TRACKING · EVENTS" : "PLAY_BY_PLAY · PLAYER_GAME · TEAM_GAME"}
+        </span>
+        <span className="ml-auto flex items-center gap-3 text-[11px] text-text-muted">
+          <span>{contextEdition?.provider ?? edition.provider}</span>
+          <MeasurementClassBadge measurementClass={contextEdition?.measurement_class ?? edition.measurement_class} compact />
+          {contextEdition ? <RightsChip license={contextEdition.license} /> : null}
+        </span>
       </header>
 
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(16rem,0.28fr)_minmax(0,0.72fr)] gap-px overflow-hidden bg-border-subtle">

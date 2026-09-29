@@ -710,10 +710,77 @@ const RUNS = {
   ],
 };
 
+export const WHITE_DATASET = {
+  ...DATASET,
+  dataset_id: "white-cmj-acc-grf",
+  name: "White CMJ accelerometer + vGRF (preprocessed, Python format)",
+  provider: "Zenodo",
+  domain: "laboratory",
+  upstream_urls: ["https://zenodo.org/"],
+  modalities: ["force", "imu"],
+  ingested_modalities: ["force", "imu"],
+  session_count: 1,
+  subject_count: 1,
+  trial_count: 1,
+  stream_count: 1,
+};
+
+const WHITE_SESSION = {
+  dataset_id: "white-cmj-acc-grf",
+  session: {
+    session_id: "cmj-1",
+    kind: "laboratory",
+    label: "Released CMJ trials for dataset subject 0",
+    started_at: null,
+    ended_at: null,
+    participant_count: 1,
+    trial_count: 1,
+    stream_count: 1,
+  },
+  participants: [{ subject_id: "cmj-subject-0", role: "participant", group_label: null, cohort: null, notes: null }],
+  trials: [
+    { trial_id: "cmj-1-arms-t00", subject_id: "cmj-subject-0", parent_trial_id: null, label: "condition=arms; source_row=1", started_at: null, ended_at: null },
+  ],
+  streams: [],
+};
+
+const SPORTS_MATCHES = [
+  {
+    dataset_id: "skillcorner-opendata",
+    session_id: "1925299",
+    provider_match_id: "1925299",
+    contest_id: "skillcorner:contest:1925299",
+    sport_id: "football",
+    sport_code: "football",
+    sport_name: "Football",
+    competition_id: "skillcorner:competition:9",
+    competition_name: "A-League",
+    edition_id: "skillcorner:edition:870",
+    edition_label: "2024/2025",
+    label: "Brisbane Roar FC vs Perth Glory",
+    scheduled_start_at: "2024-12-21T08:00:00+00:00",
+    actual_start_at: null,
+    venue: null,
+    home_away_supported: true,
+    teams: [
+      { team_id: "brisbane", display_name: "Brisbane Roar FC", side: "home", score: 0 },
+      { team_id: "perth", display_name: "Perth Glory", side: "away", score: 1 },
+    ],
+    periods: [],
+    source_capability: null,
+  },
+];
+
 function body(pathname: string): unknown | undefined {
   if (pathname === "/api/serving/status") return STATUS;
   if (pathname === "/api/catalog/read-model") return CATALOG_READ_MODEL;
-  if (pathname === "/api/catalog/datasets") return [DATASET];
+  if (pathname === "/api/catalog/datasets") return [DATASET, WHITE_DATASET];
+  if (pathname === "/api/catalog/sports/matches") return SPORTS_MATCHES;
+  if (pathname === "/api/catalog/source-capabilities") return [];
+  if (pathname === "/api/season/editions") return [];
+  if (pathname === "/api/games/editions") return [];
+  if (pathname === "/api/catalog/datasets/white-cmj-acc-grf/sessions") return [WHITE_SESSION.session];
+  if (pathname === "/api/catalog/datasets/white-cmj-acc-grf/sessions/cmj-1") return WHITE_SESSION;
   if (pathname === "/api/catalog/datasets/skillcorner-opendata") {
     return { ...DATASET, versions: [], v1_role: "reference", initial_scope: "match 1925299", adapter_id: "skillcorner_adapter" };
   }

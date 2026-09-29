@@ -71,7 +71,7 @@ test("real SkillCorner Field selection preserves time into Pose and both views p
   await expect(page).toHaveURL(/t_ns=0(?:&|$)/);
   await expect(page.getByTestId("pitch-selection")).toContainText(selected.entity_id);
 
-  await page.getByRole("tab", { name: "pose", exact: true }).click();
+  await page.getByRole("tab", { name: "Pose", exact: true }).click();
   await expect(page).toHaveURL(/view=pose/);
   await waitForPose(page);
   const poseView = page.getByTestId("pose-canvas");
@@ -94,7 +94,7 @@ test("real SkillCorner Field selection preserves time into Pose and both views p
   const poseFrameNs = BigInt((await poseView.getAttribute("data-source-frame-ns"))!);
   expect(canonicalTimeNs - poseFrameNs).toBeLessThanOrEqual(BigInt(Math.ceil(1.5e9 / poseRateHz)));
 
-  await page.getByRole("tab", { name: "field", exact: true }).click();
+  await page.getByRole("tab", { name: "Field", exact: true }).click();
   const resumedField = await waitForPitch(page);
   await expect(resumedField).toHaveAttribute("data-selected-player-id", selected.entity_id);
   await expect(resumedField).toHaveAttribute("data-canonical-time-ns", canonicalTimeNs.toString());
@@ -117,7 +117,7 @@ test("real SkillCorner Pose-origin subject selection updates Field identity and 
   await expect(page).toHaveURL(new RegExp(`t_ns=${targetTimeNs}`));
   await expect(page.getByTestId("pose-canvas")).toHaveAttribute("data-canonical-time-ns", targetTimeNs.toString());
 
-  await page.getByRole("tab", { name: "field", exact: true }).click();
+  await page.getByRole("tab", { name: "Field", exact: true }).click();
   const field = await waitForPitch(page);
   await expect(field).toHaveAttribute("data-selected-player-id", to!.entity_id);
   await expect(field).toHaveAttribute("data-canonical-time-ns", targetTimeNs.toString());

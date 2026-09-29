@@ -37,7 +37,10 @@ export interface UiState {
    * rail elsewhere, so an empty inspector never reserves flagship width.
    */
   inspectorOpen: boolean | null;
+  /** Match Navigator overlay inside the Match World. */
+  navigatorOpen: boolean;
   setPaletteOpen: (open: boolean) => void;
+  setNavigatorOpen: (open: boolean) => void;
   toggleFocusMode: () => void;
   setTheme: (theme: Theme) => void;
   setInspectorOpen: (open: boolean | null) => void;
@@ -53,7 +56,9 @@ export const useUiStore = create<UiState>()((set) => ({
   focusMode: false,
   theme: readStoredTheme(),
   inspectorOpen: null,
+  navigatorOpen: false,
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
+  setNavigatorOpen: (navigatorOpen) => set({ navigatorOpen }),
   toggleFocusMode: () => set((state) => ({ focusMode: !state.focusMode })),
   setInspectorOpen: (inspectorOpen) => set({ inspectorOpen }),
   setTheme: (theme) => {

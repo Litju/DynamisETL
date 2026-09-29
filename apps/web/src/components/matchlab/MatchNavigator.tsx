@@ -1,12 +1,16 @@
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight, Database, ExternalLink, Map as MapIcon, Search } from "lucide-react";
+import { ArrowLeft, ArrowRight, Database, Map as MapIcon, Search } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
 
 import type { SessionSummary, SourceCapabilityView, SportsCatalogMatchView } from "@/api/types";
+import { PrepareDialog } from "@/components/catalog/PrepareDialog";
+import { ReadinessGlyph } from "@/components/common/Readiness";
 import { StatePanel } from "@/components/common/StatePanel";
+import { WorldGlyph } from "@/components/common/WorldGlyph";
 import {
   artifactQuery,
+  catalogReadModelQuery,
   datasetsQuery,
   sessionQuery,
   sessionsQuery,
@@ -98,7 +102,7 @@ function CapabilityBadge({
   return (
     <span
       data-testid={testId}
-      className={`rounded-sm border px-1 py-px text-[9px] ${state === "local" ? "border-quality-valid/40 text-quality-valid" : "border-border-strong text-text-muted"}`}
+      className={`rounded-[4px] border px-1.5 py-px text-[10px] ${state === "local" ? "border-[color-mix(in_oklab,var(--d-ready-ready)_45%,transparent)] text-text-secondary" : "border-dashed border-border-subtle text-text-faint"}`}
       title={`${label} ${state === "local" ? "materialized locally" : "available from source"}`}
     >
       {label} · {state}
@@ -137,6 +141,7 @@ function MatchNavigatorContent({ compact }: { readonly compact: boolean }) {
   const matchFrame = useMatchFrameContext();
   const datasetListQuery = useQuery(datasetsQuery());
   const sportsQuery = useQuery(sportsCatalogMatchesQuery());
+  const catalogQuery = useQuery(catalogReadModelQuery());
   const path = location.pathname.split("/").filter(Boolean);
   const routeDatasetId = path[0] === "lab" ? path[1] ?? null : null;
   const routeSessionId = path[0] === "lab" ? path[2] ?? null : null;
@@ -421,6 +426,11 @@ function MatchNavigatorContent({ compact }: { readonly compact: boolean }) {
     });
   };
 
+  const catalogResource = (match: NavigatorMatch) => (catalogQuery.data?.resources ?? []).find(
+    (resource) => resource.resource_kind === "contest" && (resource.dataset_ids ?? []).includes(match.datasetId) &&
+      (resource.external_ids ?? []).includes(match.providerMatchId),
+  ) ?? null;
+
   const currentTrial = search.trial ?? activeSession?.trials[0]?.trial_id ?? "";
   const selectedSubject = matchFrame?.selectedPlayerId ?? search.subject ?? "";
   const heading = "Match Navigator";
@@ -432,135 +442,178 @@ function MatchNavigatorContent({ compact }: { readonly compact: boolean }) {
     return <StatePanel state="error" title="Sports catalog is unavailable." />;
   }
 
-  return (
-    <section
-      data-testid="match-navigator"
-      className={compact ? "flex h-full min-h-0 flex-col" : "mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col px-5 py-4"}
-    >
-      <header className={compact ? "border-b border-border-subtle px-3 py-2" : "mb-3 border-b border-border-subtle pb-3"}>
-        <div className="flex items-center gap-2">
-          <MapIcon size={14} aria-hidden="true" className="text-accent" />
-          <h1 className={compact ? "t-section" : "text-base font-medium text-text-primary"}>{heading}</h1>
-          {routeSessionId ? (
-            <span className="ml-auto flex gap-1">
-              <button type="button" aria-label="Navigator back" title="Back" onClick={() => window.history.back()} className="rounded-control p-1 text-text-muted hover:bg-surface-2"><ArrowLeft size={13} /></button>
-              <button type="button" aria-label="Navigator forward" title="Forward" onClick={() => window.history.forward()} className="rounded-control p-1 text-text-muted hover:bg-surface-2"><ArrowRight size={13} /></button>
-            </span>
-          ) : null}
-        </div>
-        {!compact ? <p className="mt-1 text-[11px] text-text-muted">Browse the sports corpus and local readiness. This view reads catalog metadata only.</p> : null}
-      </header>
-
-      <div className={compact ? "space-y-2 border-b border-border-subtle p-2" : "grid gap-2 border-b border-border-subtle pb-3 md:grid-cols-5"}>
-        <label className="t-label block text-text-muted">Sport
-          <select aria-label="Sport" value={filters.sport} onChange={(event) => setHierarchyFilters({ sport: event.target.value, competition: "", edition: "", team: "" })} className="mt-1 block w-full rounded-control border border-border-subtle bg-surface-0 px-2 py-1.5 text-[11px] text-text-primary">
-            <option value="">All sports</option>{sports.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-          </select>
-        </label>
-        <label className="t-label block text-text-muted">Competition
-          <select aria-label="Competition" value={filters.competition} onChange={(event) => setHierarchyFilters({ ...filters, competition: event.target.value, edition: "", team: "" })} className="mt-1 block w-full rounded-control border border-border-subtle bg-surface-0 px-2 py-1.5 text-[11px] text-text-primary">
-            <option value="">All competitions</option>{competitionOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-          </select>
-        </label>
-        <label className="t-label block text-text-muted">Season / Edition
-          <select aria-label="Season / Edition" value={filters.edition} onChange={(event) => setHierarchyFilters({ ...filters, edition: event.target.value, team: "" })} className="mt-1 block w-full rounded-control border border-border-subtle bg-surface-0 px-2 py-1.5 text-[11px] text-text-primary">
-            <option value="">All editions</option>{editionOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-          </select>
-        </label>
-        <label className="t-label block text-text-muted">Team
-          <select aria-label="Team" value={filters.team} onChange={(event) => setHierarchyFilters({ ...filters, team: event.target.value })} className="mt-1 block w-full rounded-control border border-border-subtle bg-surface-0 px-2 py-1.5 text-[11px] text-text-primary">
-            <option value="">All teams</option>{teamOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-          </select>
-        </label>
-        <label className="t-label block text-text-muted">Match
-          <select aria-label="Match" value={activeMatch?.key ?? ""} onChange={(event) => { const match = visibleMatches.find((item) => item.key === event.target.value); if (match) void openMatch(match); }} className="mt-1 block w-full rounded-control border border-border-subtle bg-surface-0 px-2 py-1.5 text-[11px] text-text-primary">
-            <option value="">Choose a match</option>{visibleMatches.map((match) => <option key={match.key} value={match.key}>{matchLabel(match)} · {match.competitionName}</option>)}
-          </select>
-        </label>
-      </div>
-
-      <label className={compact ? "block border-b border-border-subtle p-2 text-text-muted" : "my-3 block max-w-xl text-text-muted"}>
-        <span className="t-label flex items-center gap-1"><Search size={11} aria-hidden="true" /> Filter matches</span>
-        <input value={textFilter} onChange={(event) => setTextFilter(event.target.value)} placeholder="Team, match or source" aria-label="Filter matches" className="mt-1 block w-full rounded-control border border-border-subtle bg-surface-0 px-2 py-1.5 text-[11px] text-text-primary" />
+  const selectClass = "d-input mt-1 block w-full pr-2 text-[11.5px]";
+  const filtersBlock = (
+    <div className={compact ? "grid grid-cols-2 gap-2 px-4 pb-3" : "grid grid-cols-5 gap-3"}>
+      <label className="block"><span className="t-kicker">Sport</span><select aria-label="Sport" value={filters.sport} onChange={(event) => setHierarchyFilters({ sport: event.target.value, competition: "", edition: "", team: "" })} className={selectClass}>
+          <option value="">All sports</option>{sports.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+        </select>
       </label>
+      <label className="block"><span className="t-kicker">Competition</span><select aria-label="Competition" value={filters.competition} onChange={(event) => setHierarchyFilters({ ...filters, competition: event.target.value, edition: "", team: "" })} className={selectClass}>
+          <option value="">All competitions</option>{competitionOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+        </select>
+      </label>
+      <label className="block"><span className="t-kicker">Season / Edition</span><select aria-label="Season / Edition" value={filters.edition} onChange={(event) => setHierarchyFilters({ ...filters, edition: event.target.value, team: "" })} className={selectClass}>
+          <option value="">All editions</option>{editionOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+        </select>
+      </label>
+      <label className="block"><span className="t-kicker">Team</span><select aria-label="Team" value={filters.team} onChange={(event) => setHierarchyFilters({ ...filters, team: event.target.value })} className={selectClass}>
+          <option value="">All teams</option>{teamOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+        </select>
+      </label>
+      <label className={compact ? "col-span-2 block" : "block"}><span className="t-kicker">Match</span>
+        <select aria-label="Match" value={activeMatch?.key ?? ""} onChange={(event) => { const match = visibleMatches.find((item) => item.key === event.target.value); if (match) void openMatch(match); }} className={selectClass}>
+          <option value="">Choose a match</option>{visibleMatches.map((match) => <option key={match.key} value={match.key}>{matchLabel(match)} · {match.competitionName}</option>)}
+        </select>
+      </label>
+    </div>
+  );
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border-subtle bg-surface-1 px-3 py-1.5 text-[10px] text-text-muted">
-          <span>{visibleMatches.length} matches</span><span>Source capability · local readiness</span>
-        </div>
-        {visibleMatches.map((match) => {
-          const current = match.key === activeMatch?.key;
-          const canOpen = Boolean(match.sessionId && match.localCapabilities.includes("TRACKING"));
-          return (
-            <article key={match.key} data-testid="match-navigator-match" data-match-id={match.providerMatchId} className={`border-b border-border-subtle px-3 py-2 ${current ? "bg-surface-2" : "hover:bg-surface-1"}`}>
-              <div className="flex items-start gap-2">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[11px] font-medium text-text-primary">{matchLabel(match)}</div>
-                  <div className="mt-0.5 flex flex-wrap gap-x-2 text-[9px] text-text-muted">
-                    <span>{match.competitionName}</span><span>{match.editionLabel}</span><span>{match.datasetProvider || match.datasetName}</span>
-                  </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-1">
-                    <span className="rounded-sm border border-border-subtle px-1 py-px text-[9px] text-text-muted">Source · {sourceReadinessText(match.sourceReadiness)}</span>
-                    <span className="rounded-sm border border-border-subtle px-1 py-px text-[9px] text-text-muted">Local · {readinessText(match.localReadiness)}</span>
-                    <MatchCapabilityBadges match={match} />
-                  </div>
+  const matchList = (
+    <ul className={compact ? "divide-y divide-border-subtle" : "d-card divide-y divide-border-subtle overflow-hidden"}>
+      {visibleMatches.map((match) => {
+        const current = match.key === activeMatch?.key;
+        const canOpen = Boolean(match.sessionId && match.localCapabilities.includes("TRACKING"));
+        const readiness = match.localReadiness === "READY" || canOpen ? "ready" : match.localReadiness === "PARTIAL" || match.localReadiness === "MATERIALIZED" ? "materialized" : "upstream";
+        return (
+          <li key={match.key} data-testid="match-navigator-match" data-match-id={match.providerMatchId} data-selected={current} className={`d-row group ${compact ? "px-4 py-2.5" : "px-5 py-3"}`}>
+            <div className="flex items-center gap-3">
+              <ReadinessGlyph kind={readiness} className="shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className={`truncate font-medium text-text-primary ${compact ? "text-[12px]" : "text-[13px]"}`}>{matchLabel(match)}</div>
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-text-muted">
+                  <span>{match.competitionName} {match.editionLabel}</span>
+                  <span className="text-text-faint">·</span>
+                  <span>Source {sourceReadinessText(match.sourceReadiness).toLowerCase()}</span>
+                  <span className="text-text-faint">·</span>
+                  <span>Local {readinessText(match.localReadiness).toLowerCase()}</span>
                 </div>
-                {canOpen ? (
-                  <button type="button" onClick={() => void openMatch(match)} aria-label={`Open ${matchLabel(match)}`} className="flex shrink-0 items-center gap-1 rounded-control border border-border-strong px-2 py-1 text-[10px] text-text-secondary hover:bg-surface-3">
-                    Open <ExternalLink size={10} aria-hidden="true" />
-                  </button>
-                ) : (
-                  <button type="button" onClick={() => { setPrepareKey(match.key); setStatus("No local tracking artifacts are registered. Prepare the match before opening; browsing has not acquired dense data."); }} aria-label={`Prepare ${matchLabel(match)}`} className="flex shrink-0 items-center gap-1 rounded-control border border-border-subtle px-2 py-1 text-[10px] text-text-muted hover:bg-surface-2">
-                    <Database size={10} aria-hidden="true" /> Prepare
-                  </button>
-                )}
+                <div className="mt-1.5"><MatchCapabilityBadges match={match} /></div>
               </div>
-              {prepareKey === match.key ? <p role="status" className="mt-1 text-[10px] text-quality-warning">Prepare required · local tracking is absent.</p> : null}
-            </article>
-          );
-        })}
-        {visibleMatches.length === 0 ? <p className="p-3 text-[11px] text-text-muted">No matches for these filters.</p> : null}
-      </div>
+              {canOpen ? (
+                <button type="button" onClick={() => void openMatch(match)} aria-label={`Open ${matchLabel(match)}`} className="d-btn shrink-0 border-selected-border text-text-primary">
+                  {current ? "Current" : "Open"} <ArrowRight size={12} aria-hidden="true" />
+                </button>
+              ) : (
+                <button type="button" onClick={() => { setPrepareKey(match.key); setStatus("No local tracking artifacts are registered. Prepare the match before opening; browsing has not acquired dense data."); }} aria-label={`Prepare ${matchLabel(match)}`} className="d-btn shrink-0">
+                  <Database size={11} aria-hidden="true" /> Prepare
+                </button>
+              )}
+            </div>
+            {prepareKey === match.key ? (
+              <p role="status" className="mt-2 flex items-center gap-2 text-[11px] text-warning">
+                Prepare required · local tracking is absent.
+                {catalogResource(match) ? (
+                  <PrepareDialog resource={catalogResource(match)!} trigger={<>Show preparation plan</>} />
+                ) : null}
+              </p>
+            ) : null}
+          </li>
+        );
+      })}
+      {visibleMatches.length === 0 ? <li className="px-4 py-6 text-center text-[12px] text-text-muted">No matches for these filters.</li> : null}
+    </ul>
+  );
 
-      {activeSession ? (
-        <section aria-label="Current match context" className={compact ? "shrink-0 space-y-2 border-t border-border-subtle p-2" : "shrink-0 space-y-2 border-t border-border-subtle py-3"}>
-          <h2 className="t-section text-text-muted">{activeMatch ? matchLabel(activeMatch) : activeSession.session.label ?? routeSessionId}</h2>
-          <label className="t-label block text-text-muted">Period
-          <select aria-label="Match period" value={currentTrial} onChange={(event) => void changePeriod(event.target.value)} className="mt-1 block w-full rounded-control border border-border-subtle bg-surface-0 px-2 py-1 text-[10px] text-text-primary">
-              {activeSession.trials.map((trial) => {
-                const tracking = activeSession.streams.some((stream) => stream.trial_id === trial.trial_id && stream.modality === "tracking" && stream.sample_artifact_ids.length > 0);
-                const poseLocal = activeSession.streams.some((stream) => stream.trial_id === trial.trial_id && stream.modality === "pose" && stream.sample_artifact_ids.length > 0);
-                const eventsLocal = activeSession.streams.some((stream) => stream.trial_id === trial.trial_id && stream.modality === "event" && stream.sample_artifact_ids.length > 0) || activeMatch?.localCapabilities.includes("EVENTS");
-                const poseSource = activeMatch?.upstreamCapabilities.includes("POSE");
-                const eventsSource = activeMatch?.upstreamCapabilities.includes("EVENTS");
-                return <option key={trial.trial_id} value={trial.trial_id}>{trial.label ?? trial.trial_id} · {tracking ? "Tracking local" : "Prepare"}{poseLocal ? " · Pose local" : poseSource ? " · Pose source" : ""}{eventsLocal ? " · Events local" : eventsSource ? " · Events source" : ""}</option>;
-              })}
-            </select>
+  const contextBlock = activeSession ? (
+    <section aria-label="Current match context" className={compact ? "space-y-3 border-b border-border-subtle px-4 pb-4 pt-1" : "d-card mt-6 space-y-3 p-5"}>
+      <div>
+        <div className="t-kicker">Current match</div>
+        <h2 className="mt-1 truncate text-[13px] font-semibold text-text-primary">{activeMatch ? matchLabel(activeMatch) : activeSession.session.label ?? routeSessionId}</h2>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="block"><span className="t-kicker">Period</span><select aria-label="Match period" value={currentTrial} onChange={(event) => void changePeriod(event.target.value)} className={selectClass}>
+            {activeSession.trials.map((trial) => {
+              const tracking = activeSession.streams.some((stream) => stream.trial_id === trial.trial_id && stream.modality === "tracking" && stream.sample_artifact_ids.length > 0);
+              const poseLocal = activeSession.streams.some((stream) => stream.trial_id === trial.trial_id && stream.modality === "pose" && stream.sample_artifact_ids.length > 0);
+              const eventsLocal = activeSession.streams.some((stream) => stream.trial_id === trial.trial_id && stream.modality === "event" && stream.sample_artifact_ids.length > 0) || activeMatch?.localCapabilities.includes("EVENTS");
+              const poseSource = activeMatch?.upstreamCapabilities.includes("POSE");
+              const eventsSource = activeMatch?.upstreamCapabilities.includes("EVENTS");
+              return <option key={trial.trial_id} value={trial.trial_id}>{trial.label ?? trial.trial_id} · {tracking ? "Tracking local" : "Prepare"}{poseLocal ? " · Pose local" : poseSource ? " · Pose source" : ""}{eventsLocal ? " · Events local" : eventsSource ? " · Events source" : ""}</option>;
+            })}
+          </select>
+        </label>
+        <label className="block"><span className="t-kicker">Player</span><select aria-label="Match player" value={selectedSubject} onChange={(event) => {
+            const id = event.currentTarget.value || null;
+            if (matchFrame) matchFrame.selectPlayer(id, { origin: "dashboard" });
+            else updateSearch({ subject: id ?? undefined });
+          }} className={selectClass}>
+            <option value="">No player selected</option>{activeSession.participants.map((player) => <option key={player.subject_id} value={player.subject_id}>{player.notes ?? player.subject_id}{player.cohort ? ` · ${player.cohort}` : ""}</option>)}
+          </select>
+        </label>
+      </div>
+      <form onSubmit={commitTimestamp} className="grid grid-cols-[1fr_auto] items-end gap-2">
+        <label className="block"><span className="t-kicker">Canonical timestamp · ns</span><input key={`${routeDatasetId}/${routeSessionId}/${search.t_ns ?? ""}`} name="timestamp" defaultValue={search.t_ns ?? ""} inputMode="numeric" aria-label="Canonical timestamp in nanoseconds" placeholder="e.g. 120000000000" className="d-input mono mt-1 block w-full text-[11px]" />
+        </label>
+        <button type="submit" className="d-btn">Go</button>
+      </form>
+      <form onSubmit={commitRange} className="grid grid-cols-2 gap-2">
+        <label className="block"><span className="t-kicker">From · ns</span><input key={`${routeDatasetId}/${routeSessionId}/from/${search.from_ns ?? ""}`} name="rangeFrom" defaultValue={search.from_ns ?? ""} inputMode="numeric" aria-label="Range start in nanoseconds" className="d-input mono mt-1 block w-full text-[11px]" /></label>
+        <label className="block"><span className="t-kicker">To · ns</span><input key={`${routeDatasetId}/${routeSessionId}/to/${search.to_ns ?? ""}`} name="rangeTo" defaultValue={search.to_ns ?? ""} inputMode="numeric" aria-label="Range end in nanoseconds" className="d-input mono mt-1 block w-full text-[11px]" /></label>
+        <button type="submit" className="d-btn">Apply range</button>
+        <button type="button" onClick={() => analysis?.commitRange(null)} className="d-btn d-btn-ghost">Clear range</button>
+      </form>
+    </section>
+  ) : null;
+
+  if (compact) {
+    return (
+      <section data-testid="match-navigator" className="flex h-full min-h-0 flex-col">
+        <header className="shrink-0 px-4 pb-3 pt-4">
+          <div className="t-kicker flex items-center gap-2"><MapIcon size={11} aria-hidden="true" className="text-accent" /> Match World</div>
+          <div className="mt-1 flex items-center gap-2">
+            <h1 className="text-[15px] font-semibold tracking-[-0.015em] text-text-primary">{heading}</h1>
+            {routeSessionId ? (
+              <span className="ml-auto mr-8 flex gap-1">
+                <button type="button" aria-label="Navigator back" title="Back" onClick={() => window.history.back()} className="rounded-control p-1 text-text-muted hover:bg-hover"><ArrowLeft size={13} /></button>
+                <button type="button" aria-label="Navigator forward" title="Forward" onClick={() => window.history.forward()} className="rounded-control p-1 text-text-muted hover:bg-hover"><ArrowRight size={13} /></button>
+              </span>
+            ) : null}
+          </div>
+        </header>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {contextBlock}
+          <div className="pt-3">{filtersBlock}</div>
+          <label className="block px-4 pb-3">
+            <span className="sr-only">Filter matches</span>
+            <span className="relative flex items-center">
+              <Search size={12} aria-hidden="true" className="pointer-events-none absolute left-2.5 text-text-muted" />
+              <input value={textFilter} onChange={(event) => setTextFilter(event.target.value)} placeholder="Team, match or source" aria-label="Filter matches" className="d-input w-full pl-7" />
+            </span>
           </label>
-          <label className="t-label block text-text-muted">Player
-            <select aria-label="Match player" value={selectedSubject} onChange={(event) => {
-              const id = event.currentTarget.value || null;
-              if (matchFrame) matchFrame.selectPlayer(id, { origin: "dashboard" });
-              else updateSearch({ subject: id ?? undefined });
-            }} className="mt-1 block w-full rounded-control border border-border-subtle bg-surface-0 px-2 py-1 text-[10px] text-text-primary">
-              <option value="">No player selected</option>{activeSession.participants.map((player) => <option key={player.subject_id} value={player.subject_id}>{player.notes ?? player.subject_id}{player.cohort ? ` · ${player.cohort}` : ""}</option>)}
-            </select>
-          </label>
-          <form onSubmit={commitTimestamp} className="grid grid-cols-[1fr_auto] gap-1">
-            <label className="t-label col-span-2 text-text-muted">Canonical timestamp · ns
-              <input key={`${routeDatasetId}/${routeSessionId}/${search.t_ns ?? ""}`} name="timestamp" defaultValue={search.t_ns ?? ""} inputMode="numeric" aria-label="Canonical timestamp in nanoseconds" placeholder="e.g. 120000000000" className="mono mt-1 block w-full rounded-control border border-border-subtle bg-surface-0 px-2 py-1 text-[10px] text-text-primary" />
-            </label>
-            <button type="submit" className="col-start-2 rounded-control border border-border-strong px-2 py-1 text-[10px] text-text-secondary hover:bg-surface-2">Go</button>
-          </form>
-          <form onSubmit={commitRange} className="grid grid-cols-2 gap-1">
-            <label className="t-label text-text-muted">From · ns<input key={`${routeDatasetId}/${routeSessionId}/from/${search.from_ns ?? ""}`} name="rangeFrom" defaultValue={search.from_ns ?? ""} inputMode="numeric" aria-label="Range start in nanoseconds" className="mono mt-1 block w-full rounded-control border border-border-subtle bg-surface-0 px-2 py-1 text-[9px] text-text-primary" /></label>
-            <label className="t-label text-text-muted">To · ns<input key={`${routeDatasetId}/${routeSessionId}/to/${search.to_ns ?? ""}`} name="rangeTo" defaultValue={search.to_ns ?? ""} inputMode="numeric" aria-label="Range end in nanoseconds" className="mono mt-1 block w-full rounded-control border border-border-subtle bg-surface-0 px-2 py-1 text-[9px] text-text-primary" /></label>
-            <button type="submit" className="rounded-control border border-border-strong px-2 py-1 text-[10px] text-text-secondary hover:bg-surface-2">Apply range</button>
-            <button type="button" onClick={() => analysis?.commitRange(null)} className="rounded-control border border-border-subtle px-2 py-1 text-[10px] text-text-muted hover:bg-surface-2">Clear range</button>
-          </form>
-        </section>
-      ) : null}
-      {status ? <p role="status" className="shrink-0 border-t border-border-subtle bg-surface-1 px-3 py-2 text-[10px] text-quality-warning">{status}</p> : null}
+          <div className="flex items-center justify-between border-y border-border-subtle px-4 py-1.5 text-[10.5px] text-text-muted">
+            <span>{visibleMatches.length} matches</span><span>Source · local readiness</span>
+          </div>
+          {matchList}
+        </div>
+        {status ? <p role="status" className="shrink-0 border-t border-border-subtle px-4 py-2 text-[11px] text-warning">{status}</p> : null}
+      </section>
+    );
+  }
+
+  return (
+    <section data-testid="match-navigator" className="d-atmosphere h-full min-h-0 overflow-y-auto">
+      <div className="mx-auto w-full max-w-[72rem] px-8 pb-16 pt-9">
+        <header className="mb-7">
+          <div className="t-kicker mb-3 flex items-center gap-2"><WorldGlyph world="match" size="sm" className="text-accent" /> Match World · entry</div>
+          <h1 className="t-display">{heading}</h1>
+          <p className="t-lede mt-3 max-w-2xl">Browse the sports corpus and local readiness. This view reads catalog metadata only; a match's dense tracking and Pose load when you open it.</p>
+        </header>
+        {filtersBlock}
+        <label className="mt-4 block max-w-md">
+          <span className="sr-only">Filter matches</span>
+          <span className="relative flex items-center">
+            <Search size={13} aria-hidden="true" className="pointer-events-none absolute left-2.5 text-text-muted" />
+            <input value={textFilter} onChange={(event) => setTextFilter(event.target.value)} placeholder="Team, match or source" aria-label="Filter matches" className="d-input w-full pl-8" />
+          </span>
+        </label>
+        <div className="mb-2 mt-6 flex items-center justify-between text-[11px] text-text-muted">
+          <span><span className="mono text-text-secondary">{visibleMatches.length}</span> matches</span><span>Source capability · local readiness</span>
+        </div>
+        {matchList}
+        {contextBlock}
+        {status ? <p role="status" className="mt-4 text-[11px] text-warning">{status}</p> : null}
+      </div>
     </section>
   );
 }

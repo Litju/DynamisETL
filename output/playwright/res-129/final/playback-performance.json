@@ -1,0 +1,108 @@
+{
+  "field-dfl": {
+    "base-replay-planar-default": {
+      "fps": 12,
+      "worstFrameMs": 117,
+      "longTasks": 58,
+      "longTaskMs": 4877,
+      "heapMb": 33,
+      "requests": 0,
+      "advancedS": 6.5831
+    },
+    "with-territory": {
+      "fps": 10,
+      "worstFrameMs": 200,
+      "longTasks": 50,
+      "longTaskMs": 4989,
+      "heapMb": 33,
+      "requests": 3,
+      "advancedS": 6.7831
+    },
+    "with-influence": {
+      "fps": 10,
+      "worstFrameMs": 267,
+      "longTasks": 46,
+      "longTaskMs": 4903,
+      "heapMb": 33,
+      "requests": 3,
+      "advancedS": 6.8664
+    },
+    "combined-across-chunk-boundary": {
+      "fps": 9,
+      "worstFrameMs": 267,
+      "longTasks": 89,
+      "longTaskMs": 9904,
+      "heapMb": 33,
+      "requests": 5,
+      "advancedS": 12.4994
+    },
+    "inPlaybackWindowP95Ms": 1194,
+    "duplicateRequests": []
+  },
+  "playback-chunk": {
+    "samples": [
+      154,
+      138,
+      134,
+      131,
+      133,
+      150,
+      137,
+      140,
+      147,
+      136,
+      132,
+      141,
+      135,
+      141,
+      140,
+      117,
+      123,
+      124,
+      118,
+      132
+    ],
+    "p95Ms": 150,
+    "budgetMs": 250
+  },
+  "pose-sc": {
+    "one-subject-all-layers": {
+      "fps": 30,
+      "worstFrameMs": 50,
+      "longTasks": 0,
+      "longTaskMs": 0,
+      "heapMb": 26,
+      "requests": 0,
+      "advancedS": 5.4831
+    },
+    "follow-camera": {
+      "fps": 32,
+      "worstFrameMs": 50,
+      "longTasks": 0,
+      "longTaskMs": 0,
+      "heapMb": 26,
+      "requests": 0,
+      "advancedS": 5.333134
+    },
+    "all-subjects": {
+      "fps": 12,
+      "worstFrameMs": 233,
+      "longTasks": 57,
+      "longTaskMs": 4780,
+      "heapMb": 26,
+      "requests": 7,
+      "advancedS": 6.018223527
+    },
+    "subjectSwitchMs": 1176,
+    "duplicateRequests": []
+  },
+  "routes": {
+    "readyMs": {
+      "catalog": 8404,
+      "overview": 6151,
+      "field": 2326,
+      "pose": 3928
+    },
+    "poseRendererLoadedLazily": true
+  }
+}

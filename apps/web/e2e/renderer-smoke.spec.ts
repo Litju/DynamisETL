@@ -101,11 +101,11 @@ test("keeps one MatchLab Canvas mounted across Field and Pose modes", async ({ p
   const originalCanvas = await canvas.elementHandle();
   await expect(page.getByTestId("pose-canvas")).toHaveAttribute("data-renderer-ready", "true");
 
-  await page.getByRole("tab", { name: "field", exact: true }).click();
+  await page.getByRole("tab", { name: "Field", exact: true }).click();
   await expect(page.getByTestId("pitch-canvas")).toHaveAttribute("data-renderer-ready", "true");
   await expect(page.getByTestId("matchlab-canvas").locator("canvas")).toHaveCount(1);
   expect(await originalCanvas?.evaluate((element) => element.isConnected)).toBe(true);
-  await page.getByRole("tab", { name: "pose", exact: true }).click();
+  await page.getByRole("tab", { name: "Pose", exact: true }).click();
   await expect(page.getByTestId("pose-canvas")).toHaveAttribute("data-renderer-ready", "true");
   const currentCanvas = await page.getByTestId("matchlab-canvas").locator("canvas").elementHandle();
   expect(await currentCanvas?.evaluate((element, original) => element === original, originalCanvas)).toBe(true);

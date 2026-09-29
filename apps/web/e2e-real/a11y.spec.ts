@@ -27,7 +27,9 @@ const ROUTES: ReadonlyArray<readonly [string, string]> = [
 async function expectRouteReady(page: Page, label: string) {
   switch (label) {
     case "catalog":
-      await expect(page.getByText("DFL/Sportec IDSSE")).toBeVisible();
+      await expect(page).toHaveURL(/\/data(?:\?|$)/u);
+      await expect(page.getByRole("heading", { name: "Sports", exact: true })).toBeVisible();
+      await expect(page.getByRole("navigation", { name: "Data hierarchy" })).toBeVisible();
       break;
     case "DFL overview":
       await expect(page.getByText(/Highest total locomotor distance/i)).toBeVisible();

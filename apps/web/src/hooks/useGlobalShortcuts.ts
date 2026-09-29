@@ -52,6 +52,15 @@ export function useGlobalShortcuts(): void {
         return;
       }
       if (!isLab) return;
+      if ((event.key === "n" || event.key === "N") && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        const search = new URLSearchParams(window.location.search);
+        if (search.get("view") === "matchlab") {
+          event.preventDefault();
+          const ui = useUiStore.getState();
+          ui.setNavigatorOpen(!ui.navigatorOpen);
+          return;
+        }
+      }
 
       const commit = (tNs: bigint) => {
         analysis.setPlayhead(tNs);

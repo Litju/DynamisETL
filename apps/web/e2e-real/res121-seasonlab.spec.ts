@@ -104,11 +104,12 @@ test("RES-121 SeasonLab real-data acceptance walkthrough", async ({ page }) => {
   await expect(evidence).toContainText("No materialized match proves this player's participation");
   await page.getByRole("button", { name: /^Adam Bugarija/ }).click();
   await expect(masthead.getByRole("heading", { name: "Adam Bugarija" })).toBeVisible();
-  const matchLink = evidence.getByRole("link", { name: /Brisbane Roar FC vs Perth Glory/ });
+  await expect(evidence).toContainText("Brisbane Roar FC vs Perth Glory");
+  const matchLink = evidence.getByRole("link", { name: "Open Match World with player selected" });
   await expect(matchLink).toBeVisible();
   await capture(page, "05-bugarija-match-linkage-1440x900.png");
   await matchLink.click();
-  await expect(page).toHaveURL(/\/lab\/skillcorner-opendata\/1925299\?.*view=matchlab/);
+  await expect(page).toHaveURL(/\/lab\/skillcorner-opendata\/1925299\?.*subject=966112.*view=matchlab|\/lab\/skillcorner-opendata\/1925299\?.*view=matchlab.*subject=966112/);
 
   // 10 — season aggregates never became frame/match data: no dense reads, no transport.
   await page.goBack();
