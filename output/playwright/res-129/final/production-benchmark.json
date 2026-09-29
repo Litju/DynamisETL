@@ -1,0 +1,4543 @@
+{
+  "issue": "RES-129",
+  "capturedAt": "2026-09-29T02:46:22.827Z",
+  "mode": "Vite production preview only; no test runner active.",
+  "baseUrl": "http://127.0.0.1:4174",
+  "apiBase": "http://127.0.0.1:8000",
+  "browser": "Playwright Chromium headless with AMD D3D11 hardware WebGL2",
+  "backend": "Production WebGL2 default; no dev benchmark renderer or WebGPU flag.",
+  "hardwareAccelerationConfirmed": true,
+  "repeatCount": 3,
+  "warmupMs": 2000,
+  "sampleMs": 5000,
+  "viewportSizesCssPx": [
+    {
+      "width": 1600,
+      "height": 1000
+    },
+    {
+      "width": 1440,
+      "height": 900
+    }
+  ],
+  "instrumentation": "Wraps WebGL2 draw and resource creation calls in the production page; records RAF intervals, triangles, GL submission time, long tasks, canvas context attributes, GPU renderer, JS heap, script resource timings, and first useful World render. GPU memory bytes are unavailable via WebGL2.",
+  "runs": [
+    {
+      "viewport": {
+        "width": 1600,
+        "height": 1000
+      },
+      "scenario": "field",
+      "repeat": 1,
+      "status": "ok",
+      "errors": [],
+      "usefulWorldReadyMs": 2648,
+      "measurement": {
+        "elapsedMs": 5029,
+        "frames": 181,
+        "fps": 35.99,
+        "frameIntervalMs": {
+          "p50": 16.7,
+          "p95": 50,
+          "p99": 66.7,
+          "worst": 83.4
+        },
+        "render": {
+          "drawCalls": 33592,
+          "drawCallsPerFrame": 185,
+          "drawCallsPerFrameP95": 188,
+          "triangles": 1003570,
+          "trianglesPerFrameP50": 5542,
+          "glCpuSubmissionMs": 48.3,
+          "longTaskCount": 7,
+          "rendererResources": [
+            {
+              "buffers": 9588,
+              "textures": 5,
+              "framebuffers": 3,
+              "renderbuffers": 0
+            }
+          ],
+          "allocatedGpuBytes": null,
+          "allocatedGpuBytesReason": "WebGL2 does not expose total device allocation."
+        },
+        "gpu": {
+          "webgl2ContextCount": 1,
+          "contexts": [
+            {
+              "canvas": {
+                "width": 926,
+                "height": 908
+              },
+              "renderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+              "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+              "attributes": {
+                "alpha": true,
+                "antialias": true,
+                "depth": true,
+                "desynchronized": false,
+                "failIfMajorPerformanceCaveat": false,
+                "powerPreference": "high-performance",
+                "premultipliedAlpha": true,
+                "preserveDrawingBuffer": false,
+                "stencil": false,
+                "xrCompatible": false
+              },
+              "maxTextureSize": 16384,
+              "drawCalls": 33592,
+              "triangles": 1003570,
+              "cpuSubmissionMs": 48.3,
+              "resourcesCreated": {
+                "buffers": 9588,
+                "textures": 5,
+                "framebuffers": 3,
+                "renderbuffers": 0
+              }
+            }
+          ],
+          "softwareRendererDetected": false
+        },
+        "jsHeapBytes": 60300000,
+        "navigation": {
+          "domContentLoadedMs": 201.6,
+          "loadEventMs": 201.7
+        },
+        "scriptTimings": [
+          {
+            "file": "index-ChiaqPEb.js",
+            "startMs": 24.2,
+            "responseEndMs": 118.1,
+            "durationMs": 93.9,
+            "transferBytes": 204827,
+            "encodedBytes": 204527
+          },
+          {
+            "file": "TacticalAnalysisPane-BIxn0Zlb.js",
+            "startMs": 250.4,
+            "responseEndMs": 377.5,
+            "durationMs": 127.1,
+            "transferBytes": 10949,
+            "encodedBytes": 10649
+          },
+          {
+            "file": "pitch-model--qJzQGGg.js",
+            "startMs": 251.1,
+            "responseEndMs": 374.3,
+            "durationMs": 123.2,
+            "transferBytes": 766,
+            "encodedBytes": 466
+          },
+          {
+            "file": "useThrottledPlayhead-h0uFdNYi.js",
+            "startMs": 251.3,
+            "responseEndMs": 374.7,
+            "durationMs": 123.4,
+            "transferBytes": 1256,
+            "encodedBytes": 956
+          },
+          {
+            "file": "tactical-v3-CnZrQlm3.js",
+            "startMs": 251.4,
+            "responseEndMs": 376.9,
+            "durationMs": 125.5,
+            "transferBytes": 1700,
+            "encodedBytes": 1400
+          },
+          {
+            "file": "PaletteBody-HTfe9bMJ.js",
+            "startMs": 436.2,
+            "responseEndMs": 446.9,
+            "durationMs": 10.7,
+            "transferBytes": 3323,
+            "encodedBytes": 3023
+          },
+          {
+            "file": "ComboboxEmpty-BvW5MAd4.js",
+            "startMs": 437.3,
+            "responseEndMs": 448.5,
+            "durationMs": 11.2,
+            "transferBytes": 10575,
+            "encodedBytes": 10275
+          },
+          {
+            "file": "useLabelableId-Dy_scwfF.js",
+            "startMs": 438.3,
+            "responseEndMs": 447.7,
+            "durationMs": 9.4,
+            "transferBytes": 2499,
+            "encodedBytes": 2199
+          },
+          {
+            "file": "AutocompleteItem-BK9lbOEp.js",
+            "startMs": 438.5,
+            "responseEndMs": 447.3,
+            "durationMs": 8.8,
+            "transferBytes": 1466,
+            "encodedBytes": 1166
+          },
+          {
+            "file": "MatchLabCanvasRoot-CbbApmOe.js",
+            "startMs": 476.4,
+            "responseEndMs": 527.1,
+            "durationMs": 50.7,
+            "transferBytes": 2725,
+            "encodedBytes": 2425
+          },
+          {
+            "file": "View-YjPNc8A4.js",
+            "startMs": 477,
+            "responseEndMs": 637.7,
+            "durationMs": 160.7,
+            "transferBytes": 235452,
+            "encodedBytes": 235152
+          },
+          {
+            "file": "vanilla--C5Lp_AM.js",
+            "startMs": 477.2,
+            "responseEndMs": 525.4,
+            "durationMs": 48.2,
+            "transferBytes": 687,
+            "encodedBytes": 387
+          },
+          {
+            "file": "PitchReplay-BaHtZpOi.js",
+            "startMs": 719.5,
+            "responseEndMs": 749.9,
+            "durationMs": 30.4,
+            "transferBytes": 24433,
+            "encodedBytes": 24133
+          },
+          {
+            "file": "PoseScene-CTXB5Gdq.js",
+            "startMs": 720.2,
+            "responseEndMs": 749.5,
+            "durationMs": 29.3,
+            "transferBytes": 19881,
+            "encodedBytes": 19581
+          },
+          {
+            "file": "match-frame-windows-CPQQAS5n.js",
+            "startMs": 720.6,
+            "responseEndMs": 745.3,
+            "durationMs": 24.7,
+            "transferBytes": 2896,
+            "encodedBytes": 2596
+          },
+          {
+            "file": "arrow-window-BMNtibqe.js",
+            "startMs": 721,
+            "responseEndMs": 747.5,
+            "durationMs": 26.5,
+            "transferBytes": 4762,
+            "encodedBytes": 4462
+          },
+          {
+            "file": "frame-buffers-DvJ99041.js",
+            "startMs": 721.4,
+            "responseEndMs": 749.1,
+            "durationMs": 27.7,
+            "transferBytes": 1612,
+            "encodedBytes": 1312
+          }
+        ],
+        "echartsLoadedAtUsefulRender": false
+      },
+      "hardwareAccelerationConfirmed": true
+    },
+    {
+      "viewport": {
+        "width": 1600,
+        "height": 1000
+      },
+      "scenario": "field",
+      "repeat": 2,
+      "status": "ok",
+      "errors": [],
+      "usefulWorldReadyMs": 3298,
+      "measurement": {
+        "elapsedMs": 5076,
+        "frames": 169,
+        "fps": 33.29,
+        "frameIntervalMs": {
+          "p50": 33.3,
+          "p95": 50.1,
+          "p99": 66.7,
+          "worst": 83.3
+        },
+        "render": {
+          "drawCalls": 31371,
+          "drawCallsPerFrame": 185,
+          "drawCallsPerFrameP95": 188,
+          "triangles": 937562,
+          "trianglesPerFrameP50": 5542,
+          "glCpuSubmissionMs": 44.9,
+          "longTaskCount": 11,
+          "rendererResources": [
+            {
+              "buffers": 9558,
+              "textures": 5,
+              "framebuffers": 3,
+              "renderbuffers": 0
+            }
+          ],
+          "allocatedGpuBytes": null,
+          "allocatedGpuBytesReason": "WebGL2 does not expose total device allocation."
+        },
+        "gpu": {
+          "webgl2ContextCount": 1,
+          "contexts": [
+            {
+              "canvas": {
+                "width": 926,
+                "height": 908
+              },
+              "renderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+              "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+              "attributes": {
+                "alpha": true,
+                "antialias": true,
+                "depth": true,
+                "desynchronized": false,
+                "failIfMajorPerformanceCaveat": false,
+                "powerPreference": "high-performance",
+                "premultipliedAlpha": true,
+                "preserveDrawingBuffer": false,
+                "stencil": false,
+                "xrCompatible": false
+              },
+              "maxTextureSize": 16384,
+              "drawCalls": 31371,
+              "triangles": 937562,
+              "cpuSubmissionMs": 44.9,
+              "resourcesCreated": {
+                "buffers": 9558,
+                "textures": 5,
+                "framebuffers": 3,
+                "renderbuffers": 0
+              }
+            }
+          ],
+          "softwareRendererDetected": false
+        },
+        "jsHeapBytes": 56800000,
+        "navigation": {
+          "domContentLoadedMs": 167.4,
+          "loadEventMs": 167.5
+        },
+        "scriptTimings": [
+          {
+            "file": "index-ChiaqPEb.js",
+            "startMs": 13.9,
+            "responseEndMs": 73.7,
+            "durationMs": 59.8,
+            "transferBytes": 204827,
+            "encodedBytes": 204527
+          },
+          {
+            "file": "TacticalAnalysisPane-BIxn0Zlb.js",
+            "startMs": 222,
+            "responseEndMs": 338.6,
+            "durationMs": 116.6,
+            "transferBytes": 10949,
+            "encodedBytes": 10649
+          },
+          {
+            "file": "pitch-model--qJzQGGg.js",
+            "startMs": 222.9,
+            "responseEndMs": 333.1,
+            "durationMs": 110.2,
+            "transferBytes": 766,
+            "encodedBytes": 466
+          },
+          {
+            "file": "useThrottledPlayhead-h0uFdNYi.js",
+            "startMs": 223.3,
+            "responseEndMs": 332.8,
+            "durationMs": 109.5,
+            "transferBytes": 1256,
+            "encodedBytes": 956
+          },
+          {
+            "file": "tactical-v3-CnZrQlm3.js",
+            "startMs": 223.6,
+            "responseEndMs": 337.8,
+            "durationMs": 114.2,
+            "transferBytes": 1700,
+            "encodedBytes": 1400
+          },
+          {
+            "file": "PaletteBody-HTfe9bMJ.js",
+            "startMs": 399.6,
+            "responseEndMs": 410.9,
+            "durationMs": 11.3,
+            "transferBytes": 3323,
+            "encodedBytes": 3023
+          },
+          {
+            "file": "ComboboxEmpty-BvW5MAd4.js",
+            "startMs": 400,
+            "responseEndMs": 412.2,
+            "durationMs": 12.2,
+            "transferBytes": 10575,
+            "encodedBytes": 10275
+          },
+          {
+            "file": "useLabelableId-Dy_scwfF.js",
+            "startMs": 400.1,
+            "responseEndMs": 411.2,
+            "durationMs": 11.1,
+            "transferBytes": 2499,
+            "encodedBytes": 2199
+          },
+          {
+            "file": "AutocompleteItem-BK9lbOEp.js",
+            "startMs": 400.3,
+            "responseEndMs": 411.1,
+            "durationMs": 10.8,
+            "transferBytes": 1466,
+            "encodedBytes": 1166
+          },
+          {
+            "file": "MatchLabCanvasRoot-CbbApmOe.js",
+            "startMs": 423.3,
+            "responseEndMs": 457.5,
+            "durationMs": 34.2,
+            "transferBytes": 2725,
+            "encodedBytes": 2425
+          },
+          {
+            "file": "View-YjPNc8A4.js",
+            "startMs": 424,
+            "responseEndMs": 489.2,
+            "durationMs": 65.2,
+            "transferBytes": 235452,
+            "encodedBytes": 235152
+          },
+          {
+            "file": "vanilla--C5Lp_AM.js",
+            "startMs": 424.2,
+            "responseEndMs": 457.1,
+            "durationMs": 32.9,
+            "transferBytes": 687,
+            "encodedBytes": 387
+          },
+          {
+            "file": "PitchReplay-BaHtZpOi.js",
+            "startMs": 548.4,
+            "responseEndMs": 559.7,
+            "durationMs": 11.3,
+            "transferBytes": 24433,
+            "encodedBytes": 24133
+          },
+          {
+            "file": "PoseScene-CTXB5Gdq.js",
+            "startMs": 548.7,
+            "responseEndMs": 560.1,
+            "durationMs": 11.4,
+            "transferBytes": 19881,
+            "encodedBytes": 19581
+          },
+          {
+            "file": "match-frame-windows-CPQQAS5n.js",
+            "startMs": 548.9,
+            "responseEndMs": 557.9,
+            "durationMs": 9,
+            "transferBytes": 2896,
+            "encodedBytes": 2596
+          },
+          {
+            "file": "arrow-window-BMNtibqe.js",
+            "startMs": 549,
+            "responseEndMs": 558.1,
+            "durationMs": 9.1,
+            "transferBytes": 4762,
+            "encodedBytes": 4462
+          },
+          {
+            "file": "frame-buffers-DvJ99041.js",
+            "startMs": 549.2,
+            "responseEndMs": 557.9,
+            "durationMs": 8.7,
+            "transferBytes": 1612,
+            "encodedBytes": 1312
+          }
+        ],
+        "echartsLoadedAtUsefulRender": false
+      },
+      "hardwareAccelerationConfirmed": true
+    },
+    {
+      "viewport": {
+        "width": 1600,
+        "height": 1000
+      },
+      "scenario": "field",
+      "repeat": 3,
+      "status": "ok",
+      "errors": [],
+      "usefulWorldReadyMs": 2812,
+      "measurement": {
+        "elapsedMs": 5069,
+        "frames": 172,
+        "fps": 33.93,
+        "frameIntervalMs": {
+          "p50": 33.3,
+          "p95": 50.1,
+          "p99": 66.7,
+          "worst": 83.3
+        },
+        "render": {
+          "drawCalls": 31883,
+          "drawCallsPerFrame": 185,
+          "drawCallsPerFrameP95": 188,
+          "triangles": 954192,
+          "trianglesPerFrameP50": 5542,
+          "glCpuSubmissionMs": 39,
+          "longTaskCount": 11,
+          "rendererResources": [
+            {
+              "buffers": 9608,
+              "textures": 5,
+              "framebuffers": 3,
+              "renderbuffers": 0
+            }
+          ],
+          "allocatedGpuBytes": null,
+          "allocatedGpuBytesReason": "WebGL2 does not expose total device allocation."
+        },
+        "gpu": {
+          "webgl2ContextCount": 1,
+          "contexts": [
+            {
+              "canvas": {
+                "width": 926,
+                "height": 908
+              },
+              "renderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+              "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+              "attributes": {
+                "alpha": true,
+                "antialias": true,
+                "depth": true,
+                "desynchronized": false,
+                "failIfMajorPerformanceCaveat": false,
+                "powerPreference": "high-performance",
+                "premultipliedAlpha": true,
+                "preserveDrawingBuffer": false,
+                "stencil": false,
+                "xrCompatible": false
+              },
+              "maxTextureSize": 16384,
+              "drawCalls": 31883,
+              "triangles": 954192,
+              "cpuSubmissionMs": 39,
+              "resourcesCreated": {
+                "buffers": 9608,
+                "textures": 5,
+                "framebuffers": 3,
+                "renderbuffers": 0
+              }
+            }
+          ],
+          "softwareRendererDetected": false
+        },
+        "jsHeapBytes": 39600000,
+        "navigation": {
+          "domContentLoadedMs": 163.6,
+          "loadEventMs": 163.7
+        },
+        "scriptTimings": [
+          {
+            "file": "index-ChiaqPEb.js",
+            "startMs": 14.4,
+            "responseEndMs": 77.8,
+            "durationMs": 63.4,
+            "transferBytes": 204827,
+            "encodedBytes": 204527
+          },
+          {
+            "file": "TacticalAnalysisPane-BIxn0Zlb.js",
+            "startMs": 207.5,
+            "responseEndMs": 320.2,
+            "durationMs": 112.7,
+            "transferBytes": 10949,
+            "encodedBytes": 10649
+          },
+          {
+            "file": "pitch-model--qJzQGGg.js",
+            "startMs": 208.2,
+            "responseEndMs": 318.7,
+            "durationMs": 110.5,
+            "transferBytes": 766,
+            "encodedBytes": 466
+          },
+          {
+            "file": "useThrottledPlayhead-h0uFdNYi.js",
+            "startMs": 208.5,
+            "responseEndMs": 318.8,
+            "durationMs": 110.3,
+            "transferBytes": 1256,
+            "encodedBytes": 956
+          },
+          {
+            "file": "tactical-v3-CnZrQlm3.js",
+            "startMs": 208.6,
+            "responseEndMs": 347,
+            "durationMs": 138.4,
+            "transferBytes": 1700,
+            "encodedBytes": 1400
+          },
+          {
+            "file": "PaletteBody-HTfe9bMJ.js",
+            "startMs": 358.4,
+            "responseEndMs": 384.8,
+            "durationMs": 26.4,
+            "transferBytes": 3323,
+            "encodedBytes": 3023
+          },
+          {
+            "file": "ComboboxEmpty-BvW5MAd4.js",
+            "startMs": 358.8,
+            "responseEndMs": 386.4,
+            "durationMs": 27.6,
+            "transferBytes": 10575,
+            "encodedBytes": 10275
+          },
+          {
+            "file": "useLabelableId-Dy_scwfF.js",
+            "startMs": 358.9,
+            "responseEndMs": 385.1,
+            "durationMs": 26.2,
+            "transferBytes": 2499,
+            "encodedBytes": 2199
+          },
+          {
+            "file": "AutocompleteItem-BK9lbOEp.js",
+            "startMs": 359.1,
+            "responseEndMs": 385,
+            "durationMs": 25.9,
+            "transferBytes": 1466,
+            "encodedBytes": 1166
+          },
+          {
+            "file": "MatchLabCanvasRoot-CbbApmOe.js",
+            "startMs": 505.2,
+            "responseEndMs": 539.2,
+            "durationMs": 34,
+            "transferBytes": 2725,
+            "encodedBytes": 2425
+          },
+          {
+            "file": "View-YjPNc8A4.js",
+            "startMs": 505.4,
+            "responseEndMs": 575.6,
+            "durationMs": 70.2,
+            "transferBytes": 235452,
+            "encodedBytes": 235152
+          },
+          {
+            "file": "vanilla--C5Lp_AM.js",
+            "startMs": 505.7,
+            "responseEndMs": 538.2,
+            "durationMs": 32.5,
+            "transferBytes": 687,
+            "encodedBytes": 387
+          },
+          {
+            "file": "PitchReplay-BaHtZpOi.js",
+            "startMs": 634.9,
+            "responseEndMs": 657.5,
+            "durationMs": 22.6,
+            "transferBytes": 24433,
+            "encodedBytes": 24133
+          },
+          {
+            "file": "PoseScene-CTXB5Gdq.js",
+            "startMs": 635.2,
+            "responseEndMs": 651.5,
+            "durationMs": 16.3,
+            "transferBytes": 19881,
+            "encodedBytes": 19581
+          },
+          {
+            "file": "match-frame-windows-CPQQAS5n.js",
+            "startMs": 635.3,
+            "responseEndMs": 644.7,
+            "durationMs": 9.4,
+            "transferBytes": 2896,
+            "encodedBytes": 2596
+          },
+          {
+            "file": "arrow-window-BMNtibqe.js",
+            "startMs": 635.5,
+            "responseEndMs": 645,
+            "durationMs": 9.5,
+            "transferBytes": 4762,
+            "encodedBytes": 4462
+          },
+          {
+            "file": "frame-buffers-DvJ99041.js",
+            "startMs": 635.6,
+            "responseEndMs": 645.5,
+            "durationMs": 9.9,
+            "transferBytes": 1612,
+            "encodedBytes": 1312
+          }
+        ],
+        "echartsLoadedAtUsefulRender": false
+      },
+      "hardwareAccelerationConfirmed": true
+    },
+    {
+      "viewport": {
+        "width": 1600,
+        "height": 1000
+      },
+      "scenario": "pose",
+      "repeat": 1,
+      "status": "ok",
+      "errors": [],
+      "usefulWorldReadyMs": 1997,
+      "measurement": {
+        "elapsedMs": 5008,
+        "frames": 299,
+        "fps": 59.71,
+        "frameIntervalMs": {
+          "p50": 16.7,
+          "p95": 16.7,
+          "p99": 16.8,
+          "worst": 33.4
+        },
+        "render": {
+          "drawCalls": 2750,
+          "drawCallsPerFrame": 13,
+          "drawCallsPerFrameP95": 13,
+          "triangles": 87515176,
+          "trianglesPerFrameP50": 288820,
+          "glCpuSubmissionMs": 9.4,
+          "longTaskCount": 0,
+          "rendererResources": [
+            {
+              "buffers": 102,
+              "textures": 4,
+              "framebuffers": 3,
+              "renderbuffers": 0
+            }
+          ],
+          "allocatedGpuBytes": null,
+          "allocatedGpuBytesReason": "WebGL2 does not expose total device allocation."
+        },
+        "gpu": {
+          "webgl2ContextCount": 1,
+          "contexts": [
+            {
+              "canvas": {
+                "width": 926,
+                "height": 908
+              },
+              "renderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+              "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+              "attributes": {
+                "alpha": true,
+                "antialias": true,
+                "depth": true,
+                "desynchronized": false,
+                "failIfMajorPerformanceCaveat": false,
+                "powerPreference": "high-performance",
+                "premultipliedAlpha": true,
+                "preserveDrawingBuffer": false,
+                "stencil": false,
+                "xrCompatible": false
+              },
+              "maxTextureSize": 16384,
+              "drawCalls": 2750,
+              "triangles": 87515176,
+              "cpuSubmissionMs": 9.4,
+              "resourcesCreated": {
+                "buffers": 102,
+                "textures": 4,
+                "framebuffers": 3,
+                "renderbuffers": 0
+              }
+            }
+          ],
+          "softwareRendererDetected": false
+        },
+        "jsHeapBytes": 33100000,
+        "navigation": {
+          "domContentLoadedMs": 160.9,
+          "loadEventMs": 160.9
+        },
+        "scriptTimings": [
+          {
+            "file": "index-ChiaqPEb.js",
+            "startMs": 15.5,
+            "responseEndMs": 85.3,
+            "durationMs": 69.8,
+            "transferBytes": 204827,
+            "encodedBytes": 204527
+          },
+          {
+            "file": "PoseAnalysisPane-BdRYld46.js",
+            "startMs": 204.6,
+            "responseEndMs": 318.9,
+            "durationMs": 114.3,
+            "transferBytes": 7152,
+            "encodedBytes": 6852
+          },
+          {
+            "file": "arrow-window-BMNtibqe.js",
+            "startMs": 205,
+            "responseEndMs": 323.9,
+            "durationMs": 118.9,
+            "transferBytes": 4762,
+            "encodedBytes": 4462
+          },
+          {
+            "file": "match-frame-windows-CPQQAS5n.js",
+            "startMs": 205.3,
+            "responseEndMs": 333.7,
+            "durationMs": 128.4,
+            "transferBytes": 2896,
+            "encodedBytes": 2596
+          },
+          {
+            "file": "pitch-model--qJzQGGg.js",
+            "startMs": 205.5,
+            "responseEndMs": 320.2,
+            "durationMs": 114.7,
+            "transferBytes": 766,
+            "encodedBytes": 466
+          },
+          {
+            "file": "use-pose-playback-VYWwJOPf.js",
+            "startMs": 205.7,
+            "responseEndMs": 335.9,
+            "durationMs": 130.2,
+            "transferBytes": 1796,
+            "encodedBytes": 1496
+          },
+          {
+            "file": "useThrottledPlayhead-h0uFdNYi.js",
+            "startMs": 205.8,
+            "responseEndMs": 322.5,
+            "durationMs": 116.7,
+            "transferBytes": 1256,
+            "encodedBytes": 956
+          },
+          {
+            "file": "PaletteBody-HTfe9bMJ.js",
+            "startMs": 346.9,
+            "responseEndMs": 356.1,
+            "durationMs": 9.2,
+            "transferBytes": 3323,
+            "encodedBytes": 3023
+          },
+          {
+            "file": "ComboboxEmpty-BvW5MAd4.js",
+            "startMs": 347.4,
+            "responseEndMs": 357.8,
+            "durationMs": 10.4,
+            "transferBytes": 10575,
+            "encodedBytes": 10275
+          },
+          {
+            "file": "useLabelableId-Dy_scwfF.js",
+            "startMs": 347.7,
+            "responseEndMs": 356.8,
+            "durationMs": 9.1,
+            "transferBytes": 2499,
+            "encodedBytes": 2199
+          },
+          {
+            "file": "AutocompleteItem-BK9lbOEp.js",
+            "startMs": 348,
+            "responseEndMs": 356.2,
+            "durationMs": 8.2,
+            "transferBytes": 1466,
+            "encodedBytes": 1166
+          },
+          {
+            "file": "MatchLabCanvasRoot-CbbApmOe.js",
+            "startMs": 385.4,
+            "responseEndMs": 411.1,
+            "durationMs": 25.7,
+            "transferBytes": 2725,
+            "encodedBytes": 2425
+          },
+          {
+            "file": "View-YjPNc8A4.js",
+            "startMs": 385.6,
+            "responseEndMs": 444.8,
+            "durationMs": 59.2,
+            "transferBytes": 235452,
+            "encodedBytes": 235152
+          },
+          {
+            "file": "vanilla--C5Lp_AM.js",
+            "startMs": 385.8,
+            "responseEndMs": 410.8,
+            "durationMs": 25,
+            "transferBytes": 687,
+            "encodedBytes": 387
+          },
+          {
+            "file": "PoseViewer-CmicvLh7.js",
+            "startMs": 499.3,
+            "responseEndMs": 504.4,
+            "durationMs": 5.1,
+            "transferBytes": 8565,
+            "encodedBytes": 8265
+          },
+          {
+            "file": "PoseScene-CTXB5Gdq.js",
+            "startMs": 1414.7,
+            "responseEndMs": 1428.9,
+            "durationMs": 14.2,
+            "transferBytes": 19881,
+            "encodedBytes": 19581
+          }
+        ],
+        "echartsLoadedAtUsefulRender": false
+      },
+      "hardwareAccelerationConfirmed": true
+    },
+    {
+      "viewport": {
+        "width": 1600,
+        "height": 1000
+      },
+      "scenario": "pose",
+      "repeat": 2,
+      "status": "ok",
+      "errors": [],
+      "usefulWorldReadyMs": 1946,
+      "measurement": {
+        "elapsedMs": 5014,
+        "frames": 299,
+        "fps": 59.63,
+        "frameIntervalMs": {
+          "p50": 16.7,
+          "p95": 16.8,
+          "p99": 16.8,
+          "worst": 33.3
+        },
+        "render": {
+          "drawCalls": 2750,
+          "drawCallsPerFrame": 13,
+          "drawCallsPerFrameP95": 13,
+          "triangles": 87393608,
+          "trianglesPerFrameP50": 288820,
+          "glCpuSubmissionMs": 8.8,
+          "longTaskCount": 0,
+          "rendererResources": [
+            {
+              "buffers": 102,
+              "textures": 4,
+              "framebuffers": 3,
+              "renderbuffers": 0
+            }
+          ],
+          "allocatedGpuBytes": null,
+          "allocatedGpuBytesReason": "WebGL2 does not expose total device allocation."
+        },
+        "gpu": {
+          "webgl2ContextCount": 1,
+          "contexts": [
+            {
+              "canvas": {
+                "width": 926,
+                "height": 908
+              },
+              "renderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+              "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+              "attributes": {
+                "alpha": true,
+                "antialias": true,
+                "depth": true,
+                "desynchronized": false,
+                "failIfMajorPerformanceCaveat": false,
+                "powerPreference": "high-performance",
+                "premultipliedAlpha": true,
+                "preserveDrawingBuffer": false,
+                "stencil": false,
+                "xrCompatible": false
+              },
+              "maxTextureSize": 16384,
+              "drawCalls": 2750,
+              "triangles": 87393608,
+              "cpuSubmissionMs": 8.8,
+              "resourcesCreated": {
+                "buffers": 102,
+                "textures": 4,
+                "framebuffers": 3,
+                "renderbuffers": 0
+              }
+            }
+          ],
+          "softwareRendererDetected": false
+        },
+        "jsHeapBytes": 42100000,
+        "navigation": {
+          "domContentLoadedMs": 147.6,
+          "loadEventMs": 147.7
+        },
+        "scriptTimings": [
+          {
+            "file": "index-ChiaqPEb.js",
+            "startMs": 11.3,
+            "responseEndMs": 65.2,
+            "durationMs": 53.9,
+            "transferBytes": 204827,
+            "encodedBytes": 204527
+          },
+          {
+            "file": "PoseAnalysisPane-BdRYld46.js",
+            "startMs": 199.6,
+            "responseEndMs": 307.7,
+            "durationMs": 108.1,
+            "transferBytes": 7152,
+            "encodedBytes": 6852
+          },
+          {
+            "file": "arrow-window-BMNtibqe.js",
+            "startMs": 200,
+            "responseEndMs": 306.2,
+            "durationMs": 106.2,
+            "transferBytes": 4762,
+            "encodedBytes": 4462
+          },
+          {
+            "file": "match-frame-windows-CPQQAS5n.js",
+            "startMs": 200.2,
+            "responseEndMs": 307,
+            "durationMs": 106.8,
+            "transferBytes": 2896,
+            "encodedBytes": 2596
+          },
+          {
+            "file": "pitch-model--qJzQGGg.js",
+            "startMs": 200.4,
+            "responseEndMs": 304.8,
+            "durationMs": 104.4,
+            "transferBytes": 766,
+            "encodedBytes": 466
+          },
+          {
+            "file": "use-pose-playback-VYWwJOPf.js",
+            "startMs": 200.5,
+            "responseEndMs": 311.5,
+            "durationMs": 111,
+            "transferBytes": 1796,
+            "encodedBytes": 1496
+          },
+          {
+            "file": "useThrottledPlayhead-h0uFdNYi.js",
+            "startMs": 200.8,
+            "responseEndMs": 305.1,
+            "durationMs": 104.3,
+            "transferBytes": 1256,
+            "encodedBytes": 956
+          },
+          {
+            "file": "PaletteBody-HTfe9bMJ.js",
+            "startMs": 337.8,
+            "responseEndMs": 351,
+            "durationMs": 13.2,
+            "transferBytes": 3323,
+            "encodedBytes": 3023
+          },
+          {
+            "file": "ComboboxEmpty-BvW5MAd4.js",
+            "startMs": 338.2,
+            "responseEndMs": 351.2,
+            "durationMs": 13,
+            "transferBytes": 10575,
+            "encodedBytes": 10275
+          },
+          {
+            "file": "useLabelableId-Dy_scwfF.js",
+            "startMs": 338.3,
+            "responseEndMs": 351.6,
+            "durationMs": 13.3,
+            "transferBytes": 2499,
+            "encodedBytes": 2199
+          },
+          {
+            "file": "AutocompleteItem-BK9lbOEp.js",
+            "startMs": 338.4,
+            "responseEndMs": 352.3,
+            "durationMs": 13.9,
+            "transferBytes": 1466,
+            "encodedBytes": 1166
+          },
+          {
+            "file": "MatchLabCanvasRoot-CbbApmOe.js",
+            "startMs": 575.8,
+            "responseEndMs": 600,
+            "durationMs": 24.2,
+            "transferBytes": 2725,
+            "encodedBytes": 2425
+          },
+          {
+            "file": "View-YjPNc8A4.js",
+            "startMs": 575.9,
+            "responseEndMs": 625,
+            "durationMs": 49.1,
+            "transferBytes": 235452,
+            "encodedBytes": 235152
+          },
+          {
+            "file": "vanilla--C5Lp_AM.js",
+            "startMs": 576.1,
+            "responseEndMs": 600.6,
+            "durationMs": 24.5,
+            "transferBytes": 687,
+            "encodedBytes": 387
+          },
+          {
+            "file": "PoseViewer-CmicvLh7.js",
+            "startMs": 676.5,
+            "responseEndMs": 681.3,
+            "durationMs": 4.8,
+            "transferBytes": 8565,
+            "encodedBytes": 8265
+          },
+          {
+            "file": "PoseScene-CTXB5Gdq.js",
+            "startMs": 1455.9,
+            "responseEndMs": 1468.7,
+            "durationMs": 12.8,
+            "transferBytes": 19881,
+            "encodedBytes": 19581
+          }
+        ],
+        "echartsLoadedAtUsefulRender": false
+      },
+      "hardwareAccelerationConfirmed": true
+    },
+    {
+      "viewport": {
+        "width": 1600,
+        "height": 1000
+      },
+      "scenario": "pose",
+      "repeat": 3,
+      "status": "ok",
+      "errors": [],
+      "usefulWorldReadyMs": 1869,
+      "measurement": {
+        "elapsedMs": 5013,
+        "frames": 300,
+        "fps": 59.84,
+        "frameIntervalMs": {
+          "p50": 16.7,
+          "p95": 16.8,
+          "p99": 16.8,
+          "worst": 16.8
+        },
+        "render": {
+          "drawCalls": 2774,
+          "drawCallsPerFrame": 13,
+          "drawCallsPerFrameP95": 13,
+          "triangles": 87682524,
+          "trianglesPerFrameP50": 288820,
+          "glCpuSubmissionMs": 8.4,
+          "longTaskCount": 0,
+          "rendererResources": [
+            {
+              "buffers": 102,
+              "textures": 4,
+              "framebuffers": 3,
+              "renderbuffers": 0
+            }
+          ],
+          "allocatedGpuBytes": null,
+          "allocatedGpuBytesReason": "WebGL2 does not expose total device allocation."
+        },
+        "gpu": {
+          "webgl2ContextCount": 1,
+          "contexts": [
+            {
+              "canvas": {
+                "width": 926,
+                "height": 908
+              },
+              "renderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+              "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+              "attributes": {
+                "alpha": true,
+                "antialias": true,
+                "depth": true,
+                "desynchronized": false,
+                "failIfMajorPerformanceCaveat": false,
+                "powerPreference": "high-performance",
+                "premultipliedAlpha": true,
+                "preserveDrawingBuffer": false,
+                "stencil": false,
+                "xrCompatible": false
+              },
+              "maxTextureSize": 16384,
+              "drawCalls": 2774,
+              "triangles": 87682524,
+              "cpuSubmissionMs": 8.4,
+              "resourcesCreated": {
+                "buffers": 102,
+                "textures": 4,
+                "framebuffers": 3,
+                "renderbuffers": 0
+              }
+            }
+          ],
+          "softwareRendererDetected": false
+        },
+        "jsHeapBytes": 44700000,
+        "navigation": {
+          "domContentLoadedMs": 159.5,
+          "loadEventMs": 159.6
+        },
+        "scriptTimings": [
+          {
+            "file": "index-ChiaqPEb.js",
+            "startMs": 13.7,
+            "responseEndMs": 64.9,
+            "durationMs": 51.2,
+            "transferBytes": 204827,
+            "encodedBytes": 204527
+          },
+          {
+            "file": "PoseAnalysisPane-BdRYld46.js",
+            "startMs": 211.7,
+            "responseEndMs": 326.7,
+            "durationMs": 115,
+            "transferBytes": 7152,
+            "encodedBytes": 6852
+          },
+          {
+            "file": "arrow-window-BMNtibqe.js",
+            "startMs": 212.2,
+            "responseEndMs": 327.3,
+            "durationMs": 115.1,
+            "transferBytes": 4762,
+            "encodedBytes": 4462
+          },
+          {
+            "file": "match-frame-windows-CPQQAS5n.js",
+            "startMs": 212.3,
+            "responseEndMs": 326.9,
+            "durationMs": 114.6,
+            "transferBytes": 2896,
+            "encodedBytes": 2596
+          },
+          {
+            "file": "pitch-model--qJzQGGg.js",
+            "startMs": 212.5,
+            "responseEndMs": 326,
+            "durationMs": 113.5,
+            "transferBytes": 766,
+            "encodedBytes": 466
+          },
+          {
+            "file": "use-pose-playback-VYWwJOPf.js",
+            "startMs": 212.6,
+            "responseEndMs": 335,
+            "durationMs": 122.4,
+            "transferBytes": 1796,
+            "encodedBytes": 1496
+          },
+          {
+            "file": "useThrottledPlayhead-h0uFdNYi.js",
+            "startMs": 212.7,
+            "responseEndMs": 327,
+            "durationMs": 114.3,
+            "transferBytes": 1256,
+            "encodedBytes": 956
+          },
+          {
+            "file": "PaletteBody-HTfe9bMJ.js",
+            "startMs": 346.4,
+            "responseEndMs": 358.4,
+            "durationMs": 12,
+            "transferBytes": 3323,
+            "encodedBytes": 3023
+          },
+          {
+            "file": "ComboboxEmpty-BvW5MAd4.js",
+            "startMs": 346.8,
+            "responseEndMs": 359.2,
+            "durationMs": 12.4,
+            "transferBytes": 10575,
+            "encodedBytes": 10275
+          },
+          {
+            "file": "useLabelableId-Dy_scwfF.js",
+            "startMs": 347,
+            "responseEndMs": 358.3,
+            "durationMs": 11.3,
+            "transferBytes": 2499,
+            "encodedBytes": 2199
+          },
+          {
+            "file": "AutocompleteItem-BK9lbOEp.js",
+            "startMs": 347,
+            "responseEndMs": 358.6,
+            "durationMs": 11.6,
+            "transferBytes": 1466,
+            "encodedBytes": 1166
+          },
+          {
+            "file": "MatchLabCanvasRoot-CbbApmOe.js",
+            "startMs": 389.9,
+            "responseEndMs": 416.5,
+            "durationMs": 26.6,
+            "transferBytes": 2725,
+            "encodedBytes": 2425
+          },
+          {
+            "file": "View-YjPNc8A4.js",
+            "startMs": 390.2,
+            "responseEndMs": 449.3,
+            "durationMs": 59.1,
+            "transferBytes": 235452,
+            "encodedBytes": 235152
+          },
+          {
+            "file": "vanilla--C5Lp_AM.js",
+            "startMs": 390.4,
+            "responseEndMs": 415.7,
+            "durationMs": 25.3,
+            "transferBytes": 687,
+            "encodedBytes": 387
+          },
+          {
+            "file": "PoseViewer-CmicvLh7.js",
+            "startMs": 502.7,
+            "responseEndMs": 507.2,
+            "durationMs": 4.5,
+            "transferBytes": 8565,
+            "encodedBytes": 8265
+          },
+          {
+            "file": "PoseScene-CTXB5Gdq.js",
+            "startMs": 1333.3,
+            "responseEndMs": 1350.6,
+            "durationMs": 17.3,
+            "transferBytes": 19881,
+            "encodedBytes": 19581
+          }
+        ],
+        "echartsLoadedAtUsefulRender": false
+      },
+      "hardwareAccelerationConfirmed": true
+    },
+    {
+      "viewport": {
+        "width": 1600,
+        "height": 1000
+      },
+      "scenario": "split",
+      "repeat": 1,
+      "status": "ok",
+      "errors": [],
+      "usefulWorldReadyMs": 3219,
+      "measurement": {
+        "elapsedMs": 5032,
+        "frames": 212,
+        "fps": 42.13,
+        "frameIntervalMs": {
+          "p50": 16.7,
+          "p95": 33.4,
+          "p99": 50,
+          "worst": 50.1
+        },
+        "render": {
+          "drawCalls": 35340,
+          "drawCallsPerFrame": 164,
+          "drawCallsPerFrameP95": 173,
+          "triangles": 4377884,
+          "trianglesPerFrameP50": 20534,
+          "glCpuSubmissionMs": 40.7,
+          "longTaskCount": 0,
+          "rendererResources": [
+            {
+              "buffers": 9609,
+              "textures": 5,
+              "framebuffers": 3,
+              "renderbuffers": 0
+            }
+          ],
+          "allocatedGpuBytes": null,
+          "allocatedGpuBytesReason": "WebGL2 does not expose total device allocation."
+        },
+        "gpu": {
+          "webgl2ContextCount": 1,
+          "contexts": [
+            {
+              "canvas": {
+                "width": 1600,
+                "height": 908
+              },
+              "renderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+              "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+              "attributes": {
+                "alpha": true,
+                "antialias": true,
+                "depth": true,
+                "desynchronized": false,
+                "failIfMajorPerformanceCaveat": false,
+                "powerPreference": "high-performance",
+                "premultipliedAlpha": true,
+                "preserveDrawingBuffer": false,
+                "stencil": false,
+                "xrCompatible": false
+              },
+              "maxTextureSize": 16384,
+              "drawCalls": 35340,
+              "triangles": 4377884,
+              "cpuSubmissionMs": 40.7,
+              "resourcesCreated": {
+                "buffers": 9609,
+                "textures": 5,
+                "framebuffers": 3,
+                "renderbuffers": 0
+              }
+            }
+          ],
+          "softwareRendererDetected": false
+        },
+        "jsHeapBytes": 50400000,
+        "navigation": {
+          "domContentLoadedMs": 193.3,
+          "loadEventMs": 193.3
+        },
+        "scriptTimings": [
+          {
+            "file": "index-ChiaqPEb.js",
+            "startMs": 11.8,
+            "responseEndMs": 69.8,
+            "durationMs": 58,
+            "transferBytes": 204827,
+            "encodedBytes": 204527
+          },
+          {
+            "file": "MatchLabCanvasRoot-CbbApmOe.js",
+            "startMs": 388.9,
+            "responseEndMs": 406.8,
+            "durationMs": 17.9,
+            "transferBytes": 2725,
+            "encodedBytes": 2425
+          },
+          {
+            "file": "View-YjPNc8A4.js",
+            "startMs": 389.4,
+            "responseEndMs": 440.1,
+            "durationMs": 50.7,
+            "transferBytes": 235452,
+            "encodedBytes": 235152
+          },
+          {
+            "file": "vanilla--C5Lp_AM.js",
+            "startMs": 389.5,
+            "responseEndMs": 406.1,
+            "durationMs": 16.6,
+            "transferBytes": 687,
+            "encodedBytes": 387
+          },
+          {
+            "file": "PaletteBody-HTfe9bMJ.js",
+            "startMs": 418.3,
+            "responseEndMs": 428.1,
+            "durationMs": 9.8,
+            "transferBytes": 3323,
+            "encodedBytes": 3023
+          },
+          {
+            "file": "ComboboxEmpty-BvW5MAd4.js",
+            "startMs": 418.8,
+            "responseEndMs": 429.9,
+            "durationMs": 11.1,
+            "transferBytes": 10575,
+            "encodedBytes": 10275
+          },
+          {
+            "file": "useLabelableId-Dy_scwfF.js",
+            "startMs": 419,
+            "responseEndMs": 429.7,
+            "durationMs": 10.7,
+            "transferBytes": 2499,
+            "encodedBytes": 2199
+          },
+          {
+            "file": "AutocompleteItem-BK9lbOEp.js",
+            "startMs": 419.1,
+            "responseEndMs": 429.6,
+            "durationMs": 10.5,
+            "transferBytes": 1466,
+            "encodedBytes": 1166
+          },
+          {
+            "file": "MatchWorldStrip-Cyjg18tP.js",
+            "startMs": 492.2,
+            "responseEndMs": 501.9,
+            "durationMs": 9.7,
+            "transferBytes": 2669,
+            "encodedBytes": 2369
+          },
+          {
+            "file": "arrow-up-right-DYmjkj0a.js",
+            "startMs": 492.4,
+            "responseEndMs": 500.6,
+            "durationMs": 8.2,
+            "transferBytes": 559,
+            "encodedBytes": 259
+          },
+          {
+            "file": "pitch-model--qJzQGGg.js",
+            "startMs": 492.4,
+            "responseEndMs": 500.9,
+            "durationMs": 8.5,
+            "transferBytes": 766,
+            "encodedBytes": 466
+          },
+          {
+            "file": "useThrottledPlayhead-h0uFdNYi.js",
+            "startMs": 492.6,
+            "responseEndMs": 501.8,
+            "durationMs": 9.2,
+            "transferBytes": 1256,
+            "encodedBytes": 956
+          },
+          {
+            "file": "PitchReplay-BaHtZpOi.js",
+            "startMs": 493.4,
+            "responseEndMs": 507.5,
+            "durationMs": 14.1,
+            "transferBytes": 24433,
+            "encodedBytes": 24133
+          },
+          {
+            "file": "PoseScene-CTXB5Gdq.js",
+            "startMs": 493.5,
+            "responseEndMs": 508.7,
+            "durationMs": 15.2,
+            "transferBytes": 19881,
+            "encodedBytes": 19581
+          },
+          {
+            "file": "match-frame-windows-CPQQAS5n.js",
+            "startMs": 493.7,
+            "responseEndMs": 508.9,
+            "durationMs": 15.2,
+            "transferBytes": 2896,
+            "encodedBytes": 2596
+          },
+          {
+            "file": "arrow-window-BMNtibqe.js",
+            "startMs": 493.9,
+            "responseEndMs": 509.3,
+            "durationMs": 15.4,
+            "transferBytes": 4762,
+            "encodedBytes": 4462
+          },
+          {
+            "file": "tactical-v3-CnZrQlm3.js",
+            "startMs": 494,
+            "responseEndMs": 509.1,
+            "durationMs": 15.1,
+            "transferBytes": 1700,
+            "encodedBytes": 1400
+          },
+          {
+            "file": "frame-buffers-DvJ99041.js",
+            "startMs": 494.1,
+            "responseEndMs": 509.6,
+            "durationMs": 15.5,
+            "transferBytes": 1612,
+            "encodedBytes": 1312
+          },
+          {
+            "file": "MatchLabWorkspace-D5_vJOrE.js",
+            "startMs": 523.1,
+            "responseEndMs": 529.5,
+            "durationMs": 6.4,
+            "transferBytes": 2695,
+            "encodedBytes": 2395
+          },
+          {
+            "file": "PoseAnalysisPane-BdRYld46.js",
+            "startMs": 523.2,
+            "responseEndMs": 530.9,
+            "durationMs": 7.7,
+            "transferBytes": 7152,
+            "encodedBytes": 6852
+          },
+          {
+            "file": "use-pose-playback-VYWwJOPf.js",
+            "startMs": 523.4,
+            "responseEndMs": 530.3,
+            "durationMs": 6.9,
+            "transferBytes": 1796,
+            "encodedBytes": 1496
+          },
+          {
+            "file": "PoseViewer-CmicvLh7.js",
+            "startMs": 523.4,
+            "responseEndMs": 531,
+            "durationMs": 7.6,
+            "transferBytes": 8565,
+            "encodedBytes": 8265
+          },
+          {
+            "file": "TacticalAnalysisPane-BIxn0Zlb.js",
+            "startMs": 523.6,
+            "responseEndMs": 531.4,
+            "durationMs": 7.8,
+            "transferBytes": 10949,
+            "encodedBytes": 10649
+          }
+        ],
+        "echartsLoadedAtUsefulRender": false
+      },
+      "hardwareAccelerationConfirmed": true
+    },
+    {
+      "viewport": {
+        "width": 1600,
+        "height": 1000
+      },
+      "scenario": "split",
+      "repeat": 2,
+      "status": "ok",
+      "errors": [],
+      "usefulWorldReadyMs": 3447,
+      "measurement": {
+        "elapsedMs": 5058,
+        "frames": 199,
+        "fps": 39.34,
+        "frameIntervalMs": {
+          "p50": 16.7,
+          "p95": 50,
+          "p99": 66.8,
+          "worst": 83.3
+        },
+        "render": {
+          "drawCalls": 33079,
+          "drawCallsPerFrame": 164,
+          "drawCallsPerFrameP95": 173,
+          "triangles": 4109706,
+          "trianglesPerFrameP50": 20526,
+          "glCpuSubmissionMs": 38.8,
+          "longTaskCount": 2,
+          "rendererResources": [
+            {
+              "buffers": 9706,
+              "textures": 5,
+              "framebuffers": 3,
+              "renderbuffers": 0
+            }
+          ],
+          "allocatedGpuBytes": null,
+          "allocatedGpuBytesReason": "WebGL2 does not expose total device allocation."
+        },
+        "gpu": {
+          "webgl2ContextCount": 1,
+          "contexts": [
+            {
+              "canvas": {
+                "width": 1600,
+                "height": 908
+              },
+              "renderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+              "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+              "attributes": {
+                "alpha": true,
+                "antialias": true,
+                "depth": true,
+                "desynchronized": false,
+                "failIfMajorPerformanceCaveat": false,
+                "powerPreference": "high-performance",
+                "premultipliedAlpha": true,
+                "preserveDrawingBuffer": false,
+                "stencil": false,
+                "xrCompatible": false
+              },
+              "maxTextureSize": 16384,
+              "drawCalls": 33079,
+              "triangles": 4109706,
+              "cpuSubmissionMs": 38.8,
+              "resourcesCreated": {
+                "buffers": 9706,
+                "textures": 5,
+                "framebuffers": 3,
+                "renderbuffers": 0
+              }
+            }
+          ],
+          "softwareRendererDetected": false
+        },
+        "jsHeapBytes": 39600000,
+        "navigation": {
+          "domContentLoadedMs": 186,
+          "loadEventMs": 186.1
+        },
+        "scriptTimings": [
+          {
+            "file": "index-ChiaqPEb.js",
+            "startMs": 12.9,
+            "responseEndMs": 79.2,
+            "durationMs": 66.3,
+            "transferBytes": 204827,
+            "encodedBytes": 204527
+          },
+          {
+            "file": "PaletteBody-HTfe9bMJ.js",
+            "startMs": 396.6,
+            "responseEndMs": 406.9,
+            "durationMs": 10.3,
+            "transferBytes": 3323,
+            "encodedBytes": 3023
+          },
+          {
+            "file": "ComboboxEmpty-BvW5MAd4.js",
+            "startMs": 397.3,
+            "responseEndMs": 408.8,
+            "durationMs": 11.5,
+            "transferBytes": 10575,
+            "encodedBytes": 10275
+          },
+          {
+            "file": "useLabelableId-Dy_scwfF.js",
+            "startMs": 397.4,
+            "responseEndMs": 407.4,
+            "durationMs": 10,
+            "transferBytes": 2499,
+            "encodedBytes": 2199
+          },
+          {
+            "file": "AutocompleteItem-BK9lbOEp.js",
+            "startMs": 397.6,
+            "responseEndMs": 407.4,
+            "durationMs": 9.8,
+            "transferBytes": 1466,
+            "encodedBytes": 1166
+          },
+          {
+            "file": "MatchLabCanvasRoot-CbbApmOe.js",
+            "startMs": 410,
+            "responseEndMs": 433.6,
+            "durationMs": 23.6,
+            "transferBytes": 2725,
+            "encodedBytes": 2425
+          },
+          {
+            "file": "View-YjPNc8A4.js",
+            "startMs": 410.6,
+            "responseEndMs": 469.6,
+            "durationMs": 59,
+            "transferBytes": 235452,
+            "encodedBytes": 235152
+          },
+          {
+            "file": "vanilla--C5Lp_AM.js",
+            "startMs": 410.7,
+            "responseEndMs": 432.7,
+            "durationMs": 22,
+            "transferBytes": 687,
+            "encodedBytes": 387
+          },
+          {
+            "file": "MatchWorldStrip-Cyjg18tP.js",
+            "startMs": 529.5,
+            "responseEndMs": 542.6,
+            "durationMs": 13.1,
+            "transferBytes": 2669,
+            "encodedBytes": 2369
+          },
+          {
+            "file": "arrow-up-right-DYmjkj0a.js",
+            "startMs": 529.9,
+            "responseEndMs": 540.5,
+            "durationMs": 10.6,
+            "transferBytes": 559,
+            "encodedBytes": 259
+          },
+          {
+            "file": "pitch-model--qJzQGGg.js",
+            "startMs": 530.1,
+            "responseEndMs": 540.7,
+            "durationMs": 10.6,
+            "transferBytes": 766,
+            "encodedBytes": 466
+          },
+          {
+            "file": "useThrottledPlayhead-h0uFdNYi.js",
+            "startMs": 530.2,
+            "responseEndMs": 541.9,
+            "durationMs": 11.7,
+            "transferBytes": 1256,
+            "encodedBytes": 956
+          },
+          {
+            "file": "PitchReplay-BaHtZpOi.js",
+            "startMs": 531.7,
+            "responseEndMs": 552.8,
+            "durationMs": 21.1,
+            "transferBytes": 24433,
+            "encodedBytes": 24133
+          },
+          {
+            "file": "PoseScene-CTXB5Gdq.js",
+            "startMs": 531.9,
+            "responseEndMs": 553.8,
+            "durationMs": 21.9,
+            "transferBytes": 19881,
+            "encodedBytes": 19581
+          },
+          {
+            "file": "match-frame-windows-CPQQAS5n.js",
+            "startMs": 532,
+            "responseEndMs": 554.8,
+            "durationMs": 22.8,
+            "transferBytes": 2896,
+            "encodedBytes": 2596
+          },
+          {
+            "file": "arrow-window-BMNtibqe.js",
+            "startMs": 532.2,
+            "responseEndMs": 555.4,
+            "durationMs": 23.2,
+            "transferBytes": 4762,
+            "encodedBytes": 4462
+          },
+          {
+            "file": "tactical-v3-CnZrQlm3.js",
+            "startMs": 532.4,
+            "responseEndMs": 555.8,
+            "durationMs": 23.4,
+            "transferBytes": 1700,
+            "encodedBytes": 1400
+          },
+          {
+            "file": "frame-buffers-DvJ99041.js",
+            "startMs": 532.6,
+            "responseEndMs": 556.9,
+            "durationMs": 24.3,
+            "transferBytes": 1612,
+            "encodedBytes": 1312
+          },
+          {
+            "file": "MatchLabWorkspace-D5_vJOrE.js",
+            "startMs": 563.2,
+            "responseEndMs": 573.6,
+            "durationMs": 10.4,
+            "transferBytes": 2695,
+            "encodedBytes": 2395
+          },
+          {
+            "file": "PoseAnalysisPane-BdRYld46.js",
+            "startMs": 563.4,
+            "responseEndMs": 575.7,
+            "durationMs": 12.3,
+            "transferBytes": 7152,
+            "encodedBytes": 6852
+          },
+          {
+            "file": "use-pose-playback-VYWwJOPf.js",
+            "startMs": 563.8,
+            "responseEndMs": 574.6,
+            "durationMs": 10.8,
+            "transferBytes": 1796,
+            "encodedBytes": 1496
+          },
+          {
+            "file": "PoseViewer-CmicvLh7.js",
+            "startMs": 563.9,
+            "responseEndMs": 576.5,
+            "durationMs": 12.6,
+            "transferBytes": 8565,
+            "encodedBytes": 8265
+          },
+          {
+            "file": "TacticalAnalysisPane-BIxn0Zlb.js",
+            "startMs": 564,
+            "responseEndMs": 578,
+            "durationMs": 14,
+            "transferBytes": 10949,
+            "encodedBytes": 10649
+          }
+        ],
+        "echartsLoadedAtUsefulRender": false
+      },
+      "hardwareAccelerationConfirmed": true
+    },
+    {
+      "viewport": {
+        "width": 1600,
+        "height": 1000
+      },
+      "scenario": "split",
+      "repeat": 3,
+      "status": "ok",
+      "errors": [],
+      "usefulWorldReadyMs": 4350,
+      "measurement": {
+        "elapsedMs": 5034,
+        "frames": 199,
+        "fps": 39.53,
+        "frameIntervalMs": {
+          "p50": 16.7,
+          "p95": 50,
+          "p99": 50.1,
+          "worst": 83.4
+        },
+        "render": {
+          "drawCalls": 33216,
+          "drawCallsPerFrame": 164,
+          "drawCallsPerFrameP95": 174,
+          "triangles": 4110450,
+          "trianglesPerFrameP50": 20550,
+          "glCpuSubmissionMs": 46.2,
+          "longTaskCount": 4,
+          "rendererResources": [
+            {
+              "buffers": 9300,
+              "textures": 5,
+              "framebuffers": 3,
+              "renderbuffers": 0
+            }
+          ],
+          "allocatedGpuBytes": null,
+          "allocatedGpuBytesReason": "WebGL2 does not expose total device allocation."
+        },
+        "gpu": {
+          "webgl2ContextCount": 1,
+          "contexts": [
+            {
+              "canvas": {
+                "width": 1600,
+                "height": 908
+              },
+              "renderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+              "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+              "attributes": {
+                "alpha": true,
+                "antialias": true,
+                "depth": true,
+                "desynchronized": false,
+                "failIfMajorPerformanceCaveat": false,
+                "powerPreference": "high-performance",
+                "premultipliedAlpha": true,
+                "preserveDrawingBuffer": false,
+                "stencil": false,
+                "xrCompatible": false
+              },
+              "maxTextureSize": 16384,
+              "drawCalls": 33216,
+              "triangles": 4110450,
+              "cpuSubmissionMs": 46.2,
+              "resourcesCreated": {
+                "buffers": 9300,
+                "textures": 5,
+                "framebuffers": 3,
+                "renderbuffers": 0
+              }
+            }
+          ],
+          "softwareRendererDetected": false
+        },
+        "jsHeapBytes": 47400000,
+        "navigation": {
+          "domContentLoadedMs": 169.4,
+          "loadEventMs": 169.5
+        },
+        "scriptTimings": [
+          {
+            "file": "index-ChiaqPEb.js",
+            "startMs": 14.6,
+            "responseEndMs": 77.2,
+            "durationMs": 62.6,
+            "transferBytes": 204827,
+            "encodedBytes": 204527
+          },
+          {
+            "file": "PaletteBody-HTfe9bMJ.js",
+            "startMs": 315.8,
+            "responseEndMs": 325,
+            "durationMs": 9.2,
+            "transferBytes": 3323,
+            "encodedBytes": 3023
+          },
+          {
+            "file": "ComboboxEmpty-BvW5MAd4.js",
+            "startMs": 316.4,
+            "responseEndMs": 327.9,
+            "durationMs": 11.5,
+            "transferBytes": 10575,
+            "encodedBytes": 10275
+          },
+          {
+            "file": "useLabelableId-Dy_scwfF.js",
+            "startMs": 316.5,
+            "responseEndMs": 326.8,
+            "durationMs": 10.3,
+            "transferBytes": 2499,
+            "encodedBytes": 2199
+          },
+          {
+            "file": "AutocompleteItem-BK9lbOEp.js",
+            "startMs": 316.7,
+            "responseEndMs": 327.8,
+            "durationMs": 11.1,
+            "transferBytes": 1466,
+            "encodedBytes": 1166
+          },
+          {
+            "file": "MatchLabCanvasRoot-CbbApmOe.js",
+            "startMs": 701.8,
+            "responseEndMs": 717.6,
+            "durationMs": 15.8,
+            "transferBytes": 2725,
+            "encodedBytes": 2425
+          },
+          {
+            "file": "View-YjPNc8A4.js",
+            "startMs": 702,
+            "responseEndMs": 746.6,
+            "durationMs": 44.6,
+            "transferBytes": 235452,
+            "encodedBytes": 235152
+          },
+          {
+            "file": "vanilla--C5Lp_AM.js",
+            "startMs": 702.1,
+            "responseEndMs": 716.9,
+            "durationMs": 14.8,
+            "transferBytes": 687,
+            "encodedBytes": 387
+          },
+          {
+            "file": "MatchWorldStrip-Cyjg18tP.js",
+            "startMs": 801,
+            "responseEndMs": 811.4,
+            "durationMs": 10.4,
+            "transferBytes": 2669,
+            "encodedBytes": 2369
+          },
+          {
+            "file": "arrow-up-right-DYmjkj0a.js",
+            "startMs": 801.4,
+            "responseEndMs": 810.1,
+            "durationMs": 8.7,
+            "transferBytes": 559,
+            "encodedBytes": 259
+          },
+          {
+            "file": "pitch-model--qJzQGGg.js",
+            "startMs": 801.6,
+            "responseEndMs": 810.5,
+            "durationMs": 8.9,
+            "transferBytes": 766,
+            "encodedBytes": 466
+          },
+          {
+            "file": "useThrottledPlayhead-h0uFdNYi.js",
+            "startMs": 801.7,
+            "responseEndMs": 811.6,
+            "durationMs": 9.9,
+            "transferBytes": 1256,
+            "encodedBytes": 956
+          },
+          {
+            "file": "PitchReplay-BaHtZpOi.js",
+            "startMs": 803.2,
+            "responseEndMs": 821.8,
+            "durationMs": 18.6,
+            "transferBytes": 24433,
+            "encodedBytes": 24133
+          },
+          {
+            "file": "PoseScene-CTXB5Gdq.js",
+            "startMs": 803.5,
+            "responseEndMs": 818.4,
+            "durationMs": 14.9,
+            "transferBytes": 19881,
+            "encodedBytes": 19581
+          },
+          {
+            "file": "match-frame-windows-CPQQAS5n.js",
+            "startMs": 803.7,
+            "responseEndMs": 821.3,
+            "durationMs": 17.6,
+            "transferBytes": 2896,
+            "encodedBytes": 2596
+          },
+          {
+            "file": "arrow-window-BMNtibqe.js",
+            "startMs": 803.9,
+            "responseEndMs": 823.8,
+            "durationMs": 19.9,
+            "transferBytes": 4762,
+            "encodedBytes": 4462
+          },
+          {
+            "file": "tactical-v3-CnZrQlm3.js",
+            "startMs": 804.1,
+            "responseEndMs": 824.3,
+            "durationMs": 20.2,
+            "transferBytes": 1700,
+            "encodedBytes": 1400
+          },
+          {
+            "file": "frame-buffers-DvJ99041.js",
+            "startMs": 804.3,
+            "responseEndMs": 824.4,
+            "durationMs": 20.1,
+            "transferBytes": 1612,
+            "encodedBytes": 1312
+          },
+          {
+            "file": "MatchLabWorkspace-D5_vJOrE.js",
+            "startMs": 831.5,
+            "responseEndMs": 843,
+            "durationMs": 11.5,
+            "transferBytes": 2695,
+            "encodedBytes": 2395
+          },
+          {
+            "file": "PoseAnalysisPane-BdRYld46.js",
+            "startMs": 831.7,
+            "responseEndMs": 844.9,
+            "durationMs": 13.2,
+            "transferBytes": 7152,
+            "encodedBytes": 6852
+          },
+          {
+            "file": "use-pose-playback-VYWwJOPf.js",
+            "startMs": 831.9,
+            "responseEndMs": 843.3,
+            "durationMs": 11.4,
+            "transferBytes": 1796,
+            "encodedBytes": 1496
+          },
+          {
+            "file": "PoseViewer-CmicvLh7.js",
+            "startMs": 832,
+            "responseEndMs": 844.6,
+            "durationMs": 12.6,
+            "transferBytes": 8565,
+            "encodedBytes": 8265
+          },
+          {
+            "file": "TacticalAnalysisPane-BIxn0Zlb.js",
+            "startMs": 832.2,
+            "responseEndMs": 844.8,
+            "durationMs": 12.6,
+            "transferBytes": 10949,
+            "encodedBytes": 10649
+          }
+        ],
+        "echartsLoadedAtUsefulRender": false
+      },
+      "hardwareAccelerationConfirmed": true
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scenario": "field",
+      "repeat": 1,
+      "status": "ok",
+      "errors": [],
+      "usefulWorldReadyMs": 2967,
+      "measurement": {
+        "elapsedMs": 5041,
+        "frames": 216,
+        "fps": 42.85,
+        "frameIntervalMs": {
+          "p50": 16.7,
+          "p95": 33.4,
+          "p99": 50,
+          "worst": 66.7
+        },
+        "render": {
+          "drawCalls": 40302,
+          "drawCallsPerFrame": 186,
+          "drawCallsPerFrameP95": 188,
+          "triangles": 1196770,
+          "trianglesPerFrameP50": 5542,
+          "glCpuSubmissionMs": 52,
+          "longTaskCount": 1,
+          "rendererResources": [
+            {
+              "buffers": 9603,
+              "textures": 5,
+              "framebuffers": 3,
+              "renderbuffers": 0
+            }
+          ],
+          "allocatedGpuBytes": null,
+          "allocatedGpuBytesReason": "WebGL2 does not expose total device allocation."
+        },
+        "gpu": {
+          "webgl2ContextCount": 1,
+          "contexts": [
+            {
+              "canvas": {
+                "width": 834,
+                "height": 808
+              },
+              "renderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+              "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+              "attributes": {
+                "alpha": true,
+                "antialias": true,
+                "depth": true,
+                "desynchronized": false,
+                "failIfMajorPerformanceCaveat": false,
+                "powerPreference": "high-performance",
+                "premultipliedAlpha": true,
+                "preserveDrawingBuffer": false,
+                "stencil": false,
+                "xrCompatible": false
+              },
+              "maxTextureSize": 16384,
+              "drawCalls": 40302,
+              "triangles": 1196770,
+              "cpuSubmissionMs": 52,
+              "resourcesCreated": {
+                "buffers": 9603,
+                "textures": 5,
+                "framebuffers": 3,
+                "renderbuffers": 0
+              }
+            }
+          ],
+          "softwareRendererDetected": false
+        },
+        "jsHeapBytes": 56800000,
+        "navigation": {
+          "domContentLoadedMs": 186.3,
+          "loadEventMs": 186.4
+        },
+        "scriptTimings": [
+          {
+            "file": "index-ChiaqPEb.js",
+            "startMs": 13,
+            "responseEndMs": 94.1,
+            "durationMs": 81.1,
+            "transferBytes": 204827,
+            "encodedBytes": 204527
+          },
+          {
+            "file": "TacticalAnalysisPane-BIxn0Zlb.js",
+            "startMs": 231.9,
+            "responseEndMs": 376.2,
+            "durationMs": 144.3,
+            "transferBytes": 10949,
+            "encodedBytes": 10649
+          },
+          {
+            "file": "pitch-model--qJzQGGg.js",
+            "startMs": 232.7,
+            "responseEndMs": 349.6,
+            "durationMs": 116.9,
+            "transferBytes": 766,
+            "encodedBytes": 466
+          },
+          {
+            "file": "useThrottledPlayhead-h0uFdNYi.js",
+            "startMs": 233,
+            "responseEndMs": 358.6,
+            "durationMs": 125.6,
+            "transferBytes": 1256,
+            "encodedBytes": 956
+          },
+          {
+            "file": "tactical-v3-CnZrQlm3.js",
+            "startMs": 233.2,
+            "responseEndMs": 375.8,
+            "durationMs": 142.6,
+            "transferBytes": 1700,
+            "encodedBytes": 1400
+          },
+          {
+            "file": "PaletteBody-HTfe9bMJ.js",
+            "startMs": 370.1,
+            "responseEndMs": 392.3,
+            "durationMs": 22.2,
+            "transferBytes": 3323,
+            "encodedBytes": 3023
+          },
+          {
+            "file": "ComboboxEmpty-BvW5MAd4.js",
+            "startMs": 370.5,
+            "responseEndMs": 392.8,
+            "durationMs": 22.3,
+            "transferBytes": 10575,
+            "encodedBytes": 10275
+          },
+          {
+            "file": "useLabelableId-Dy_scwfF.js",
+            "startMs": 370.7,
+            "responseEndMs": 392.9,
+            "durationMs": 22.2,
+            "transferBytes": 2499,
+            "encodedBytes": 2199
+          },
+          {
+            "file": "AutocompleteItem-BK9lbOEp.js",
+            "startMs": 370.8,
+            "responseEndMs": 393.1,
+            "durationMs": 22.3,
+            "transferBytes": 1466,
+            "encodedBytes": 1166
+          },
+          {
+            "file": "MatchLabCanvasRoot-CbbApmOe.js",
+            "startMs": 1353.1,
+            "responseEndMs": 1378.7,
+            "durationMs": 25.6,
+            "transferBytes": 2725,
+            "encodedBytes": 2425
+          },
+          {
+            "file": "View-YjPNc8A4.js",
+            "startMs": 1353.3,
+            "responseEndMs": 1428.3,
+            "durationMs": 75,
+            "transferBytes": 235452,
+            "encodedBytes": 235152
+          },
+          {
+            "file": "vanilla--C5Lp_AM.js",
+            "startMs": 1353.4,
+            "responseEndMs": 1378.4,
+            "durationMs": 25,
+            "transferBytes": 687,
+            "encodedBytes": 387
+          },
+          {
+            "file": "PitchReplay-BaHtZpOi.js",
+            "startMs": 1502.6,
+            "responseEndMs": 1514.1,
+            "durationMs": 11.5,
+            "transferBytes": 24433,
+            "encodedBytes": 24133
+          },
+          {
+            "file": "PoseScene-CTXB5Gdq.js",
+            "startMs": 1503,
+            "responseEndMs": 1513.3,
+            "durationMs": 10.3,
+            "transferBytes": 19881,
+            "encodedBytes": 19581
+          },
+          {
+            "file": "match-frame-windows-CPQQAS5n.js",
+            "startMs": 1503.2,
+            "responseEndMs": 1511.9,
+            "durationMs": 8.7,
+            "transferBytes": 2896,
+            "encodedBytes": 2596
+          },
+          {
+            "file": "arrow-window-BMNtibqe.js",
+            "startMs": 1503.2,
+            "responseEndMs": 1512.8,
+            "durationMs": 9.6,
+            "transferBytes": 4762,
+            "encodedBytes": 4462
+          },
+          {
+            "file": "frame-buffers-DvJ99041.js",
+            "startMs": 1503.5,
+            "responseEndMs": 1512.4,
+            "durationMs": 8.9,
+            "transferBytes": 1612,
+            "encodedBytes": 1312
+          }
+        ],
+        "echartsLoadedAtUsefulRender": false
+      },
+      "hardwareAccelerationConfirmed": true
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scenario": "field",
+      "repeat": 2,
+      "status": "ok",
+      "errors": [],
+      "usefulWorldReadyMs": 2931,
+      "measurement": {
+        "elapsedMs": 5017,
+        "frames": 207,
+        "fps": 41.26,
+        "frameIntervalMs": {
+          "p50": 16.7,
+          "p95": 33.4,
+          "p99": 50.1,
+          "worst": 83.4
+        },
+        "render": {
+          "drawCalls": 38653,
+          "drawCallsPerFrame": 187,
+          "drawCallsPerFrameP95": 188,
+          "triangles": 1147312,
+          "trianglesPerFrameP50": 5542,
+          "glCpuSubmissionMs": 53.8,
+          "longTaskCount": 3,
+          "rendererResources": [
+            {
+              "buffers": 9463,
+              "textures": 5,
+              "framebuffers": 3,
+              "renderbuffers": 0
+            }
+          ],
+          "allocatedGpuBytes": null,
+          "allocatedGpuBytesReason": "WebGL2 does not expose total device allocation."
+        },
+        "gpu": {
+          "webgl2ContextCount": 1,
+          "contexts": [
+            {
+              "canvas": {
+                "width": 834,
+                "height": 808
+              },
+              "renderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+              "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+              "attributes": {
+                "alpha": true,
+                "antialias": true,
+                "depth": true,
+                "desynchronized": false,
+                "failIfMajorPerformanceCaveat": false,
+                "powerPreference": "high-performance",
+                "premultipliedAlpha": true,
+                "preserveDrawingBuffer": false,
+                "stencil": false,
+                "xrCompatible": false
+              },
+              "maxTextureSize": 16384,
+              "drawCalls": 38653,
+              "triangles": 1147312,
+              "cpuSubmissionMs": 53.8,
+              "resourcesCreated": {
+                "buffers": 9463,
+                "textures": 5,
+                "framebuffers": 3,
+                "renderbuffers": 0
+              }
+            }
+          ],
+          "softwareRendererDetected": false
+        },
+        "jsHeapBytes": 60300000,
+        "navigation": {
+          "domContentLoadedMs": 168.4,
+          "loadEventMs": 168.4
+        },
+        "scriptTimings": [
+          {
+            "file": "index-ChiaqPEb.js",
+            "startMs": 13.8,
+            "responseEndMs": 79.6,
+            "durationMs": 65.8,
+            "transferBytes": 204827,
+            "encodedBytes": 204527
+          },
+          {
+            "file": "TacticalAnalysisPane-BIxn0Zlb.js",
+            "startMs": 213.5,
+            "responseEndMs": 336.3,
+            "durationMs": 122.8,
+            "transferBytes": 10949,
+            "encodedBytes": 10649
+          },
+          {
+            "file": "pitch-model--qJzQGGg.js",
+            "startMs": 214,
+            "responseEndMs": 325.6,
+            "durationMs": 111.6,
+            "transferBytes": 766,
+            "encodedBytes": 466
+          },
+          {
+            "file": "useThrottledPlayhead-h0uFdNYi.js",
+            "startMs": 214.1,
+            "responseEndMs": 327,
+            "durationMs": 112.9,
+            "transferBytes": 1256,
+            "encodedBytes": 956
+          },
+          {
+            "file": "tactical-v3-CnZrQlm3.js",
+            "startMs": 214.3,
+            "responseEndMs": 331.2,
+            "durationMs": 116.9,
+            "transferBytes": 1700,
+            "encodedBytes": 1400
+          },
+          {
+            "file": "PaletteBody-HTfe9bMJ.js",
+            "startMs": 388.4,
+            "responseEndMs": 399.1,
+            "durationMs": 10.7,
+            "transferBytes": 3323,
+            "encodedBytes": 3023
+          },
+          {
+            "file": "ComboboxEmpty-BvW5MAd4.js",
+            "startMs": 388.7,
+            "responseEndMs": 401,
+            "durationMs": 12.3,
+            "transferBytes": 10575,
+            "encodedBytes": 10275
+          },
+          {
+            "file": "useLabelableId-Dy_scwfF.js",
+            "startMs": 388.9,
+            "responseEndMs": 399.8,
+            "durationMs": 10.9,
+            "transferBytes": 2499,
+            "encodedBytes": 2199
+          },
+          {
+            "file": "AutocompleteItem-BK9lbOEp.js",
+            "startMs": 389.1,
+            "responseEndMs": 400.2,
+            "durationMs": 11.1,
+            "transferBytes": 1466,
+            "encodedBytes": 1166
+          },
+          {
+            "file": "MatchLabCanvasRoot-CbbApmOe.js",
+            "startMs": 431.6,
+            "responseEndMs": 459.5,
+            "durationMs": 27.9,
+            "transferBytes": 2725,
+            "encodedBytes": 2425
+          },
+          {
+            "file": "View-YjPNc8A4.js",
+            "startMs": 431.9,
+            "responseEndMs": 493.9,
+            "durationMs": 62,
+            "transferBytes": 235452,
+            "encodedBytes": 235152
+          },
+          {
+            "file": "vanilla--C5Lp_AM.js",
+            "startMs": 432.1,
+            "responseEndMs": 458.9,
+            "durationMs": 26.8,
+            "transferBytes": 687,
+            "encodedBytes": 387
+          },
+          {
+            "file": "PitchReplay-BaHtZpOi.js",
+            "startMs": 546.8,
+            "responseEndMs": 556.9,
+            "durationMs": 10.1,
+            "transferBytes": 24433,
+            "encodedBytes": 24133
+          },
+          {
+            "file": "PoseScene-CTXB5Gdq.js",
+            "startMs": 547.2,
+            "responseEndMs": 556.5,
+            "durationMs": 9.3,
+            "transferBytes": 19881,
+            "encodedBytes": 19581
+          },
+          {
+            "file": "match-frame-windows-CPQQAS5n.js",
+            "startMs": 547.4,
+            "responseEndMs": 554.6,
+            "durationMs": 7.2,
+            "transferBytes": 2896,
+            "encodedBytes": 2596
+          },
+          {
+            "file": "arrow-window-BMNtibqe.js",
+            "startMs": 547.7,
+            "responseEndMs": 555,
+            "durationMs": 7.3,
+            "transferBytes": 4762,
+            "encodedBytes": 4462
+          },
+          {
+            "file": "frame-buffers-DvJ99041.js",
+            "startMs": 547.8,
+            "responseEndMs": 554.8,
+            "durationMs": 7,
+            "transferBytes": 1612,
+            "encodedBytes": 1312
+          }
+        ],
+        "echartsLoadedAtUsefulRender": false
+      },
+      "hardwareAccelerationConfirmed": true
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scenario": "field",
+      "repeat": 3,
+      "status": "ok",
+      "errors": [],
+      "usefulWorldReadyMs": 2785,
+      "measurement": {
+        "elapsedMs": 5052,
+        "frames": 213,
+        "fps": 42.16,
+        "frameIntervalMs": {
+          "p50": 16.7,
+          "p95": 33.4,
+          "p99": 50.1,
+          "worst": 83.4
+        },
+        "render": {
+          "drawCalls": 39756,
+          "drawCallsPerFrame": 187,
+          "drawCallsPerFrameP95": 188,
+          "triangles": 1181748,
+          "trianglesPerFrameP50": 5542,
+          "glCpuSubmissionMs": 52.9,
+          "longTaskCount": 2,
+          "rendererResources": [
+            {
+              "buffers": 9700,
+              "textures": 5,
+              "framebuffers": 3,
+              "renderbuffers": 0
+            }
+          ],
+          "allocatedGpuBytes": null,
+          "allocatedGpuBytesReason": "WebGL2 does not expose total device allocation."
+        },
+        "gpu": {
+          "webgl2ContextCount": 1,
+          "contexts": [
+            {
+              "canvas": {
+                "width": 834,
+                "height": 808
+              },
+              "renderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+              "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+              "attributes": {
+                "alpha": true,
+                "antialias": true,
+                "depth": true,
+                "desynchronized": false,
+                "failIfMajorPerformanceCaveat": false,
+                "powerPreference": "high-performance",
+                "premultipliedAlpha": true,
+                "preserveDrawingBuffer": false,
+                "stencil": false,
+                "xrCompatible": false
+              },
+              "maxTextureSize": 16384,
+              "drawCalls": 39756,
+              "triangles": 1181748,
+              "cpuSubmissionMs": 52.9,
+              "resourcesCreated": {
+                "buffers": 9700,
+                "textures": 5,
+                "framebuffers": 3,
+                "renderbuffers": 0
+              }
+            }
+          ],
+          "softwareRendererDetected": false
+        },
+        "jsHeapBytes": 60300000,
+        "navigation": {
+          "domContentLoadedMs": 154.6,
+          "loadEventMs": 154.8
+        },
+        "scriptTimings": [
+          {
+            "file": "index-ChiaqPEb.js",
+            "startMs": 12.7,
+            "responseEndMs": 54.1,
+            "durationMs": 41.4,
+            "transferBytes": 204827,
+            "encodedBytes": 204527
+          },
+          {
+            "file": "TacticalAnalysisPane-BIxn0Zlb.js",
+            "startMs": 215.7,
+            "responseEndMs": 344.1,
+            "durationMs": 128.4,
+            "transferBytes": 10949,
+            "encodedBytes": 10649
+          },
+          {
+            "file": "pitch-model--qJzQGGg.js",
+            "startMs": 216.1,
+            "responseEndMs": 340.5,
+            "durationMs": 124.4,
+            "transferBytes": 766,
+            "encodedBytes": 466
+          },
+          {
+            "file": "useThrottledPlayhead-h0uFdNYi.js",
+            "startMs": 216.2,
+            "responseEndMs": 340.8,
+            "durationMs": 124.6,
+            "transferBytes": 1256,
+            "encodedBytes": 956
+          },
+          {
+            "file": "tactical-v3-CnZrQlm3.js",
+            "startMs": 216.3,
+            "responseEndMs": 344.8,
+            "durationMs": 128.5,
+            "transferBytes": 1700,
+            "encodedBytes": 1400
+          },
+          {
+            "file": "MatchLabCanvasRoot-CbbApmOe.js",
+            "startMs": 424.2,
+            "responseEndMs": 462.7,
+            "durationMs": 38.5,
+            "transferBytes": 2725,
+            "encodedBytes": 2425
+          },
+          {
+            "file": "View-YjPNc8A4.js",
+            "startMs": 425.1,
+            "responseEndMs": 492,
+            "durationMs": 66.9,
+            "transferBytes": 235452,
+            "encodedBytes": 235152
+          },
+          {
+            "file": "vanilla--C5Lp_AM.js",
+            "startMs": 425.9,
+            "responseEndMs": 462,
+            "durationMs": 36.1,
+            "transferBytes": 687,
+            "encodedBytes": 387
+          },
+          {
+            "file": "PaletteBody-HTfe9bMJ.js",
+            "startMs": 493.4,
+            "responseEndMs": 504.1,
+            "durationMs": 10.7,
+            "transferBytes": 3323,
+            "encodedBytes": 3023
+          },
+          {
+            "file": "ComboboxEmpty-BvW5MAd4.js",
+            "startMs": 493.9,
+            "responseEndMs": 503.5,
+            "durationMs": 9.6,
+            "transferBytes": 10575,
+            "encodedBytes": 10275
+          },
+          {
+            "file": "useLabelableId-Dy_scwfF.js",
+            "startMs": 494.6,
+            "responseEndMs": 502.7,
+            "durationMs": 8.1,
+            "transferBytes": 2499,
+            "encodedBytes": 2199
+          },
+          {
+            "file": "AutocompleteItem-BK9lbOEp.js",
+            "startMs": 494.8,
+            "responseEndMs": 503,
+            "durationMs": 8.2,
+            "transferBytes": 1466,
+            "encodedBytes": 1166
+          },
+          {
+            "file": "PitchReplay-BaHtZpOi.js",
+            "startMs": 550.7,
+            "responseEndMs": 566.4,
+            "durationMs": 15.7,
+            "transferBytes": 24433,
+            "encodedBytes": 24133
+          },
+          {
+            "file": "PoseScene-CTXB5Gdq.js",
+            "startMs": 551,
+            "responseEndMs": 566.8,
+            "durationMs": 15.8,
+            "transferBytes": 19881,
+            "encodedBytes": 19581
+          },
+          {
+            "file": "match-frame-windows-CPQQAS5n.js",
+            "startMs": 551.3,
+            "responseEndMs": 559,
+            "durationMs": 7.7,
+            "transferBytes": 2896,
+            "encodedBytes": 2596
+          },
+          {
+            "file": "arrow-window-BMNtibqe.js",
+            "startMs": 551.6,
+            "responseEndMs": 565.6,
+            "durationMs": 14,
+            "transferBytes": 4762,
+            "encodedBytes": 4462
+          },
+          {
+            "file": "frame-buffers-DvJ99041.js",
+            "startMs": 551.7,
+            "responseEndMs": 560.3,
+            "durationMs": 8.6,
+            "transferBytes": 1612,
+            "encodedBytes": 1312
+          }
+        ],
+        "echartsLoadedAtUsefulRender": false
+      },
+      "hardwareAccelerationConfirmed": true
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scenario": "pose",
+      "repeat": 1,
+      "status": "ok",
+      "errors": [],
+      "usefulWorldReadyMs": 2023,
+      "measurement": {
+        "elapsedMs": 5016,
+        "frames": 300,
+        "fps": 59.81,
+        "frameIntervalMs": {
+          "p50": 16.7,
+          "p95": 16.7,
+          "p99": 16.8,
+          "worst": 16.8
+        },
+        "render": {
+          "drawCalls": 2735,
+          "drawCallsPerFrame": 13,
+          "drawCallsPerFrameP95": 13,
+          "triangles": 87667040,
+          "trianglesPerFrameP50": 288820,
+          "glCpuSubmissionMs": 9.8,
+          "longTaskCount": 0,
+          "rendererResources": [
+            {
+              "buffers": 102,
+              "textures": 4,
+              "framebuffers": 3,
+              "renderbuffers": 0
+            }
+          ],
+          "allocatedGpuBytes": null,
+          "allocatedGpuBytesReason": "WebGL2 does not expose total device allocation."
+        },
+        "gpu": {
+          "webgl2ContextCount": 1,
+          "contexts": [
+            {
+              "canvas": {
+                "width": 834,
+                "height": 808
+              },
+              "renderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+              "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+              "attributes": {
+                "alpha": true,
+                "antialias": true,
+                "depth": true,
+                "desynchronized": false,
+                "failIfMajorPerformanceCaveat": false,
+                "powerPreference": "high-performance",
+                "premultipliedAlpha": true,
+                "preserveDrawingBuffer": false,
+                "stencil": false,
+                "xrCompatible": false
+              },
+              "maxTextureSize": 16384,
+              "drawCalls": 2735,
+              "triangles": 87667040,
+              "cpuSubmissionMs": 9.8,
+              "resourcesCreated": {
+                "buffers": 102,
+                "textures": 4,
+                "framebuffers": 3,
+                "renderbuffers": 0
+              }
+            }
+          ],
+          "softwareRendererDetected": false
+        },
+        "jsHeapBytes": 42100000,
+        "navigation": {
+          "domContentLoadedMs": 168,
+          "loadEventMs": 168
+        },
+        "scriptTimings": [
+          {
+            "file": "index-ChiaqPEb.js",
+            "startMs": 15,
+            "responseEndMs": 69.6,
+            "durationMs": 54.6,
+            "transferBytes": 204827,
+            "encodedBytes": 204527
+          },
+          {
+            "file": "PoseAnalysisPane-BdRYld46.js",
+            "startMs": 227.4,
+            "responseEndMs": 350.2,
+            "durationMs": 122.8,
+            "transferBytes": 7152,
+            "encodedBytes": 6852
+          },
+          {
+            "file": "arrow-window-BMNtibqe.js",
+            "startMs": 227.8,
+            "responseEndMs": 348.9,
+            "durationMs": 121.1,
+            "transferBytes": 4762,
+            "encodedBytes": 4462
+          },
+          {
+            "file": "match-frame-windows-CPQQAS5n.js",
+            "startMs": 228.1,
+            "responseEndMs": 364.7,
+            "durationMs": 136.6,
+            "transferBytes": 2896,
+            "encodedBytes": 2596
+          },
+          {
+            "file": "pitch-model--qJzQGGg.js",
+            "startMs": 228.2,
+            "responseEndMs": 359.2,
+            "durationMs": 131,
+            "transferBytes": 766,
+            "encodedBytes": 466
+          },
+          {
+            "file": "use-pose-playback-VYWwJOPf.js",
+            "startMs": 228.4,
+            "responseEndMs": 365,
+            "durationMs": 136.6,
+            "transferBytes": 1796,
+            "encodedBytes": 1496
+          },
+          {
+            "file": "useThrottledPlayhead-h0uFdNYi.js",
+            "startMs": 228.8,
+            "responseEndMs": 363.6,
+            "durationMs": 134.8,
+            "transferBytes": 1256,
+            "encodedBytes": 956
+          },
+          {
+            "file": "MatchLabCanvasRoot-CbbApmOe.js",
+            "startMs": 415.8,
+            "responseEndMs": 455.7,
+            "durationMs": 39.9,
+            "transferBytes": 2725,
+            "encodedBytes": 2425
+          },
+          {
+            "file": "View-YjPNc8A4.js",
+            "startMs": 416.1,
+            "responseEndMs": 498.5,
+            "durationMs": 82.4,
+            "transferBytes": 235452,
+            "encodedBytes": 235152
+          },
+          {
+            "file": "vanilla--C5Lp_AM.js",
+            "startMs": 416.4,
+            "responseEndMs": 455.4,
+            "durationMs": 39,
+            "transferBytes": 687,
+            "encodedBytes": 387
+          },
+          {
+            "file": "PaletteBody-HTfe9bMJ.js",
+            "startMs": 473.4,
+            "responseEndMs": 485,
+            "durationMs": 11.6,
+            "transferBytes": 3323,
+            "encodedBytes": 3023
+          },
+          {
+            "file": "ComboboxEmpty-BvW5MAd4.js",
+            "startMs": 473.9,
+            "responseEndMs": 486.8,
+            "durationMs": 12.9,
+            "transferBytes": 10575,
+            "encodedBytes": 10275
+          },
+          {
+            "file": "useLabelableId-Dy_scwfF.js",
+            "startMs": 474,
+            "responseEndMs": 485.1,
+            "durationMs": 11.1,
+            "transferBytes": 2499,
+            "encodedBytes": 2199
+          },
+          {
+            "file": "AutocompleteItem-BK9lbOEp.js",
+            "startMs": 474.3,
+            "responseEndMs": 485.8,
+            "durationMs": 11.5,
+            "transferBytes": 1466,
+            "encodedBytes": 1166
+          },
+          {
+            "file": "PoseViewer-CmicvLh7.js",
+            "startMs": 555.3,
+            "responseEndMs": 561.4,
+            "durationMs": 6.1,
+            "transferBytes": 8565,
+            "encodedBytes": 8265
+          },
+          {
+            "file": "PoseScene-CTXB5Gdq.js",
+            "startMs": 1489.4,
+            "responseEndMs": 1502.3,
+            "durationMs": 12.9,
+            "transferBytes": 19881,
+            "encodedBytes": 19581
+          }
+        ],
+        "echartsLoadedAtUsefulRender": false
+      },
+      "hardwareAccelerationConfirmed": true
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scenario": "pose",
+      "repeat": 2,
+      "status": "ok",
+      "errors": [],
+      "usefulWorldReadyMs": 1897,
+      "measurement": {
+        "elapsedMs": 5006,
+        "frames": 299,
+        "fps": 59.72,
+        "frameIntervalMs": {
+          "p50": 16.7,
+          "p95": 16.8,
+          "p99": 16.8,
+          "worst": 33.3
+        },
+        "render": {
+          "drawCalls": 2730,
+          "drawCallsPerFrame": 13,
+          "drawCallsPerFrameP95": 13,
+          "triangles": 87803708,
+          "trianglesPerFrameP50": 288820,
+          "glCpuSubmissionMs": 9.3,
+          "longTaskCount": 0,
+          "rendererResources": [
+            {
+              "buffers": 117,
+              "textures": 4,
+              "framebuffers": 3,
+              "renderbuffers": 0
+            }
+          ],
+          "allocatedGpuBytes": null,
+          "allocatedGpuBytesReason": "WebGL2 does not expose total device allocation."
+        },
+        "gpu": {
+          "webgl2ContextCount": 1,
+          "contexts": [
+            {
+              "canvas": {
+                "width": 834,
+                "height": 808
+              },
+              "renderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+              "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+              "attributes": {
+                "alpha": true,
+                "antialias": true,
+                "depth": true,
+                "desynchronized": false,
+                "failIfMajorPerformanceCaveat": false,
+                "powerPreference": "high-performance",
+                "premultipliedAlpha": true,
+                "preserveDrawingBuffer": false,
+                "stencil": false,
+                "xrCompatible": false
+              },
+              "maxTextureSize": 16384,
+              "drawCalls": 2730,
+              "triangles": 87803708,
+              "cpuSubmissionMs": 9.3,
+              "resourcesCreated": {
+                "buffers": 117,
+                "textures": 4,
+                "framebuffers": 3,
+                "renderbuffers": 0
+              }
+            }
+          ],
+          "softwareRendererDetected": false
+        },
+        "jsHeapBytes": 37300000,
+        "navigation": {
+          "domContentLoadedMs": 174.5,
+          "loadEventMs": 174.5
+        },
+        "scriptTimings": [
+          {
+            "file": "index-ChiaqPEb.js",
+            "startMs": 13.3,
+            "responseEndMs": 72.6,
+            "durationMs": 59.3,
+            "transferBytes": 204827,
+            "encodedBytes": 204527
+          },
+          {
+            "file": "PoseAnalysisPane-BdRYld46.js",
+            "startMs": 225,
+            "responseEndMs": 347.7,
+            "durationMs": 122.7,
+            "transferBytes": 7152,
+            "encodedBytes": 6852
+          },
+          {
+            "file": "arrow-window-BMNtibqe.js",
+            "startMs": 225.5,
+            "responseEndMs": 348.8,
+            "durationMs": 123.3,
+            "transferBytes": 4762,
+            "encodedBytes": 4462
+          },
+          {
+            "file": "match-frame-windows-CPQQAS5n.js",
+            "startMs": 225.7,
+            "responseEndMs": 353.5,
+            "durationMs": 127.8,
+            "transferBytes": 2896,
+            "encodedBytes": 2596
+          },
+          {
+            "file": "pitch-model--qJzQGGg.js",
+            "startMs": 225.8,
+            "responseEndMs": 349.3,
+            "durationMs": 123.5,
+            "transferBytes": 766,
+            "encodedBytes": 466
+          },
+          {
+            "file": "use-pose-playback-VYWwJOPf.js",
+            "startMs": 226,
+            "responseEndMs": 354.8,
+            "durationMs": 128.8,
+            "transferBytes": 1796,
+            "encodedBytes": 1496
+          },
+          {
+            "file": "useThrottledPlayhead-h0uFdNYi.js",
+            "startMs": 226.1,
+            "responseEndMs": 349.7,
+            "durationMs": 123.6,
+            "transferBytes": 1256,
+            "encodedBytes": 956
+          },
+          {
+            "file": "PaletteBody-HTfe9bMJ.js",
+            "startMs": 344.4,
+            "responseEndMs": 364.6,
+            "durationMs": 20.2,
+            "transferBytes": 3323,
+            "encodedBytes": 3023
+          },
+          {
+            "file": "ComboboxEmpty-BvW5MAd4.js",
+            "startMs": 345,
+            "responseEndMs": 366,
+            "durationMs": 21,
+            "transferBytes": 10575,
+            "encodedBytes": 10275
+          },
+          {
+            "file": "useLabelableId-Dy_scwfF.js",
+            "startMs": 345.3,
+            "responseEndMs": 365.1,
+            "durationMs": 19.8,
+            "transferBytes": 2499,
+            "encodedBytes": 2199
+          },
+          {
+            "file": "AutocompleteItem-BK9lbOEp.js",
+            "startMs": 345.5,
+            "responseEndMs": 364.3,
+            "durationMs": 18.8,
+            "transferBytes": 1466,
+            "encodedBytes": 1166
+          },
+          {
+            "file": "MatchLabCanvasRoot-CbbApmOe.js",
+            "startMs": 418.3,
+            "responseEndMs": 443.1,
+            "durationMs": 24.8,
+            "transferBytes": 2725,
+            "encodedBytes": 2425
+          },
+          {
+            "file": "View-YjPNc8A4.js",
+            "startMs": 418.7,
+            "responseEndMs": 474,
+            "durationMs": 55.3,
+            "transferBytes": 235452,
+            "encodedBytes": 235152
+          },
+          {
+            "file": "vanilla--C5Lp_AM.js",
+            "startMs": 418.9,
+            "responseEndMs": 442.7,
+            "durationMs": 23.8,
+            "transferBytes": 687,
+            "encodedBytes": 387
+          },
+          {
+            "file": "PoseViewer-CmicvLh7.js",
+            "startMs": 523.9,
+            "responseEndMs": 529.3,
+            "durationMs": 5.4,
+            "transferBytes": 8565,
+            "encodedBytes": 8265
+          },
+          {
+            "file": "PoseScene-CTXB5Gdq.js",
+            "startMs": 1371.8,
+            "responseEndMs": 1385.4,
+            "durationMs": 13.6,
+            "transferBytes": 19881,
+            "encodedBytes": 19581
+          }
+        ],
+        "echartsLoadedAtUsefulRender": false
+      },
+      "hardwareAccelerationConfirmed": true
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scenario": "pose",
+      "repeat": 3,
+      "status": "ok",
+      "errors": [],
+      "usefulWorldReadyMs": 1937,
+      "measurement": {
+        "elapsedMs": 5017,
+        "frames": 301,
+        "fps": 60,
+        "frameIntervalMs": {
+          "p50": 16.7,
+          "p95": 16.7,
+          "p99": 16.8,
+          "worst": 16.8
+        },
+        "render": {
+          "drawCalls": 2756,
+          "drawCallsPerFrame": 13,
+          "drawCallsPerFrameP95": 13,
+          "triangles": 88381348,
+          "trianglesPerFrameP50": 288820,
+          "glCpuSubmissionMs": 9.6,
+          "longTaskCount": 0,
+          "rendererResources": [
+            {
+              "buffers": 117,
+              "textures": 4,
+              "framebuffers": 3,
+              "renderbuffers": 0
+            }
+          ],
+          "allocatedGpuBytes": null,
+          "allocatedGpuBytesReason": "WebGL2 does not expose total device allocation."
+        },
+        "gpu": {
+          "webgl2ContextCount": 1,
+          "contexts": [
+            {
+              "canvas": {
+                "width": 834,
+                "height": 808
+              },
+              "renderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+              "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+              "attributes": {
+                "alpha": true,
+                "antialias": true,
+                "depth": true,
+                "desynchronized": false,
+                "failIfMajorPerformanceCaveat": false,
+                "powerPreference": "high-performance",
+                "premultipliedAlpha": true,
+                "preserveDrawingBuffer": false,
+                "stencil": false,
+                "xrCompatible": false
+              },
+              "maxTextureSize": 16384,
+              "drawCalls": 2756,
+              "triangles": 88381348,
+              "cpuSubmissionMs": 9.6,
+              "resourcesCreated": {
+                "buffers": 117,
+                "textures": 4,
+                "framebuffers": 3,
+                "renderbuffers": 0
+              }
+            }
+          ],
+          "softwareRendererDetected": false
+        },
+        "jsHeapBytes": 37300000,
+        "navigation": {
+          "domContentLoadedMs": 148.4,
+          "loadEventMs": 148.5
+        },
+        "scriptTimings": [
+          {
+            "file": "index-ChiaqPEb.js",
+            "startMs": 11.3,
+            "responseEndMs": 58.4,
+            "durationMs": 47.1,
+            "transferBytes": 204827,
+            "encodedBytes": 204527
+          },
+          {
+            "file": "PoseAnalysisPane-BdRYld46.js",
+            "startMs": 203.5,
+            "responseEndMs": 329.4,
+            "durationMs": 125.9,
+            "transferBytes": 7152,
+            "encodedBytes": 6852
+          },
+          {
+            "file": "arrow-window-BMNtibqe.js",
+            "startMs": 203.9,
+            "responseEndMs": 324.9,
+            "durationMs": 121,
+            "transferBytes": 4762,
+            "encodedBytes": 4462
+          },
+          {
+            "file": "match-frame-windows-CPQQAS5n.js",
+            "startMs": 204.1,
+            "responseEndMs": 336.4,
+            "durationMs": 132.3,
+            "transferBytes": 2896,
+            "encodedBytes": 2596
+          },
+          {
+            "file": "pitch-model--qJzQGGg.js",
+            "startMs": 204.2,
+            "responseEndMs": 321.1,
+            "durationMs": 116.9,
+            "transferBytes": 766,
+            "encodedBytes": 466
+          },
+          {
+            "file": "use-pose-playback-VYWwJOPf.js",
+            "startMs": 204.3,
+            "responseEndMs": 330,
+            "durationMs": 125.7,
+            "transferBytes": 1796,
+            "encodedBytes": 1496
+          },
+          {
+            "file": "useThrottledPlayhead-h0uFdNYi.js",
+            "startMs": 204.4,
+            "responseEndMs": 321.8,
+            "durationMs": 117.4,
+            "transferBytes": 1256,
+            "encodedBytes": 956
+          },
+          {
+            "file": "PaletteBody-HTfe9bMJ.js",
+            "startMs": 335.8,
+            "responseEndMs": 345.1,
+            "durationMs": 9.3,
+            "transferBytes": 3323,
+            "encodedBytes": 3023
+          },
+          {
+            "file": "ComboboxEmpty-BvW5MAd4.js",
+            "startMs": 336.2,
+            "responseEndMs": 346.3,
+            "durationMs": 10.1,
+            "transferBytes": 10575,
+            "encodedBytes": 10275
+          },
+          {
+            "file": "useLabelableId-Dy_scwfF.js",
+            "startMs": 336.4,
+            "responseEndMs": 345.3,
+            "durationMs": 8.9,
+            "transferBytes": 2499,
+            "encodedBytes": 2199
+          },
+          {
+            "file": "AutocompleteItem-BK9lbOEp.js",
+            "startMs": 336.6,
+            "responseEndMs": 345.4,
+            "durationMs": 8.8,
+            "transferBytes": 1466,
+            "encodedBytes": 1166
+          },
+          {
+            "file": "MatchLabCanvasRoot-CbbApmOe.js",
+            "startMs": 428.8,
+            "responseEndMs": 455.5,
+            "durationMs": 26.7,
+            "transferBytes": 2725,
+            "encodedBytes": 2425
+          },
+          {
+            "file": "View-YjPNc8A4.js",
+            "startMs": 429.1,
+            "responseEndMs": 479.7,
+            "durationMs": 50.6,
+            "transferBytes": 235452,
+            "encodedBytes": 235152
+          },
+          {
+            "file": "vanilla--C5Lp_AM.js",
+            "startMs": 429.3,
+            "responseEndMs": 454.7,
+            "durationMs": 25.4,
+            "transferBytes": 687,
+            "encodedBytes": 387
+          },
+          {
+            "file": "PoseViewer-CmicvLh7.js",
+            "startMs": 532.9,
+            "responseEndMs": 538.6,
+            "durationMs": 5.7,
+            "transferBytes": 8565,
+            "encodedBytes": 8265
+          },
+          {
+            "file": "PoseScene-CTXB5Gdq.js",
+            "startMs": 1400.4,
+            "responseEndMs": 1413.1,
+            "durationMs": 12.7,
+            "transferBytes": 19881,
+            "encodedBytes": 19581
+          }
+        ],
+        "echartsLoadedAtUsefulRender": false
+      },
+      "hardwareAccelerationConfirmed": true
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scenario": "split",
+      "repeat": 1,
+      "status": "ok",
+      "errors": [],
+      "usefulWorldReadyMs": 4408,
+      "measurement": {
+        "elapsedMs": 5028,
+        "frames": 186,
+        "fps": 36.99,
+        "frameIntervalMs": {
+          "p50": 16.7,
+          "p95": 50,
+          "p99": 66.8,
+          "worst": 83.3
+        },
+        "render": {
+          "drawCalls": 32031,
+          "drawCallsPerFrame": 171,
+          "drawCallsPerFrameP95": 177,
+          "triangles": 3845766,
+          "trianglesPerFrameP50": 20546,
+          "glCpuSubmissionMs": 43,
+          "longTaskCount": 5,
+          "rendererResources": [
+            {
+              "buffers": 9551,
+              "textures": 5,
+              "framebuffers": 3,
+              "renderbuffers": 0
+            }
+          ],
+          "allocatedGpuBytes": null,
+          "allocatedGpuBytesReason": "WebGL2 does not expose total device allocation."
+        },
+        "gpu": {
+          "webgl2ContextCount": 1,
+          "contexts": [
+            {
+              "canvas": {
+                "width": 1440,
+                "height": 808
+              },
+              "renderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+              "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+              "attributes": {
+                "alpha": true,
+                "antialias": true,
+                "depth": true,
+                "desynchronized": false,
+                "failIfMajorPerformanceCaveat": false,
+                "powerPreference": "high-performance",
+                "premultipliedAlpha": true,
+                "preserveDrawingBuffer": false,
+                "stencil": false,
+                "xrCompatible": false
+              },
+              "maxTextureSize": 16384,
+              "drawCalls": 32031,
+              "triangles": 3845766,
+              "cpuSubmissionMs": 43,
+              "resourcesCreated": {
+                "buffers": 9551,
+                "textures": 5,
+                "framebuffers": 3,
+                "renderbuffers": 0
+              }
+            }
+          ],
+          "softwareRendererDetected": false
+        },
+        "jsHeapBytes": 53500000,
+        "navigation": {
+          "domContentLoadedMs": 146.7,
+          "loadEventMs": 146.8
+        },
+        "scriptTimings": [
+          {
+            "file": "index-ChiaqPEb.js",
+            "startMs": 11.7,
+            "responseEndMs": 69.4,
+            "durationMs": 57.7,
+            "transferBytes": 204827,
+            "encodedBytes": 204527
+          },
+          {
+            "file": "PaletteBody-HTfe9bMJ.js",
+            "startMs": 278.4,
+            "responseEndMs": 292.3,
+            "durationMs": 13.9,
+            "transferBytes": 3323,
+            "encodedBytes": 3023
+          },
+          {
+            "file": "ComboboxEmpty-BvW5MAd4.js",
+            "startMs": 279.1,
+            "responseEndMs": 293.7,
+            "durationMs": 14.6,
+            "transferBytes": 10575,
+            "encodedBytes": 10275
+          },
+          {
+            "file": "useLabelableId-Dy_scwfF.js",
+            "startMs": 279.4,
+            "responseEndMs": 292.4,
+            "durationMs": 13,
+            "transferBytes": 2499,
+            "encodedBytes": 2199
+          },
+          {
+            "file": "AutocompleteItem-BK9lbOEp.js",
+            "startMs": 279.6,
+            "responseEndMs": 293,
+            "durationMs": 13.4,
+            "transferBytes": 1466,
+            "encodedBytes": 1166
+          },
+          {
+            "file": "MatchLabCanvasRoot-CbbApmOe.js",
+            "startMs": 628.5,
+            "responseEndMs": 648.7,
+            "durationMs": 20.2,
+            "transferBytes": 2725,
+            "encodedBytes": 2425
+          },
+          {
+            "file": "View-YjPNc8A4.js",
+            "startMs": 628.9,
+            "responseEndMs": 674.1,
+            "durationMs": 45.2,
+            "transferBytes": 235452,
+            "encodedBytes": 235152
+          },
+          {
+            "file": "vanilla--C5Lp_AM.js",
+            "startMs": 629,
+            "responseEndMs": 648.3,
+            "durationMs": 19.3,
+            "transferBytes": 687,
+            "encodedBytes": 387
+          },
+          {
+            "file": "MatchWorldStrip-Cyjg18tP.js",
+            "startMs": 730.9,
+            "responseEndMs": 736.7,
+            "durationMs": 5.8,
+            "transferBytes": 2669,
+            "encodedBytes": 2369
+          },
+          {
+            "file": "arrow-up-right-DYmjkj0a.js",
+            "startMs": 731.2,
+            "responseEndMs": 737.1,
+            "durationMs": 5.9,
+            "transferBytes": 559,
+            "encodedBytes": 259
+          },
+          {
+            "file": "pitch-model--qJzQGGg.js",
+            "startMs": 731.4,
+            "responseEndMs": 738,
+            "durationMs": 6.6,
+            "transferBytes": 766,
+            "encodedBytes": 466
+          },
+          {
+            "file": "useThrottledPlayhead-h0uFdNYi.js",
+            "startMs": 731.6,
+            "responseEndMs": 738.3,
+            "durationMs": 6.7,
+            "transferBytes": 1256,
+            "encodedBytes": 956
+          },
+          {
+            "file": "PitchReplay-BaHtZpOi.js",
+            "startMs": 733.1,
+            "responseEndMs": 743.6,
+            "durationMs": 10.5,
+            "transferBytes": 24433,
+            "encodedBytes": 24133
+          },
+          {
+            "file": "PoseScene-CTXB5Gdq.js",
+            "startMs": 733.4,
+            "responseEndMs": 746.3,
+            "durationMs": 12.9,
+            "transferBytes": 19881,
+            "encodedBytes": 19581
+          },
+          {
+            "file": "match-frame-windows-CPQQAS5n.js",
+            "startMs": 733.6,
+            "responseEndMs": 744.3,
+            "durationMs": 10.7,
+            "transferBytes": 2896,
+            "encodedBytes": 2596
+          },
+          {
+            "file": "arrow-window-BMNtibqe.js",
+            "startMs": 733.7,
+            "responseEndMs": 745,
+            "durationMs": 11.3,
+            "transferBytes": 4762,
+            "encodedBytes": 4462
+          },
+          {
+            "file": "tactical-v3-CnZrQlm3.js",
+            "startMs": 733.8,
+            "responseEndMs": 744.5,
+            "durationMs": 10.7,
+            "transferBytes": 1700,
+            "encodedBytes": 1400
+          },
+          {
+            "file": "frame-buffers-DvJ99041.js",
+            "startMs": 734,
+            "responseEndMs": 745.2,
+            "durationMs": 11.2,
+            "transferBytes": 1612,
+            "encodedBytes": 1312
+          },
+          {
+            "file": "MatchLabWorkspace-D5_vJOrE.js",
+            "startMs": 758.5,
+            "responseEndMs": 767,
+            "durationMs": 8.5,
+            "transferBytes": 2695,
+            "encodedBytes": 2395
+          },
+          {
+            "file": "PoseAnalysisPane-BdRYld46.js",
+            "startMs": 758.7,
+            "responseEndMs": 767.7,
+            "durationMs": 9,
+            "transferBytes": 7152,
+            "encodedBytes": 6852
+          },
+          {
+            "file": "use-pose-playback-VYWwJOPf.js",
+            "startMs": 758.8,
+            "responseEndMs": 767.1,
+            "durationMs": 8.3,
+            "transferBytes": 1796,
+            "encodedBytes": 1496
+          },
+          {
+            "file": "PoseViewer-CmicvLh7.js",
+            "startMs": 758.9,
+            "responseEndMs": 768.3,
+            "durationMs": 9.4,
+            "transferBytes": 8565,
+            "encodedBytes": 8265
+          },
+          {
+            "file": "TacticalAnalysisPane-BIxn0Zlb.js",
+            "startMs": 759.1,
+            "responseEndMs": 769.8,
+            "durationMs": 10.7,
+            "transferBytes": 10949,
+            "encodedBytes": 10649
+          }
+        ],
+        "echartsLoadedAtUsefulRender": false
+      },
+      "hardwareAccelerationConfirmed": true
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scenario": "split",
+      "repeat": 2,
+      "status": "ok",
+      "errors": [],
+      "usefulWorldReadyMs": 4495,
+      "measurement": {
+        "elapsedMs": 5034,
+        "frames": 234,
+        "fps": 46.49,
+        "frameIntervalMs": {
+          "p50": 16.7,
+          "p95": 33.4,
+          "p99": 49.9,
+          "worst": 50
+        },
+        "render": {
+          "drawCalls": 40214,
+          "drawCallsPerFrame": 171,
+          "drawCallsPerFrameP95": 177,
+          "triangles": 4831042,
+          "trianglesPerFrameP50": 20540,
+          "glCpuSubmissionMs": 52.1,
+          "longTaskCount": 0,
+          "rendererResources": [
+            {
+              "buffers": 9470,
+              "textures": 5,
+              "framebuffers": 3,
+              "renderbuffers": 0
+            }
+          ],
+          "allocatedGpuBytes": null,
+          "allocatedGpuBytesReason": "WebGL2 does not expose total device allocation."
+        },
+        "gpu": {
+          "webgl2ContextCount": 1,
+          "contexts": [
+            {
+              "canvas": {
+                "width": 1440,
+                "height": 808
+              },
+              "renderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+              "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+              "attributes": {
+                "alpha": true,
+                "antialias": true,
+                "depth": true,
+                "desynchronized": false,
+                "failIfMajorPerformanceCaveat": false,
+                "powerPreference": "high-performance",
+                "premultipliedAlpha": true,
+                "preserveDrawingBuffer": false,
+                "stencil": false,
+                "xrCompatible": false
+              },
+              "maxTextureSize": 16384,
+              "drawCalls": 40214,
+              "triangles": 4831042,
+              "cpuSubmissionMs": 52.1,
+              "resourcesCreated": {
+                "buffers": 9470,
+                "textures": 5,
+                "framebuffers": 3,
+                "renderbuffers": 0
+              }
+            }
+          ],
+          "softwareRendererDetected": false
+        },
+        "jsHeapBytes": 60300000,
+        "navigation": {
+          "domContentLoadedMs": 140.7,
+          "loadEventMs": 140.7
+        },
+        "scriptTimings": [
+          {
+            "file": "index-ChiaqPEb.js",
+            "startMs": 13.9,
+            "responseEndMs": 56.3,
+            "durationMs": 42.4,
+            "transferBytes": 204827,
+            "encodedBytes": 204527
+          },
+          {
+            "file": "PaletteBody-HTfe9bMJ.js",
+            "startMs": 289.7,
+            "responseEndMs": 311.2,
+            "durationMs": 21.5,
+            "transferBytes": 3323,
+            "encodedBytes": 3023
+          },
+          {
+            "file": "ComboboxEmpty-BvW5MAd4.js",
+            "startMs": 290.9,
+            "responseEndMs": 318.7,
+            "durationMs": 27.8,
+            "transferBytes": 10575,
+            "encodedBytes": 10275
+          },
+          {
+            "file": "useLabelableId-Dy_scwfF.js",
+            "startMs": 291.1,
+            "responseEndMs": 312,
+            "durationMs": 20.9,
+            "transferBytes": 2499,
+            "encodedBytes": 2199
+          },
+          {
+            "file": "AutocompleteItem-BK9lbOEp.js",
+            "startMs": 291.4,
+            "responseEndMs": 311.8,
+            "durationMs": 20.4,
+            "transferBytes": 1466,
+            "encodedBytes": 1166
+          },
+          {
+            "file": "MatchLabCanvasRoot-CbbApmOe.js",
+            "startMs": 844.2,
+            "responseEndMs": 870.2,
+            "durationMs": 26,
+            "transferBytes": 2725,
+            "encodedBytes": 2425
+          },
+          {
+            "file": "View-YjPNc8A4.js",
+            "startMs": 844.5,
+            "responseEndMs": 902.1,
+            "durationMs": 57.6,
+            "transferBytes": 235452,
+            "encodedBytes": 235152
+          },
+          {
+            "file": "vanilla--C5Lp_AM.js",
+            "startMs": 844.6,
+            "responseEndMs": 870.2,
+            "durationMs": 25.6,
+            "transferBytes": 687,
+            "encodedBytes": 387
+          },
+          {
+            "file": "MatchWorldStrip-Cyjg18tP.js",
+            "startMs": 963,
+            "responseEndMs": 972.8,
+            "durationMs": 9.8,
+            "transferBytes": 2669,
+            "encodedBytes": 2369
+          },
+          {
+            "file": "arrow-up-right-DYmjkj0a.js",
+            "startMs": 963.3,
+            "responseEndMs": 971.3,
+            "durationMs": 8,
+            "transferBytes": 559,
+            "encodedBytes": 259
+          },
+          {
+            "file": "pitch-model--qJzQGGg.js",
+            "startMs": 963.4,
+            "responseEndMs": 972.1,
+            "durationMs": 8.7,
+            "transferBytes": 766,
+            "encodedBytes": 466
+          },
+          {
+            "file": "useThrottledPlayhead-h0uFdNYi.js",
+            "startMs": 963.6,
+            "responseEndMs": 973.8,
+            "durationMs": 10.2,
+            "transferBytes": 1256,
+            "encodedBytes": 956
+          },
+          {
+            "file": "PitchReplay-BaHtZpOi.js",
+            "startMs": 965.5,
+            "responseEndMs": 979.4,
+            "durationMs": 13.9,
+            "transferBytes": 24433,
+            "encodedBytes": 24133
+          },
+          {
+            "file": "PoseScene-CTXB5Gdq.js",
+            "startMs": 966.1,
+            "responseEndMs": 978.9,
+            "durationMs": 12.8,
+            "transferBytes": 19881,
+            "encodedBytes": 19581
+          },
+          {
+            "file": "match-frame-windows-CPQQAS5n.js",
+            "startMs": 966.2,
+            "responseEndMs": 977.9,
+            "durationMs": 11.7,
+            "transferBytes": 2896,
+            "encodedBytes": 2596
+          },
+          {
+            "file": "arrow-window-BMNtibqe.js",
+            "startMs": 966.4,
+            "responseEndMs": 980.2,
+            "durationMs": 13.8,
+            "transferBytes": 4762,
+            "encodedBytes": 4462
+          },
+          {
+            "file": "tactical-v3-CnZrQlm3.js",
+            "startMs": 966.5,
+            "responseEndMs": 980.9,
+            "durationMs": 14.4,
+            "transferBytes": 1700,
+            "encodedBytes": 1400
+          },
+          {
+            "file": "frame-buffers-DvJ99041.js",
+            "startMs": 966.7,
+            "responseEndMs": 980.9,
+            "durationMs": 14.2,
+            "transferBytes": 1612,
+            "encodedBytes": 1312
+          },
+          {
+            "file": "MatchLabWorkspace-D5_vJOrE.js",
+            "startMs": 990.5,
+            "responseEndMs": 1001.4,
+            "durationMs": 10.9,
+            "transferBytes": 2695,
+            "encodedBytes": 2395
+          },
+          {
+            "file": "PoseAnalysisPane-BdRYld46.js",
+            "startMs": 990.7,
+            "responseEndMs": 1001.5,
+            "durationMs": 10.8,
+            "transferBytes": 7152,
+            "encodedBytes": 6852
+          },
+          {
+            "file": "use-pose-playback-VYWwJOPf.js",
+            "startMs": 990.8,
+            "responseEndMs": 1000,
+            "durationMs": 9.2,
+            "transferBytes": 1796,
+            "encodedBytes": 1496
+          },
+          {
+            "file": "PoseViewer-CmicvLh7.js",
+            "startMs": 990.9,
+            "responseEndMs": 1001.5,
+            "durationMs": 10.6,
+            "transferBytes": 8565,
+            "encodedBytes": 8265
+          },
+          {
+            "file": "TacticalAnalysisPane-BIxn0Zlb.js",
+            "startMs": 991.1,
+            "responseEndMs": 1001.9,
+            "durationMs": 10.8,
+            "transferBytes": 10949,
+            "encodedBytes": 10649
+          }
+        ],
+        "echartsLoadedAtUsefulRender": false
+      },
+      "hardwareAccelerationConfirmed": true
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scenario": "split",
+      "repeat": 3,
+      "status": "ok",
+      "errors": [],
+      "usefulWorldReadyMs": 4176,
+      "measurement": {
+        "elapsedMs": 5026,
+        "frames": 234,
+        "fps": 46.56,
+        "frameIntervalMs": {
+          "p50": 16.7,
+          "p95": 33.4,
+          "p99": 50,
+          "worst": 50.1
+        },
+        "render": {
+          "drawCalls": 40250,
+          "drawCallsPerFrame": 171,
+          "drawCallsPerFrameP95": 177,
+          "triangles": 4831724,
+          "trianglesPerFrameP50": 20540,
+          "glCpuSubmissionMs": 50.1,
+          "longTaskCount": 1,
+          "rendererResources": [
+            {
+              "buffers": 9470,
+              "textures": 5,
+              "framebuffers": 3,
+              "renderbuffers": 0
+            }
+          ],
+          "allocatedGpuBytes": null,
+          "allocatedGpuBytesReason": "WebGL2 does not expose total device allocation."
+        },
+        "gpu": {
+          "webgl2ContextCount": 1,
+          "contexts": [
+            {
+              "canvas": {
+                "width": 1440,
+                "height": 808
+              },
+              "renderer": "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+              "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+              "attributes": {
+                "alpha": true,
+                "antialias": true,
+                "depth": true,
+                "desynchronized": false,
+                "failIfMajorPerformanceCaveat": false,
+                "powerPreference": "high-performance",
+                "premultipliedAlpha": true,
+                "preserveDrawingBuffer": false,
+                "stencil": false,
+                "xrCompatible": false
+              },
+              "maxTextureSize": 16384,
+              "drawCalls": 40250,
+              "triangles": 4831724,
+              "cpuSubmissionMs": 50.1,
+              "resourcesCreated": {
+                "buffers": 9470,
+                "textures": 5,
+                "framebuffers": 3,
+                "renderbuffers": 0
+              }
+            }
+          ],
+          "softwareRendererDetected": false
+        },
+        "jsHeapBytes": 60300000,
+        "navigation": {
+          "domContentLoadedMs": 180,
+          "loadEventMs": 180.1
+        },
+        "scriptTimings": [
+          {
+            "file": "index-ChiaqPEb.js",
+            "startMs": 12.7,
+            "responseEndMs": 90.1,
+            "durationMs": 77.4,
+            "transferBytes": 204827,
+            "encodedBytes": 204527
+          },
+          {
+            "file": "PaletteBody-HTfe9bMJ.js",
+            "startMs": 363.3,
+            "responseEndMs": 372.8,
+            "durationMs": 9.5,
+            "transferBytes": 3323,
+            "encodedBytes": 3023
+          },
+          {
+            "file": "ComboboxEmpty-BvW5MAd4.js",
+            "startMs": 363.9,
+            "responseEndMs": 375.8,
+            "durationMs": 11.9,
+            "transferBytes": 10575,
+            "encodedBytes": 10275
+          },
+          {
+            "file": "useLabelableId-Dy_scwfF.js",
+            "startMs": 364.1,
+            "responseEndMs": 372.9,
+            "durationMs": 8.8,
+            "transferBytes": 2499,
+            "encodedBytes": 2199
+          },
+          {
+            "file": "AutocompleteItem-BK9lbOEp.js",
+            "startMs": 364.2,
+            "responseEndMs": 373,
+            "durationMs": 8.8,
+            "transferBytes": 1466,
+            "encodedBytes": 1166
+          },
+          {
+            "file": "MatchLabCanvasRoot-CbbApmOe.js",
+            "startMs": 382.5,
+            "responseEndMs": 405.6,
+            "durationMs": 23.1,
+            "transferBytes": 2725,
+            "encodedBytes": 2425
+          },
+          {
+            "file": "View-YjPNc8A4.js",
+            "startMs": 383,
+            "responseEndMs": 435.4,
+            "durationMs": 52.4,
+            "transferBytes": 235452,
+            "encodedBytes": 235152
+          },
+          {
+            "file": "vanilla--C5Lp_AM.js",
+            "startMs": 383.3,
+            "responseEndMs": 408.9,
+            "durationMs": 25.6,
+            "transferBytes": 687,
+            "encodedBytes": 387
+          },
+          {
+            "file": "MatchWorldStrip-Cyjg18tP.js",
+            "startMs": 490.8,
+            "responseEndMs": 499.6,
+            "durationMs": 8.8,
+            "transferBytes": 2669,
+            "encodedBytes": 2369
+          },
+          {
+            "file": "arrow-up-right-DYmjkj0a.js",
+            "startMs": 491.1,
+            "responseEndMs": 498.2,
+            "durationMs": 7.1,
+            "transferBytes": 559,
+            "encodedBytes": 259
+          },
+          {
+            "file": "pitch-model--qJzQGGg.js",
+            "startMs": 491.3,
+            "responseEndMs": 498.7,
+            "durationMs": 7.4,
+            "transferBytes": 766,
+            "encodedBytes": 466
+          },
+          {
+            "file": "useThrottledPlayhead-h0uFdNYi.js",
+            "startMs": 491.5,
+            "responseEndMs": 500,
+            "durationMs": 8.5,
+            "transferBytes": 1256,
+            "encodedBytes": 956
+          },
+          {
+            "file": "PitchReplay-BaHtZpOi.js",
+            "startMs": 492.7,
+            "responseEndMs": 509.4,
+            "durationMs": 16.7,
+            "transferBytes": 24433,
+            "encodedBytes": 24133
+          },
+          {
+            "file": "PoseScene-CTXB5Gdq.js",
+            "startMs": 493,
+            "responseEndMs": 509.3,
+            "durationMs": 16.3,
+            "transferBytes": 19881,
+            "encodedBytes": 19581
+          },
+          {
+            "file": "match-frame-windows-CPQQAS5n.js",
+            "startMs": 493.2,
+            "responseEndMs": 508,
+            "durationMs": 14.8,
+            "transferBytes": 2896,
+            "encodedBytes": 2596
+          },
+          {
+            "file": "arrow-window-BMNtibqe.js",
+            "startMs": 493.4,
+            "responseEndMs": 508.3,
+            "durationMs": 14.9,
+            "transferBytes": 4762,
+            "encodedBytes": 4462
+          },
+          {
+            "file": "tactical-v3-CnZrQlm3.js",
+            "startMs": 493.5,
+            "responseEndMs": 508.6,
+            "durationMs": 15.1,
+            "transferBytes": 1700,
+            "encodedBytes": 1400
+          },
+          {
+            "file": "frame-buffers-DvJ99041.js",
+            "startMs": 493.7,
+            "responseEndMs": 510.1,
+            "durationMs": 16.4,
+            "transferBytes": 1612,
+            "encodedBytes": 1312
+          },
+          {
+            "file": "MatchLabWorkspace-D5_vJOrE.js",
+            "startMs": 521.1,
+            "responseEndMs": 532.6,
+            "durationMs": 11.5,
+            "transferBytes": 2695,
+            "encodedBytes": 2395
+          },
+          {
+            "file": "PoseAnalysisPane-BdRYld46.js",
+            "startMs": 521.5,
+            "responseEndMs": 533.6,
+            "durationMs": 12.1,
+            "transferBytes": 7152,
+            "encodedBytes": 6852
+          },
+          {
+            "file": "use-pose-playback-VYWwJOPf.js",
+            "startMs": 521.8,
+            "responseEndMs": 533.3,
+            "durationMs": 11.5,
+            "transferBytes": 1796,
+            "encodedBytes": 1496
+          },
+          {
+            "file": "PoseViewer-CmicvLh7.js",
+            "startMs": 522,
+            "responseEndMs": 533.9,
+            "durationMs": 11.9,
+            "transferBytes": 8565,
+            "encodedBytes": 8265
+          },
+          {
+            "file": "TacticalAnalysisPane-BIxn0Zlb.js",
+            "startMs": 522.2,
+            "responseEndMs": 534.6,
+            "durationMs": 12.4,
+            "transferBytes": 10949,
+            "encodedBytes": 10649
+          }
+        ],
+        "echartsLoadedAtUsefulRender": false
+      },
+      "hardwareAccelerationConfirmed": true
+    }
+  ],
+  "summaries": [
+    {
+      "viewport": {
+        "width": 1600,
+        "height": 1000
+      },
+      "scenario": "field",
+      "successfulRuns": 3,
+      "medianFps": 33.93,
+      "medianP95FrameIntervalMs": 50.1,
+      "medianUsefulWorldReadyMs": 2812,
+      "medianDrawCallsPerFrame": 185,
+      "medianTrianglesPerFrame": 5542,
+      "medianGlCpuSubmissionMsPerSample": 44.9,
+      "medianLongTasks": 11,
+      "medianViewChunkNetworkMs": 70.2,
+      "hardwareRenderer": [
+        "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+      ],
+      "echartsLoadedBeforeFirstUsefulRender": false
+    },
+    {
+      "viewport": {
+        "width": 1600,
+        "height": 1000
+      },
+      "scenario": "pose",
+      "successfulRuns": 3,
+      "medianFps": 59.71,
+      "medianP95FrameIntervalMs": 16.8,
+      "medianUsefulWorldReadyMs": 1946,
+      "medianDrawCallsPerFrame": 13,
+      "medianTrianglesPerFrame": 288820,
+      "medianGlCpuSubmissionMsPerSample": 8.8,
+      "medianLongTasks": 0,
+      "medianViewChunkNetworkMs": 59.1,
+      "hardwareRenderer": [
+        "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+      ],
+      "echartsLoadedBeforeFirstUsefulRender": false
+    },
+    {
+      "viewport": {
+        "width": 1600,
+        "height": 1000
+      },
+      "scenario": "split",
+      "successfulRuns": 3,
+      "medianFps": 39.53,
+      "medianP95FrameIntervalMs": 50,
+      "medianUsefulWorldReadyMs": 3447,
+      "medianDrawCallsPerFrame": 164,
+      "medianTrianglesPerFrame": 20534,
+      "medianGlCpuSubmissionMsPerSample": 40.7,
+      "medianLongTasks": 2,
+      "medianViewChunkNetworkMs": 50.7,
+      "hardwareRenderer": [
+        "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+      ],
+      "echartsLoadedBeforeFirstUsefulRender": false
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scenario": "field",
+      "successfulRuns": 3,
+      "medianFps": 42.16,
+      "medianP95FrameIntervalMs": 33.4,
+      "medianUsefulWorldReadyMs": 2931,
+      "medianDrawCallsPerFrame": 187,
+      "medianTrianglesPerFrame": 5542,
+      "medianGlCpuSubmissionMsPerSample": 52.9,
+      "medianLongTasks": 2,
+      "medianViewChunkNetworkMs": 66.9,
+      "hardwareRenderer": [
+        "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+      ],
+      "echartsLoadedBeforeFirstUsefulRender": false
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scenario": "pose",
+      "successfulRuns": 3,
+      "medianFps": 59.81,
+      "medianP95FrameIntervalMs": 16.7,
+      "medianUsefulWorldReadyMs": 1937,
+      "medianDrawCallsPerFrame": 13,
+      "medianTrianglesPerFrame": 288820,
+      "medianGlCpuSubmissionMsPerSample": 9.6,
+      "medianLongTasks": 0,
+      "medianViewChunkNetworkMs": 55.3,
+      "hardwareRenderer": [
+        "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+      ],
+      "echartsLoadedBeforeFirstUsefulRender": false
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scenario": "split",
+      "successfulRuns": 3,
+      "medianFps": 46.49,
+      "medianP95FrameIntervalMs": 33.4,
+      "medianUsefulWorldReadyMs": 4408,
+      "medianDrawCallsPerFrame": 171,
+      "medianTrianglesPerFrame": 20540,
+      "medianGlCpuSubmissionMsPerSample": 50.1,
+      "medianLongTasks": 1,
+      "medianViewChunkNetworkMs": 52.4,
+      "hardwareRenderer": [
+        "ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+      ],
+      "echartsLoadedBeforeFirstUsefulRender": false
+    }
+  ],
+  "lazyEcharts": {
+    "route": "/season?edition=edition-ebf871f2a9cd29912d68880e&family=physical&team=team-6db2746c59daa23a45580196&player=skillcorner-opendata%2F966112",
+    "loadedOnlyAfterChartRoute": true,
+    "productionChunk": {
+      "file": "echarts-CRgnc_ZP.js",
+      "rawBytes": 1117207,
+      "gzipBytes": 367677
+    },
+    "runs": [
+      {
+        "viewport": {
+          "width": 1600,
+          "height": 1000
+        },
+        "scenario": "season-echarts-lazy",
+        "repeat": 1,
+        "status": "ok",
+        "errors": [],
+        "chartReadyMs": 1275,
+        "timings": [
+          {
+            "file": "echarts-CRgnc_ZP.js",
+            "startMs": 1060.2,
+            "responseEndMs": 1109.1,
+            "networkDurationMs": 48.9,
+            "transferBytes": 367977,
+            "encodedBytes": 367677
+          }
+        ]
+      },
+      {
+        "viewport": {
+          "width": 1600,
+          "height": 1000
+        },
+        "scenario": "season-echarts-lazy",
+        "repeat": 2,
+        "status": "ok",
+        "errors": [],
+        "chartReadyMs": 1617,
+        "timings": [
+          {
+            "file": "echarts-CRgnc_ZP.js",
+            "startMs": 1143.1,
+            "responseEndMs": 1193.7,
+            "networkDurationMs": 50.6,
+            "transferBytes": 367977,
+            "encodedBytes": 367677
+          }
+        ]
+      },
+      {
+        "viewport": {
+          "width": 1600,
+          "height": 1000
+        },
+        "scenario": "season-echarts-lazy",
+        "repeat": 3,
+        "status": "ok",
+        "errors": [],
+        "chartReadyMs": 3780,
+        "timings": [
+          {
+            "file": "echarts-CRgnc_ZP.js",
+            "startMs": 3665.5,
+            "responseEndMs": 3715.9,
+            "networkDurationMs": 50.4,
+            "transferBytes": 367977,
+            "encodedBytes": 367677
+          }
+        ]
+      },
+      {
+        "viewport": {
+          "width": 1440,
+          "height": 900
+        },
+        "scenario": "season-echarts-lazy",
+        "repeat": 1,
+        "status": "ok",
+        "errors": [],
+        "chartReadyMs": 5243,
+        "timings": [
+          {
+            "file": "echarts-CRgnc_ZP.js",
+            "startMs": 4771.6,
+            "responseEndMs": 4816.9,
+            "networkDurationMs": 45.3,
+            "transferBytes": 367977,
+            "encodedBytes": 367677
+          }
+        ]
+      },
+      {
+        "viewport": {
+          "width": 1440,
+          "height": 900
+        },
+        "scenario": "season-echarts-lazy",
+        "repeat": 2,
+        "status": "ok",
+        "errors": [],
+        "chartReadyMs": 1219,
+        "timings": [
+          {
+            "file": "echarts-CRgnc_ZP.js",
+            "startMs": 1095.4,
+            "responseEndMs": 1144.9,
+            "networkDurationMs": 49.5,
+            "transferBytes": 367977,
+            "encodedBytes": 367677
+          }
+        ]
+      },
+      {
+        "viewport": {
+          "width": 1440,
+          "height": 900
+        },
+        "scenario": "season-echarts-lazy",
+        "repeat": 3,
+        "status": "ok",
+        "errors": [],
+        "chartReadyMs": 6734,
+        "timings": [
+          {
+            "file": "echarts-CRgnc_ZP.js",
+            "startMs": 6323.5,
+            "responseEndMs": 6389.7,
+            "networkDurationMs": 66.2,
+            "transferBytes": 367977,
+            "encodedBytes": 367677
+          }
+        ]
+      }
+    ],
+    "summaries": [
+      {
+        "viewport": {
+          "width": 1600,
+          "height": 1000
+        },
+        "successfulRuns": 3,
+        "medianChartReadyMs": 1617,
+        "medianEchartsNetworkMs": 50.4,
+        "medianTransferBytes": 367977
+      },
+      {
+        "viewport": {
+          "width": 1440,
+          "height": 900
+        },
+        "successfulRuns": 3,
+        "medianChartReadyMs": 5243,
+        "medianEchartsNetworkMs": 49.5,
+        "medianTransferBytes": 367977
+      }
+    ]
+  }
+}

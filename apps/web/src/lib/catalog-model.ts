@@ -380,11 +380,7 @@ export function buildStudies(
     .filter((dataset) => dataset.modalities.some((modality) => SIGNAL_SET.has(modality)))
     .map((dataset): StudyNode => {
       const sessions = sessionsByDataset.get(dataset.dataset_id) ?? [];
-      const readySessions = sessions.length
-        ? sessions.filter((session) => readinessOf(session).server === "ready").length
-        : dataset.ingested_modalities.some((modality) => SIGNAL_SET.has(modality)) && dataset.stream_count > 0
-          ? dataset.session_count
-          : 0;
+      const readySessions = sessions.filter((session) => readinessOf(session).server === "ready").length;
       return {
         datasetId: dataset.dataset_id,
         name: dataset.name,

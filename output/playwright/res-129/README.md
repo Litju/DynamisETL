@@ -56,11 +56,11 @@ The real-data continuation adds the A-League edition tabs, Perth Glory team cont
 
 ## RES-129 continuation: World and operational states
 
-These captures use the final production build against the local read-only API. Rights, missing-session, and API-unavailable states were deliberately returned as 451, 404, and 503 for their respective captures. Each step asserts no horizontal document overflow. Screens 18–26 are present at all three viewports; the upstream-only session example is at 1440×900.
+These captures use the final production build against the local read-only API. Rights, missing-session, and API-unavailable states were deliberately returned as 451, 404, and 503 for their respective captures. Each step asserts no horizontal document overflow. Screens 17–26 are present at all three viewports; the final set also adds Human Performance and Match Navigator captures and refreshes the Competition, Team, Player and SeasonLab views at each size.
 
 | State | 1366×768 | 1440×900 | 1600×1000 |
 | --- | --- | --- | --- |
-| Upstream-only GymAware session, no openable trials | — | [17](final/1440x900/17-gymaware-upstream-only-session.png) | — |
+| Upstream-only GymAware session, no openable trials | [17](final/1366x768/17-gymaware-upstream-only-session.png) | [17](final/1440x900/17-gymaware-upstream-only-session.png) | [17](final/1600x1000/17-gymaware-upstream-only-session.png) |
 | Game World | [18](final/1366x768/18-game-world.png) | [18](final/1440x900/18-game-world.png) | [18](final/1600x1000/18-game-world.png) |
 | Basketball spatial | [19](final/1366x768/19-basketball-spatial.png) | [19](final/1440x900/19-basketball-spatial.png) | [19](final/1600x1000/19-basketball-spatial.png) |
 | Performance World, ready White CMJ session | [20](final/1366x768/20-performance-world.png) | [20](final/1440x900/20-performance-world.png) | [20](final/1600x1000/20-performance-world.png) |
@@ -75,14 +75,35 @@ The Performance World distinguishes readiness at the session level. White CMJ ke
 
 The real-data Back regression also enters Match World from a direct deep link with no prior catalog route and returns to the in-app catalog fallback. A separate catalog-history test verifies Back from an in-app open returns to the exact filtered edition URL. Both keep the product inside the app.
 
-## Final acceptance evidence
+## Final acceptance evidence — 2026-09-29
 
-- Web unit suite: 226 tests in 39 files passed; TypeScript typecheck and production build passed.
-- Fixture browser suite: 105 passed, 1 real-data-only case skipped. Its direct deep-link regression opened Match World as the first route, then verified Back falls back to `/data`; the in-app path separately returned to its exact ready-filtered edition URL. Viewport overflow, axe, reduced-motion, lazy loading and renderer-smoke checks also passed.
-- Real-data browser suite: the selected RES-129/123/124/accessibility/camera/performance set had 32 passing checks. One existing isolated tracking-chunk p95 assertion observed 290.6 ms against its 250 ms limit in the full run; rerunning that test alone passed and recorded 150 ms. Entity continuity, readiness-gated upstream trials, real rights states, Basketball spatial, accessibility, reduced motion, camera ownership and playback flow passed.
-- Production capture: 97 API requests across the captured states, 11 dense-data requests in total, and zero dense-data requests before entering Match World. Research, Data, and Library static import closures have no renderer or ECharts chunks. Match World adds the 895 kB `View` chunk (about 235 kB gzip); the tested Research/Data/Library screens do not load the ECharts chunk.
-- Build warning: the lazy ECharts chunk is 1,117 kB raw / 371 kB gzip, above Vite's 900 kB warning threshold. It was not loaded by the screens in this capture; splitting or replacing it is a separate bundle optimization decision.
-- GPU receipts: [renderer benchmark](final/renderer-gpu-benchmark.json) and [hybrid field benchmark](final/hybrid-field-benchmark.json). In the repeated headless Chromium sample on AMD GCN5/D3D11, WebGL2 measured 30/34 FPS for Field, 52/53 for Pose, and 17/20 for split at 1600×1000 / 1440×900. WebGPU measured 25/47 for Field, 50/50 for Pose, and 5/4 for split; split p95 frame intervals were 333/400 ms. WebGPU performance varied by workload, including a faster 1440 Field sample, but the split result supports keeping WebGL2 as the production backend. The hybrid WebGL2 split measured 27/21 FPS; structure-lift shadow pass p95 was 0.2/0.4 ms and scalar update p95 was 1.2/1.2 ms with shadows enabled. These are headless measurements; the browser does not expose comparable allocated GPU bytes for WebGL2.
-- Playback chunk p95 is variable in this headless run: one full real-browser run observed 290.6 ms against the existing 250 ms budget, while the immediate isolated retry passed at 150 ms. The saved [playback performance receipt](final/playback-performance.json) contains the passing retry. Treat the isolated chunk timing as noisy rather than as a stable pass margin.
+Readiness is authoritative per `performance_session` in the serving read-model. White CMJ publishes `stages.ready: "ready"` with materialized FORCE/IMU trial-series capabilities; the live `white-s000` detail has 16 streams, each with a sample artifact and positive sample-row count. The Performance UI now opens trials only from that explicit session readiness. GymAware publishes `not_ready`/upstream availability; its trial metadata remains visible without an openable link.
 
-The measured split-view frame rate and variable playback p95 remain owner-review findings. RES-129 is intentionally local and In Progress pending visual/performance review; this work does not create a PR or close the item.
+Acceptance gates passed:
+
+- Final production build and TypeScript check; ESLint.
+- 227 unit tests across 39 files.
+- Fixture browser suite: 105 passed, 1 real-data-only case skipped, including axe, reduced-motion, responsive, lazy-loading and renderer-smoke checks.
+- Live-data browser suite: 20 passed, including RES-129 readiness, entity continuity, axe and reduced-motion cases.
+- Production screenshot assertions: no horizontal overflow and zero console errors at all three viewports.
+
+The screenshot folders contain the complete owner-review set: [1600×1000](final/1600x1000/), [1440×900](final/1440x900/) and [1366×768](final/1366x768/). Each has a `report.json`; the required states include Research Home, Data/Sports, Human Performance, Competition/Season, Team, Player, Match Navigator, MatchLab, GameLab, SeasonLab, Basketball spatial, ready and upstream-only Performance, Prepare, rights-restricted, unsupported, API-error/unavailable, and Library/Evidence. The 1366×768 folder also includes the Prepare scroll-state capture.
+
+### Controlled production renderer benchmark
+
+The [production benchmark receipt](final/production-benchmark.json) contains three runs per viewport/scenario, from the Vite production preview with test runners idle. Chromium reported AMD Radeon(TM) Graphics through D3D11; WebGL2 was the actual production backend. Medians:
+
+| Viewport | Scenario | FPS | p95 frame interval | Draw calls/frame | Triangles/frame | GL submission CPU / 5 s | View chunk network |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1600×1000 | Field | 33.93 | 50.1 ms | 185 | 5,542 | 44.9 ms | 70.2 ms |
+| 1600×1000 | Pose | 59.71 | 16.8 ms | 13 | 288,820 | 8.8 ms | 59.1 ms |
+| 1600×1000 | Split | 39.53 | 50.0 ms | 164 | 20,534 | 40.7 ms | 50.7 ms |
+| 1440×900 | Field | 42.16 | 33.4 ms | 187 | 5,542 | 52.9 ms | 66.9 ms |
+| 1440×900 | Pose | 59.81 | 16.7 ms | 13 | 288,820 | 9.6 ms | 55.3 ms |
+| 1440×900 | Split | 46.49 | 33.4 ms | 171 | 20,540 | 50.1 ms | 52.4 ms |
+
+Split remained above 30 FPS in every repeated viewport median, so no renderer optimization was warranted. The earlier 17–20 FPS single-run result did not reproduce. GPU allocation bytes are unavailable through WebGL2; the receipt records renderer resources, WebGL contexts, draw/triangle counts, long tasks, JS heap, and hardware renderer instead. WebGPU remains experimental.
+
+ECharts stays lazy. Its production chunk is 1,117,207 raw bytes / 367,677 gzip bytes. Across three SeasonLab runs, the chunk request took a median 50.4 ms at 1600×1000 and 49.5 ms at 1440×900; transfer size was 367,977 bytes. It was not loaded before the first useful MatchLab render. The measured World ready time is in each viewport `report.json`.
+
+RES-129 remains local and In Progress. No push, final PR, merge, or Done transition was performed. The production preview is running at `http://127.0.0.1:4174/` for owner review.

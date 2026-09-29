@@ -87,12 +87,10 @@ function StudyContext({ study, search }: { study: StudyNode; search: Performance
   const navigate = useNavigate();
   const sessions = useQuery({ ...sessionsQuery(study.datasetId), staleTime: METADATA_STALE_MS });
   const selected = search.session ?? null;
+  // The serving read-model publishes readiness per session after checking its
+  // materialized artifacts and grains; registered stream metadata alone is not authority.
   const readyIds = useMemo(
     () => new Set(study.sessions.filter((item) => readinessOf(item).server === "ready").flatMap((item) => (item.session_id ? [item.session_id] : []))),
-    [study.sessions],
-  );
-  const catalogSessionIds = useMemo(
-    () => new Set(study.sessions.flatMap((item) => (item.session_id ? [item.session_id] : []))),
     [study.sessions],
   );
   const selectedResource = study.sessions.find((item) => item.session_id === selected) ?? null;
@@ -136,8 +134,6 @@ function StudyContext({ study, search }: { study: StudyNode; search: Performance
             rows={rows}
             selected={selected}
             readyIds={readyIds}
-            catalogSessionIds={catalogSessionIds}
-            studyReady={study.ready}
             pending={sessions.isPending}
             onSelect={(sessionId) => update({ session: sessionId })}
           />
@@ -148,7 +144,6 @@ function StudyContext({ study, search }: { study: StudyNode; search: Performance
               datasetId={study.datasetId}
               sessionId={selected}
               readiness={selectedReadiness}
-              studyReady={study.ready}
             />
           ) : (
             <StatePanel state="empty" title="Choose a session to see its trials." detail="Session and trial metadata load here; signal windows load only when a trial opens in the Performance World." />
@@ -163,16 +158,12 @@ function SessionList({
   rows,
   selected,
   readyIds,
-  catalogSessionIds,
-  studyReady,
   pending,
   onSelect,
 }: {
   rows: readonly SessionSummary[];
   selected: string | null;
   readyIds: ReadonlySet<string>;
-  catalogSessionIds: ReadonlySet<string>;
-  studyReady: boolean;
   pending: boolean;
   onSelect: (sessionId: string) => void;
 }) {
@@ -186,8 +177,7 @@ function SessionList({
       getKey={(session) => session.session_id}
       renderRow={(session, _index, style) => {
         const active = session.session_id === selected;
-        const ready = readyIds.has(session.session_id) ||
-          (studyReady && !catalogSessionIds.has(session.session_id) && session.stream_count > 0);
+        const ready = readyIds.has(session.session_id);
         return (
           <button
             type="button"
@@ -214,13 +204,13 @@ function SessionList({
   );
 }
 
-function SessionPanel({ datasetId, sessionId, readiness, studyReady }: { datasetId: string; sessionId: string; readiness: Readiness | null; studyReady: boolean }) {
+function SessionPanel({ datasetId, sessionId, readiness }: { datasetId: string; sessionId: string; readiness: Readiness | null }) {
   const detail = useQuery(sessionQuery(datasetId, sessionId));
   if (detail.isPending) {
     return <div className="space-y-3 p-8" aria-busy="true"><div className="d-skeleton h-6 w-72" /><div className="d-skeleton h-40" /></div>;
   }
   if (detail.isError) return <ErrorPanel error={detail.error} onRetry={() => void detail.refetch()} />;
-  const ready = readiness?.server === "ready" || (!readiness && studyReady && detail.data.streams.length > 0);
+  const ready = readiness?.server === "ready";
   return <SessionTrials detail={detail.data} readiness={readiness} ready={ready} />;
 }
 

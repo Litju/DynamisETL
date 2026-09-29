@@ -149,6 +149,17 @@ test("RES-129 opens a Performance trial only when the selected session has ready
     if (/\/window$/u.test(new URL(request.url()).pathname)) denseReads.push(request.url());
   });
 
+  const readModel = await (await page.request.get("/api/catalog/read-model")).json();
+  const whiteSession = readModel.resources.find((item: { resource_kind: string; resource_id: string }) =>
+    item.resource_kind === "performance_session" && item.resource_id === "white-cmj-acc-grf/white-s000");
+  expect(whiteSession.stages.ready).toBe("ready");
+  expect(whiteSession.materialized_capabilities).toEqual(expect.arrayContaining(["FORCE", "IMU"]));
+  expect(whiteSession.materialized_grains).toContain("TRIAL_SERIES");
+  const detail = await (await page.request.get("/api/catalog/datasets/white-cmj-acc-grf/sessions/white-s000")).json();
+  expect(detail.streams).toHaveLength(detail.session.stream_count);
+  expect(detail.streams.every((stream: { sample_artifact_ids: string[]; sample_row_count: number }) =>
+    stream.sample_artifact_ids.length > 0 && stream.sample_row_count > 0)).toBe(true);
+
   await page.goto("/performance?dataset=white-cmj-acc-grf&session=white-s000");
   await expect(page.getByRole("heading", { name: "White CMJ accelerometer + vGRF", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "white-s000", exact: true })).toBeVisible();

@@ -18,6 +18,9 @@ const upstreamOnly = matches.filter((item) => item.stages.ready !== "ready");
 const match = readyMatches.find((item) => item.dataset_ids?.includes("skillcorner-opendata") && item.label.startsWith("Brisbane Roar FC"));
 assert.ok(match?.session_id, "live read model must contain the ready SkillCorner Brisbane match");
 assert.ok(match.routes?.some((route) => route.product === "MatchLab" && route.ready), "match must route to the existing Match World");
+const perthId = "team-6db2746c59daa23a45580196";
+const bugarijaId = "skillcorner-opendata/966112";
+const taggartId = "skillcorner-opendata/211";
 
 const gameEditions = await (await fetch(`${apiBase}/api/games/editions`)).json();
 const acbEdition = gameEditions.find((item) => item.dataset_id === "skillcorner-basketball-opendata");
@@ -90,7 +93,7 @@ const viewportDir = path.join(outputRoot, viewport.label);
 await mkdir(viewportDir, { recursive: true });
 const steps = [];
 let responseMark = 0;
-async function capture(name) {
+async function capture(name, metadata = {}) {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
   assert.equal(overflow, false, `${name} has horizontal overflow at ${viewport.label}`);
   const file = path.join(viewportDir, `${name}.png`);
@@ -101,8 +104,18 @@ async function capture(name) {
     const body = await readFile(path.resolve(appDir, "dist", "assets", asset));
     js.push({ file: asset, bytes: body.length, gzipBytes: gzipSync(body).length, status: response.status });
   }
+  const scriptTimings = await page.evaluate(() => performance.getEntriesByType("resource")
+    .filter((entry) => entry.initiatorType === "script" && /\.js(?:\?|$)/u.test(entry.name))
+    .map((entry) => ({
+      file: new URL(entry.name).pathname.split("/").at(-1),
+      startMs: Math.round(entry.startTime * 100) / 100,
+      responseEndMs: Math.round(entry.responseEnd * 100) / 100,
+      durationMs: Math.round(entry.duration * 100) / 100,
+      transferBytes: entry.transferSize || null,
+      encodedBytes: entry.encodedBodySize || null,
+    })));
   responseMark = responses.length;
-  steps.push({ name, url: page.url(), file, js });
+  steps.push({ name, url: page.url(), file, js, scriptTimings, ...metadata });
 }
 const dataNav = page.getByRole("navigation", { name: "Data hierarchy" });
 
@@ -115,6 +128,10 @@ await page.getByRole("link", { name: "Data", exact: true }).click();
 await page.getByRole("heading", { name: "Sports", exact: true }).waitFor({ state: "visible" });
 await page.getByRole("link", { name: /Human Performance/i }).waitFor({ state: "visible" });
 await capture("02-data-browser");
+
+await page.goto(`${webBase}/data?domain=human`);
+await page.getByRole("heading", { name: "Human Performance", exact: true }).waitFor({ state: "visible" });
+await capture("02-human-performance");
 
 await dataNav.getByRole("link", { name: "Sports", exact: true }).click();
 await page.waitForURL((url) => url.searchParams.get("domain") === "sports");
@@ -143,10 +160,14 @@ const beforeWorldRequests = requests.length;
 const beforeWorldScripts = [...new Set(responses.filter((response) => response.type === "script").map((response) => new URL(response.url).pathname.split("/").pop()))];
 const heavyChunk = /(echarts|^View-|three|fiber|drei|PoseScene|PitchReplay|MatchLabCanvasRoot)/iu;
 const preWorldHeavyScripts = beforeWorldScripts.filter((file) => heavyChunk.test(file));
+const worldNavigationStartedAt = await page.evaluate(() => performance.now());
 await readyMatchLink.click();
 await page.getByRole("button", { name: "Back", exact: true }).waitFor({ state: "visible" });
 await page.getByTestId("matchlab-composition").waitFor({ state: "visible" });
 await page.getByText(/29\/29 landmarks/).waitFor({ state: "visible", timeout: 120000 });
+await page.locator('[data-testid="pitch-canvas"][data-renderer-ready="true"]').waitFor({ timeout: 120000 });
+await page.locator('[data-testid="pose-canvas"][data-renderer-ready="true"]').waitFor({ timeout: 120000 });
+const worldUsefulRenderMs = await page.evaluate((startedAt) => Math.round((performance.now() - startedAt) * 100) / 100, worldNavigationStartedAt);
 await page.waitForTimeout(5000);
 const preWorldRequests = requests.slice(0, beforeWorldRequests);
 const initialWorldRequests = requests.slice(beforeWorldRequests);
@@ -156,7 +177,7 @@ const densePaths = preWorldRequests.filter((request) =>
   /^\/api\/basketball\/[^/]+\/frames/.test(new URL(request.url).pathname),
 );
 assert.equal(densePaths.length, 0, "ordinary catalog browsing must not request dense telemetry");
-await capture("07-match-world");
+await capture("07-match-world", { usefulWorldRenderMs: worldUsefulRenderMs });
 
 await page.getByRole("button", { name: "Back", exact: true }).click();
 await page.waitForURL((url) => url.href === returnUrl);
@@ -168,6 +189,42 @@ await page.getByRole("link", { name: "Research", exact: true }).click();
 await page.getByRole("heading", { name: "Continue", exact: true }).waitFor({ state: "visible" });
 await page.getByText(/Brisbane Roar FC 0–1 Perth Glory Football Club/).first().waitFor({ state: "visible" });
 await capture("09-research-home-recent");
+
+await page.goto(`${webBase}/lab`);
+await page.getByTestId("match-navigator").waitFor({ state: "visible" });
+await capture("06-match-navigator");
+
+await page.goto(`${webBase}/data/edition/${encodeURIComponent(edition.edition_id)}?tab=teams`);
+await page.getByRole("tab", { name: /Teams/ }).waitFor({ state: "visible" });
+await capture("10-a-league-teams");
+
+await page.goto(`${webBase}/data/edition/${encodeURIComponent(edition.edition_id)}?tab=players`);
+await page.getByRole("tab", { name: /Players/ }).waitFor({ state: "visible" });
+await capture("11-a-league-players");
+
+await page.goto(`${webBase}/data/edition/${encodeURIComponent(edition.edition_id)}?tab=season`);
+await page.getByText("Metric families", { exact: true }).waitFor({ state: "visible" });
+await capture("12-a-league-season-data");
+
+await page.goto(`${webBase}/data/team/${perthId}?edition=${encodeURIComponent(edition.edition_id)}`);
+await page.getByRole("heading", { name: "Perth Glory Football Club", exact: true }).waitFor({ state: "visible" });
+await page.getByText(/registered contests ready/).waitFor({ state: "visible" });
+await capture("13-team-perth-glory");
+
+await page.goto(`${webBase}/data/player/${encodeURIComponent(bugarijaId)}?edition=${encodeURIComponent(edition.edition_id)}`);
+await page.getByRole("heading", { name: "Adam Bugarija", exact: true }).waitFor({ state: "visible" });
+await page.getByText("Pose available", { exact: true }).waitFor({ state: "visible" });
+await capture("14-player-adam-bugarija");
+
+await page.goto(`${webBase}/data/player/${encodeURIComponent(taggartId)}?edition=${encodeURIComponent(edition.edition_id)}`);
+await page.getByRole("heading", { name: "Adam Taggart", exact: true }).waitFor({ state: "visible" });
+await page.getByText(/No materialized contest proves this player's participation/).waitFor({ state: "visible" });
+await capture("15-player-adam-taggart-unlinked");
+
+await page.goto(`${webBase}/season?edition=${encodeURIComponent(edition.edition_id)}&family=physical&team=${perthId}&player=${encodeURIComponent(bugarijaId)}`);
+await page.locator('[data-renderer="echarts"]').first().waitFor({ state: "attached", timeout: 120000 });
+await page.waitForFunction(() => document.querySelector('[data-renderer="echarts"]')?.getAttribute("data-renderer-ready") === "true", null, { timeout: 120000 });
+await capture("16-season-bugarija-match-linkage");
 
 await page.goto(`${webBase}/games?edition=${encodeURIComponent(acbEdition.edition_id)}&game=${encodeURIComponent(acbGame.contest_id)}&offset=0`);
 await page.getByRole("heading", { name: "Basketball game", exact: true }).waitFor({ state: "visible" });
@@ -187,6 +244,14 @@ await page.getByRole("heading", { name: "white-s000", exact: true }).waitFor({ s
 await page.getByRole("listbox", { name: "Sessions" }).getByRole("option", { name: /white-s000/ }).waitFor({ state: "visible" });
 await page.getByRole("link", { name: "Open first trial" }).waitFor({ state: "visible" });
 await capture("20-performance-world");
+
+await page.goto(`${webBase}/performance?dataset=gymaware-landmine-vision&session=session-ga-p001`);
+await page.getByRole("heading", { name: "GymAware landmine press + vision agreement", exact: true }).waitFor({ state: "visible" });
+await page.getByRole("heading", { name: "session-ga-p001", exact: true }).waitFor({ state: "visible" });
+await page.locator('[data-state="upstream"]').getByText("This session is available upstream, not materialized locally.").waitFor({ state: "visible" });
+await page.getByText("ga-t001-r01", { exact: true }).waitFor({ state: "visible" });
+assert.equal(await page.getByRole("link", { name: "Open first trial" }).count(), 0);
+await capture("17-gymaware-upstream-only-session");
 
 await page.goto(`${webBase}/library`);
 await page.getByRole("heading", { name: "Library", exact: true }).waitFor({ state: "visible" });
@@ -294,19 +359,30 @@ const report = {
   apiRequests: apiRequests.map((request) => ({ path: request.path, type: request.type })),
   expectedHttpStates: responses.filter((item) => [404, 451, 503].includes(item.status)).map(({ url, status }) => ({ path: new URL(url).pathname, status })),
   consoleErrors,
+  usefulWorldRenderMs: worldUsefulRenderMs,
+  firstWorldChunkTimings: steps.find((step) => step.name === "07-match-world")?.scriptTimings.filter((item) => /(View-|PitchReplay|PoseScene)/iu.test(item.file)) ?? [],
+  echartsLazyLoad: {
+    beforeWorld: !steps.find((step) => step.name === "07-match-world")?.scriptTimings.some((item) => /echarts/iu.test(item.file)),
+    afterSeasonLab: steps.find((step) => step.name === "16-season-bugarija-match-linkage")?.scriptTimings.find((item) => /echarts/iu.test(item.file)) ?? null,
+  },
 };
-const manifest = JSON.parse(await readFile(path.resolve(appDir, "dist/.vite/manifest.json"), "utf8"));
-function staticImports(key, seen = new Set()) {
-  if (seen.has(key) || !manifest[key]) return seen;
-  seen.add(key);
-  for (const dependency of manifest[key].imports ?? []) staticImports(dependency, seen);
-  return seen;
-}
-const staticRouteAudit = {};
-for (const key of ["src/pages/research.tsx", "src/pages/data.tsx", "src/pages/library.tsx"]) {
-  const modules = [...staticImports(key)];
-  const files = modules.map((module) => manifest[module]?.file).filter((file) => file?.endsWith(".js"));
-  staticRouteAudit[key] = { files, heavy: files.filter((file) => heavyChunk.test(path.basename(file))) };
+let staticRouteAudit = null;
+try {
+  const manifest = JSON.parse(await readFile(path.resolve(appDir, "dist/.vite/manifest.json"), "utf8"));
+  function staticImports(key, seen = new Set()) {
+    if (seen.has(key) || !manifest[key]) return seen;
+    seen.add(key);
+    for (const dependency of manifest[key].imports ?? []) staticImports(dependency, seen);
+    return seen;
+  }
+  staticRouteAudit = {};
+  for (const key of ["src/pages/research.tsx", "src/pages/data.tsx", "src/pages/library.tsx"]) {
+    const modules = [...staticImports(key)];
+    const files = modules.map((module) => manifest[module]?.file).filter((file) => file?.endsWith(".js"));
+    staticRouteAudit[key] = { files, heavy: files.filter((file) => heavyChunk.test(path.basename(file))) };
+  }
+} catch (error) {
+  if (error?.code !== "ENOENT") throw error;
 }
 report.staticRouteAudit = staticRouteAudit;
 await writeFile(path.join(viewportDir, "report.json"), JSON.stringify(report, null, 2));
@@ -321,7 +397,9 @@ console.log(JSON.stringify({
   denseInFirstMatchWorld: report.apiRequestCounts.denseFirstMatchWorld,
   totalApiRequestsAcrossScreens: report.apiRequestCounts.allCapturedScreens,
   denseRequestsAcrossScreens: report.apiRequestCounts.denseAcrossCapturedScreens,
-  staticRouteAudit: Object.fromEntries(Object.entries(report.staticRouteAudit).map(([route, value]) => [route, { staticChunks: value.files.length, heavy: value.heavy }])),
+  staticRouteAudit: report.staticRouteAudit
+    ? Object.fromEntries(Object.entries(report.staticRouteAudit).map(([route, value]) => [route, { staticChunks: value.files.length, heavy: value.heavy }]))
+    : "Vite did not emit a manifest for this production build.",
   beforeWorldScripts: { count: beforeWorldScripts.length, heavy: preWorldHeavyScripts },
   matchWorldChunks: report.matchWorldChunkFiles.map((file) => {
     const asset = uniqueScripts.find((item) => item.file === file);

@@ -212,6 +212,25 @@ describe("human performance and search", () => {
   it("lists only signal-modality datasets as studies", () => {
     const studies = buildStudies(datasets, []);
     expect(studies.map((study) => study.datasetId)).toEqual(["white-cmj-acc-grf"]);
+    expect(studies[0]!.ready).toBe(false);
+    expect(studies[0]!.readySessions).toBe(0);
+  });
+
+  it("uses per-session artifact and grain readiness instead of stream counts", () => {
+    const session = (sessionId: string, stages: CatalogResourceView["stages"]) => ({
+      resource_kind: "performance_session",
+      resource_id: `white-cmj-acc-grf/${sessionId}`,
+      label: sessionId,
+      dataset_ids: ["white-cmj-acc-grf"],
+      session_id: sessionId,
+      stages,
+    }) as CatalogResourceView;
+    const studies = buildStudies(datasets, [
+      session("white-s000", READY),
+      session("white-s001", { ...READY, materialized: "not_materialized", ready: "not_ready" }),
+    ]);
+
+    expect(studies[0]!.readySessions).toBe(1);
     expect(studies[0]!.ready).toBe(true);
   });
 
