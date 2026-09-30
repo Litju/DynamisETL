@@ -10,6 +10,7 @@ import subprocess
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from types import SimpleNamespace
 
 from sqlalchemy import select
 
@@ -100,12 +101,27 @@ def _artifacts(
     try:
         with engine.connect() as connection:
             registry = validate_registry()
-            source_rows = connection.execute(
-                select(DatasetSource.dataset_id, LicensePolicy).outerjoin(
-                    LicensePolicy, DatasetSource.license_policy_id == LicensePolicy.policy_id
+            source_rows = (
+                connection.execute(
+                    select(
+                        DatasetSource.dataset_id,
+                        LicensePolicy.policy_id,
+                        LicensePolicy.identifier,
+                        LicensePolicy.status,
+                        LicensePolicy.attribution_required,
+                        LicensePolicy.noncommercial_only,
+                        LicensePolicy.share_alike,
+                        LicensePolicy.redistribution,
+                        LicensePolicy.local_only,
+                        LicensePolicy.restrictions,
+                    ).outerjoin(
+                        LicensePolicy, DatasetSource.license_policy_id == LicensePolicy.policy_id
+                    )
                 )
-            ).all()
-            registered = {dataset_id for dataset_id, _policy in source_rows}
+                .mappings()
+                .all()
+            )
+            registered = {row["dataset_id"] for row in source_rows}
             unexpected = sorted(registered - ids)
             if unexpected:
                 raise DeploymentError(
@@ -117,9 +133,26 @@ def _artifacts(
                 raise DeploymentError(
                     "preview database is missing allowlisted sources: " + ", ".join(missing_sources)
                 )
-            for dataset_id, policy in source_rows:
-                if dataset_id in ids:
-                    _assert_registry_rights(dataset_id, policy, registry.source(dataset_id).license)
+            for row in source_rows:
+                source_dataset_id = row["dataset_id"]
+                if source_dataset_id in ids:
+                    policy = (
+                        None
+                        if row["policy_id"] is None
+                        else SimpleNamespace(
+                            identifier=row["identifier"],
+                            status=row["status"],
+                            attribution_required=row["attribution_required"],
+                            noncommercial_only=row["noncommercial_only"],
+                            share_alike=row["share_alike"],
+                            redistribution=row["redistribution"],
+                            local_only=row["local_only"],
+                            restrictions=row["restrictions"],
+                        )
+                    )
+                    _assert_registry_rights(
+                        source_dataset_id, policy, registry.source(source_dataset_id).license
+                    )
 
             sample_rows = connection.execute(
                 select(
@@ -149,36 +182,46 @@ def _artifacts(
                 )
             )
             for kind, rows in (("sample", sample_rows), ("processing", processing_rows)):
-                for artifact_id, dataset_id, relative_path, checksum, byte_size in rows:
+                for artifact_id, artifact_dataset_id, relative_path, checksum, byte_size in rows:
                     if not relative_path.lower().endswith(".parquet"):
                         continue
                     if byte_size is None or byte_size <= 0:
-                        raise DeploymentError(f"{dataset_id}/{relative_path}: byte size is missing")
+                        raise DeploymentError(
+                            f"{artifact_dataset_id}/{relative_path}: byte size is missing"
+                        )
                     checksum = checksum.lower()
                     if not re.fullmatch(r"[0-9a-f]{64}", checksum):
-                        raise DeploymentError(f"{dataset_id}/{relative_path}: invalid SHA-256")
+                        raise DeploymentError(
+                            f"{artifact_dataset_id}/{relative_path}: invalid SHA-256"
+                        )
                     relative = Path(relative_path)
                     root = resolved.dataset_root.resolve()
                     source_path = (root / relative).resolve()
                     if relative.is_absolute() or not source_path.is_relative_to(root):
-                        raise DeploymentError(f"{dataset_id}/{relative_path}: unsafe artifact path")
+                        raise DeploymentError(
+                            f"{artifact_dataset_id}/{relative_path}: unsafe artifact path"
+                        )
                     if not source_path.is_file():
                         raise DeploymentError(
-                            f"{dataset_id}/{relative_path}: artifact file is missing"
+                            f"{artifact_dataset_id}/{relative_path}: artifact file is missing"
                         )
                     if source_path.stat().st_size != byte_size:
-                        raise DeploymentError(f"{dataset_id}/{relative_path}: byte size mismatch")
+                        raise DeploymentError(
+                            f"{artifact_dataset_id}/{relative_path}: byte size mismatch"
+                        )
                     if sha256_file(source_path) != checksum:
                         raise DeploymentError(
-                            f"{dataset_id}/{relative_path}: source checksum mismatch"
+                            f"{artifact_dataset_id}/{relative_path}: source checksum mismatch"
                         )
-                    identity = (dataset_id, checksum)
+                    identity = (artifact_dataset_id, checksum)
                     prior = found.get(identity)
                     if prior is not None and prior[3] != byte_size:
-                        raise DeploymentError(f"{dataset_id}: checksum has conflicting byte sizes")
+                        raise DeploymentError(
+                            f"{artifact_dataset_id}: checksum has conflicting byte sizes"
+                        )
                     if prior is None:
                         found[identity] = (
-                            dataset_id,
+                            artifact_dataset_id,
                             source_path,
                             checksum,
                             byte_size,
