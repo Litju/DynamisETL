@@ -50,9 +50,9 @@ def run(apply: bool) -> int:
         evidence = values.get("DYNAMIS_RELEASE_EVIDENCE", "").strip()
         if not evidence:
             raise DeploymentError("Production migration requires completed Preview evidence")
-        gate = Path(__file__).with_name("release_gate.py")
         subprocess.run(
-            [sys.executable, str(gate), evidence, "--git-sha", _sha(root)],
+            [sys.executable, "-m", "infra.deploy.release_gate", evidence, "--git-sha", _sha(root)],
+            cwd=root,
             check=True,
         )
         preview = json.loads(Path(evidence).read_text(encoding="utf-8"))

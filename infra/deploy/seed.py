@@ -63,14 +63,18 @@ def run(
     if vercel_environment and vercel_environment != environment:
         raise DeploymentError("DYNAMIS_DEPLOY_ENV does not match the Vercel environment")
     sha = _sha()
+    root = Path(__file__).resolve().parents[2]
     release: dict[str, object] | None = None
     preview_receipt_path: Path | None = None
     if environment == "production":
         evidence = values.get("DYNAMIS_RELEASE_EVIDENCE", "").strip()
         if not evidence:
             raise DeploymentError("production seed requires completed preview release evidence")
-        gate = Path(__file__).with_name("release_gate.py")
-        subprocess.run([sys.executable, str(gate), evidence, "--git-sha", sha], check=True)
+        subprocess.run(
+            [sys.executable, "-m", "infra.deploy.release_gate", evidence, "--git-sha", sha],
+            cwd=root,
+            check=True,
+        )
         release = json.loads(Path(evidence).read_text(encoding="utf-8"))
 
     seeds = load_public_seed()
@@ -166,7 +170,6 @@ def run(
         preview_receipt = release.get("artifact_receipt")
         if not isinstance(preview_receipt, str) or not preview_receipt:
             raise DeploymentError("Preview evidence must include its artifact receipt")
-    root = Path(__file__).resolve().parents[2]
     subprocess.run(
         [sys.executable, str(root / "infra/deploy/check_migrations.py")],
         cwd=root,

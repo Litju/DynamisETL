@@ -269,8 +269,12 @@ def upload(
         evidence = os.environ.get("DYNAMIS_RELEASE_EVIDENCE", "").strip()
         if not evidence:
             raise DeploymentError("production upload requires completed preview release evidence")
-        gate = Path(__file__).with_name("release_gate.py")
-        subprocess.run([sys.executable, str(gate), evidence, "--git-sha", git_sha], check=True)
+        root = Path(__file__).resolve().parents[2]
+        subprocess.run(
+            [sys.executable, "-m", "infra.deploy.release_gate", evidence, "--git-sha", git_sha],
+            cwd=root,
+            check=True,
+        )
 
     seeds = load_public_seed()
     ids = {seed.dataset_id for seed in seeds}
