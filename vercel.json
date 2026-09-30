@@ -1,0 +1,30 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "app": {
+      "root": ".",
+      "framework": "fastapi",
+      "entrypoint": "api.index:app"
+    },
+    "web": {
+      "root": "apps/web",
+      "framework": "vite",
+      "buildCommand": "pnpm run build",
+      "outputDirectory": "dist"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api",
+      "destination": { "service": "app" }
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": { "service": "app" }
+    },
+    {
+      "source": "/(.*)",
+      "destination": { "service": "web" }
+    }
+  ]
+}

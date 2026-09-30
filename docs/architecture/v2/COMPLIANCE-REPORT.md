@@ -2,6 +2,8 @@
 
 _RES-109 final acceptance report including the §11 and §12 manual-acceptance amendments. Raw real-data receipts remain in the external evidence cache; this report contains summary evidence only._
 
+> Historical report: its runtime and object-store references describe the earlier deployment proposal. Current production deployment policy is Vercel-only; see [`docs/deployment/vercel.md`](../../deployment/vercel.md).
+
 ---
 
 ## ✅ Outcome

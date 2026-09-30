@@ -34,7 +34,7 @@ from dynamis.serving.models import (
 )
 from dynamis.storage.object_store import (
     ObjectStoreError,
-    S3ObjectStore,
+    VercelPrivateBlobStore,
     immutable_object_key,
     object_store,
 )
@@ -117,14 +117,14 @@ def resolve_artifact_path(settings: Settings, ref: ArtifactRefView) -> Path:
     try:
         checksum = ref.checksum_sha256.lower()
         key = immutable_object_key(checksum)
-        # ponytail: cold reads cache the full Parquet file via 8 MiB ranges;
-        # use seekable Arrow I/O if cold-cache latency or disk use matters.
+        # ponytail: cache verified private blobs in /tmp; switch to range reads
+        # if cold-cache transfer size becomes a measured bottleneck.
         cached = _OBJECT_CACHE_ROOT / checksum[:2] / f"{checksum}.parquet"
         store = object_store(settings)
-        if not isinstance(store, S3ObjectStore):
-            raise ObjectStoreError("non-local artifact reads require the S3 object store")
+        if not isinstance(store, VercelPrivateBlobStore):
+            raise ObjectStoreError("non-local artifact reads require Vercel Private Blob")
         if ref.byte_size is None:
-            raise ObjectStoreError("S3 artifact serving requires the registered byte size")
+            raise ObjectStoreError("private artifact serving requires the registered byte size")
         return store.materialize(
             key,
             destination=cached,

@@ -1,6 +1,8 @@
 # DynamisData V2 architecture
 
-_Frozen RES-109 contract summary. Machine-readable authority: [`architecture/system-v2.json`](../../../architecture/system-v2.json); schema: [`architecture/system-v2.schema.json`](../../../architecture/system-v2.schema.json)._ 
+_Frozen RES-109 scientific/product contract summary. Machine-readable authority: [`architecture/system-v2.json`](../../../architecture/system-v2.json); schema: [`architecture/system-v2.schema.json`](../../../architecture/system-v2.schema.json). The V2 hosting/object-plane selection is superseded by the current Vercel deployment guide below._
+
+> **Production deployment update:** The old split-runtime plan is superseded. Current hosting is the single-project Vercel topology in [`docs/deployment/vercel.md`](../../deployment/vercel.md); Vercel owns both FastAPI and React/Vite services, with Neon and Private Blob provisioned through Vercel.
 
 ---
 
@@ -13,18 +15,19 @@ The V2 architecture is frozen at contract version `2.0.3`. The §11 and §12 man
 ```mermaid
 flowchart LR
     accTitle: V2 runtime topology
-    accDescr: V2 separates the Vercel browser workbench from the Cloud Run scientific API, with Neon PostgreSQL for control data and private R2-preferred S3-compatible storage for immutable Parquet.
+    accDescr: One Vercel project routes the React/Vite workbench and FastAPI API, with Neon PostgreSQL for control data and Vercel Private Blob for immutable Parquet.
 
-    github[🔒 Protected main] --> vercel[☁️ Vercel workbench]
-    github --> cloud_run[🖥️ Cloud Run FastAPI]
-    vercel --> cloud_run
-    cloud_run --> neon[(💾 Neon PostgreSQL)]
-    cloud_run --> object_store[(💾 Private R2/S3 Parquet)]
-    cloud_run --> arrow[📦 Arrow HTTP stream]
-    arrow --> vercel
+    github[🔒 Protected main] --> vercel[☁️ Vercel project]
+    vercel --> web[🌐 React/Vite service]
+    vercel --> app[⚙️ FastAPI Python Function]
+    web -->|same-origin /api| app
+    app --> neon[(💾 Neon PostgreSQL)]
+    app --> object_store[(💾 Vercel Private Blob)]
+    app --> arrow[📦 Arrow HTTP stream]
+    arrow --> web
 ```
 
-Vercel is frontend-only. Cloud Run owns the FastAPI/PyArrow/DuckDB process and its bounded streaming HTTP responses. Neon owns relational registry/control/Gold/provenance/quality/rights metadata. Dense telemetry remains immutable Parquet in a private S3-compatible object plane; the local filesystem adapter is for development and tests only.
+The Vercel project serves the Vite application and routes `/api/*` to its FastAPI service; both services share one origin. FastAPI runs on Python Functions/Fluid Compute and owns bounded API/Arrow responses. Neon owns relational registry/control/Gold/provenance/quality/rights metadata. Dense telemetry remains immutable Parquet in Vercel Private Blob; the local filesystem adapter is for development and tests only.
 
 ## 📊 Selected implementation map
 
@@ -39,7 +42,7 @@ Vercel is frontend-only. Cloud Run owns the FastAPI/PyArrow/DuckDB process and i
 | Broad reduction | DuckDB Parquet SQL | Bounded PyArrow candidate | Dense matrix |
 | Scientific compute | Python/NumPy/SciPy/PyArrow | Isolated future kernel | Processor matrix |
 | Relational control | PostgreSQL/Neon | Local PostgreSQL/DuckDB Gold | Locked RES-109 boundary |
-| Object plane | Private R2-preferred S3-compatible | Local filesystem | Rights/provenance contract |
+| Object plane | Vercel Private Blob | Local filesystem | Rights/provenance contract |
 | Continuous playback | Shared playhead-driven coordinator for Signal/Field/Pose | Explicit `BUFFERING` and JSON compatibility path | ADR-006 / §11 browser acceptance |
 | Pose display authority | Body-local or match/world plus named camera ownership modes | Stable fixed-world framing | ADR-006 / §11 browser acceptance |
 | Pose subject transition | Artifact/entity observation authority plus atomic subject/time navigation | Explicit switching/no-observation/temporary-absence states | ADR-007 / §12 browser acceptance |

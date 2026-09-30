@@ -42,6 +42,13 @@ Dense analytical scans run directly over Parquet with **DuckDB**. **PostgreSQL**
 stores the registry, provenance, algorithms, quality results and curated serving
 marts. **Dagster** owns asset lineage and orchestration.
 
+## Production deployment
+
+Production uses one Vercel project with FastAPI and React/Vite services, Vercel-managed
+Neon Postgres, and Vercel Private Blob. Preview and Production use separate Neon
+endpoints. See [the Vercel deployment guide](docs/deployment/vercel.md) for routing,
+environment, migration, seed, and release gates.
+
 **Parquet is authoritative for dense signals.** High-frequency samples never
 enter PostgreSQL; only artifact metadata does.
 

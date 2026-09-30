@@ -101,3 +101,6 @@ desktop.ini
 analytics/target/
 analytics/logs/
 
+
+.vercel
+.env*
