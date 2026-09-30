@@ -179,6 +179,24 @@ def run(
             "target Neon branch contains unapproved sources: " + ", ".join(unexpected)
         )
 
+    # Both SkillCorner adapters link session metadata to contest catalog entries.
+    # Register those metadata-only entries before dense ingestion so the session
+    # foreign keys are valid on a fresh deployment database.
+    if "skillcorner-opendata" in allowlisted:
+        from dynamis.adapters.skillcorner.catalog import register_skillcorner_corpus
+
+        result = register_skillcorner_corpus(verify_upstream=False)
+        if result.get("dataset_id") != "skillcorner-opendata":
+            raise DeploymentError("SkillCorner metadata registration returned an unexpected source")
+    if "skillcorner-basketball-opendata" in allowlisted:
+        from dynamis.adapters.skillcorner_basketball.catalog import register_corpus
+
+        result = register_corpus(verify_upstream=False)
+        if result.get("dataset_id") != "skillcorner-basketball-opendata":
+            raise DeploymentError(
+                "SkillCorner Basketball metadata registration returned an unexpected source"
+            )
+
     from dynamis.pipeline.cli import main as ingest
 
     for seed in seeds:
