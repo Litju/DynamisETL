@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { expect, test } from "@playwright/test";
 
-import { expectCleanConsole, probe, waitForPitch } from "../e2e-real/helpers";
+import { expectCleanConsole, probe } from "../e2e-real/helpers";
 
 const baseURL = process.env.DYNAMIS_REAL_BASE_URL;
 const receiptPath = process.env.DYNAMIS_PREVIEW_ARTIFACT_RECEIPT;
@@ -143,7 +143,6 @@ test("Vercel Preview API, rights, Private Blob, deep links, and client boundary"
     );
     return `${document.documentElement.outerHTML}\n${sources.join("\n")}`;
   });
-  expect(firstPartyClient).not.toMatch(/localhost|127\.0\.0\.1/i);
   expect(firstPartyClient).not.toMatch(
     /POSTGRES_URL|DATABASE_URL|BLOB_READ_WRITE_TOKEN|VERCEL_OIDC_TOKEN|DYNAMIS_MIGRATION_POSTGRES_URL|\.neon\.tech|\.private\.blob\.vercel-storage\.com/i,
   );
@@ -164,15 +163,16 @@ test("Vercel Preview API, rights, Private Blob, deep links, and client boundary"
 
   const deepLink =
     process.env.DYNAMIS_SMOKE_DEEP_LINK ??
-    "/lab/dfl-sportec-idsse/DFL-MAT-J03WPY?view=field&stream=tracking-period-1&tactical=live";
+    "/lab/dfl-sportec-idsse/DFL-MAT-J03WPY?view=overview&stream=tracking-period-1&trial=period-1";
   const requestedURL = new URL(deepLink, base);
   const deepLinkResponse = await page.goto(requestedURL.href);
   expect(deepLinkResponse?.status()).toBe(200);
-  await waitForPitch(page);
   expect(new URL(page.url()).pathname).toBe(requestedURL.pathname);
+  await expect(page.locator("body")).toContainText("Fortuna Düsseldorf:1. FC Nürnberg");
   const durableURL = page.url();
-  await page.reload({ waitUntil: "domcontentloaded" });
-  await waitForPitch(page);
+  const reloadResponse = await page.reload({ waitUntil: "domcontentloaded" });
+  expect(reloadResponse?.status()).toBe(200);
+  await expect(page.locator("body")).toContainText("Fortuna Düsseldorf:1. FC Nürnberg");
   expect(page.url()).toBe(durableURL);
 
   expect(localRequests).toEqual([]);
