@@ -354,3 +354,91 @@ def test_semantic_catalog_routes_only_from_local_capabilities_and_grain() -> Non
         if "SportsDataverse" in item.providers and item.availability_state == "UPSTREAM_AVAILABLE"
     }
     assert {"basketball", "ice_hockey"}.issubset(upstream_leagues)
+
+
+def test_blob_reconciliation_never_leaves_a_ready_route_missing_required_objects() -> None:
+    source = capability(
+        "basketball-match",
+        provider="SkillCorner",
+        sport_id="basketball",
+        edition_id="basketball-edition",
+        upstream=["TRACKING"],
+        registered=["TRACKING"],
+        materialized=["TRACKING"],
+        grains=[DataGrainKind.FRAME_SERIES.value],
+    )
+    source._required_artifact_ids = {"tracking-period-1", "derived-frame-clock"}
+    dataset = DatasetSummary(
+        dataset_id="skillcorner-basketball-opendata",
+        name="SkillCorner Basketball",
+        provider="SkillCorner",
+        domain="multi_sport",
+        doi=None,
+        upstream_urls=["https://example.org/basketball"],
+        modalities=["tracking"],
+        license=LICENSE,
+        version_count=1,
+        session_count=1,
+        subject_count=0,
+        trial_count=0,
+        stream_count=4,
+        metric_count=0,
+        quality_issue_count=0,
+    )
+    match = SportsCatalogMatchView(
+        dataset_id=dataset.dataset_id,
+        session_id="114243",
+        provider_match_id="114243",
+        contest_id="contest-114243",
+        sport_id="basketball",
+        sport_code="basketball",
+        sport_name="Basketball",
+        competition_id="competition-basketball",
+        competition_name="Competition",
+        edition_id="basketball-edition",
+        edition_label="2025-26",
+        label="Demo game",
+        scheduled_start_at=None,
+        actual_start_at=None,
+        venue=None,
+        home_away_supported=False,
+        teams=[],
+        periods=[],
+        source_capability=source,
+    )
+
+    partial_ids = {"tracking-period-1"}
+    partial = build_catalog_read_model(
+        datasets=[dataset],
+        matches=[match],
+        game_editions=[],
+        season_editions=[],
+        source_capabilities={dataset.dataset_id: [source]},
+        performance_sessions=[],
+        deployed_artifact_ids=partial_ids,
+    )
+    resource = next(item for item in partial.resources if item.resource_kind == "contest")
+    assert resource.stages.registered == "registered"
+    assert resource.stages.materialized == "not_materialized"
+    assert resource.stages.ready == "not_ready"
+    assert resource.availability_state == "REGISTERED"
+    missing_ready = [
+        (item.resource_id, route.product)
+        for item in partial.resources
+        for route in item.routes
+        if route.ready and not item._required_artifact_ids.issubset(partial_ids)
+    ]
+    assert missing_ready == []
+
+    complete_ids = {"tracking-period-1", "derived-frame-clock"}
+    complete = build_catalog_read_model(
+        datasets=[dataset],
+        matches=[match],
+        game_editions=[],
+        season_editions=[],
+        source_capabilities={dataset.dataset_id: [source]},
+        performance_sessions=[],
+        deployed_artifact_ids=complete_ids,
+    )
+    complete_resource = next(item for item in complete.resources if item.resource_kind == "contest")
+    assert any(route.product == "MatchLab" and route.ready for route in complete_resource.routes)

@@ -32,6 +32,7 @@ def main(argv: list[str] | None = None) -> int:
         port=args.port or int(os.environ.get("PORT", "8000")),
         reload=args.reload,
         log_level=args.log_level,
+        access_log=os.environ.get("DYNAMIS_ACCESS_LOG", "0") != "1",
     )
     return 0
 

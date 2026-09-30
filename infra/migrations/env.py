@@ -15,8 +15,14 @@ from typing import Any
 
 from alembic import context
 from sqlalchemy import MetaData, engine_from_config, pool
+from sqlalchemy.engine import make_url
 
-from dynamis.config import ENV_POSTGRES_URL, resolve_db_schema, resolved_environ
+from dynamis.config import (
+    ENV_MIGRATION_POSTGRES_URL,
+    ENV_POSTGRES_URL,
+    resolve_db_schema,
+    resolved_environ,
+)
 from dynamis.storage import tables as _tables
 
 VERSION_TABLE_NAME = "alembic_version"
@@ -27,9 +33,16 @@ _target: MetaData = _tables.Base.metadata
 schema_name: str = resolve_db_schema()
 
 if config.config_file_name is not None:
-    _url = resolved_environ().get(ENV_POSTGRES_URL, "").strip()
-    if _url.startswith("postgresql://"):
-        _url = "postgresql+psycopg://" + _url.removeprefix("postgresql://")
+    values = resolved_environ()
+    _url = (
+        values.get(ENV_MIGRATION_POSTGRES_URL, "").strip()
+        or values.get(ENV_POSTGRES_URL, "").strip()
+    )
+    if _url:
+        parsed_url = make_url(_url)
+        if parsed_url.drivername in {"postgres", "postgresql"}:
+            parsed_url = parsed_url.set(drivername="postgresql+psycopg")
+        _url = parsed_url.render_as_string(hide_password=False)
     if _url:
         # Escape percent signs: ConfigParser interpolation would otherwise break.
         config.set_main_option("sqlalchemy.url", _url.replace("%", "%%"))

@@ -357,6 +357,17 @@ def _preserve_materialized_contest_metadata(
     return replace(domain, sports_contexts=tuple(contexts))
 
 
+def _defer_contest_catalog_link(domain: ProviderDomain) -> ProviderDomain:
+    """Persist session metadata before linking the contest catalog row."""
+    contexts = tuple(
+        context.model_copy(
+            update={"session": context.session.model_copy(update={"source_catalog_entry_id": None})}
+        )
+        for context in domain.sports_contexts
+    )
+    return replace(domain, sports_contexts=contexts)
+
+
 def build_catalog_entries(source, corpus: dict[str, Any]) -> list[dict[str, Any]]:
     upstream = corpus["upstream"]
     revision = upstream["revision"]
@@ -642,7 +653,7 @@ def persist_catalog(connection, source, corpus: dict[str, Any]) -> dict[str, int
         domain = _preserve_materialized_contest_metadata(
             build_game_domain(corpus, item), existing_metadata
         )
-        rows = persist_domain(connection, domain)
+        rows = persist_domain(connection, _defer_contest_catalog_link(domain))
         for key, count in rows.items():
             written[key] = written.get(key, 0) + count
     entries = build_catalog_entries(source, corpus)

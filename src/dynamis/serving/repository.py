@@ -101,7 +101,11 @@ def _preparation_action(availability_state: str) -> str | None:
     }.get(availability_state)
 
 
-def list_source_capabilities(connection: Connection, dataset_id: str) -> list[SourceCapabilityView]:
+def list_source_capabilities(
+    connection: Connection,
+    dataset_id: str,
+    deployed_artifact_ids: set[str] | frozenset[str] | None = None,
+) -> list[SourceCapabilityView]:
     """Separate provider-available capability from locally materialized data."""
     entries = (
         connection.execute(
@@ -139,10 +143,16 @@ def list_source_capabilities(connection: Connection, dataset_id: str) -> list[So
         str(row["entry_id"]): [] for row in entries
     }
     materialized_grains: dict[str, set[str]] = {str(row["entry_id"]): set() for row in entries}
+    required_artifacts: dict[str, set[str]] = {str(row["entry_id"]): set() for row in entries}
+    sessions_by_entry: dict[str, set[str]] = {str(row["entry_id"]): set() for row in entries}
+    artifacts_by_stream: dict[tuple[str, str], set[str]] = {}
+    capabilities_by_stream: dict[tuple[str, str], set[str]] = {}
+    grains_by_stream: dict[tuple[str, str], set[str]] = {}
     modalities = connection.execute(
         sa.text(
             """
-            SELECT ctx.source_catalog_entry_id, stream.stream_id, stream.modality,
+            SELECT ctx.source_catalog_entry_id, stream.session_id, stream.stream_id,
+                   stream.modality,
                    stream.data_grain_kind,
                    artifact.artifact_id, artifact.data_grain_kind AS artifact_grain_kind
             FROM session_sport_context AS ctx
@@ -170,40 +180,73 @@ def list_source_capabilities(connection: Connection, dataset_id: str) -> list[So
     for row in modalities:
         entry_id = str(row["source_catalog_entry_id"])
         capabilities = modality_capabilities.get(row["modality"], set())
+        stream_id = str(row["stream_id"])
+        stream_key = (entry_id, stream_id)
+        sessions_by_entry.setdefault(entry_id, set()).add(str(row["session_id"]))
+        capabilities_by_stream.setdefault(stream_key, set()).update(capabilities)
         registered.setdefault(entry_id, set()).update(capabilities)
         registered_evidence.setdefault(entry_id, []).extend(
-            (Capability(capability), str(row["stream_id"])) for capability in capabilities
+            (Capability(capability), stream_id) for capability in capabilities
         )
         if row["artifact_id"] is not None:
-            materialized.setdefault(entry_id, set()).update(capabilities)
-            materialized_evidence.setdefault(entry_id, []).extend(
-                (Capability(capability), str(row["artifact_id"])) for capability in capabilities
-            )
+            artifact_id = str(row["artifact_id"])
+            required_artifacts.setdefault(entry_id, set()).add(artifact_id)
+            artifacts_by_stream.setdefault(stream_key, set()).add(artifact_id)
             grain = row["artifact_grain_kind"] or row["data_grain_kind"]
             if grain in DataGrainKind._value2member_map_:
-                materialized_grains.setdefault(entry_id, set()).add(str(grain))
+                grains_by_stream.setdefault(stream_key, set()).add(str(grain))
+
+    for (entry_id, _stream_id), artifact_ids in artifacts_by_stream.items():
+        complete = deployed_artifact_ids is None or artifact_ids.issubset(deployed_artifact_ids)
+        if not complete:
+            continue
+        capabilities = capabilities_by_stream[(entry_id, _stream_id)]
+        materialized.setdefault(entry_id, set()).update(capabilities)
+        materialized_evidence.setdefault(entry_id, []).extend(
+            (Capability(capability), artifact_id)
+            for capability in capabilities
+            for artifact_id in artifact_ids
+        )
+        materialized_grains.setdefault(entry_id, set()).update(
+            grains_by_stream.get((entry_id, _stream_id), set())
+        )
 
     aggregate_rows = connection.execute(
         sa.text(
             """
             SELECT artifact_id, data_grain_kind,
                    artifact_metadata ->> 'source_catalog_entry_id' AS entry_id,
-                   artifact_metadata ->> 'aggregate_family' AS family
+                   artifact_metadata ->> 'session_id' AS session_id
             FROM processing_artifact
             WHERE dataset_id = :dataset_id
-              AND artifact_metadata ? 'source_catalog_entry_id'
+              AND (artifact_metadata ? 'source_catalog_entry_id'
+                OR artifact_metadata ? 'session_id')
             """
         ),
         {"dataset_id": dataset_id},
     ).mappings()
     for row in aggregate_rows:
-        entry_id = str(row["entry_id"])
-        materialized.setdefault(entry_id, set()).add("SEASON_AGGREGATE")
-        materialized_evidence.setdefault(entry_id, []).append(
-            (Capability.SEASON_AGGREGATE, str(row["artifact_id"]))
-        )
-        if row["data_grain_kind"] in DataGrainKind._value2member_map_:
-            materialized_grains.setdefault(entry_id, set()).add(str(row["data_grain_kind"]))
+        artifact_id = str(row["artifact_id"])
+        targets = set()
+        if row["entry_id"] is not None:
+            targets.add(str(row["entry_id"]))
+        if row["session_id"] is not None:
+            session_id = str(row["session_id"])
+            targets.update(
+                entry_id
+                for entry_id, session_ids in sessions_by_entry.items()
+                if session_id in session_ids
+            )
+        for entry_id in targets:
+            required_artifacts.setdefault(entry_id, set()).add(artifact_id)
+            if deployed_artifact_ids is not None and artifact_id not in deployed_artifact_ids:
+                continue
+            materialized.setdefault(entry_id, set()).add("SEASON_AGGREGATE")
+            materialized_evidence.setdefault(entry_id, []).append(
+                (Capability.SEASON_AGGREGATE, artifact_id)
+            )
+            if row["data_grain_kind"] in DataGrainKind._value2member_map_:
+                materialized_grains.setdefault(entry_id, set()).add(str(row["data_grain_kind"]))
 
     file_states = {
         str(row["registry_file_key"]): str(row["availability_state"])
@@ -264,45 +307,62 @@ def list_source_capabilities(connection: Connection, dataset_id: str) -> list[So
                 else {}
             )
         pending = sorted(upstream_names - materialized_names)
+        artifact_ids = required_artifacts.get(entry_id, set())
+        manifest_complete = (
+            deployed_artifact_ids is None
+            or bool(artifact_ids)
+            and artifact_ids.issubset(deployed_artifact_ids)
+        )
         readiness = (
             "READY"
-            if upstream_names and not pending
+            if upstream_names and not pending and manifest_complete
             else "PARTIAL"
             if materialized_names
             else "NOT_MATERIALIZED"
         )
         state = str(row["availability_state"])
+        if (
+            deployed_artifact_ids is not None
+            and not manifest_complete
+            and state
+            in {
+                "ACQUIRED",
+                "MATERIALIZATION_FAILED",
+                "MATERIALIZED",
+                "VALIDATION_FAILED",
+                "READY",
+            }
+        ):
+            state = "REGISTERED"
         preparation_action = _preparation_action(state)
         grains = sorted(materialized_grains.get(entry_id, set()))
-        result.append(
-            SourceCapabilityView(
-                entry_id=entry_id,
-                provider=str(row["provider"]),
-                sport_id=str(row["sport_id"]) if row["sport_id"] else None,
-                sport_name=str(row["sport_name"]) if row["sport_name"] else None,
-                competition_id=(str(row["competition_id"]) if row["competition_id"] else None),
-                competition_name=(
-                    str(row["competition_name"]) if row["competition_name"] else None
-                ),
-                edition_id=str(row["edition_id"]) if row["edition_id"] else None,
-                edition_label=str(row["edition_label"]) if row["edition_label"] else None,
-                external_id=str(row["external_id"]),
-                object_kind=str(row["object_kind"]),
-                availability_state=state,
-                source_readiness=_source_readiness(state, upstream_names),
-                local_readiness=readiness,
-                upstream_capabilities=sorted(upstream_names),
-                registered_capabilities=sorted(registered_names),
-                materialized_capabilities=sorted(materialized_names),
-                materialized_grains=grains,
-                local_capabilities=sorted(materialized_names),
-                pending_local_capabilities=pending,
-                preparation_eligible=preparation_action is not None,
-                preparation_action=preparation_action,
-                provider_metadata=metadata,
-                source_file_states=source_file_states,
-            )
+        view = SourceCapabilityView(
+            entry_id=entry_id,
+            provider=str(row["provider"]),
+            sport_id=str(row["sport_id"]) if row["sport_id"] else None,
+            sport_name=str(row["sport_name"]) if row["sport_name"] else None,
+            competition_id=(str(row["competition_id"]) if row["competition_id"] else None),
+            competition_name=(str(row["competition_name"]) if row["competition_name"] else None),
+            edition_id=str(row["edition_id"]) if row["edition_id"] else None,
+            edition_label=str(row["edition_label"]) if row["edition_label"] else None,
+            external_id=str(row["external_id"]),
+            object_kind=str(row["object_kind"]),
+            availability_state=state,
+            source_readiness=_source_readiness(state, upstream_names),
+            local_readiness=readiness,
+            upstream_capabilities=sorted(upstream_names),
+            registered_capabilities=sorted(registered_names),
+            materialized_capabilities=sorted(materialized_names),
+            materialized_grains=grains,
+            local_capabilities=sorted(materialized_names),
+            pending_local_capabilities=pending,
+            preparation_eligible=preparation_action is not None,
+            preparation_action=preparation_action,
+            provider_metadata=metadata,
+            source_file_states=source_file_states,
         )
+        view._required_artifact_ids = set(artifact_ids)
+        result.append(view)
     return result
 
 
@@ -862,7 +922,7 @@ def session_detail(
         connection,
         {str(row["skeleton_id"]) for row in streams if row["skeleton_id"] is not None},
     )
-    return SessionDetail(
+    detail = SessionDetail(
         dataset_id=dataset_id,
         session=SessionSummary(
             session_id=session["session_id"],
@@ -934,6 +994,26 @@ def session_detail(
             for row in streams
         ],
     )
+    detail._required_artifact_ids = set(
+        connection.execute(
+            sa.text(
+                """SELECT artifact_id
+                   FROM sample_artifact
+                   WHERE dataset_id = :dataset_id AND session_id = :session_id
+                   UNION
+                   SELECT artifact_id
+                   FROM processing_artifact
+                   WHERE dataset_id = :dataset_id
+                     AND (artifact_metadata ->> 'session_id' = :session_id
+                       OR artifact_metadata ->> 'source_catalog_entry_id' IN (
+                           SELECT source_catalog_entry_id FROM session_sport_context
+                           WHERE dataset_id = :dataset_id AND session_id = :session_id
+                             AND source_catalog_entry_id IS NOT NULL))"""
+            ),
+            {"dataset_id": dataset_id, "session_id": session_id},
+        ).scalars()
+    )
+    return detail
 
 
 def gold_published(connection: Connection, gold_schema: str) -> bool:

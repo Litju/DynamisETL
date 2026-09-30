@@ -28,14 +28,10 @@ interface FetchResult<T> {
 }
 
 export function apiBaseUrl(): string {
-  const configured = import.meta.env.VITE_API_BASE_URL;
-  if (configured) return configured;
-  // openapi-fetch requires an absolute base; same-origin is the product default
-  // and the Vite dev server proxies /api to the local FastAPI process.
-  if (typeof window !== "undefined" && window.location?.origin) {
-    return window.location.origin;
+  if (typeof window === "undefined" || !window.location.origin) {
+    throw new Error("The DynamisData API client requires a browser origin");
   }
-  return "http://localhost";
+  return window.location.origin;
 }
 
 export const api = createClient<paths>({

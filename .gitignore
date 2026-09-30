@@ -23,6 +23,7 @@ dist/
 .ruff_cache/
 .pytest_cache/
 .pytest-tmp*/
+.tmp-pytest-*/
 .pyright/
 .mypy_cache/
 .coverage
@@ -87,6 +88,7 @@ tmp/
 # Local-only credentials and service state
 infra/docker/data/
 pgdata/
+output/deploy/
 
 # Editors and OS
 .idea/
@@ -101,3 +103,6 @@ desktop.ini
 analytics/target/
 analytics/logs/
 
+
+.vercel
+.env*

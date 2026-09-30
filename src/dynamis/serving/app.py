@@ -11,8 +11,10 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import time
 from typing import Annotated, Any, Literal, Protocol, cast
+from uuid import uuid4
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -20,11 +22,15 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy import Engine
 from sqlalchemy.exc import SQLAlchemyError
+from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from dynamis.adapters.skillcorner_basketball import authorities as basketball_authorities
 from dynamis.adapters.sportsdataverse.releases import SnapshotError, load_snapshot
 from dynamis.config import ConfigurationError, Settings
 from dynamis.config import settings as resolve_settings
+from dynamis.deployment import DeploymentError, public_rights_error
+from dynamis.deployment_manifest import load_manifest
 from dynamis.gold.publish import resolve_gold_schema
 from dynamis.serving import basketball as basketball_reader
 from dynamis.serving import catalog as catalog_model
@@ -105,9 +111,16 @@ from dynamis.serving.models import (
     TacticalSeriesView,
 )
 from dynamis.storage.control_plane import control_plane_engine
+from dynamis.storage.object_store import ObjectStoreError, object_store
 
 API_VERSION = "0.1.0"
 ACCESS_LOG = logging.getLogger("dynamis.access")
+ACCESS_LOG.setLevel(logging.INFO)
+ACCESS_LOG.propagate = False
+if not ACCESS_LOG.handlers:
+    _access_handler = logging.StreamHandler()
+    _access_handler.setFormatter(logging.Formatter("%(message)s"))
+    ACCESS_LOG.addHandler(_access_handler)
 DEFAULT_PAGE_LIMIT = 100
 MAX_PAGE_LIMIT = 1000
 MAX_SEASON_METRICS = 160
@@ -124,8 +137,36 @@ class RightsRestricted(RuntimeError):
 
 
 def serving_exposure() -> str:
-    raw = os.environ.get(ENV_SERVING_EXPOSURE, "local").strip().lower() or "local"
+    runtime = (
+        (os.environ.get("DYNAMIS_ENVIRONMENT") or os.environ.get("VERCEL_ENV") or "local")
+        .strip()
+        .lower()
+    )
+    default = "public" if os.environ.get("VERCEL") == "1" or runtime != "local" else "local"
+    raw = os.environ.get(ENV_SERVING_EXPOSURE, "").strip().lower() or default
     return raw if raw in SERVING_EXPOSURES else "public"
+
+
+def _env_list(name: str, default: tuple[str, ...] = ()) -> list[str]:
+    raw = os.environ.get(name, "")
+    if not raw.strip():
+        return list(default)
+    return [value.strip() for value in raw.split(",") if value.strip()]
+
+
+def _log_request_error(request: Request, exc: Exception) -> None:
+    ACCESS_LOG.error(
+        json.dumps(
+            {
+                "event": "http_error",
+                "method": request.method,
+                "path": request.url.path,
+                "error_type": type(exc).__name__,
+                "request_id": getattr(request.state, "request_id", None),
+            },
+            separators=(",", ":"),
+        )
+    )
 
 
 ARROW_MEDIA_TYPE = "application/vnd.apache.arrow.stream"
@@ -145,6 +186,8 @@ class ServingBackend(Protocol):
     def sports_catalog_matches(self) -> list[SportsCatalogMatchView]: ...
 
     def catalog_read_model(self) -> CatalogReadModelView: ...
+
+    def world_is_deployed(self, world: str, resource_id: str) -> bool: ...
 
     def sessions(self, dataset_id: str) -> list[SessionSummary]: ...
 
@@ -299,6 +342,7 @@ class PostgresServingBackend:
     def __init__(self, settings: Settings, engine: Engine | None = None) -> None:
         self.settings = settings
         self._engine = engine
+        self._manifest_cache: tuple[str, str, frozenset[str]] | None = None
         self.gold_schema = resolve_gold_schema()
 
     @property
@@ -309,6 +353,44 @@ class PostgresServingBackend:
 
     def _connect(self):
         return self.engine.connect()
+
+    def _deployed_artifact_ids(self) -> frozenset[str] | None:
+        if self.settings.object_store_provider != "vercel-blob":
+            return None
+        environment = (
+            (os.environ.get("DYNAMIS_ENVIRONMENT") or os.environ.get("VERCEL_ENV") or "")
+            .strip()
+            .lower()
+        )
+        git_sha = (
+            (
+                os.environ.get("VERCEL_GIT_COMMIT_SHA")
+                or os.environ.get("DYNAMIS_CODE_GIT_SHA")
+                or ""
+            )
+            .strip()
+            .lower()
+        )
+        if environment not in {"preview", "production"} or not re.fullmatch(
+            r"[0-9a-f]{40}", git_sha
+        ):
+            return frozenset()
+        cached = self._manifest_cache
+        if cached is not None and cached[:2] == (environment, git_sha):
+            return cached[2]
+        try:
+            artifact_ids = load_manifest(object_store(self.settings), environment, git_sha)
+        except (ConfigurationError, ObjectStoreError, DeploymentError) as exc:
+            ACCESS_LOG.warning(
+                "private Blob readiness manifest unavailable (%s)", type(exc).__name__
+            )
+            return frozenset()
+        self._manifest_cache = (environment, git_sha, artifact_ids)
+        return artifact_ids
+
+    def artifact_is_deployed(self, artifact_id: str) -> bool:
+        deployed = self._deployed_artifact_ids()
+        return deployed is None or artifact_id in deployed
 
     def status(self) -> ServingStatus:
         with self._connect() as connection:
@@ -327,19 +409,30 @@ class PostgresServingBackend:
 
     def source_capabilities(self, dataset_id: str) -> list[SourceCapabilityView]:
         with self._connect() as connection:
-            return repository.list_source_capabilities(connection, dataset_id)
+            return repository.list_source_capabilities(
+                connection, dataset_id, self._deployed_artifact_ids()
+            )
 
     def sports_catalog_matches(self) -> list[SportsCatalogMatchView]:
         with self._connect() as connection:
-            return repository.list_sports_catalog_matches(connection)
+            datasets = repository.list_datasets(connection, gold_schema=self.gold_schema)
+            deployed = self._deployed_artifact_ids()
+            capabilities = {
+                dataset.dataset_id: repository.list_source_capabilities(
+                    connection, dataset.dataset_id, deployed
+                )
+                for dataset in datasets
+            }
+            return repository.list_sports_catalog_matches(connection, capabilities)
 
     def catalog_read_model(self) -> CatalogReadModelView:
         """Assemble the semantic library from relational metadata only."""
+        deployed_artifact_ids = self._deployed_artifact_ids()
         with self._connect() as connection:
             datasets = repository.list_datasets(connection, gold_schema=self.gold_schema)
             source_capabilities = {
                 dataset.dataset_id: repository.list_source_capabilities(
-                    connection, dataset.dataset_id
+                    connection, dataset.dataset_id, deployed_artifact_ids
                 )
                 for dataset in datasets
             }
@@ -369,7 +462,58 @@ class PostgresServingBackend:
             source_capabilities=source_capabilities,
             performance_sessions=performance_sessions,
             sportsdataverse_snapshot=snapshot,
+            deployed_artifact_ids=deployed_artifact_ids,
         )
+
+    def world_is_deployed(self, world: str, resource_id: str) -> bool:
+        if self.settings.object_store_provider != "vercel-blob":
+            return True
+        catalog = self.catalog_read_model().resources
+        target_id = resource_id
+        resource_kind = "competition_edition"
+        expected_product = world
+        if world in {"MatchLab", "Court"}:
+            resource_kind = "contest"
+            expected_product = "MatchLab"
+            if "/" in resource_id:
+                dataset_id, session_id = resource_id.split("/", 1)
+                target_id = next(
+                    (
+                        item.resource_id
+                        for item in catalog
+                        if item.resource_kind == "contest"
+                        and dataset_id in item.dataset_ids
+                        and item.session_id == session_id
+                    ),
+                    "",
+                )
+        elif world == "PerformanceLab":
+            resource_kind = "performance_session"
+        elif world not in {"GameLab", "SeasonLab"}:
+            return False
+        if world == "GameLab" and not any(
+            item.resource_kind == "competition_edition" and item.resource_id == target_id
+            for item in catalog
+        ):
+            with self._connect() as connection:
+                summary = repository.game_summary(connection, resource_id)
+            if summary is None:
+                return False
+            target_id = summary.edition_id
+        resource = next(
+            (
+                item
+                for item in catalog
+                if item.resource_kind == resource_kind and item.resource_id == target_id
+            ),
+            None,
+        )
+        if resource is None:
+            return False
+        route_ready = any(
+            route.product == expected_product and route.ready for route in resource.routes
+        )
+        return route_ready and (world != "Court" or resource.basketball_spatial_ready)
 
     def sessions(self, dataset_id: str) -> list[SessionSummary]:
         with self._connect() as connection:
@@ -1111,14 +1255,60 @@ def create_app(
     the environment and connects lazily, so importing the module has no side
     effects.
     """
+    runtime = (
+        (os.environ.get("DYNAMIS_ENVIRONMENT") or os.environ.get("VERCEL_ENV") or "local")
+        .strip()
+        .lower()
+    )
+    public_runtime = os.environ.get("VERCEL") == "1" or runtime not in {
+        "local",
+        "development",
+        "test",
+    }
+    exposure_mode = exposure if exposure in SERVING_EXPOSURES else serving_exposure()
+    if public_runtime and exposure_mode != "public":
+        raise ConfigurationError("preview and production APIs must use public rights enforcement")
+    cors_regex = os.environ.get("DYNAMIS_CORS_ORIGIN_REGEX", "").strip() or None
+    if cors_regex is not None:
+        re.compile(cors_regex)
+        if cors_regex in {".*", ".+", "^.*$", "^.+$"}:
+            raise ConfigurationError("DYNAMIS_CORS_ORIGIN_REGEX must be project-scoped")
+    cors_origins = _env_list("DYNAMIS_CORS_ORIGINS")
+    trusted_hosts = _env_list(
+        "DYNAMIS_TRUSTED_HOSTS",
+        ("*.vercel.app",) if public_runtime else ("localhost", "127.0.0.1", "testserver"),
+    )
+    if public_runtime:
+        if not trusted_hosts or "*" in trusted_hosts:
+            raise ConfigurationError("public API trusted hosts must be explicit")
+        if "*" in cors_origins or (cors_regex and "dynamisdata" not in cors_regex):
+            raise ConfigurationError(
+                "public API CORS must be restricted to the DynamisData frontend"
+            )
     app = FastAPI(
+        debug=False,
         title="DynamisData Analytical API",
         version=API_VERSION,
+        docs_url=None if public_runtime else "/docs",
+        redoc_url=None if public_runtime else "/redoc",
+        openapi_url=None if public_runtime else "/openapi.json",
         description=(
             "Precomputed, provenance-explicit serving of the DynamisData gold/metadata "
             "plane. Dense windows are bounded and display-reduced; scientific values are "
             "never recomputed here."
         ),
+    )
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=trusted_hosts,
+    )
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_origin_regex=cors_regex,
+        allow_credentials=False,
+        allow_methods=["GET", "HEAD", "OPTIONS"],
+        allow_headers=["Accept", "Content-Type", "If-None-Match", "Range"],
     )
     if backend is not None:
         app.state.backend = backend
@@ -1146,10 +1336,31 @@ def create_app(
         app.state.backend = _LazyBackend()
 
     @app.middleware("http")
+    async def security_headers(request: Request, call_next):
+        request.state.request_id = uuid4().hex
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request.state.request_id
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "no-referrer")
+        response.headers.setdefault(
+            "Permissions-Policy", "camera=(), microphone=(), geolocation=()"
+        )
+        if public_runtime:
+            response.headers.setdefault(
+                "Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'"
+            )
+            response.headers.setdefault(
+                "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+            )
+        return response
+
+    @app.middleware("http")
     async def bounded_access_log(request: Request, call_next):
         started = time.perf_counter()
         response = await call_next(request)
-        if os.environ.get("DYNAMIS_ACCESS_LOG", "0") == "1":
+        access_log_default = "1" if os.environ.get("VERCEL") == "1" else "0"
+        if os.environ.get("DYNAMIS_ACCESS_LOG", access_log_default) == "1":
             ACCESS_LOG.info(
                 json.dumps(
                     {
@@ -1158,6 +1369,7 @@ def create_app(
                         "path": request.url.path,
                         "status": response.status_code,
                         "duration_ms": round((time.perf_counter() - started) * 1000, 3),
+                        "request_id": getattr(request.state, "request_id", None),
                     },
                     separators=(",", ":"),
                 )
@@ -1166,41 +1378,100 @@ def create_app(
 
     @app.exception_handler(SQLAlchemyError)
     async def _database_error(_request, exc: SQLAlchemyError) -> JSONResponse:
+        _log_request_error(_request, exc)
         return JSONResponse(
             status_code=503,
             content={
                 "detail": "database unavailable",
                 "state": "api_error",
-                "error": type(exc).__name__,
+                "request_id": getattr(_request.state, "request_id", None),
             },
         )
 
     @app.exception_handler(ConfigurationError)
     async def _configuration_error(_request, exc: ConfigurationError) -> JSONResponse:
+        _log_request_error(_request, exc)
         return JSONResponse(
             status_code=503,
-            content={"detail": str(exc), "state": "unavailable_for_source"},
+            content={
+                "detail": "service configuration unavailable",
+                "state": "api_error",
+                "request_id": getattr(_request.state, "request_id", None),
+            },
         )
 
-    exposure_mode = exposure if exposure in SERVING_EXPOSURES else serving_exposure()
     app.state.exposure = exposure_mode
 
     @app.exception_handler(RightsRestricted)
     async def _rights_restricted(_request, exc: RightsRestricted) -> JSONResponse:
         return JSONResponse(
-            status_code=451, content={"detail": str(exc), "state": "rights_restricted"}
+            status_code=451,
+            content={
+                "detail": str(exc),
+                "state": "rights_restricted",
+                "request_id": getattr(_request.state, "request_id", None),
+            },
         )
 
-    def _require_payload_rights(service: ServingBackend, contest_id: str) -> None:
+    def _require_world_bytes(service: ServingBackend, world: str, resource_id: str) -> None:
         if exposure_mode != "public":
             return
-        license = service.game_license(contest_id)
-        if license is None or license.local_only:
-            notice = license.notice if license else "rights unknown"
-            raise RightsRestricted(
-                f"contest {contest_id!r} comes from a local-only source; its play-by-play and "
-                f"box-score payloads are not served in public exposure ({notice})"
+        world_is_deployed = getattr(service, "world_is_deployed", None)
+        if callable(world_is_deployed) and not world_is_deployed(world, resource_id):
+            raise HTTPException(
+                status_code=404,
+                detail=f"{world} bytes are not complete in this release's private Blob manifest",
             )
+
+    def _require_session_world_bytes(
+        service: ServingBackend, dataset_id: str, session_id: str
+    ) -> None:
+        if exposure_mode != "public":
+            return
+        world_is_deployed = getattr(service, "world_is_deployed", None)
+        if callable(world_is_deployed) and not any(
+            world_is_deployed(world, f"{dataset_id}/{session_id}")
+            for world in ("MatchLab", "PerformanceLab")
+        ):
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    "session has no complete openable World in this release's private Blob manifest"
+                ),
+            )
+
+    def _require_payload_rights(
+        service: ServingBackend, contest_id: str, *, world: str = "GameLab"
+    ) -> None:
+        if exposure_mode != "public":
+            return
+        policy = service.game_license(contest_id)
+        blocked = public_rights_error(policy)
+        if blocked:
+            raise RightsRestricted(
+                f"contest {contest_id!r}: {blocked}; payload is not served publicly"
+            )
+        _require_world_bytes(service, world, contest_id)
+
+    def _require_public_dataset(service: ServingBackend, dataset_id: str) -> None:
+        if exposure_mode != "public":
+            return
+        dataset = service.dataset(dataset_id)
+        blocked = public_rights_error(dataset.license if dataset is not None else None)
+        if blocked:
+            raise RightsRestricted(f"{dataset_id}: {blocked}; payload is not served publicly")
+
+    def _require_artifact_payload_rights(service: ServingBackend, artifact_id: str) -> None:
+        if exposure_mode == "public":
+            artifact_ref = service.artifact(artifact_id)
+            if artifact_ref is not None:
+                _require_public_dataset(service, artifact_ref.dataset_id)
+            artifact_is_deployed = getattr(service, "artifact_is_deployed", None)
+            if callable(artifact_is_deployed) and not artifact_is_deployed(artifact_id):
+                raise HTTPException(
+                    status_code=404,
+                    detail="artifact bytes are not present in this release's private Blob manifest",
+                )
 
     @app.exception_handler(DenseWindowTooLarge)
     async def _window_too_large(_request, exc: DenseWindowTooLarge) -> JSONResponse:
@@ -1216,6 +1487,44 @@ def create_app(
     async def _artifact_error(_request, exc: ArtifactPathError) -> JSONResponse:
         return JSONResponse(
             status_code=404, content={"detail": str(exc), "state": "unavailable_for_source"}
+        )
+
+    @app.exception_handler(Exception)
+    async def _internal_error(request: Request, exc: Exception) -> JSONResponse:
+        _log_request_error(request, exc)
+        request_id = getattr(request.state, "request_id", uuid4().hex)
+        response_headers = {
+            "X-Request-ID": request_id,
+            "X-Content-Type-Options": "nosniff",
+            "X-Frame-Options": "DENY",
+            "Referrer-Policy": "no-referrer",
+            "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+        }
+        origin = request.headers.get("origin")
+        if origin:
+            allowed_origins = _env_list("DYNAMIS_CORS_ORIGINS")
+            origin_regex = os.environ.get("DYNAMIS_CORS_ORIGIN_REGEX", "").strip()
+            if origin in allowed_origins or "*" in allowed_origins:
+                response_headers["Access-Control-Allow-Origin"] = (
+                    "*" if "*" in allowed_origins else origin
+                )
+            elif origin_regex and re.fullmatch(origin_regex, origin):
+                response_headers["Access-Control-Allow-Origin"] = origin
+            if response_headers.get("Access-Control-Allow-Origin") != "*":
+                response_headers["Vary"] = "Origin"
+        if runtime not in {"local", "development", "test"}:
+            response_headers["Content-Security-Policy"] = (
+                "default-src 'none'; frame-ancestors 'none'"
+            )
+            response_headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": "internal server error",
+                "state": "api_error",
+                "request_id": request_id,
+            },
+            headers=response_headers,
         )
 
     @app.get("/api/health", response_model=HealthStatus, tags=["system"])
@@ -1284,6 +1593,7 @@ def create_app(
         tags=["season"],
     )
     def season_family(edition_id: str, family: str, service: BackendDependency) -> SeasonFamilyView:
+        _require_world_bytes(service, "SeasonLab", edition_id)
         try:
             found = service.season_family(edition_id, family)
         except season_model.SeasonDataError as exc:
@@ -1312,6 +1622,7 @@ def create_app(
         limit: int = Query(default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT),
         offset: int = Query(default=0, ge=0),
     ) -> SeasonRowPage:
+        _require_world_bytes(service, "SeasonLab", edition_id)
         filters = season_model.SeasonRowFilter(
             team_id=team_id,
             position_group=position_group,
@@ -1358,6 +1669,7 @@ def create_app(
             default=None, description="Rank against this position group instead of the row's own"
         ),
     ) -> SeasonProfileView:
+        _require_world_bytes(service, "SeasonLab", edition_id)
         try:
             found = service.season_profile(
                 edition_id,
@@ -1390,6 +1702,7 @@ def create_app(
         service: BackendDependency,
         subject_id: str = Query(min_length=1, max_length=256),
     ) -> SeasonPlayerLinksView:
+        _require_world_bytes(service, "SeasonLab", edition_id)
         found = service.season_player_links(edition_id, subject_id)
         if found is None:
             raise HTTPException(
@@ -1409,6 +1722,7 @@ def create_app(
         limit: int = Query(default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT),
         offset: int = Query(default=0, ge=0),
     ) -> GamePage:
+        _require_world_bytes(service, "GameLab", edition_id)
         found = service.games(edition_id, team_id=team_id, limit=limit, offset=offset)
         if found is None:
             raise HTTPException(status_code=404, detail=f"no game data for {edition_id!r}")
@@ -1416,6 +1730,7 @@ def create_app(
 
     @app.get("/api/games/{contest_id}", response_model=GameDetailView, tags=["games"])
     def game(contest_id: str, service: BackendDependency) -> GameDetailView:
+        _require_payload_rights(service, contest_id)
         found = service.game(contest_id)
         if found is None:
             raise HTTPException(status_code=404, detail=f"contest {contest_id!r} has no game data")
@@ -1466,6 +1781,7 @@ def create_app(
     def basketball_spatial_game(
         contest_id: str, service: BackendDependency
     ) -> BasketballSpatialGameView:
+        _require_payload_rights(service, contest_id, world="Court")
         found = service.basketball_spatial_game(contest_id)
         if found is None:
             raise HTTPException(
@@ -1485,7 +1801,7 @@ def create_app(
         from_frame: int = Query(default=0, ge=0),
         limit: int = Query(default=125, ge=1, le=250),
     ) -> BasketballFramePage:
-        _require_payload_rights(service, contest_id)
+        _require_payload_rights(service, contest_id, world="Court")
         found = service.basketball_frames(
             contest_id, period=period, from_frame=from_frame, limit=limit
         )
@@ -1508,7 +1824,7 @@ def create_app(
         limit: int = Query(default=250, ge=1, le=MAX_PAGE_LIMIT),
         offset: int = Query(default=0, ge=0),
     ) -> BasketballEventPage:
-        _require_payload_rights(service, contest_id)
+        _require_payload_rights(service, contest_id, world="Court")
         found = service.basketball_events(contest_id, period=period, limit=limit, offset=offset)
         if found is None:
             raise HTTPException(
@@ -1542,6 +1858,7 @@ def create_app(
     def session_detail(
         dataset_id: str, session_id: str, service: BackendDependency
     ) -> SessionDetail:
+        _require_session_world_bytes(service, dataset_id, session_id)
         found = service.session(dataset_id, session_id)
         if found is None:
             raise HTTPException(status_code=404, detail=f"session {session_id!r} is not registered")
@@ -1665,6 +1982,7 @@ def create_app(
         tags=["tactical"],
     )
     def tactical_quality(dataset_id: str, service: BackendDependency) -> TacticalQualityView:
+        _require_public_dataset(service, dataset_id)
         found = service.tactical_quality(dataset_id)
         if found is None:
             raise HTTPException(
@@ -1684,6 +2002,7 @@ def create_app(
         stream_id: str | None = None,
         series_name: str | None = None,
     ) -> list[ArtifactRefView]:
+        _require_public_dataset(service, dataset_id)
         return service.tactical_artifacts(dataset_id, session_id, stream_id, series_name)
 
     @app.get(
@@ -1699,6 +2018,7 @@ def create_app(
         algorithm_id: str | None = None,
         series_name: str | None = None,
     ) -> list[ArtifactRefView]:
+        _require_public_dataset(service, dataset_id)
         return service.processing_artifacts(
             dataset_id,
             session_id,
@@ -1722,6 +2042,7 @@ def create_app(
         service: BackendDependency,
         landmark_name: str = Query(min_length=1, max_length=128),
     ) -> PoseRangeReportView:
+        _require_public_dataset(service, dataset_id)
         try:
             report = service.pose_range_report(
                 dataset_id,
@@ -1837,6 +2158,7 @@ def create_app(
         columns: str | None = Query(default=None),
         max_points: int | None = Query(default=None, ge=1, le=100_000),
     ) -> Response:
+        _require_artifact_payload_rights(service, artifact_id)
         payload, response = _tactical_series(
             artifact_id,
             request,
@@ -1865,6 +2187,7 @@ def create_app(
         to_ns: int | None = Query(default=None),
         max_points: int | None = Query(default=None, ge=1, le=100_000),
     ) -> Response:
+        _require_artifact_payload_rights(service, artifact_id)
         payload, response = _tactical_series(
             artifact_id,
             request,
@@ -1889,6 +2212,7 @@ def create_app(
         tags=["dense"],
     )
     def artifact(artifact_id: str, service: BackendDependency) -> ArtifactDetail:
+        _require_artifact_payload_rights(service, artifact_id)
         found = service.artifact_detail(artifact_id)
         if found is None:
             raise HTTPException(
@@ -1908,6 +2232,7 @@ def create_app(
         from_ns: int | None = Query(default=None),
         to_ns: int | None = Query(default=None),
     ) -> list[EntityObservationView]:
+        _require_artifact_payload_rights(service, artifact_id)
         found = service.artifact_observations(artifact_id, from_ns=from_ns, to_ns=to_ns)
         if found is None:
             raise HTTPException(
@@ -1936,6 +2261,7 @@ def create_app(
         entity_id: str | None = Query(default=None, max_length=128),
         format: str = Query(default="json", pattern="^(json|arrow)$"),
     ) -> Response:
+        _require_artifact_payload_rights(service, artifact_id)
         parsed_columns = _parse_columns(columns)
         ref = service.artifact(artifact_id)
         if ref is None:

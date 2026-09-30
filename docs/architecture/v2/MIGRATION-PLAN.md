@@ -2,6 +2,8 @@
 
 _Implementation order after the RES-109 contract-freeze commit._
 
+> This migration plan is historical. Current production hosting and release order are documented in [`docs/deployment/vercel.md`](../../deployment/vercel.md).
+
 ---
 
 ## 📋 Unit sequence

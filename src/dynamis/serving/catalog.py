@@ -107,6 +107,32 @@ def _routes(
     return [route for route in routes if products is None or route.product in products]
 
 
+def _manifest_routes(
+    routes: Sequence[ProductRouteView],
+    required_artifact_ids: set[str],
+    deployed_artifact_ids: set[str] | frozenset[str] | None,
+) -> tuple[list[ProductRouteView], bool]:
+    if deployed_artifact_ids is None:
+        return list(routes), True
+    complete = bool(required_artifact_ids) and required_artifact_ids.issubset(deployed_artifact_ids)
+    if complete:
+        return list(routes), True
+    return [route.model_copy(update={"ready": False}) for route in routes], False
+
+
+def _deployed_state(
+    state: str | None,
+    routes: Sequence[ProductRouteView],
+    deployed_artifact_ids: set[str] | frozenset[str] | None,
+    manifest_complete: bool,
+) -> str | None:
+    if deployed_artifact_ids is None or any(route.ready for route in routes):
+        return state
+    if state in {"READY", "MATERIALIZED", "VALIDATION_FAILED", "MATERIALIZATION_FAILED"}:
+        return "MATERIALIZED" if manifest_complete else "REGISTERED"
+    return state
+
+
 def _stages(
     *,
     upstream: Sequence[str],
@@ -191,6 +217,7 @@ def _edition_entry(
             "registered": set(),
             "materialized": set(),
             "grains": set(),
+            "required_artifact_ids": set(),
             "source_known": False,
         }
         editions[edition_id] = entry
@@ -211,11 +238,14 @@ def _add_source_capability(
     entry["registered"].update(item.registered_capabilities)
     entry["materialized"].update(item.materialized_capabilities or item.local_capabilities)
     entry["grains"].update(item.materialized_grains)
+    entry["required_artifact_ids"].update(item._required_artifact_ids)
     entry["source_known"] = True
 
 
 def _edition_resource(
-    entry: dict[str, Any], datasets: Mapping[str, DatasetSummary]
+    entry: dict[str, Any],
+    datasets: Mapping[str, DatasetSummary],
+    deployed_artifact_ids: set[str] | frozenset[str] | None,
 ) -> CatalogResourceView:
     upstream = sorted(entry["upstream"])
     registered = sorted(entry["registered"])
@@ -223,8 +253,16 @@ def _edition_resource(
     grains = sorted(entry["grains"])
     routes = _routes(upstream, registered, materialized, grains, {"GameLab", "SeasonLab"})
     state = _state(entry["availability_states"])
+    required_artifact_ids = set(entry["required_artifact_ids"])
+    routes, manifest_complete = _manifest_routes(
+        routes, required_artifact_ids, deployed_artifact_ids
+    )
+    state = _deployed_state(state, routes, deployed_artifact_ids, manifest_complete)
+    if deployed_artifact_ids is not None and not manifest_complete:
+        materialized = []
+        grains = []
     rights, noncommercial_only, local_only = _rights(sorted(entry["dataset_ids"]), datasets)
-    return CatalogResourceView(
+    resource = CatalogResourceView(
         resource_kind="competition_edition",
         resource_id=entry["resource_id"],
         label=entry["label"],
@@ -258,6 +296,8 @@ def _edition_resource(
         preparation_eligible=bool(_actions(entry["availability_states"])),
         preparation_actions=_actions(entry["availability_states"]),
     )
+    resource._required_artifact_ids = required_artifact_ids
+    return resource
 
 
 def _snapshot_editions(
@@ -307,6 +347,7 @@ def build_catalog_read_model(
     source_capabilities: Mapping[str, Sequence[SourceCapabilityView]],
     performance_sessions: Sequence[tuple[DatasetSummary, SessionDetail]],
     sportsdataverse_snapshot: Mapping[str, Any] | None = None,
+    deployed_artifact_ids: set[str] | frozenset[str] | None = None,
 ) -> CatalogReadModelView:
     """Join only explicit canonical IDs and publish deterministic product gates."""
     dataset_by_id = {dataset.dataset_id: dataset for dataset in datasets}
@@ -327,6 +368,7 @@ def build_catalog_read_model(
         entry["source_known"] = True
         if isinstance(edition, GameEditionView):
             for family in edition.families:
+                entry["required_artifact_ids"].add(family.artifact_id)
                 if family.grain_kind in DataGrainKind._value2member_map_:
                     entry["grains"].add(family.grain_kind)
                 if family.grain_kind == DataGrainKind.PLAY_BY_PLAY.value:
@@ -341,6 +383,7 @@ def build_catalog_read_model(
                 entry["availability_states"].append("MATERIALIZED")
         else:
             for family in edition.families:
+                entry["required_artifact_ids"].add(family.artifact_id)
                 if family.grain_kind in DataGrainKind._value2member_map_:
                     entry["grains"].add(family.grain_kind)
                 entry["materialized"].add(Capability.SEASON_AGGREGATE.value)
@@ -362,7 +405,10 @@ def build_catalog_read_model(
             _add_source_capability(entry, dataset_id, item)
 
     _snapshot_editions(editions, sportsdataverse_snapshot, dataset_by_id)
-    resources = [_edition_resource(entry, dataset_by_id) for entry in editions.values()]
+    resources = [
+        _edition_resource(entry, dataset_by_id, deployed_artifact_ids)
+        for entry in editions.values()
+    ]
 
     for match in matches:
         capability = match.source_capability
@@ -374,6 +420,7 @@ def build_catalog_read_model(
             else []
         )
         match_grains = capability.materialized_grains if capability else []
+        required_artifact_ids = set(capability._required_artifact_ids) if capability else set()
         routes = _routes(
             match_upstream,
             match_registered,
@@ -382,6 +429,13 @@ def build_catalog_read_model(
             {"MatchLab", "GameLab"},
         )
         state = capability.availability_state if capability else None
+        routes, manifest_complete = _manifest_routes(
+            routes, required_artifact_ids, deployed_artifact_ids
+        )
+        state = _deployed_state(state, routes, deployed_artifact_ids, manifest_complete)
+        if deployed_artifact_ids is not None and not manifest_complete:
+            match_materialized = []
+            match_grains = []
         provider = (
             capability.provider
             if capability
@@ -392,54 +446,55 @@ def build_catalog_read_model(
             )
         )
         rights, noncommercial_only, local_only = _rights([match.dataset_id], dataset_by_id)
-        resources.append(
-            CatalogResourceView(
-                resource_kind="contest",
-                resource_id=match.contest_id,
-                label=match.label or f"Contest {match.provider_match_id}",
-                dataset_ids=[match.dataset_id],
-                providers=[provider] if provider else [],
-                source_entry_ids=[capability.entry_id] if capability else [],
-                external_ids=[match.provider_match_id],
-                sport_id=match.sport_id,
-                sport_name=match.sport_name,
-                competition_id=match.competition_id,
-                competition_name=match.competition_name,
-                edition_id=match.edition_id,
-                edition_label=match.edition_label,
-                contest_id=match.contest_id,
-                teams=match.teams,
-                session_id=match.session_id,
-                rights_identifiers=rights,
-                noncommercial_only=noncommercial_only,
-                local_only=local_only,
-                availability_state=state,
-                stages=_stages(
-                    upstream=match_upstream,
-                    registered=match_registered,
-                    materialized=match_materialized,
-                    routes=routes,
-                    state=state,
-                    source_known=capability is not None,
-                ),
-                upstream_capabilities=sorted(set(match_upstream)),
-                registered_capabilities=sorted(set(match_registered)),
-                materialized_capabilities=sorted(set(match_materialized)),
-                materialized_grains=sorted(set(match_grains)),
+        resource = CatalogResourceView(
+            resource_kind="contest",
+            resource_id=match.contest_id,
+            label=match.label or f"Contest {match.provider_match_id}",
+            dataset_ids=[match.dataset_id],
+            providers=[provider] if provider else [],
+            source_entry_ids=[capability.entry_id] if capability else [],
+            external_ids=[match.provider_match_id],
+            sport_id=match.sport_id,
+            sport_name=match.sport_name,
+            competition_id=match.competition_id,
+            competition_name=match.competition_name,
+            edition_id=match.edition_id,
+            edition_label=match.edition_label,
+            contest_id=match.contest_id,
+            teams=match.teams,
+            session_id=match.session_id,
+            rights_identifiers=rights,
+            noncommercial_only=noncommercial_only,
+            local_only=local_only,
+            availability_state=state,
+            stages=_stages(
+                upstream=match_upstream,
+                registered=match_registered,
+                materialized=match_materialized,
                 routes=routes,
-                basketball_spatial_ready=(
-                    match.sport_id == "basketball"
-                    and Capability.TRACKING.value in match_materialized
-                    and DataGrainKind.FRAME_SERIES.value in match_grains
-                ),
-                preparation_eligible=bool(capability and capability.preparation_eligible),
-                preparation_actions=(
-                    [capability.preparation_action]
-                    if capability and capability.preparation_action
-                    else []
-                ),
-            )
+                state=state,
+                source_known=capability is not None,
+            ),
+            upstream_capabilities=sorted(set(match_upstream)),
+            registered_capabilities=sorted(set(match_registered)),
+            materialized_capabilities=sorted(set(match_materialized)),
+            materialized_grains=sorted(set(match_grains)),
+            routes=routes,
+            basketball_spatial_ready=(
+                manifest_complete
+                and match.sport_id == "basketball"
+                and Capability.TRACKING.value in match_materialized
+                and DataGrainKind.FRAME_SERIES.value in match_grains
+            ),
+            preparation_eligible=bool(capability and capability.preparation_eligible),
+            preparation_actions=(
+                [capability.preparation_action]
+                if capability and capability.preparation_action
+                else []
+            ),
         )
+        resource._required_artifact_ids = required_artifact_ids
+        resources.append(resource)
 
     capabilities_by_dataset: dict[str, list[SourceCapabilityView]] = defaultdict(list)
     for dataset_id, items in source_capabilities.items():
@@ -468,6 +523,7 @@ def build_catalog_read_model(
         state = _state(states) or (
             "REGISTERED" if registered_list else "UPSTREAM_AVAILABLE" if upstream_list else None
         )
+        state = _deployed_state(state, routes, deployed_artifact_ids, False)
         actions = _actions(states)
         if not actions and registered_list:
             actions = ["materialize"]
@@ -516,12 +572,16 @@ def build_catalog_read_model(
         grains: set[str] = set()
         for stream in detail.streams:
             capability = _MODALITY_CAPABILITIES.get(stream.modality)
+            stream_complete = bool(stream.sample_artifact_ids) and (
+                deployed_artifact_ids is None
+                or set(stream.sample_artifact_ids).issubset(deployed_artifact_ids)
+            )
             if capability is not None:
                 registered.add(capability.value)
-                if stream.sample_artifact_ids:
+                if stream_complete:
                     materialized.add(capability.value)
             grain = stream.data_grain_kind
-            if stream.sample_artifact_ids and grain in DataGrainKind._value2member_map_:
+            if stream_complete and grain in DataGrainKind._value2member_map_:
                 assert grain is not None
                 grains.add(grain)
         upstream_list = sorted(upstream)
@@ -535,6 +595,13 @@ def build_catalog_read_model(
             grain_list,
             {"PerformanceLab"},
         )
+        required_artifact_ids = set(detail._required_artifact_ids)
+        routes, manifest_complete = _manifest_routes(
+            routes, required_artifact_ids, deployed_artifact_ids
+        )
+        if deployed_artifact_ids is not None and not manifest_complete:
+            materialized_list = []
+            grain_list = []
         state = (
             "READY"
             if any(route.ready for route in routes)
@@ -544,42 +611,43 @@ def build_catalog_read_model(
             if registered_list
             else None
         )
+        state = _deployed_state(state, routes, deployed_artifact_ids, manifest_complete)
         actions = sorted(
             {item.preparation_action for item in source_items if item.preparation_action}
         )
         if not actions and registered_list and not materialized_list:
             actions = ["materialize"]
         rights, noncommercial_only, local_only = _rights([dataset.dataset_id], dataset_by_id)
-        resources.append(
-            CatalogResourceView(
-                resource_kind="performance_session",
-                resource_id=f"{dataset.dataset_id}/{detail.session.session_id}",
-                label=detail.session.label or detail.session.session_id,
-                dataset_ids=[dataset.dataset_id],
-                providers=[dataset.provider],
-                external_ids=[detail.session.session_id],
-                session_id=detail.session.session_id,
-                rights_identifiers=rights,
-                noncommercial_only=noncommercial_only,
-                local_only=local_only,
-                availability_state=state,
-                stages=_stages(
-                    upstream=upstream_list,
-                    registered=registered_list,
-                    materialized=materialized_list,
-                    routes=routes,
-                    state=state,
-                    source_known=bool(dataset.upstream_urls),
-                ),
-                upstream_capabilities=upstream_list,
-                registered_capabilities=registered_list,
-                materialized_capabilities=materialized_list,
-                materialized_grains=grain_list,
+        resource = CatalogResourceView(
+            resource_kind="performance_session",
+            resource_id=f"{dataset.dataset_id}/{detail.session.session_id}",
+            label=detail.session.label or detail.session.session_id,
+            dataset_ids=[dataset.dataset_id],
+            providers=[dataset.provider],
+            external_ids=[detail.session.session_id],
+            session_id=detail.session.session_id,
+            rights_identifiers=rights,
+            noncommercial_only=noncommercial_only,
+            local_only=local_only,
+            availability_state=state,
+            stages=_stages(
+                upstream=upstream_list,
+                registered=registered_list,
+                materialized=materialized_list,
                 routes=routes,
-                preparation_eligible=bool(actions),
-                preparation_actions=actions,
-            )
+                state=state,
+                source_known=bool(dataset.upstream_urls),
+            ),
+            upstream_capabilities=upstream_list,
+            registered_capabilities=registered_list,
+            materialized_capabilities=materialized_list,
+            materialized_grains=grain_list,
+            routes=routes,
+            preparation_eligible=bool(actions),
+            preparation_actions=actions,
         )
+        resource._required_artifact_ids = required_artifact_ids
+        resources.append(resource)
 
     resources.sort(
         key=lambda item: (

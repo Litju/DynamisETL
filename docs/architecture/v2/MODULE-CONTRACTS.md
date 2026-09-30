@@ -20,9 +20,9 @@ _Executable ownership summary for the frozen V2 module graph._
 | Control API | FastAPI | request/backend | Pydantic, OpenAPI, SQLAlchemy | processor execution |
 | Dense read plane | PyArrow/DuckDB | request-local | Parquet scan/reduction | Rust without trigger |
 | Scientific compute | Python processors | processor/artifact contract | NumPy, SciPy, PyArrow | display data as input |
-| Artifact plane | S3-compatible/local adapter | artifact identity | private object/file IO | public restricted URLs |
+| Artifact plane | Vercel Private Blob/local adapter | artifact identity | private object/file IO | public restricted URLs |
 | PostgreSQL plane | PostgreSQL/Neon | database transaction | SQLAlchemy/Alembic | dense telemetry storage |
-| Runtime readiness | Cloud Run container | environment contract | Docker/Uvicorn | Vercel dense API, Kubernetes |
+| Runtime readiness | Vercel Python Function/Fluid Compute | environment contract | Vercel environment + structured logs | separate API host, Kubernetes |
 
 ## 📦 Input/output invariants
 

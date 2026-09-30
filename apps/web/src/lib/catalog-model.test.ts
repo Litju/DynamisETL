@@ -127,6 +127,24 @@ describe("World routing", () => {
     expect(link?.missing).toEqual(["TRACKING", "FRAME_SERIES"]);
   });
 
+  it("keeps a manifest-incomplete registered contest non-openable", () => {
+    const incomplete = contest({
+      availability_state: "REGISTERED",
+      stages: { ...READY, materialized: "not_materialized", ready: "not_ready" },
+      routes: [
+        {
+          product: "MatchLab",
+          ready: false,
+          missing_capabilities: [],
+          missing_grains: [],
+        },
+      ],
+    });
+    const [link] = resourceWorlds(incomplete);
+    expect(link?.ready).toBe(false);
+    expect(link?.target).toBeNull();
+  });
+
   it("opens basketball tracking on the court, not in football MatchLab", () => {
     const world = primaryWorld(courtContest);
     expect(world?.workbench).toBe("Court");

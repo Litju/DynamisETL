@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 ServingSource = Literal["gold", "control_plane"]
 
@@ -68,6 +68,8 @@ class DatasetDetail(DatasetSummary):
 
 
 class SourceCapabilityView(BaseModel):
+    _required_artifact_ids: set[str] = PrivateAttr(default_factory=set)
+
     entry_id: str
     provider: str = ""
     sport_id: str | None = None
@@ -109,6 +111,8 @@ class CatalogStageView(BaseModel):
 
 class CatalogResourceView(BaseModel):
     """One navigable canonical contest, competition edition or lab session."""
+
+    _required_artifact_ids: set[str] = PrivateAttr(default_factory=set)
 
     resource_kind: Literal[
         "contest", "competition_edition", "performance_dataset", "performance_session"
@@ -262,6 +266,8 @@ class SessionParticipantView(BaseModel):
 
 
 class SessionDetail(BaseModel):
+    _required_artifact_ids: set[str] = PrivateAttr(default_factory=set)
+
     dataset_id: str
     session: SessionSummary
     participants: list[SessionParticipantView]

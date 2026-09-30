@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "purpose": "RES-107 public preview and production seed",
+  "demo_resources": [
+    {
+      "dataset_id": "skillcorner-basketball-opendata",
+      "session_id": "114243",
+      "worlds": ["GameLab", "MatchLab"]
+    }
+  ],
+  "datasets": [
+    {
+      "dataset_id": "white-cmj-acc-grf",
+      "version": "v1",
+      "license_identifier": "CC-BY-4.0",
+      "attribution": "White CMJ dataset, DOI 10.5281/zenodo.19136480; attribution required.",
+      "keys": ["cmj_dataset_both.npz"]
+    },
+    {
+      "dataset_id": "dfl-sportec-idsse",
+      "version": "a715a38dfbaf5f58e431727c2b78d174101a703c",
+      "license_identifier": "CC-BY-4.0",
+      "attribution": "Credit DFL/Sportec IDSSE; attribution required.",
+      "session_id": "DFL-MAT-J03WPY",
+      "keys": [
+        "DFL_02_01_matchinformation_DFL-COM-000002_DFL-MAT-J03WPY.xml",
+        "DFL_03_02_events_raw_DFL-COM-000002_DFL-MAT-J03WPY.xml",
+        "DFL_04_03_positions_raw_observed_DFL-COM-000002_DFL-MAT-J03WPY.xml"
+      ]
+    },
+    {
+      "dataset_id": "skillcorner-opendata",
+      "version": "4340d274572876239c154c90bc507a9b3250a656",
+      "license_identifier": "MIT",
+      "attribution": "Credit SkillCorner and the pinned Open Data revision.",
+      "session_id": "1925299",
+      "keys": [
+        "data/matches/1925299/1925299_dynamic_events.csv",
+        "data/matches/1925299/1925299_match.json",
+        "data/matches/1925299/1925299_phases_of_play.csv",
+        "data/matches/1925299/1925299_tracking_extrapolated.jsonl",
+        "raw/1925299.jsonl.zip"
+      ]
+    },
+    {
+      "dataset_id": "skillcorner-basketball-opendata",
+      "version": "4bbed2e35e8fdd2cf083e8c8b280b3e5381a2c66",
+      "license_identifier": "MIT",
+      "attribution": "Credit SkillCorner and the pinned Basketball Open Data revision.",
+      "session_id": "114243",
+      "keys": [
+        "data/matches/114243/114243_dynamic_events.json",
+        "data/matches/114243/114243_game_data.json",
+        "data/matches/114243/114243_tracking_data.jsonl.gz"
+      ]
+    }
+  ]
+}

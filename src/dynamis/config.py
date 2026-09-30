@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import re
+import tempfile
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -24,13 +25,9 @@ ENV_DATABASE_ROOT = "DYNAMIS_DATABASE_ROOT"
 ENV_DUCKDB_PATH = "DYNAMIS_DUCKDB_PATH"
 ENV_DB_SCHEMA = "DYNAMIS_DB_SCHEMA"
 ENV_POSTGRES_URL = "POSTGRES_URL"
+ENV_MIGRATION_POSTGRES_URL = "DYNAMIS_MIGRATION_POSTGRES_URL"
 ENV_TEST_POSTGRES_URL = "DYNAMIS_TEST_POSTGRES_URL"
 ENV_OBJECT_STORE_PROVIDER = "DYNAMIS_OBJECT_STORE_PROVIDER"
-ENV_OBJECT_STORE_ENDPOINT = "DYNAMIS_OBJECT_STORE_ENDPOINT"
-ENV_OBJECT_STORE_BUCKET = "DYNAMIS_OBJECT_STORE_BUCKET"
-ENV_OBJECT_STORE_ACCESS_KEY = "DYNAMIS_OBJECT_STORE_ACCESS_KEY"
-ENV_OBJECT_STORE_SECRET_KEY = "DYNAMIS_OBJECT_STORE_SECRET_KEY"
-ENV_OBJECT_STORE_REGION = "DYNAMIS_OBJECT_STORE_REGION"
 
 DEFAULT_DB_SCHEMA = "dynamis"
 DUCKDB_SUBDIR = "duckdb"
@@ -77,10 +74,20 @@ def load_env_file(path: Path | None = None) -> dict[str, str]:
 
 
 def resolved_environ(env: Mapping[str, str] | None = None) -> dict[str, str]:
-    if env is not None:
-        return dict(env)
-    merged = load_env_file()
-    merged.update(os.environ)
+    merged = dict(env) if env is not None else load_env_file()
+    if env is None:
+        merged.update(os.environ)
+    if not merged.get(ENV_POSTGRES_URL):
+        merged[ENV_POSTGRES_URL] = merged.get("DATABASE_URL", "")
+    if not merged.get(ENV_MIGRATION_POSTGRES_URL):
+        merged[ENV_MIGRATION_POSTGRES_URL] = next(
+            (
+                merged[name]
+                for name in ("DATABASE_URL_UNPOOLED", "POSTGRES_URL_NON_POOLING")
+                if merged.get(name)
+            ),
+            "",
+        )
     return merged
 
 
@@ -114,11 +121,6 @@ class Settings(BaseModel):
     postgres_url: str | None = None
     test_postgres_url: str | None = None
     object_store_provider: str = "local"
-    object_store_endpoint: str | None = None
-    object_store_bucket: str | None = None
-    object_store_access_key: str | None = None
-    object_store_secret_key: str | None = None
-    object_store_region: str = "auto"
 
     def require_postgres_url(self) -> str:
         if not self.postgres_url:
@@ -133,6 +135,10 @@ class Settings(BaseModel):
         values = resolved_environ(env)
         dataset_root = values.get(ENV_DATASET_ROOT, "").strip()
         database_root = values.get(ENV_DATABASE_ROOT, "").strip()
+        if values.get("VERCEL") == "1":
+            ephemeral_root = Path(tempfile.gettempdir()) / "dynamisdata"
+            dataset_root = dataset_root or str(ephemeral_root / "datasets")
+            database_root = database_root or str(ephemeral_root / "database")
         missing = [
             name
             for name, value in (
@@ -165,11 +171,6 @@ class Settings(BaseModel):
             postgres_url=values.get(ENV_POSTGRES_URL) or None,
             test_postgres_url=values.get(ENV_TEST_POSTGRES_URL) or None,
             object_store_provider=values.get(ENV_OBJECT_STORE_PROVIDER, "local").strip() or "local",
-            object_store_endpoint=values.get(ENV_OBJECT_STORE_ENDPOINT) or None,
-            object_store_bucket=values.get(ENV_OBJECT_STORE_BUCKET) or None,
-            object_store_access_key=values.get(ENV_OBJECT_STORE_ACCESS_KEY) or None,
-            object_store_secret_key=values.get(ENV_OBJECT_STORE_SECRET_KEY) or None,
-            object_store_region=values.get(ENV_OBJECT_STORE_REGION, "auto").strip() or "auto",
         )
 
 

@@ -22,6 +22,41 @@ from dynamis.serving.app import PostgresServingBackend, create_app
 
 
 @pytest.mark.postgres
+def test_control_plane_sets_search_path_in_each_transaction(
+    postgres_url: str,
+    tmp_settings: Settings,
+) -> None:
+    from uuid import uuid4
+
+    from dynamis.storage.control_plane import control_plane_engine
+
+    schema = f"control_plane_{uuid4().hex[:12]}"
+    admin = create_engine(postgres_url, future=True)
+    engine = None
+    try:
+        with admin.begin() as connection:
+            connection.execute(text(f'CREATE SCHEMA "{schema}"'))
+        settings = Settings(
+            dataset_root=tmp_settings.dataset_root,
+            database_root=tmp_settings.database_root,
+            duckdb_path=tmp_settings.duckdb_path,
+            db_schema=schema,
+            postgres_url=postgres_url,
+        )
+        engine = control_plane_engine(settings, postgres_url)
+        with engine.connect() as connection:
+            assert connection.scalar(text("SELECT current_schema()")) == schema
+            connection.commit()
+            assert connection.scalar(text("SELECT current_schema()")) == schema
+    finally:
+        if engine is not None:
+            engine.dispose()
+        with admin.begin() as connection:
+            connection.execute(text(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE'))
+        admin.dispose()
+
+
+@pytest.mark.postgres
 def test_postgres_serving_end_to_end(
     postgres_url: str,
     test_db_schema: str,

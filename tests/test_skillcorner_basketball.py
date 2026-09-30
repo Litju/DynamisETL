@@ -13,6 +13,7 @@ from dynamis.adapters.skillcorner_basketball.aggregates import (
     _persist_player_identities,
 )
 from dynamis.adapters.skillcorner_basketball.catalog import (
+    _defer_contest_catalog_link,
     _preserve_materialized_contest_metadata,
     build_catalog_entries,
     build_game_domain,
@@ -121,6 +122,18 @@ def test_metadata_reregistration_preserves_materialized_contest_flags() -> None:
     assert contest_metadata["play_by_play_available"] is True
     assert contest_metadata["tracking_available"] is True
     assert contest_metadata["period_count"] == 4
+
+
+def test_basketball_catalog_defers_session_link_until_contest_entry_exists() -> None:
+    corpus = load_corpus_manifest()
+    domain = build_game_domain(corpus, corpus["matches"][0])
+
+    deferred = _defer_contest_catalog_link(domain)
+
+    assert domain.sports_contexts[0].session.source_catalog_entry_id == contest_catalog_id(
+        str(corpus["matches"][0]["match"]["id"])
+    )
+    assert deferred.sports_contexts[0].session.source_catalog_entry_id is None
 
 
 def test_aggregate_subject_rows_use_canonical_sports_ids(monkeypatch: pytest.MonkeyPatch) -> None:

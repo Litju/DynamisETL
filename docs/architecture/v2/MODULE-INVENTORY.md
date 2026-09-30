@@ -22,7 +22,7 @@ _Evidence-backed module boundaries for RES-109 before the V2 contract freeze._
 | Dense storage | Parquet/PyArrow | External dataset root | `storage/parquet.py`, `storage/paths.py` | Immutable Parquet + checksums | Keep Parquet; never move telemetry to PostgreSQL |
 | Scientific compute | Python processors | Processor/artifact contracts | `processors/*`, orchestration | Arrow batches → Parquet | Keep Python; trigger Polars/PyO3 only with evidence |
 | Rights/provenance | Python contracts | Artifact metadata + receipts | `rights.py`, contracts, manifests | JSON receipts/Gold metadata | Preserve all gates |
-| Runtime packaging | Docker/Cloud Run-ready API | Environment contract | `infra/docker/api.Dockerfile` | Container + external roots | Prepare adapter/config; no live provisioning |
+| Runtime packaging | Vercel Python Function API | Environment contract | `api/index.py`, `vercel.json` | Python Function + Vercel-managed services | Preview-first Vercel deployment |
 
 ## 🌐 Product/workbench paths
 

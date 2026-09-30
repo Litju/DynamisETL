@@ -70,7 +70,7 @@ from dynamis.serving.models import (
     TrialView,
 )
 from dynamis.serving.repository import MetricFilters, _source_readiness
-from dynamis.storage.object_store import ObjectMetadata, S3ObjectStore
+from dynamis.storage.object_store import VercelPrivateBlobStore, immutable_object_key
 
 LICENSE = LicenseView(
     policy_id="skillcorner-opendata",
@@ -995,7 +995,7 @@ def test_pose_observation_summary_is_cached_by_immutable_artifact(
     assert calls == 1
 
 
-def test_registered_s3_artifact_is_materialized_for_dense_serving(
+def test_registered_private_blob_artifact_is_materialized_for_dense_serving(
     tmp_path: Path, tmp_settings: Settings, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from dynamis.serving import dense
@@ -1006,15 +1006,16 @@ def test_registered_s3_artifact_is_materialized_for_dense_serving(
     data = source.read_bytes()
     checksum = hashlib.sha256(data).hexdigest()
     ref = ref.model_copy(update={"checksum_sha256": checksum, "byte_size": len(data)})
-    settings = tmp_settings.model_copy(update={"object_store_provider": "s3"})
-    store = S3ObjectStore(
-        endpoint="https://objects.example",
-        bucket="private",
-        access_key="access",
-        secret_key="secret",
-    )
-    monkeypatch.setattr(store, "head", lambda key: ObjectMetadata(key, len(data), checksum))
-    monkeypatch.setattr(store, "get_range", lambda _key, start, end: data[start : end + 1])
+    settings = tmp_settings.model_copy(update={"object_store_provider": "vercel-blob"})
+
+    class PrivateBlob:
+        def download_file(self, key: str, local_path: Path, **options: object) -> str:
+            assert key == immutable_object_key(checksum)
+            assert options["access"] == "private"
+            local_path.write_bytes(data)
+            return str(local_path)
+
+    store = VercelPrivateBlobStore(PrivateBlob())
     monkeypatch.setattr(dense, "object_store", lambda _settings: store)
     monkeypatch.setattr(dense, "_OBJECT_CACHE_ROOT", tmp_path / "object-cache")
 
