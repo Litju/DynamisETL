@@ -36,8 +36,8 @@ if (receipt.environment !== "preview") {
 const artifact = receipt.objects.find(
   (item) =>
     item.dataset_id === "dfl-sportec-idsse" &&
-    item.checksum_sha256 === "a1150b16850c1606230dfcaa89aa9beec772ff545d469076fde0716cbd4786bc" &&
-    item.artifact_ids.includes("tracking-period-1-a1150b16850c"),
+    item.checksum_sha256 === "251249426dd7451e1198c04136b7c3b65854e97c40737e669f4ac532e4dd52e7" &&
+    item.artifact_ids.includes("tracking-period-1-251249426dd7"),
 );
 if (!artifact) throw new Error("Preview has no rights-approved DFL tracking-period-1 Parquet artifact");
 
@@ -125,10 +125,10 @@ test("Vercel Preview API, rights, Private Blob, deep links, and client boundary"
       windowStatus: windowResponse.status,
       window: await windowResponse.json(),
     };
-  }, "tracking-period-1-a1150b16850c");
+  }, "tracking-period-1-251249426dd7");
   expect(artifactRead.status).toBe(200);
   expect(artifactRead.detail.dataset_id).toBe("dfl-sportec-idsse");
-  expect(artifactRead.detail.artifact_id).toBe("tracking-period-1-a1150b16850c");
+  expect(artifactRead.detail.artifact_id).toBe("tracking-period-1-251249426dd7");
   expect(artifactRead.detail.checksum_sha256).toBe(artifact.checksum_sha256);
   expect(artifactRead.windowStatus).toBe(200);
   expect(artifactRead.window.rows.length).toBeGreaterThan(0);
