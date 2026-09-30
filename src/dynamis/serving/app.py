@@ -29,7 +29,8 @@ from dynamis.adapters.skillcorner_basketball import authorities as basketball_au
 from dynamis.adapters.sportsdataverse.releases import SnapshotError, load_snapshot
 from dynamis.config import ConfigurationError, Settings
 from dynamis.config import settings as resolve_settings
-from dynamis.deployment import public_rights_error
+from dynamis.deployment import DeploymentError, public_rights_error
+from dynamis.deployment_manifest import load_manifest
 from dynamis.gold.publish import resolve_gold_schema
 from dynamis.serving import basketball as basketball_reader
 from dynamis.serving import catalog as catalog_model
@@ -110,6 +111,7 @@ from dynamis.serving.models import (
     TacticalSeriesView,
 )
 from dynamis.storage.control_plane import control_plane_engine
+from dynamis.storage.object_store import ObjectStoreError, object_store
 
 API_VERSION = "0.1.0"
 ACCESS_LOG = logging.getLogger("dynamis.access")
@@ -184,6 +186,8 @@ class ServingBackend(Protocol):
     def sports_catalog_matches(self) -> list[SportsCatalogMatchView]: ...
 
     def catalog_read_model(self) -> CatalogReadModelView: ...
+
+    def world_is_deployed(self, world: str, resource_id: str) -> bool: ...
 
     def sessions(self, dataset_id: str) -> list[SessionSummary]: ...
 
@@ -338,6 +342,7 @@ class PostgresServingBackend:
     def __init__(self, settings: Settings, engine: Engine | None = None) -> None:
         self.settings = settings
         self._engine = engine
+        self._manifest_cache: tuple[str, str, frozenset[str]] | None = None
         self.gold_schema = resolve_gold_schema()
 
     @property
@@ -348,6 +353,44 @@ class PostgresServingBackend:
 
     def _connect(self):
         return self.engine.connect()
+
+    def _deployed_artifact_ids(self) -> frozenset[str] | None:
+        if self.settings.object_store_provider != "vercel-blob":
+            return None
+        environment = (
+            (os.environ.get("DYNAMIS_ENVIRONMENT") or os.environ.get("VERCEL_ENV") or "")
+            .strip()
+            .lower()
+        )
+        git_sha = (
+            (
+                os.environ.get("VERCEL_GIT_COMMIT_SHA")
+                or os.environ.get("DYNAMIS_CODE_GIT_SHA")
+                or ""
+            )
+            .strip()
+            .lower()
+        )
+        if environment not in {"preview", "production"} or not re.fullmatch(
+            r"[0-9a-f]{40}", git_sha
+        ):
+            return frozenset()
+        cached = self._manifest_cache
+        if cached is not None and cached[:2] == (environment, git_sha):
+            return cached[2]
+        try:
+            artifact_ids = load_manifest(object_store(self.settings), environment, git_sha)
+        except (ConfigurationError, ObjectStoreError, DeploymentError) as exc:
+            ACCESS_LOG.warning(
+                "private Blob readiness manifest unavailable (%s)", type(exc).__name__
+            )
+            return frozenset()
+        self._manifest_cache = (environment, git_sha, artifact_ids)
+        return artifact_ids
+
+    def artifact_is_deployed(self, artifact_id: str) -> bool:
+        deployed = self._deployed_artifact_ids()
+        return deployed is None or artifact_id in deployed
 
     def status(self) -> ServingStatus:
         with self._connect() as connection:
@@ -366,19 +409,30 @@ class PostgresServingBackend:
 
     def source_capabilities(self, dataset_id: str) -> list[SourceCapabilityView]:
         with self._connect() as connection:
-            return repository.list_source_capabilities(connection, dataset_id)
+            return repository.list_source_capabilities(
+                connection, dataset_id, self._deployed_artifact_ids()
+            )
 
     def sports_catalog_matches(self) -> list[SportsCatalogMatchView]:
         with self._connect() as connection:
-            return repository.list_sports_catalog_matches(connection)
+            datasets = repository.list_datasets(connection, gold_schema=self.gold_schema)
+            deployed = self._deployed_artifact_ids()
+            capabilities = {
+                dataset.dataset_id: repository.list_source_capabilities(
+                    connection, dataset.dataset_id, deployed
+                )
+                for dataset in datasets
+            }
+            return repository.list_sports_catalog_matches(connection, capabilities)
 
     def catalog_read_model(self) -> CatalogReadModelView:
         """Assemble the semantic library from relational metadata only."""
+        deployed_artifact_ids = self._deployed_artifact_ids()
         with self._connect() as connection:
             datasets = repository.list_datasets(connection, gold_schema=self.gold_schema)
             source_capabilities = {
                 dataset.dataset_id: repository.list_source_capabilities(
-                    connection, dataset.dataset_id
+                    connection, dataset.dataset_id, deployed_artifact_ids
                 )
                 for dataset in datasets
             }
@@ -408,7 +462,58 @@ class PostgresServingBackend:
             source_capabilities=source_capabilities,
             performance_sessions=performance_sessions,
             sportsdataverse_snapshot=snapshot,
+            deployed_artifact_ids=deployed_artifact_ids,
         )
+
+    def world_is_deployed(self, world: str, resource_id: str) -> bool:
+        if self.settings.object_store_provider != "vercel-blob":
+            return True
+        catalog = self.catalog_read_model().resources
+        target_id = resource_id
+        resource_kind = "competition_edition"
+        expected_product = world
+        if world in {"MatchLab", "Court"}:
+            resource_kind = "contest"
+            expected_product = "MatchLab"
+            if "/" in resource_id:
+                dataset_id, session_id = resource_id.split("/", 1)
+                target_id = next(
+                    (
+                        item.resource_id
+                        for item in catalog
+                        if item.resource_kind == "contest"
+                        and dataset_id in item.dataset_ids
+                        and item.session_id == session_id
+                    ),
+                    "",
+                )
+        elif world == "PerformanceLab":
+            resource_kind = "performance_session"
+        elif world not in {"GameLab", "SeasonLab"}:
+            return False
+        if world == "GameLab" and not any(
+            item.resource_kind == "competition_edition" and item.resource_id == target_id
+            for item in catalog
+        ):
+            with self._connect() as connection:
+                summary = repository.game_summary(connection, resource_id)
+            if summary is None:
+                return False
+            target_id = summary.edition_id
+        resource = next(
+            (
+                item
+                for item in catalog
+                if item.resource_kind == resource_kind and item.resource_id == target_id
+            ),
+            None,
+        )
+        if resource is None:
+            return False
+        route_ready = any(
+            route.product == expected_product and route.ready for route in resource.routes
+        )
+        return route_ready and (world != "Court" or resource.basketball_spatial_ready)
 
     def sessions(self, dataset_id: str) -> list[SessionSummary]:
         with self._connect() as connection:
@@ -1308,7 +1413,36 @@ def create_app(
             },
         )
 
-    def _require_payload_rights(service: ServingBackend, contest_id: str) -> None:
+    def _require_world_bytes(service: ServingBackend, world: str, resource_id: str) -> None:
+        if exposure_mode != "public":
+            return
+        world_is_deployed = getattr(service, "world_is_deployed", None)
+        if callable(world_is_deployed) and not world_is_deployed(world, resource_id):
+            raise HTTPException(
+                status_code=404,
+                detail=f"{world} bytes are not complete in this release's private Blob manifest",
+            )
+
+    def _require_session_world_bytes(
+        service: ServingBackend, dataset_id: str, session_id: str
+    ) -> None:
+        if exposure_mode != "public":
+            return
+        world_is_deployed = getattr(service, "world_is_deployed", None)
+        if callable(world_is_deployed) and not any(
+            world_is_deployed(world, f"{dataset_id}/{session_id}")
+            for world in ("MatchLab", "PerformanceLab")
+        ):
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    "session has no complete openable World in this release's private Blob manifest"
+                ),
+            )
+
+    def _require_payload_rights(
+        service: ServingBackend, contest_id: str, *, world: str = "GameLab"
+    ) -> None:
         if exposure_mode != "public":
             return
         policy = service.game_license(contest_id)
@@ -1317,6 +1451,7 @@ def create_app(
             raise RightsRestricted(
                 f"contest {contest_id!r}: {blocked}; payload is not served publicly"
             )
+        _require_world_bytes(service, world, contest_id)
 
     def _require_public_dataset(service: ServingBackend, dataset_id: str) -> None:
         if exposure_mode != "public":
@@ -1331,6 +1466,12 @@ def create_app(
             artifact_ref = service.artifact(artifact_id)
             if artifact_ref is not None:
                 _require_public_dataset(service, artifact_ref.dataset_id)
+            artifact_is_deployed = getattr(service, "artifact_is_deployed", None)
+            if callable(artifact_is_deployed) and not artifact_is_deployed(artifact_id):
+                raise HTTPException(
+                    status_code=404,
+                    detail="artifact bytes are not present in this release's private Blob manifest",
+                )
 
     @app.exception_handler(DenseWindowTooLarge)
     async def _window_too_large(_request, exc: DenseWindowTooLarge) -> JSONResponse:
@@ -1452,6 +1593,7 @@ def create_app(
         tags=["season"],
     )
     def season_family(edition_id: str, family: str, service: BackendDependency) -> SeasonFamilyView:
+        _require_world_bytes(service, "SeasonLab", edition_id)
         try:
             found = service.season_family(edition_id, family)
         except season_model.SeasonDataError as exc:
@@ -1480,6 +1622,7 @@ def create_app(
         limit: int = Query(default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT),
         offset: int = Query(default=0, ge=0),
     ) -> SeasonRowPage:
+        _require_world_bytes(service, "SeasonLab", edition_id)
         filters = season_model.SeasonRowFilter(
             team_id=team_id,
             position_group=position_group,
@@ -1526,6 +1669,7 @@ def create_app(
             default=None, description="Rank against this position group instead of the row's own"
         ),
     ) -> SeasonProfileView:
+        _require_world_bytes(service, "SeasonLab", edition_id)
         try:
             found = service.season_profile(
                 edition_id,
@@ -1558,6 +1702,7 @@ def create_app(
         service: BackendDependency,
         subject_id: str = Query(min_length=1, max_length=256),
     ) -> SeasonPlayerLinksView:
+        _require_world_bytes(service, "SeasonLab", edition_id)
         found = service.season_player_links(edition_id, subject_id)
         if found is None:
             raise HTTPException(
@@ -1577,6 +1722,7 @@ def create_app(
         limit: int = Query(default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT),
         offset: int = Query(default=0, ge=0),
     ) -> GamePage:
+        _require_world_bytes(service, "GameLab", edition_id)
         found = service.games(edition_id, team_id=team_id, limit=limit, offset=offset)
         if found is None:
             raise HTTPException(status_code=404, detail=f"no game data for {edition_id!r}")
@@ -1584,6 +1730,7 @@ def create_app(
 
     @app.get("/api/games/{contest_id}", response_model=GameDetailView, tags=["games"])
     def game(contest_id: str, service: BackendDependency) -> GameDetailView:
+        _require_payload_rights(service, contest_id)
         found = service.game(contest_id)
         if found is None:
             raise HTTPException(status_code=404, detail=f"contest {contest_id!r} has no game data")
@@ -1634,6 +1781,7 @@ def create_app(
     def basketball_spatial_game(
         contest_id: str, service: BackendDependency
     ) -> BasketballSpatialGameView:
+        _require_payload_rights(service, contest_id, world="Court")
         found = service.basketball_spatial_game(contest_id)
         if found is None:
             raise HTTPException(
@@ -1653,7 +1801,7 @@ def create_app(
         from_frame: int = Query(default=0, ge=0),
         limit: int = Query(default=125, ge=1, le=250),
     ) -> BasketballFramePage:
-        _require_payload_rights(service, contest_id)
+        _require_payload_rights(service, contest_id, world="Court")
         found = service.basketball_frames(
             contest_id, period=period, from_frame=from_frame, limit=limit
         )
@@ -1676,7 +1824,7 @@ def create_app(
         limit: int = Query(default=250, ge=1, le=MAX_PAGE_LIMIT),
         offset: int = Query(default=0, ge=0),
     ) -> BasketballEventPage:
-        _require_payload_rights(service, contest_id)
+        _require_payload_rights(service, contest_id, world="Court")
         found = service.basketball_events(contest_id, period=period, limit=limit, offset=offset)
         if found is None:
             raise HTTPException(
@@ -1710,6 +1858,7 @@ def create_app(
     def session_detail(
         dataset_id: str, session_id: str, service: BackendDependency
     ) -> SessionDetail:
+        _require_session_world_bytes(service, dataset_id, session_id)
         found = service.session(dataset_id, session_id)
         if found is None:
             raise HTTPException(status_code=404, detail=f"session {session_id!r} is not registered")

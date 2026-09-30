@@ -24,22 +24,29 @@ if (base.protocol !== "https:" || base.pathname !== "/") {
 
 const receipt = JSON.parse(await readFile(receiptPath, "utf8")) as {
   environment: string;
+  git_sha: string;
+  demo_resources: Array<{
+    dataset_id: string;
+    session_id: string;
+    worlds: string[];
+  }>;
   objects: Array<{
     dataset_id: string;
     checksum_sha256: string;
     artifact_ids: string[];
+    source_kinds: string[];
   }>;
 };
-if (receipt.environment !== "preview") {
+if (receipt.environment !== "preview" || receipt.git_sha !== gitSha) {
   throw new Error("Preview smoke requires a Preview artifact receipt");
 }
+const demo = receipt.demo_resources[0];
+if (!demo) throw new Error("Preview artifact receipt has no curated demo resource");
 const artifact = receipt.objects.find(
-  (item) =>
-    item.dataset_id === "dfl-sportec-idsse" &&
-    item.checksum_sha256 === "251249426dd7451e1198c04136b7c3b65854e97c40737e669f4ac532e4dd52e7" &&
-    item.artifact_ids.includes("tracking-period-1-251249426dd7"),
+  (item) => item.dataset_id === demo.dataset_id && item.source_kinds.includes("sample"),
 );
-if (!artifact) throw new Error("Preview has no rights-approved DFL tracking-period-1 Parquet artifact");
+const artifactId = artifact?.artifact_ids[0];
+if (!artifact || !artifactId) throw new Error("Preview has no curated dense demo artifact");
 
 const allowlist = JSON.parse(
   await readFile(
@@ -68,16 +75,18 @@ test("Vercel Preview API, rights, Private Blob, deep links, and client boundary"
       const response = await fetch(path);
       return { status: response.status, body: await response.json() };
     };
-    const [health, ready, catalog] = await Promise.all([
+    const [health, ready, catalog, readModel] = await Promise.all([
       read("/api/health"),
       read("/api/ready"),
       read("/api/catalog/datasets"),
+      read("/api/catalog/read-model"),
     ]);
-    return { health, ready, catalog };
+    return { health, ready, catalog, readModel };
   });
   expect(api.health.status).toBe(200);
   expect(api.ready.status).toBe(200);
   expect(api.catalog.status).toBe(200);
+  expect(api.readModel.status).toBe(200);
 
   const datasets = api.catalog.body as Array<{
     dataset_id: string;
@@ -106,8 +115,51 @@ test("Vercel Preview API, rights, Private Blob, deep links, and client boundary"
   expect(restrictedSource.status).toBe(451);
   expect(restrictedSource.body.state).toBe("rights_restricted");
 
-  const artifactRead = await page.evaluate(async (artifactId) => {
-    const detailResponse = await fetch(`/api/artifacts/${encodeURIComponent(artifactId)}`);
+  const resources = (api.readModel.body as { resources: Array<{
+    resource_kind: string;
+    resource_id: string;
+    dataset_ids: string[];
+    session_id?: string | null;
+    contest_id?: string | null;
+    basketball_spatial_ready: boolean;
+    stages: { ready: string };
+    routes: Array<{ product: string; ready: boolean }>;
+  }> }).resources;
+  const readyDemo = resources.find(
+    (resource) =>
+      resource.resource_kind === "contest" &&
+      resource.dataset_ids.includes(demo.dataset_id) &&
+      resource.session_id === demo.session_id &&
+      resource.basketball_spatial_ready &&
+      resource.routes.some((route) => route.product === "MatchLab" && route.ready),
+  );
+  expect(readyDemo).toBeDefined();
+  const missingBlobRoutes = resources.flatMap((resource) =>
+    resource.routes
+      .filter((route) => route.ready)
+      .filter(
+        (route) => {
+          if (!demo.worlds.includes(route.product)) return true;
+          if (route.product === "MatchLab") {
+            return (
+              resource.resource_kind !== "contest" ||
+              !resource.dataset_ids.includes(demo.dataset_id) ||
+              resource.session_id !== demo.session_id
+            );
+          }
+          return (
+            route.product === "GameLab" &&
+            (resource.resource_kind !== "competition_edition" ||
+              !resource.dataset_ids.includes(demo.dataset_id))
+          );
+        },
+      )
+      .map((route) => `${resource.resource_id}:${route.product}`),
+  );
+  expect(missingBlobRoutes).toEqual([]);
+
+  const artifactRead = await page.evaluate(async (id) => {
+    const detailResponse = await fetch(`/api/artifacts/${encodeURIComponent(id)}`);
     const detail = await detailResponse.json();
     if (!detailResponse.ok) return { status: detailResponse.status, detail, windowStatus: 0 };
     const from = Number(detail.canonical_time_min_ns);
@@ -125,10 +177,10 @@ test("Vercel Preview API, rights, Private Blob, deep links, and client boundary"
       windowStatus: windowResponse.status,
       window: await windowResponse.json(),
     };
-  }, "tracking-period-1-251249426dd7");
+  }, artifactId);
   expect(artifactRead.status).toBe(200);
-  expect(artifactRead.detail.dataset_id).toBe("dfl-sportec-idsse");
-  expect(artifactRead.detail.artifact_id).toBe("tracking-period-1-251249426dd7");
+  expect(artifactRead.detail.dataset_id).toBe(demo.dataset_id);
+  expect(artifactRead.detail.artifact_id).toBe(artifactId);
   expect(artifactRead.detail.checksum_sha256).toBe(artifact.checksum_sha256);
   expect(artifactRead.windowStatus).toBe(200);
   expect(artifactRead.window.rows.length).toBeGreaterThan(0);
@@ -161,18 +213,17 @@ test("Vercel Preview API, rights, Private Blob, deep links, and client boundary"
   expect(season?.status()).toBe(200);
   await expect(page.locator("body")).toContainText(/No season-grain data is materialized\.|Season World/);
 
-  const deepLink =
-    process.env.DYNAMIS_SMOKE_DEEP_LINK ??
-    "/lab/dfl-sportec-idsse/DFL-MAT-J03WPY?view=overview&stream=tracking-period-1&trial=period-1";
+  if (!readyDemo?.contest_id) throw new Error("Curated contest has no canonical World target");
+  const deepLink = `/basketball?contest=${encodeURIComponent(readyDemo.contest_id)}`;
   const requestedURL = new URL(deepLink, base);
   const deepLinkResponse = await page.goto(requestedURL.href);
   expect(deepLinkResponse?.status()).toBe(200);
   expect(new URL(page.url()).pathname).toBe(requestedURL.pathname);
-  await expect(page.locator("body")).toContainText("Fortuna Düsseldorf:1. FC Nürnberg");
+  await expect(page.getByTestId("basketball-court")).toBeVisible();
   const durableURL = page.url();
   const reloadResponse = await page.reload({ waitUntil: "domcontentloaded" });
   expect(reloadResponse?.status()).toBe(200);
-  await expect(page.locator("body")).toContainText("Fortuna Düsseldorf:1. FC Nürnberg");
+  await expect(page.getByTestId("basketball-court")).toBeVisible();
   expect(page.url()).toBe(durableURL);
 
   expect(localRequests).toEqual([]);

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -26,6 +27,13 @@ class SeedDataset:
     attribution: str
     keys: tuple[str, ...]
     session_id: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class DemoResource:
+    dataset_id: str
+    session_id: str
+    worlds: tuple[str, ...]
 
 
 def public_rights_error(policy: Any) -> str | None:
@@ -104,3 +112,50 @@ def load_public_seed(path: Path | None = None) -> tuple[SeedDataset, ...]:
     if not seeds:
         raise DeploymentError("public seed allowlist is empty")
     return tuple(seeds)
+
+
+def load_public_demo_resources(path: Path | None = None) -> tuple[DemoResource, ...]:
+    """Return the pinned sessions whose complete artifacts may enter public Blob."""
+    target = path or repository_root() / ALLOWLIST_PATH
+    try:
+        payload = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise DeploymentError(f"cannot read public seed allowlist: {target}") from exc
+    resources = payload.get("demo_resources")
+    if not isinstance(resources, list) or not resources:
+        raise DeploymentError("public seed must declare at least one curated demo resource")
+    sessions = {seed.dataset_id: seed.session_id for seed in load_public_seed(target)}
+    seen: set[tuple[str, str]] = set()
+    result: list[DemoResource] = []
+    for item in resources:
+        dataset_id = item.get("dataset_id", "")
+        session_id = item.get("session_id", "")
+        worlds = item.get("worlds")
+        identity = (dataset_id, session_id)
+        if not dataset_id or not session_id or identity in seen:
+            raise DeploymentError(f"demo resource is missing or duplicated: {identity!r}")
+        if dataset_id not in sessions or (
+            sessions[dataset_id] and sessions[dataset_id] != session_id
+        ):
+            raise DeploymentError(
+                f"demo resource is outside its pinned source session: {identity!r}"
+            )
+        if (
+            not isinstance(worlds, list)
+            or not worlds
+            or any(not isinstance(x, str) for x in worlds)
+        ):
+            raise DeploymentError(f"demo resource {identity!r} must name its Worlds")
+        if len(set(worlds)) != len(worlds):
+            raise DeploymentError(f"demo resource {identity!r} contains duplicate Worlds")
+        seen.add(identity)
+        result.append(DemoResource(dataset_id, session_id, tuple(sorted(worlds))))
+    return tuple(sorted(result, key=lambda item: (item.dataset_id, item.session_id)))
+
+
+def rights_allowlist_sha256(path: Path | None = None) -> str:
+    target = path or repository_root() / ALLOWLIST_PATH
+    try:
+        return hashlib.sha256(target.read_bytes()).hexdigest()
+    except OSError as exc:
+        raise DeploymentError(f"cannot hash public seed allowlist: {target}") from exc

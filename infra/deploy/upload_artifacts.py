@@ -12,10 +12,18 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from types import SimpleNamespace
 
+import sqlalchemy as sa
 from sqlalchemy import select
 
 from dynamis.config import Settings, settings
-from dynamis.deployment import DeploymentError, load_public_seed, public_rights_error
+from dynamis.deployment import (
+    DeploymentError,
+    load_public_demo_resources,
+    load_public_seed,
+    public_rights_error,
+    rights_allowlist_sha256,
+)
+from dynamis.deployment_manifest import load_manifest, manifest_key, validate_manifest
 from dynamis.registry import validate_registry
 from dynamis.storage.atomic import atomic_write_text, sha256_file
 from dynamis.storage.control_plane import control_plane_engine
@@ -25,7 +33,7 @@ from dynamis.storage.object_store import (
     immutable_object_key,
     object_store,
 )
-from dynamis.storage.tables import DatasetSource, LicensePolicy, ProcessingArtifact, SampleArtifact
+from dynamis.storage.tables import DatasetSource, LicensePolicy, SampleArtifact
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,7 +49,11 @@ class UploadReceipt:
 
 
 def _sha() -> str:
-    value = os.environ.get("DYNAMIS_CODE_GIT_SHA", "").strip()
+    explicit = os.environ.get("DYNAMIS_CODE_GIT_SHA", "").strip()
+    vercel = os.environ.get("VERCEL_GIT_COMMIT_SHA", "").strip()
+    if explicit and vercel and explicit != vercel:
+        raise DeploymentError("DYNAMIS_CODE_GIT_SHA does not match VERCEL_GIT_COMMIT_SHA")
+    value = explicit or vercel
     if not value:
         import subprocess
 
@@ -87,15 +99,8 @@ def _assert_registry_rights(dataset_id: str, policy: object, expected: object) -
 def _artifacts(
     resolved: Settings,
     ids: set[str],
-    *,
-    dataset_id: str,
-    checksum_sha256: str,
+    demo_resources,
 ) -> list[tuple[str, Path, str, int, tuple[str, ...], tuple[str, ...]]]:
-    if dataset_id not in ids:
-        raise DeploymentError(f"{dataset_id}: dataset is outside the production rights allowlist")
-    if not re.fullmatch(r"[0-9a-f]{64}", checksum_sha256):
-        raise DeploymentError("artifact selection requires a lowercase SHA-256 checksum")
-
     engine = control_plane_engine(resolved)
     found: dict[tuple[str, str], tuple[str, Path, str, int, set[str], set[str]]] = {}
     try:
@@ -154,94 +159,115 @@ def _artifacts(
                         source_dataset_id, policy, registry.source(source_dataset_id).license
                     )
 
-            sample_rows = connection.execute(
-                select(
-                    SampleArtifact.artifact_id,
-                    SampleArtifact.dataset_id,
-                    SampleArtifact.relative_path,
-                    SampleArtifact.checksum_sha256,
-                    SampleArtifact.byte_size,
-                ).where(
-                    SampleArtifact.dataset_id.in_(ids),
-                    SampleArtifact.dataset_id == dataset_id,
-                    SampleArtifact.checksum_sha256 == checksum_sha256,
-                    SampleArtifact.format == "parquet",
+            for resource in demo_resources:
+                dataset_id = resource.dataset_id
+                session_id = resource.session_id
+                entry_ids = (
+                    connection.execute(
+                        sa.text(
+                            """SELECT DISTINCT source_catalog_entry_id
+                           FROM session_sport_context
+                           WHERE dataset_id = :dataset_id AND session_id = :session_id
+                             AND source_catalog_entry_id IS NOT NULL"""
+                        ),
+                        {"dataset_id": dataset_id, "session_id": session_id},
+                    )
+                    .scalars()
+                    .all()
                 )
-            )
-            processing_rows = connection.execute(
-                select(
-                    ProcessingArtifact.artifact_id,
-                    ProcessingArtifact.dataset_id,
-                    ProcessingArtifact.relative_path,
-                    ProcessingArtifact.checksum_sha256,
-                    ProcessingArtifact.byte_size,
-                ).where(
-                    ProcessingArtifact.dataset_id.in_(ids),
-                    ProcessingArtifact.dataset_id == dataset_id,
-                    ProcessingArtifact.checksum_sha256 == checksum_sha256,
-                )
-            )
-            for kind, rows in (("sample", sample_rows), ("processing", processing_rows)):
-                for artifact_id, artifact_dataset_id, relative_path, checksum, byte_size in rows:
-                    if not relative_path.lower().endswith(".parquet"):
-                        continue
-                    if byte_size is None or byte_size <= 0:
-                        raise DeploymentError(
-                            f"{artifact_dataset_id}/{relative_path}: byte size is missing"
-                        )
-                    checksum = checksum.lower()
-                    if not re.fullmatch(r"[0-9a-f]{64}", checksum):
-                        raise DeploymentError(
-                            f"{artifact_dataset_id}/{relative_path}: invalid SHA-256"
-                        )
-                    relative = Path(relative_path)
-                    root = resolved.dataset_root.resolve()
-                    source_path = (root / relative).resolve()
-                    if relative.is_absolute() or not source_path.is_relative_to(root):
-                        raise DeploymentError(
-                            f"{artifact_dataset_id}/{relative_path}: unsafe artifact path"
-                        )
-                    if not source_path.is_file():
-                        raise DeploymentError(
-                            f"{artifact_dataset_id}/{relative_path}: artifact file is missing"
-                        )
-                    if source_path.stat().st_size != byte_size:
-                        raise DeploymentError(
-                            f"{artifact_dataset_id}/{relative_path}: byte size mismatch"
-                        )
-                    if sha256_file(source_path) != checksum:
-                        raise DeploymentError(
-                            f"{artifact_dataset_id}/{relative_path}: source checksum mismatch"
-                        )
-                    identity = (artifact_dataset_id, checksum)
-                    prior = found.get(identity)
-                    if prior is not None and prior[3] != byte_size:
-                        raise DeploymentError(
-                            f"{artifact_dataset_id}: checksum has conflicting byte sizes"
-                        )
-                    if prior is None:
-                        found[identity] = (
-                            artifact_dataset_id,
-                            source_path,
-                            checksum,
-                            byte_size,
-                            {artifact_id},
-                            {kind},
-                        )
-                    else:
-                        prior[4].add(artifact_id)
-                        prior[5].add(kind)
+                sample_rows = connection.execute(
+                    select(
+                        SampleArtifact.artifact_id,
+                        SampleArtifact.dataset_id,
+                        SampleArtifact.relative_path,
+                        SampleArtifact.checksum_sha256,
+                        SampleArtifact.byte_size,
+                    ).where(
+                        SampleArtifact.dataset_id == dataset_id,
+                        SampleArtifact.session_id == session_id,
+                        SampleArtifact.format == "parquet",
+                    )
+                ).all()
+                if not sample_rows:
+                    raise DeploymentError(
+                        f"{dataset_id}/{session_id}: curated World has no dense Parquet artifacts"
+                    )
+                processing_rows = connection.execute(
+                    sa.text(
+                        """SELECT artifact_id, dataset_id, relative_path,
+                                  checksum_sha256, byte_size
+                           FROM processing_artifact
+                           WHERE dataset_id = :dataset_id
+                             AND (artifact_metadata ->> 'session_id' = :session_id
+                               OR artifact_metadata ->> 'source_catalog_entry_id'
+                                  = ANY(CAST(:entry_ids AS text[])))
+                           ORDER BY artifact_id"""
+                    ),
+                    {
+                        "dataset_id": dataset_id,
+                        "session_id": session_id,
+                        "entry_ids": list(entry_ids),
+                    },
+                ).all()
+                for kind, rows in (("sample", sample_rows), ("processing", processing_rows)):
+                    for (
+                        artifact_id,
+                        artifact_dataset_id,
+                        relative_path,
+                        checksum,
+                        byte_size,
+                    ) in rows:
+                        if not relative_path.lower().endswith(".parquet"):
+                            continue
+                        if byte_size is None or byte_size <= 0:
+                            raise DeploymentError(
+                                f"{artifact_dataset_id}/{relative_path}: byte size is missing"
+                            )
+                        checksum = checksum.lower()
+                        if not re.fullmatch(r"[0-9a-f]{64}", checksum):
+                            raise DeploymentError(
+                                f"{artifact_dataset_id}/{relative_path}: invalid SHA-256"
+                            )
+                        relative = Path(relative_path)
+                        root = resolved.dataset_root.resolve()
+                        source_path = (root / relative).resolve()
+                        if relative.is_absolute() or not source_path.is_relative_to(root):
+                            raise DeploymentError(
+                                f"{artifact_dataset_id}/{relative_path}: unsafe artifact path"
+                            )
+                        if not source_path.is_file():
+                            raise DeploymentError(
+                                f"{artifact_dataset_id}/{relative_path}: artifact file is missing"
+                            )
+                        if source_path.stat().st_size != byte_size:
+                            raise DeploymentError(
+                                f"{artifact_dataset_id}/{relative_path}: byte size mismatch"
+                            )
+                        if sha256_file(source_path) != checksum:
+                            raise DeploymentError(
+                                f"{artifact_dataset_id}/{relative_path}: source checksum mismatch"
+                            )
+                        identity = (artifact_dataset_id, checksum)
+                        prior = found.get(identity)
+                        if prior is not None and prior[3] != byte_size:
+                            raise DeploymentError(
+                                f"{artifact_dataset_id}: checksum has conflicting byte sizes"
+                            )
+                        if prior is None:
+                            found[identity] = (
+                                artifact_dataset_id,
+                                source_path,
+                                checksum,
+                                byte_size,
+                                {artifact_id},
+                                {kind},
+                            )
+                        else:
+                            prior[4].add(artifact_id)
+                            prior[5].add(kind)
     finally:
         engine.dispose()
 
-    selected = [
-        item for item in found.values() if item[0] == dataset_id and item[2] == checksum_sha256
-    ]
-    if len(selected) != 1:
-        raise DeploymentError(
-            f"{dataset_id}/{checksum_sha256}: expected exactly one registered, checksum-matched "
-            "Parquet object"
-        )
     uploads = [
         (
             item[0],
@@ -251,20 +277,19 @@ def _artifacts(
             tuple(sorted(item[4])),
             tuple(sorted(item[5])),
         )
-        for item in selected
+        for item in found.values()
     ]
     return sorted(uploads, key=lambda row: (row[0], row[2]))
 
 
 def upload(
     environment: str,
-    dataset_id: str,
-    checksum_sha256: str,
     receipt_path: Path | None = None,
 ) -> dict[str, object]:
     if environment not in {"preview", "production"}:
         raise DeploymentError("DYNAMIS_DEPLOY_ENV must be preview or production")
     git_sha = _sha()
+    expected_preview_receipt: Path | None = None
     if environment == "production":
         evidence = os.environ.get("DYNAMIS_RELEASE_EVIDENCE", "").strip()
         if not evidence:
@@ -275,6 +300,13 @@ def upload(
             cwd=root,
             check=True,
         )
+        release = json.loads(Path(evidence).read_text(encoding="utf-8"))
+        receipt_value = release.get("artifact_receipt")
+        if not isinstance(receipt_value, str) or not receipt_value:
+            raise DeploymentError("Preview release evidence is missing its artifact receipt")
+        expected_preview_receipt = Path(receipt_value)
+        if not expected_preview_receipt.is_absolute():
+            expected_preview_receipt = Path(evidence).resolve().parent / expected_preview_receipt
 
     seeds = load_public_seed()
     ids = {seed.dataset_id for seed in seeds}
@@ -287,40 +319,63 @@ def upload(
     if not isinstance(store, VercelPrivateBlobStore):
         raise DeploymentError("deployment uploads require Vercel Private Blob")
 
-    receipts: list[UploadReceipt] = []
-    for artifact_dataset_id, path, checksum, size_bytes, artifact_ids, source_kinds in _artifacts(
-        resolved,
-        ids,
-        dataset_id=dataset_id,
-        checksum_sha256=checksum_sha256,
-    ):
+    demo_resources = load_public_demo_resources()
+    uploads = _artifacts(resolved, ids, demo_resources)
+    receipts = [
+        UploadReceipt(
+            environment=environment,
+            git_sha=git_sha,
+            object_key=immutable_object_key(checksum),
+            dataset_id=artifact_dataset_id,
+            checksum_sha256=checksum,
+            size_bytes=size_bytes,
+            source_kinds=source_kinds,
+            artifact_ids=artifact_ids,
+        )
+        for artifact_dataset_id, _path, checksum, size_bytes, artifact_ids, source_kinds in uploads
+    ]
+    report = {
+        "schema_version": 1,
+        "environment": environment,
+        "git_sha": git_sha,
+        "manifest_key": manifest_key(environment, git_sha),
+        "rights_allowlist_sha256": rights_allowlist_sha256(),
+        "allowlisted_datasets": sorted(ids),
+        "demo_resources": [
+            {
+                "dataset_id": item.dataset_id,
+                "session_id": item.session_id,
+                "worlds": list(item.worlds),
+            }
+            for item in demo_resources
+        ],
+        "object_count": len(receipts),
+        "byte_count": sum(item.size_bytes for item in receipts),
+        "objects": [asdict(item) for item in receipts],
+    }
+    failures = validate_manifest(report, environment, git_sha)
+    if failures:
+        raise DeploymentError("curated artifact plan failed validation: " + "; ".join(failures))
+
+    if expected_preview_receipt is not None:
+        try:
+            preview_report = json.loads(expected_preview_receipt.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise DeploymentError("Preview artifact receipt is missing or invalid") from exc
+        failures = validate_manifest(preview_report, "preview", git_sha)
+        if failures:
+            raise DeploymentError("Preview receipt failed validation: " + "; ".join(failures))
+        if _object_identity(preview_report) != _object_identity(report):
+            raise DeploymentError("Production object plan differs from the Preview receipt")
+
+    for artifact_dataset_id, path, checksum, size_bytes, _artifact_ids, _source_kinds in uploads:
         key = immutable_object_key(checksum)
         uploaded = store.put_file(path, key=key, checksum_sha256=checksum)
         if uploaded.sha256 != checksum or uploaded.size_bytes != size_bytes:
             raise ObjectStoreError(
                 f"private Blob reconciliation failed for {artifact_dataset_id}/{key}"
             )
-        receipts.append(
-            UploadReceipt(
-                environment=environment,
-                git_sha=git_sha,
-                object_key=key,
-                dataset_id=artifact_dataset_id,
-                checksum_sha256=checksum,
-                size_bytes=size_bytes,
-                source_kinds=source_kinds,
-                artifact_ids=artifact_ids,
-            )
-        )
 
-    report = {
-        "environment": environment,
-        "git_sha": git_sha,
-        "allowlisted_datasets": sorted(ids),
-        "object_count": len(receipts),
-        "byte_count": sum(item.size_bytes for item in receipts),
-        "objects": [asdict(item) for item in receipts],
-    }
     if receipt_path is None:
         configured = os.environ.get("DYNAMIS_ARTIFACT_RECEIPT", "").strip()
         receipt_path = (
@@ -332,6 +387,21 @@ def upload(
             / f"{environment}-artifacts-{git_sha}.json"
         )
     atomic_write_text(receipt_path, json.dumps(report, indent=2, sort_keys=True) + "\n")
+    manifest_digest = sha256_file(receipt_path)
+    manifest_metadata = store.put_file(
+        receipt_path,
+        key=report["manifest_key"],
+        checksum_sha256=manifest_digest,
+    )
+    if (
+        manifest_metadata.sha256 != manifest_digest
+        or manifest_metadata.size_bytes != receipt_path.stat().st_size
+    ):
+        raise ObjectStoreError("private Blob manifest reconciliation failed")
+    if load_manifest(store, environment, git_sha) != frozenset(
+        artifact_id for receipt in receipts for artifact_id in receipt.artifact_ids
+    ):
+        raise ObjectStoreError("deployed Private Blob manifest does not reconcile")
     print(
         json.dumps(
             {key: value for key, value in report.items() if key != "objects"}, sort_keys=True
@@ -341,14 +411,28 @@ def upload(
     return report
 
 
+def _object_identity(receipt: dict[str, object]) -> tuple[tuple[object, ...], ...]:
+    return tuple(
+        sorted(
+            (
+                item["dataset_id"],
+                item["checksum_sha256"],
+                item["object_key"],
+                item["size_bytes"],
+                tuple(sorted(item["source_kinds"])),
+                tuple(sorted(item["artifact_ids"])),
+            )
+            for item in receipt["objects"]
+        )
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--check", action="store_true", help="validate rights and configuration only"
     )
     parser.add_argument("--apply", action="store_true", help="upload and reconcile private objects")
-    parser.add_argument("--dataset-id", help="one production-allowlisted artifact dataset")
-    parser.add_argument("--checksum-sha256", help="exact SHA-256 of the one Parquet artifact")
     parser.add_argument("--receipt", type=Path)
     args = parser.parse_args(argv)
     if args.check == args.apply:
@@ -356,16 +440,26 @@ def main(argv: list[str] | None = None) -> int:
     try:
         seeds = load_public_seed()
         if args.check:
+            demo_resources = [
+                {
+                    "dataset_id": item.dataset_id,
+                    "session_id": item.session_id,
+                    "worlds": list(item.worlds),
+                }
+                for item in load_public_demo_resources()
+            ]
             print(
                 json.dumps(
-                    {"allowlisted_datasets": [seed.dataset_id for seed in seeds]}, sort_keys=True
+                    {
+                        "allowlisted_datasets": [seed.dataset_id for seed in seeds],
+                        "demo_resources": demo_resources,
+                    },
+                    sort_keys=True,
                 )
             )
             return 0
         environment = os.environ.get("DYNAMIS_DEPLOY_ENV", "")
-        if not args.dataset_id or not args.checksum_sha256:
-            raise DeploymentError("--apply requires one --dataset-id and --checksum-sha256")
-        upload(environment, args.dataset_id, args.checksum_sha256, args.receipt)
+        upload(environment, args.receipt)
     except (
         DeploymentError,
         ObjectStoreError,

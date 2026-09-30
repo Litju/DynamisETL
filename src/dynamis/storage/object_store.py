@@ -70,6 +70,9 @@ class LocalObjectStore:
             return None
         return ObjectMetadata(key, target.stat().st_size, sha256_file(target))
 
+    def get_bytes(self, key: str) -> bytes:
+        return self._target(key).read_bytes()
+
     def get_range(self, key: str, start: int, end: int | None = None) -> bytes:
         if start < 0 or (end is not None and end < start):
             raise ObjectStoreError("invalid object byte range")
@@ -105,11 +108,11 @@ class VercelPrivateBlobStore:
         if existing is not None:
             return self._verify_existing(key, checksum_sha256, size, existing.etag)
 
-        content_type = (
-            "application/vnd.apache.arrow.file"
-            if source.suffix.lower() in {".arrow", ".feather"}
-            else "application/vnd.apache.parquet"
-        )
+        content_type = {
+            ".arrow": "application/vnd.apache.arrow.file",
+            ".feather": "application/vnd.apache.arrow.file",
+            ".json": "application/json",
+        }.get(source.suffix.lower(), "application/vnd.apache.parquet")
         try:
             self.client.upload_file(
                 source,
@@ -176,6 +179,22 @@ class VercelPrivateBlobStore:
             ):
                 raise ObjectStoreError(f"Vercel Private Blob checksum mismatch for {key}")
         return destination
+
+    def get_bytes(self, key: str) -> bytes:
+        key = _safe_key(key)
+        with tempfile.TemporaryDirectory(prefix="dynamis-blob-read-") as directory:
+            path = Path(directory) / "object"
+            try:
+                self.client.download_file(
+                    key,
+                    path,
+                    access="private",
+                    overwrite=True,
+                    create_parents=True,
+                )
+            except Exception as exc:
+                raise ObjectStoreError("Vercel Private Blob read failed") from exc
+            return path.read_bytes()
 
     def _verify_existing(
         self, key: str, checksum_sha256: str, size: int, etag: str | None

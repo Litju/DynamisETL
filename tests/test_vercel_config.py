@@ -8,6 +8,7 @@ def test_vercel_services_keep_api_public_before_spa_fallback() -> None:
     root = Path(__file__).resolve().parents[1]
     config = json.loads((root / "vercel.json").read_text(encoding="utf-8"))
 
+    assert config["git"]["deploymentEnabled"] == {"main": False}
     assert set(config["services"]) == {"app", "web"}
     assert config["services"]["app"]["root"] == "."
     assert config["services"]["app"]["framework"] == "fastapi"

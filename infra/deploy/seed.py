@@ -13,13 +13,20 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from dynamis.config import ENV_MIGRATION_POSTGRES_URL, ENV_POSTGRES_URL, resolved_environ
-from dynamis.deployment import DeploymentError, load_public_seed
+from dynamis.deployment import (
+    DeploymentError,
+    load_public_demo_resources,
+    load_public_seed,
+)
+from dynamis.deployment_manifest import validate_manifest
 
 
 def _sha() -> str:
-    import re
-
-    value = os.environ.get("DYNAMIS_CODE_GIT_SHA", "").strip()
+    explicit = os.environ.get("DYNAMIS_CODE_GIT_SHA", "").strip()
+    vercel = os.environ.get("VERCEL_GIT_COMMIT_SHA", "").strip()
+    if explicit and vercel and explicit != vercel:
+        raise DeploymentError("DYNAMIS_CODE_GIT_SHA does not match VERCEL_GIT_COMMIT_SHA")
+    value = explicit or vercel
     if not value:
         value = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     if not re.fullmatch(r"[0-9a-f]{40}", value):
@@ -52,13 +59,15 @@ def _database_target(url: str) -> str:
 
 def run(
     apply: bool,
-    artifact_dataset_id: str | None = None,
-    artifact_checksum_sha256: str | None = None,
 ) -> int:
     values = resolved_environ()
     environment = values.get("DYNAMIS_DEPLOY_ENV", "")
     if environment not in {"preview", "production"}:
         raise DeploymentError("set DYNAMIS_DEPLOY_ENV to preview or production")
+    if apply and environment == "production":
+        raise DeploymentError(
+            "Production Neon data must be promoted with infra.deploy.promote_neon"
+        )
     vercel_environment = values.get("VERCEL_ENV", "")
     if vercel_environment and vercel_environment != environment:
         raise DeploymentError("DYNAMIS_DEPLOY_ENV does not match the Vercel environment")
@@ -78,8 +87,8 @@ def run(
         release = json.loads(Path(evidence).read_text(encoding="utf-8"))
 
     seeds = load_public_seed()
+    demo_resources = load_public_demo_resources()
     allowlisted = {item.dataset_id for item in seeds}
-    artifact_selection: tuple[str, str] | None = None
     if environment == "production":
         assert release is not None
         preview_receipt_value = release.get("artifact_receipt")
@@ -90,44 +99,27 @@ def run(
             preview_receipt_path = (
                 Path(values["DYNAMIS_RELEASE_EVIDENCE"]).resolve().parent / preview_receipt_path
             )
-        preview_receipt = json.loads(preview_receipt_path.read_text(encoding="utf-8"))
-        objects = preview_receipt.get("objects")
-        if not isinstance(objects, list) or len(objects) != 1:
-            raise DeploymentError("Preview release must select exactly one artifact")
-        selected = objects[0]
-        dataset_id = selected.get("dataset_id")
-        checksum = selected.get("checksum_sha256")
-        if not isinstance(dataset_id, str) or dataset_id not in allowlisted:
-            raise DeploymentError("Preview artifact dataset is outside the production allowlist")
-        if not isinstance(checksum, str) or not re.fullmatch(r"[0-9a-f]{64}", checksum):
-            raise DeploymentError("Preview artifact checksum is invalid")
-        if artifact_dataset_id and artifact_dataset_id != dataset_id:
-            raise DeploymentError("Production artifact dataset must match the Preview receipt")
-        if artifact_checksum_sha256 and artifact_checksum_sha256 != checksum:
-            raise DeploymentError("Production artifact checksum must match the Preview receipt")
-        artifact_selection = (dataset_id, checksum)
-    elif artifact_dataset_id or artifact_checksum_sha256:
-        if (
-            not artifact_dataset_id
-            or artifact_dataset_id not in allowlisted
-            or not artifact_checksum_sha256
-            or not re.fullmatch(r"[0-9a-f]{64}", artifact_checksum_sha256)
-        ):
-            raise DeploymentError(
-                "Preview artifact selection requires one allowlisted dataset id and "
-                "lowercase SHA-256"
-            )
-        artifact_selection = (artifact_dataset_id, artifact_checksum_sha256)
-    if apply and artifact_selection is None:
-        raise DeploymentError(
-            "Preview seed requires --artifact-dataset-id and --artifact-checksum-sha256"
-        )
+        try:
+            preview_receipt = json.loads(preview_receipt_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise DeploymentError("Preview artifact receipt is missing or invalid") from exc
+        failures = validate_manifest(preview_receipt, "preview", sha)
+        if failures:
+            raise DeploymentError("Preview artifact receipt failed: " + "; ".join(failures))
     if not apply:
         print(
             json.dumps(
                 {
                     "environment": environment,
                     "git_sha": sha,
+                    "demo_resources": [
+                        {
+                            "dataset_id": item.dataset_id,
+                            "session_id": item.session_id,
+                            "worlds": item.worlds,
+                        }
+                        for item in demo_resources
+                    ],
                     "datasets": [
                         {"dataset_id": item.dataset_id, "version": item.version, "keys": item.keys}
                         for item in seeds
@@ -139,14 +131,6 @@ def run(
                         "spl-open-data",
                         "openbiomechanics",
                     ],
-                    "artifact_selection": (
-                        {
-                            "dataset_id": artifact_selection[0],
-                            "checksum_sha256": artifact_selection[1],
-                        }
-                        if artifact_selection
-                        else None
-                    ),
                 },
                 indent=2,
             )
@@ -222,16 +206,11 @@ def run(
     )
     upload_script = root / "infra/deploy/upload_artifacts.py"
     receipt_path = root / "output" / "deploy" / f"{environment}-artifacts-{sha}.json"
-    assert artifact_selection is not None
     subprocess.run(
         [
             sys.executable,
             str(upload_script),
             "--apply",
-            "--dataset-id",
-            artifact_selection[0],
-            "--checksum-sha256",
-            artifact_selection[1],
             "--receipt",
             str(receipt_path),
         ],
@@ -259,17 +238,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--apply", action="store_true", help="seed Neon and upload allowlisted artifacts"
     )
-    parser.add_argument(
-        "--artifact-dataset-id", help="dataset of the one approved Preview artifact"
-    )
-    parser.add_argument(
-        "--artifact-checksum-sha256", help="SHA-256 of the one approved Preview artifact"
-    )
     args = parser.parse_args(argv)
     if args.check == args.apply:
         parser.error("choose exactly one of --check or --apply")
     try:
-        return run(args.apply, args.artifact_dataset_id, args.artifact_checksum_sha256)
+        return run(args.apply)
     except (DeploymentError, OSError, subprocess.CalledProcessError, ValueError) as exc:
         print(f"deployment seed blocked: {exc}", file=sys.stderr)
         return 2

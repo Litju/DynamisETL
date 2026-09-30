@@ -112,3 +112,13 @@ def test_private_blob_rejects_non_normalized_keys(tmp_path: Path) -> None:
     store = VercelPrivateBlobStore(FakeBlobClient())
     with pytest.raises(ObjectStoreError):
         store.head("sha256/../private.parquet")
+
+
+def test_private_blob_reads_release_manifest_only_through_private_access() -> None:
+    key = "manifests/preview/" + "a" * 40 + ".json"
+    client = FakeBlobClient()
+    client.objects[key] = b'{"objects": []}'
+    store = VercelPrivateBlobStore(client)
+
+    assert store.get_bytes(key) == b'{"objects": []}'
+    assert client.downloads[-1]["access"] == "private"

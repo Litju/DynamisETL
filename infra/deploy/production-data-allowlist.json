@@ -1,6 +1,13 @@
 {
   "schema_version": 1,
   "purpose": "RES-107 public preview and production seed",
+  "demo_resources": [
+    {
+      "dataset_id": "skillcorner-basketball-opendata",
+      "session_id": "114243",
+      "worlds": ["GameLab", "MatchLab"]
+    }
+  ],
   "datasets": [
     {
       "dataset_id": "white-cmj-acc-grf",
