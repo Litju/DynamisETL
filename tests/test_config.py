@@ -14,8 +14,8 @@ def test_database_name_override_targets_pooled_and_direct_urls():
     values = resolved_environ(
         {
             ENV_DATABASE_NAME: "dynamis_sample",
-            ENV_POSTGRES_URL: "postgresql://user:secret@ep-example-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require",
-            "DATABASE_URL_UNPOOLED": "postgresql://user:secret@ep-example.us-east-1.aws.neon.tech/neondb?sslmode=require",
+            ENV_POSTGRES_URL: "postgresql://ep-example-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require",
+            "DATABASE_URL_UNPOOLED": "postgresql://ep-example.us-east-1.aws.neon.tech/neondb?sslmode=require",
         }
     )
 
