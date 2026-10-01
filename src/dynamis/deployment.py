@@ -157,7 +157,9 @@ def load_public_demo_resources(path: Path | None = None) -> tuple[DemoResource, 
         result.append(DemoResource(dataset_id, session_id, tuple(sorted(worlds))))
     if seen_datasets != set(sessions):
         missing = sorted(set(sessions) - seen_datasets)
-        raise DeploymentError("every public dataset must have one demo resource: " + ", ".join(missing))
+        raise DeploymentError(
+            "every public dataset must have one demo resource: " + ", ".join(missing)
+        )
     return tuple(sorted(result, key=lambda item: (item.dataset_id, item.session_id)))
 
 

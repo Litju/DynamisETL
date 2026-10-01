@@ -101,7 +101,9 @@ def test_public_seed_is_explicit_and_excludes_restricted_sources():
     assert "womens-soccer-positioning" not in ids
     assert "spl-open-data" not in ids
     assert "openbiomechanics" not in ids
-    assert [(item.dataset_id, item.session_id, item.worlds) for item in load_public_demo_resources()] == [
+    assert [
+        (item.dataset_id, item.session_id, item.worlds) for item in load_public_demo_resources()
+    ] == [
         ("dfl-sportec-idsse", "DFL-MAT-J03WPY", ("GameLab", "MatchLab")),
         ("skillcorner-basketball-opendata", "114243", ("MatchLab",)),
         ("skillcorner-opendata", "2011166", ("MatchLab",)),
