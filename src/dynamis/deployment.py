@@ -26,7 +26,7 @@ class SeedDataset:
     license_identifier: str
     attribution: str
     keys: tuple[str, ...]
-    session_id: str | None
+    session_id: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,6 +99,9 @@ def load_public_seed(path: Path | None = None) -> tuple[SeedDataset, ...]:
         attribution = item.get("attribution", "").strip()
         if source.license.attribution_required and not attribution:
             raise DeploymentError(f"{dataset_id}: required attribution is missing")
+        session_id = item.get("session_id")
+        if not isinstance(session_id, str) or not session_id.strip():
+            raise DeploymentError(f"{dataset_id}: a single sample session_id is required")
         seeds.append(
             SeedDataset(
                 dataset_id=dataset_id,
@@ -106,7 +109,7 @@ def load_public_seed(path: Path | None = None) -> tuple[SeedDataset, ...]:
                 license_identifier=license_identifier,
                 attribution=attribution,
                 keys=tuple(keys),
-                session_id=item.get("session_id"),
+                session_id=session_id,
             )
         )
     if not seeds:
@@ -126,6 +129,7 @@ def load_public_demo_resources(path: Path | None = None) -> tuple[DemoResource, 
         raise DeploymentError("public seed must declare at least one curated demo resource")
     sessions = {seed.dataset_id: seed.session_id for seed in load_public_seed(target)}
     seen: set[tuple[str, str]] = set()
+    seen_datasets: set[str] = set()
     result: list[DemoResource] = []
     for item in resources:
         dataset_id = item.get("dataset_id", "")
@@ -134,9 +138,9 @@ def load_public_demo_resources(path: Path | None = None) -> tuple[DemoResource, 
         identity = (dataset_id, session_id)
         if not dataset_id or not session_id or identity in seen:
             raise DeploymentError(f"demo resource is missing or duplicated: {identity!r}")
-        if dataset_id not in sessions or (
-            sessions[dataset_id] and sessions[dataset_id] != session_id
-        ):
+        if dataset_id in seen_datasets:
+            raise DeploymentError(f"demo dataset {dataset_id!r} must have exactly one sample")
+        if dataset_id not in sessions or sessions[dataset_id] != session_id:
             raise DeploymentError(
                 f"demo resource is outside its pinned source session: {identity!r}"
             )
@@ -149,7 +153,13 @@ def load_public_demo_resources(path: Path | None = None) -> tuple[DemoResource, 
         if len(set(worlds)) != len(worlds):
             raise DeploymentError(f"demo resource {identity!r} contains duplicate Worlds")
         seen.add(identity)
+        seen_datasets.add(dataset_id)
         result.append(DemoResource(dataset_id, session_id, tuple(sorted(worlds))))
+    if seen_datasets != set(sessions):
+        missing = sorted(set(sessions) - seen_datasets)
+        raise DeploymentError(
+            "every public dataset must have one demo resource: " + ", ".join(missing)
+        )
     return tuple(sorted(result, key=lambda item: (item.dataset_id, item.session_id)))
 
 

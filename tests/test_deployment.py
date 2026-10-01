@@ -11,7 +11,7 @@ from infra.deploy import promote_neon
 from infra.deploy.promote_neon import _connection, _identity
 from infra.deploy.release_gate import check_evidence
 from infra.deploy.seed import run as seed_deployment
-from infra.deploy.upload_artifacts import _assert_registry_rights
+from infra.deploy.upload_artifacts import UploadReceipt, _assert_registry_rights, _receipt_object
 from infra.deploy.verify_artifact_receipt import (
     compare_receipts,
 )
@@ -101,9 +101,32 @@ def test_public_seed_is_explicit_and_excludes_restricted_sources():
     assert "womens-soccer-positioning" not in ids
     assert "spl-open-data" not in ids
     assert "openbiomechanics" not in ids
-    assert [(item.dataset_id, item.session_id) for item in load_public_demo_resources()] == [
-        ("skillcorner-basketball-opendata", "114243")
+    assert [
+        (item.dataset_id, item.session_id, item.worlds) for item in load_public_demo_resources()
+    ] == [
+        ("dfl-sportec-idsse", "DFL-MAT-J03WPY", ("GameLab", "MatchLab")),
+        ("skillcorner-basketball-opendata", "114243", ("MatchLab",)),
+        ("skillcorner-opendata", "2011166", ("MatchLab",)),
+        ("white-cmj-acc-grf", "white-s002", ("PerformanceLab",)),
     ]
+
+
+def test_upload_receipt_tuple_fields_serialize_as_json_arrays():
+    receipt = UploadReceipt(
+        environment="preview",
+        git_sha="a" * 40,
+        object_key="sha256/example",
+        dataset_id="dfl-sportec-idsse",
+        checksum_sha256="b" * 64,
+        size_bytes=42,
+        source_kinds=("sample",),
+        artifact_ids=("artifact-1",),
+    )
+
+    value = _receipt_object(receipt)
+
+    assert value["source_kinds"] == ["sample"]
+    assert value["artifact_ids"] == ["artifact-1"]
 
 
 def test_production_gate_requires_all_preview_checks(tmp_path):

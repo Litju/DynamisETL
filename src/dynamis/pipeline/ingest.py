@@ -624,6 +624,7 @@ def ingest_white_cmj(
     *,
     npz_path: Path,
     version: str,
+    session_id: str | None = None,
     row_group_size: int = DEFAULT_ROW_GROUP_SIZE,
 ) -> IngestResult:
     """White CMJ release -> per-trial canonical IMU + force Silver streams.
@@ -637,7 +638,8 @@ def ingest_white_cmj(
     assert_local_only_boundary(settings, WHITE_DATASET_ID)
     ensure_dataset_layout(settings)
     bundle = load_white_cmj_bundle(npz_path)
-    adapter = WhiteCmjAdapter(bundle)
+    adapter = WhiteCmjAdapter(bundle, session_id=session_id)
+    receipt_session_id = session_id or "white-cmj-release"
     sink = QuarantineSink(settings)
     results: list[IngestStreamResult] = []
     reconciliations: list[StreamReconciliation] = []
@@ -717,7 +719,7 @@ def ingest_white_cmj(
     receipt = ReconciliationReceipt(
         dataset_id=WHITE_DATASET_ID,
         version=version,
-        session_id="white-cmj-release",
+        session_id=receipt_session_id,
         source_keys=(WHITE_NPZ_KEY,),
         streams=tuple(reconciliations),
         domain={
@@ -725,13 +727,20 @@ def ingest_white_cmj(
             "trial_count": len(adapter.trials),
             "valid_trials": valid_trials,
             "quarantined_trials": len(adapter.trials) - valid_trials,
-            "subject_id_count": adapter.discovery.subject_id_count,
+            "subject_id_count": len({trial.subject_id for trial in adapter.trials}),
             "declared_n_subjects_member": bundle.declared_n_subjects,
-            "condition_counts": adapter.discovery.condition_counts,
+            "condition_counts": {
+                str(label): sum(trial.condition_label == label for trial in adapter.trials)
+                for label in sorted({trial.condition_label for trial in adapter.trials})
+            },
             "acc_rate_hz": bundle.acc_sampling_rate_hz,
             "grf_rate_hz": bundle.grf_sampling_rate_hz,
-            "acc_sample_counts": adapter.discovery.acc_sample_counts,
-            "grf_sample_counts": adapter.discovery.grf_sample_counts,
+            "acc_sample_counts": [
+                int(bundle.acc_signals[trial.row_index].shape[0]) for trial in adapter.trials
+            ],
+            "grf_sample_counts": [
+                int(bundle.grf_signals[trial.row_index].shape[0]) for trial in adapter.trials
+            ],
             "source_metric_observations": len(source_metric_observations),
             "sensor_placement": {
                 "distributed_record": "L5",
@@ -762,11 +771,13 @@ def ingest_white_cmj(
         ),
     )
     assert_reconciled(receipt)
-    receipt_path = write_reconciliation_receipt(settings, receipt, name="white-cmj-release")
+    receipt_path = write_reconciliation_receipt(
+        settings, receipt, name=session_id or "white-cmj-release"
+    )
     return IngestResult(
         dataset_id=WHITE_DATASET_ID,
         version=version,
-        session_id="white-cmj-release",
+        session_id=receipt_session_id,
         source_keys=(WHITE_NPZ_KEY,),
         streams=tuple(results),
         quarantine_artifacts=quarantine_artifacts,

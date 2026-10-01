@@ -1,11 +1,26 @@
 {
   "schema_version": 1,
-  "purpose": "RES-107 public preview and production seed",
+  "purpose": "Four-source public sample release; one representative session per dataset",
   "demo_resources": [
+    {
+      "dataset_id": "dfl-sportec-idsse",
+      "session_id": "DFL-MAT-J03WPY",
+      "worlds": ["GameLab", "MatchLab"]
+    },
+    {
+      "dataset_id": "skillcorner-opendata",
+      "session_id": "2011166",
+      "worlds": ["MatchLab"]
+    },
     {
       "dataset_id": "skillcorner-basketball-opendata",
       "session_id": "114243",
-      "worlds": ["GameLab", "MatchLab"]
+      "worlds": ["MatchLab"]
+    },
+    {
+      "dataset_id": "white-cmj-acc-grf",
+      "session_id": "white-s002",
+      "worlds": ["PerformanceLab"]
     }
   ],
   "datasets": [
@@ -14,6 +29,7 @@
       "version": "v1",
       "license_identifier": "CC-BY-4.0",
       "attribution": "White CMJ dataset, DOI 10.5281/zenodo.19136480; attribution required.",
+      "session_id": "white-s002",
       "keys": ["cmj_dataset_both.npz"]
     },
     {
@@ -33,13 +49,10 @@
       "version": "4340d274572876239c154c90bc507a9b3250a656",
       "license_identifier": "MIT",
       "attribution": "Credit SkillCorner and the pinned Open Data revision.",
-      "session_id": "1925299",
+      "session_id": "2011166",
       "keys": [
-        "data/matches/1925299/1925299_dynamic_events.csv",
-        "data/matches/1925299/1925299_match.json",
-        "data/matches/1925299/1925299_phases_of_play.csv",
-        "data/matches/1925299/1925299_tracking_extrapolated.jsonl",
-        "raw/1925299.jsonl.zip"
+        "data/matches/2011166/2011166_match.json",
+        "data/matches/2011166/2011166_tracking_extrapolated.jsonl"
       ]
     },
     {

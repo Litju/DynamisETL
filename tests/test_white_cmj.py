@@ -178,6 +178,24 @@ def test_quarantine_invalid_trials_are_never_published(
         ).exists()
 
 
+def test_deployment_session_filter_writes_only_the_selected_white_subject(
+    tmp_settings: Settings, white_npz: Path
+) -> None:
+    result = ingest_white_cmj(
+        tmp_settings, npz_path=white_npz, version="v1", session_id="white-s002"
+    )
+
+    assert result.session_id == "white-s002"
+    assert {session.session_id for session in result.provider_domain.all_sessions} == {"white-s002"}
+    assert {trial.session_id for trial in result.provider_domain.trials} == {"white-s002"}
+    assert {stream.session_id for stream in result.streams} == {"white-s002"}
+    assert result.domain["subject_id_count"] == 1
+    assert result.domain["trial_count"] == 2
+    assert result.reconciliation.all_balanced
+    assert len(result.reconciliation.streams) == 4
+    assert len(result.streams) == 2
+
+
 def test_canonical_units_timing_and_force_representation(
     tmp_settings: Settings, white_npz: Path
 ) -> None:

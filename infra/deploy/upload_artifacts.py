@@ -12,7 +12,6 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from types import SimpleNamespace
 
-import sqlalchemy as sa
 from sqlalchemy import select
 
 from dynamis.config import Settings, settings
@@ -46,6 +45,13 @@ class UploadReceipt:
     size_bytes: int
     source_kinds: tuple[str, ...]
     artifact_ids: tuple[str, ...]
+
+
+def _receipt_object(item: UploadReceipt) -> dict[str, object]:
+    receipt = asdict(item)
+    receipt["source_kinds"] = list(item.source_kinds)
+    receipt["artifact_ids"] = list(item.artifact_ids)
+    return receipt
 
 
 def _sha() -> str:
@@ -162,19 +168,6 @@ def _artifacts(
             for resource in demo_resources:
                 dataset_id = resource.dataset_id
                 session_id = resource.session_id
-                entry_ids = (
-                    connection.execute(
-                        sa.text(
-                            """SELECT DISTINCT source_catalog_entry_id
-                           FROM session_sport_context
-                           WHERE dataset_id = :dataset_id AND session_id = :session_id
-                             AND source_catalog_entry_id IS NOT NULL"""
-                        ),
-                        {"dataset_id": dataset_id, "session_id": session_id},
-                    )
-                    .scalars()
-                    .all()
-                )
                 sample_rows = connection.execute(
                     select(
                         SampleArtifact.artifact_id,
@@ -192,79 +185,63 @@ def _artifacts(
                     raise DeploymentError(
                         f"{dataset_id}/{session_id}: curated World has no dense Parquet artifacts"
                     )
-                processing_rows = connection.execute(
-                    sa.text(
-                        """SELECT artifact_id, dataset_id, relative_path,
-                                  checksum_sha256, byte_size
-                           FROM processing_artifact
-                           WHERE dataset_id = :dataset_id
-                             AND (artifact_metadata ->> 'session_id' = :session_id
-                               OR artifact_metadata ->> 'source_catalog_entry_id'
-                                  = ANY(CAST(:entry_ids AS text[])))
-                           ORDER BY artifact_id"""
-                    ),
-                    {
-                        "dataset_id": dataset_id,
-                        "session_id": session_id,
-                        "entry_ids": list(entry_ids),
-                    },
-                ).all()
-                for kind, rows in (("sample", sample_rows), ("processing", processing_rows)):
-                    for (
-                        artifact_id,
-                        artifact_dataset_id,
-                        relative_path,
-                        checksum,
-                        byte_size,
-                    ) in rows:
-                        if not relative_path.lower().endswith(".parquet"):
-                            continue
-                        if byte_size is None or byte_size <= 0:
-                            raise DeploymentError(
-                                f"{artifact_dataset_id}/{relative_path}: byte size is missing"
-                            )
-                        checksum = checksum.lower()
-                        if not re.fullmatch(r"[0-9a-f]{64}", checksum):
-                            raise DeploymentError(
-                                f"{artifact_dataset_id}/{relative_path}: invalid SHA-256"
-                            )
-                        relative = Path(relative_path)
-                        root = resolved.dataset_root.resolve()
-                        source_path = (root / relative).resolve()
-                        if relative.is_absolute() or not source_path.is_relative_to(root):
-                            raise DeploymentError(
-                                f"{artifact_dataset_id}/{relative_path}: unsafe artifact path"
-                            )
-                        if not source_path.is_file():
-                            raise DeploymentError(
-                                f"{artifact_dataset_id}/{relative_path}: artifact file is missing"
-                            )
-                        if source_path.stat().st_size != byte_size:
-                            raise DeploymentError(
-                                f"{artifact_dataset_id}/{relative_path}: byte size mismatch"
-                            )
-                        if sha256_file(source_path) != checksum:
-                            raise DeploymentError(
-                                f"{artifact_dataset_id}/{relative_path}: source checksum mismatch"
-                            )
-                        identity = (artifact_dataset_id, checksum)
-                        prior = found.get(identity)
-                        if prior is not None and prior[3] != byte_size:
-                            raise DeploymentError(
-                                f"{artifact_dataset_id}: checksum has conflicting byte sizes"
-                            )
-                        if prior is None:
-                            found[identity] = (
-                                artifact_dataset_id,
-                                source_path,
-                                checksum,
-                                byte_size,
-                                {artifact_id},
-                                {kind},
-                            )
-                        else:
-                            prior[4].add(artifact_id)
-                            prior[5].add(kind)
+                # World entry readiness is bound to the dense session artifacts.
+                # Optional processing analyses remain private and aren't uploaded.
+                for (
+                    artifact_id,
+                    artifact_dataset_id,
+                    relative_path,
+                    checksum,
+                    byte_size,
+                ) in sample_rows:
+                    if not relative_path.lower().endswith(".parquet"):
+                        continue
+                    if byte_size is None or byte_size <= 0:
+                        raise DeploymentError(
+                            f"{artifact_dataset_id}/{relative_path}: byte size is missing"
+                        )
+                    checksum = checksum.lower()
+                    if not re.fullmatch(r"[0-9a-f]{64}", checksum):
+                        raise DeploymentError(
+                            f"{artifact_dataset_id}/{relative_path}: invalid SHA-256"
+                        )
+                    relative = Path(relative_path)
+                    root = resolved.dataset_root.resolve()
+                    source_path = (root / relative).resolve()
+                    if relative.is_absolute() or not source_path.is_relative_to(root):
+                        raise DeploymentError(
+                            f"{artifact_dataset_id}/{relative_path}: unsafe artifact path"
+                        )
+                    if not source_path.is_file():
+                        raise DeploymentError(
+                            f"{artifact_dataset_id}/{relative_path}: artifact file is missing"
+                        )
+                    if source_path.stat().st_size != byte_size:
+                        raise DeploymentError(
+                            f"{artifact_dataset_id}/{relative_path}: byte size mismatch"
+                        )
+                    if sha256_file(source_path) != checksum:
+                        raise DeploymentError(
+                            f"{artifact_dataset_id}/{relative_path}: source checksum mismatch"
+                        )
+                    identity = (artifact_dataset_id, checksum)
+                    prior = found.get(identity)
+                    if prior is not None and prior[3] != byte_size:
+                        raise DeploymentError(
+                            f"{artifact_dataset_id}: checksum has conflicting byte sizes"
+                        )
+                    if prior is None:
+                        found[identity] = (
+                            artifact_dataset_id,
+                            source_path,
+                            checksum,
+                            byte_size,
+                            {artifact_id},
+                            {"sample"},
+                        )
+                    else:
+                        prior[4].add(artifact_id)
+                        prior[5].add("sample")
     finally:
         engine.dispose()
 
@@ -351,7 +328,7 @@ def upload(
         ],
         "object_count": len(receipts),
         "byte_count": sum(item.size_bytes for item in receipts),
-        "objects": [asdict(item) for item in receipts],
+        "objects": [_receipt_object(item) for item in receipts],
     }
     failures = validate_manifest(report, environment, git_sha)
     if failures:

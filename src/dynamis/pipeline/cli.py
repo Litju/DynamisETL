@@ -333,7 +333,9 @@ def _ingest(args: argparse.Namespace) -> tuple[IngestResult, str]:
         npz = next((path for key, path in paths.items() if key == WHITE_NPZ_KEY), None)
         if npz is None:
             raise PlanError("no accepted .npz key selected for the White CMJ source")
-        result = ingest_white_cmj(config, npz_path=npz, version=args.version)
+        result = ingest_white_cmj(
+            config, npz_path=npz, version=args.version, session_id=args.session
+        )
         return result, session_id
     if args.dataset_id == GYMAWARE_DATASET_ID:
         archive = next((path for key, path in paths.items() if key.lower().endswith(".zip")), None)
