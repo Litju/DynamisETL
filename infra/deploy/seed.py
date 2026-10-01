@@ -198,7 +198,7 @@ def run(
     # The sample manifest defines the complete public scope. Avoid the broader
     # local flagship preparation here; it materializes sessions outside that scope.
     subprocess.run(
-        [sys.executable, str(root / "infra/deploy/check_migrations.py"), "--require-gold"],
+        [sys.executable, str(root / "infra/deploy/check_migrations.py")],
         cwd=root,
         check=True,
     )

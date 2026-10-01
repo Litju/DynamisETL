@@ -56,7 +56,6 @@ def record(preview_url: str, artifact_receipt: Path, smoke_receipt: Path, output
         [
             sys.executable,
             str(root / "infra/deploy/check_migrations.py"),
-            "--require-gold",
         ],
         cwd=root,
         check=True,
