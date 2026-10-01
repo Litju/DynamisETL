@@ -47,6 +47,13 @@ class UploadReceipt:
     artifact_ids: tuple[str, ...]
 
 
+def _receipt_object(item: UploadReceipt) -> dict[str, object]:
+    receipt = asdict(item)
+    receipt["source_kinds"] = list(item.source_kinds)
+    receipt["artifact_ids"] = list(item.artifact_ids)
+    return receipt
+
+
 def _sha() -> str:
     explicit = os.environ.get("DYNAMIS_CODE_GIT_SHA", "").strip()
     vercel = os.environ.get("VERCEL_GIT_COMMIT_SHA", "").strip()
@@ -321,7 +328,7 @@ def upload(
         ],
         "object_count": len(receipts),
         "byte_count": sum(item.size_bytes for item in receipts),
-        "objects": [asdict(item) for item in receipts],
+        "objects": [_receipt_object(item) for item in receipts],
     }
     failures = validate_manifest(report, environment, git_sha)
     if failures:
