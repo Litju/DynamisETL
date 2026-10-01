@@ -18,12 +18,12 @@ The Git integration continues to create Preview deployments for feature branches
 
 ## Curated public slice
 
-The rights allow-list keeps metadata for four declared public sources. Private Blob receives only the curated SkillCorner Basketball session `114243` and every Parquet object linked to its Match/Game Worlds. On the local control plane this is six objects (four tracking periods, play-by-play, and the derived frame clock), about 15 MB. Other registered resources stay visible as upstream or registered and have no openable World route until their complete bytes are added to a release manifest.
+The sample manifest exposes exactly one selected resource per public dataset: DFL `DFL-MAT-J03WPY` (GameLab and MatchLab), SkillCorner football `2011166` (MatchLab), Basketball `114243` (MatchLab), and White CMJ `white-s002` (PerformanceLab). Private Blob receives only the session-linked sample Parquet files required for those World routes; optional processing artifacts are not published. White CMJ ingestion filters the source NPZ to `white-s002`; the complete source corpus stays local. Other registered resources remain metadata-only and have no openable World route until their complete bytes are added to a release manifest.
 
 ## Release order
 
 1. Open the feature PR and wait for its Vercel Preview deployment.
-2. Set the Preview Neon pooled/direct URLs and Preview Blob token. Run `uv run python infra/deploy/migrate.py --apply`, then `uv run python infra/deploy/seed.py --apply`. The seed uploads only the committed `demo_resources` selection and writes its private SHA-scoped Blob manifest.
+2. Set the Preview Neon pooled/direct URLs and Preview Blob token. Point `DYNAMIS_DATASET_ROOT` at a staging root containing only the Bronze keys in the sample allow-list, then run `uv run python infra/deploy/migrate.py --apply` and `uv run python infra/deploy/seed.py --apply`. The seed ingests only the four selected sessions and writes a private SHA-scoped Blob manifest for their sample artifacts.
 3. Run `pnpm --filter @dynamis/web run test:e2e:preview` with `DYNAMIS_REAL_BASE_URL`, `DYNAMIS_PREVIEW_ARTIFACT_RECEIPT`, `DYNAMIS_PREVIEW_SMOKE_RECEIPT`, and `DYNAMIS_CODE_GIT_SHA`. It checks rights, same-origin calls, a manifest-backed dense read, the curated World route, and that no other catalog route reports ready without its complete Blob set.
 4. Run `uv run python infra/deploy/record_preview_release.py --preview-url <url> --artifact-receipt <path> --smoke-receipt <path>`. It rechecks Alembic heads, Gold tables, the manifest, the browser smoke, and the Preview Neon endpoint fingerprint.
 5. Run protected CI and CodeRabbit, address concrete findings, then merge the PR. `main` does not auto-deploy to Production.

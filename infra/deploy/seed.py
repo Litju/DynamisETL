@@ -195,10 +195,8 @@ def run(
         if ingest(argv) != 0:
             raise DeploymentError(f"ingestion failed for {seed.dataset_id}; stopping seed")
 
-    from dynamis.demo.prepare import main as prepare_flagship
-
-    if prepare_flagship([]) != 0:
-        raise DeploymentError("accepted DFL/SkillCorner Gold preparation failed")
+    # The sample manifest defines the complete public scope. Avoid the broader
+    # local flagship preparation here; it materializes sessions outside that scope.
     subprocess.run(
         [sys.executable, str(root / "infra/deploy/check_migrations.py"), "--require-gold"],
         cwd=root,

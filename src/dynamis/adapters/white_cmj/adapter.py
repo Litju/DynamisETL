@@ -159,10 +159,15 @@ def force_stream_id(trial_id: str) -> str:
 class WhiteCmjAdapter:
     """Per-trial anti-corruption layer over one decoded release bundle."""
 
-    def __init__(self, bundle: WhiteCmjBundle) -> None:
+    def __init__(self, bundle: WhiteCmjBundle, *, session_id: str | None = None) -> None:
         self._bundle = bundle
         self._discovery = discover_white_cmj(bundle)
-        self._trials = self._build_trials()
+        trials = self._build_trials()
+        if session_id is not None:
+            trials = tuple(trial for trial in trials if trial.session_id == session_id)
+            if not trials:
+                raise ValueError(f"White CMJ release has no session {session_id!r}")
+        self._trials = trials
         self._counters: dict[str, TrialCounters] = {
             trial.trial_id: TrialCounters() for trial in self._trials
         }
