@@ -24,6 +24,7 @@ ENV_DATASET_ROOT = "DYNAMIS_DATASET_ROOT"
 ENV_DATABASE_ROOT = "DYNAMIS_DATABASE_ROOT"
 ENV_DUCKDB_PATH = "DYNAMIS_DUCKDB_PATH"
 ENV_DB_SCHEMA = "DYNAMIS_DB_SCHEMA"
+ENV_DATABASE_NAME = "DYNAMIS_DATABASE_NAME"
 ENV_POSTGRES_URL = "POSTGRES_URL"
 ENV_MIGRATION_POSTGRES_URL = "DYNAMIS_MIGRATION_POSTGRES_URL"
 ENV_TEST_POSTGRES_URL = "DYNAMIS_TEST_POSTGRES_URL"
@@ -36,6 +37,7 @@ POSTGRES_SUBDIR = "postgres"
 
 _ENV_LINE = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$")
 _SCHEMA_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
+_DATABASE_NAME = re.compile(r"^[a-z][a-z0-9_]{0,62}$")
 
 
 class ConfigurationError(RuntimeError):
@@ -88,6 +90,25 @@ def resolved_environ(env: Mapping[str, str] | None = None) -> dict[str, str]:
             ),
             "",
         )
+    database_name = merged.get(ENV_DATABASE_NAME, "").strip()
+    if database_name:
+        if not _DATABASE_NAME.fullmatch(database_name):
+            raise ConfigurationError(f"{ENV_DATABASE_NAME} is not a valid PostgreSQL database name")
+        from sqlalchemy.engine import make_url
+
+        for name in (ENV_POSTGRES_URL, ENV_MIGRATION_POSTGRES_URL):
+            value = merged.get(name, "").strip()
+            if not value:
+                continue
+            try:
+                parsed = make_url(value)
+            except Exception as exc:
+                raise ConfigurationError(
+                    f"{ENV_DATABASE_NAME} requires valid PostgreSQL connection URLs"
+                ) from exc
+            if not parsed.drivername.startswith("postgres"):
+                raise ConfigurationError(f"{ENV_DATABASE_NAME} requires PostgreSQL connection URLs")
+            merged[name] = parsed.set(database=database_name).render_as_string(hide_password=False)
     return merged
 
 
